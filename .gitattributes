@@ -1,0 +1,66 @@
+# Normalize text files across Windows/Linux/macOS.
+* text=auto eol=lf
+
+# Source / config / documentation
+*.py text eol=lf
+*.pyi text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.mel text eol=lf
+*.mod text eol=lf
+*.qss text eol=lf
+*.ui text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+
+# Maya ASCII scenes are text-diffable.
+*.ma text eol=lf
+
+# Maya binary scenes and caches.
+*.mb binary
+*.abc binary
+*.usd binary
+*.usda text eol=lf
+*.usdc binary
+
+# Images / textures / render outputs.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.exr binary
+*.hdr binary
+*.tx binary
+*.tif binary
+*.tiff binary
+*.psd binary
+*.tga binary
+*.iff binary
+
+# Archives / packages.
+*.zip binary
+*.7z binary
+*.rar binary
+*.gz binary
+*.tar binary
+*.bz2 binary
+*.xz binary
+
+# Compiled / platform binaries.
+*.exe binary
+*.dll binary
+*.pyd binary
+*.so binary
+*.dylib binary
+*.lib binary
+*.a binary
+*.pyc binary
