@@ -8,6 +8,7 @@ from shader_health.adapters.base import (
     RendererAdapterError,
     RendererAdapterRegistry,
     TextureSlotSemantics,
+    VrayAdapter,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "RendererAdapterError",
     "RendererAdapterRegistry",
     "TextureSlotSemantics",
+    "VrayAdapter",
 ]
