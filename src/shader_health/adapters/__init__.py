@@ -2,6 +2,7 @@
 
 from shader_health.adapters.base import (
     BaseRendererAdapter,
+    CommonMayaAdapter,
     ComplexityWeights,
     RendererAdapter,
     RendererAdapterError,
@@ -11,6 +12,7 @@ from shader_health.adapters.base import (
 
 __all__ = [
     "BaseRendererAdapter",
+    "CommonMayaAdapter",
     "ComplexityWeights",
     "RendererAdapter",
     "RendererAdapterError",

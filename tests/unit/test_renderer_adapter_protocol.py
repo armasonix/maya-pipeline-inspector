@@ -2,6 +2,7 @@ import pytest
 
 from shader_health.adapters import (
     BaseRendererAdapter,
+    CommonMayaAdapter,
     RendererAdapterError,
     RendererAdapterRegistry,
 )
@@ -115,3 +116,85 @@ def test_fake_adapter_exposes_renderer_semantics_contract():
     assert adapter.displacement_slots() == ["fakeMaterial.displacement"]
     assert adapter.complexity_weights()["fakeMaterial"] == 2.0
     assert adapter.default_rule_packs() == ["common", "fake"]
+
+def test_common_maya_adapter_has_expected_identity_and_rule_pack():
+    adapter = CommonMayaAdapter()
+
+    assert adapter.id == "common"
+    assert adapter.display_name == "Common Maya"
+    assert adapter.is_available() is True
+    assert adapter.default_rule_packs() == ["common"]
+
+
+def test_common_maya_adapter_supports_core_maya_node_types():
+    adapter = CommonMayaAdapter()
+
+    supported = adapter.supported_node_types()
+
+    assert "file" in supported
+    assert "shadingEngine" in supported
+    assert "lambert" in supported
+    assert "standardSurface" in supported
+    assert "displacementShader" in supported
+    assert "bump2d" in supported
+    assert "place2dTexture" in supported
+
+
+def test_common_maya_adapter_classifies_common_nodes():
+    adapter = CommonMayaAdapter()
+
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:file1", name="file1", type_name="file")
+    ) == ["texture", "file"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:sg", name="sg", type_name="shadingEngine")
+    ) == ["shading_engine"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:mat", name="mat", type_name="standardSurface")
+    ) == ["material"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:disp", name="disp", type_name="displacementShader")
+    ) == ["displacement"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:bump", name="bump", type_name="bump2d")
+    ) == ["bump", "utility"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:place", name="place", type_name="place2dTexture")
+    ) == ["placement", "utility"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:unknown", name="unknown", type_name="unknownType")
+    ) == []
+
+
+def test_common_maya_adapter_exposes_texture_slot_semantics():
+    semantics = CommonMayaAdapter().texture_slot_semantics()
+
+    assert semantics["lambert.color"] == "base_color"
+    assert semantics["standardSurface.baseColor"] == "base_color"
+    assert semantics["standardSurface.specularRoughness"] == "roughness"
+    assert semantics["standardSurface.metalness"] == "metalness"
+    assert semantics["standardSurface.normalCamera"] == "normal"
+    assert semantics["standardSurface.opacity"] == "opacity"
+    assert semantics["displacementShader.displacement"] == "displacement"
+    assert semantics["bump2d.bumpValue"] == "bump"
+
+
+def test_common_maya_adapter_exposes_displacement_and_complexity_contract():
+    adapter = CommonMayaAdapter()
+
+    assert adapter.displacement_slots() == ["displacementShader.displacement"]
+
+    weights = adapter.complexity_weights()
+    assert weights["shadingEngine"] == 0.25
+    assert weights["file"] == 1.0
+    assert weights["standardSurface"] == 1.0
+    assert weights["displacementShader"] == 1.25
+    assert weights["layeredTexture"] == 2.0
+
+
+def test_registry_classifies_common_maya_nodes():
+    registry = RendererAdapterRegistry([CommonMayaAdapter()])
+    node = NodeSnapshot(id="node:file1", name="file1", type_name="file")
+
+    assert registry.classify_node(node) == ["texture", "file"]
+
