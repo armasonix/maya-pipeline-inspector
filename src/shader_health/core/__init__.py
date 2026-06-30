@@ -36,6 +36,10 @@ from shader_health.core.rule_schema import (
     ValidationSummary,
     summarize_results,
 )
+from shader_health.core.scoring import (
+    HealthScore,
+    compute_health_score,
+)
 
 __all__ = [
     "RESULT_STATUSES",
@@ -44,6 +48,7 @@ __all__ = [
     "ConnectionSnapshot",
     "FileDependencySnapshot",
     "GraphSnapshot",
+    "HealthScore",
     "ImageInfo",
     "MaterialSnapshot",
     "NodeSnapshot",
@@ -63,6 +68,7 @@ __all__ = [
     "ValidationSummary",
     "apply_profile_overrides",
     "build_rule_search_paths",
+    "compute_health_score",
     "load_profile",
     "load_rule_file",
     "load_rule_stack",
