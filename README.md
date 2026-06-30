@@ -73,13 +73,45 @@ This keeps the validation core testable before the Maya UI and renderer integrat
 
 ## Development
 
-Development setup will be added as part of the packaging milestone.
+### Requirements
 
-For now, the package source lives under:
+- Python 3.9+
+- Git
+- Autodesk Maya is not required for pure Python core tests
+
+### Editable install
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+Alternative using the dev requirements file:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+### Run tests
+
+```bash
+python -m pytest tests -v
+```
+
+### Optional local checks
+
+```bash
+python -m ruff check src tests
+python -m mypy src
+```
+
+### Source layout
 
 ```text
 src/shader_health/
 ```
+
+The package uses a `src` layout so imports during tests match installed-package behavior.
 
 ## License
 
