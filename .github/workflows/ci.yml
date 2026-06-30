@@ -38,7 +38,10 @@ jobs:
         run: python -m pytest tests -v
 
       - name: Run Ruff
-        run: python -m ruff check src tests
+        run: python -m ruff check src tests tools
 
       - name: Run mypy
         run: python -m mypy src
+
+      - name: Validate rule packs
+        run: python tools/validate_rules.py
