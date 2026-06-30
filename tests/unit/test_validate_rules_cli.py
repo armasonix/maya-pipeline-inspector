@@ -14,6 +14,7 @@ from shader_health.core import (
     load_profile,
     load_rule_file,
     load_rule_stack,
+    load_rules_from_path,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
