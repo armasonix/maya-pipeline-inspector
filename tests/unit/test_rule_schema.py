@@ -100,7 +100,8 @@ def test_rule_definition_rejects_fix_when_policy_disallows_autofix():
     data = make_rule_data()
     data["policy"]["auto_fix_allowed"] = False
 
-    with pytest.raises(RuleSchemaError, match="fix is defined but policy.auto_fix_allowed is false"):
+    error_match = "fix is defined but policy.auto_fix_allowed is false"
+    with pytest.raises(RuleSchemaError, match=error_match):
         RuleDefinition.from_dict(data)
 
 
