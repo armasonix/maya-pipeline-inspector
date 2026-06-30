@@ -1,17 +1,34 @@
 import pytest
 
-from shader_health.core import RuleDefinition, RuleFix, RulePolicy, RuleSchemaError
+from shader_health.core import (
+    FileDependencySnapshot,
+    GraphSnapshot,
+    NodeSnapshot,
+    RuleDefinition,
+    RuleFix,
+    RulePolicy,
+    RuleSchemaError,
+    ValidationEngine,
+)
 
 
-def make_rule_data():
-    return {
+def make_rule_data(
+    rule_id: str = "common.texture.colorspace.data_raw",
+    *,
+    enabled: bool = True,
+    severity: str = "critical",
+    scope: str = "texture_node",
+    auto_fix: bool = True,
+    check_type: str = "attribute_equals",
+):
+    data = {
         "schema_version": "1.0",
-        "id": "common.texture.colorspace.data_raw",
+        "id": rule_id,
         "name": "Data textures must use Raw color space",
-        "enabled": True,
+        "enabled": enabled,
         "renderer": ["common", "vray", "arnold"],
-        "scope": "texture_node",
-        "severity": "critical",
+        "scope": scope,
+        "severity": severity,
         "owner": "shader_td",
         "message": "Data texture uses a color-managed color space.",
         "why": (
@@ -23,7 +40,7 @@ def make_rule_data():
             "node_type": ["file", "VRayBitmap", "aiImage"],
         },
         "check": {
-            "type": "attribute_equals",
+            "type": check_type,
             "attribute": "colorSpace",
             "expected": "Raw",
         },
@@ -31,15 +48,47 @@ def make_rule_data():
             "block_publish": True,
             "block_deadline": True,
             "waiver_allowed": True,
-            "auto_fix_allowed": True,
+            "auto_fix_allowed": auto_fix,
         },
-        "fix": {
+    }
+    if auto_fix:
+        data["fix"] = {
             "type": "set_attr",
             "attribute": "colorSpace",
             "value": "Raw",
             "risk": "low",
-        },
-    }
+        }
+    return data
+
+
+def make_snapshot(color_space: str = "Raw", *, texture_exists: bool = True) -> GraphSnapshot:
+    return GraphSnapshot(
+        scene_path="demo.ma",
+        renderer="vray",
+        nodes=[
+            NodeSnapshot(
+                id="node:file_roughness",
+                name="file_roughness",
+                type_name="file",
+                attrs={
+                    "colorSpace": color_space,
+                    "semantic_slot": "roughness",
+                    "fileTextureName": "roughness.<UDIM>.exr",
+                },
+                classification=["texture", "file"],
+            )
+        ],
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file_roughness",
+                attr="fileTextureName",
+                raw_path="$ASSET_ROOT/tex/missing_roughness.exr",
+                resolved_path="D:/show/assets/tex/missing_roughness.exr",
+                exists=texture_exists,
+                extension=".exr",
+            )
+        ],
+    )
 
 
 def test_rule_definition_round_trip():
@@ -119,3 +168,88 @@ def test_rule_definition_rejects_non_boolean_policy_value():
 
     with pytest.raises(RuleSchemaError, match="policy.block_deadline must be a boolean"):
         RuleDefinition.from_dict(data)
+
+
+def test_validation_engine_returns_passed_result_for_matching_attribute():
+    snapshot = make_snapshot(color_space="Raw")
+    rule = RuleDefinition.from_dict(make_rule_data())
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "passed"
+    assert result.current_value == "Raw"
+    assert result.expected_value == "Raw"
+    assert result.block_publish is False
+    assert result.block_deadline is False
+    assert result.auto_fix_available is False
+    assert result.to_dict()["status"] == "passed"
+
+
+def test_validation_engine_returns_failed_result_with_block_policy_and_fix():
+    snapshot = make_snapshot(color_space="ACEScg")
+    rule = RuleDefinition.from_dict(make_rule_data())
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "failed"
+    assert result.current_value == "ACEScg"
+    assert result.expected_value == "Raw"
+    assert result.block_publish is True
+    assert result.block_deadline is True
+    assert result.auto_fix_available is True
+    assert result.fix_id == "set_attr"
+    assert result.node == "file_roughness"
+    assert result.plug == "colorSpace"
+
+
+def test_validation_engine_returns_skipped_for_disabled_rule():
+    snapshot = make_snapshot()
+    rule = RuleDefinition.from_dict(make_rule_data(enabled=False))
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "skipped"
+    assert result.evidence["reason"] == "rule_disabled"
+
+
+def test_validation_engine_returns_skipped_when_no_targets_match():
+    snapshot = make_snapshot()
+    data = make_rule_data()
+    data["match"]["node_type"] = ["aiImage"]
+    rule = RuleDefinition.from_dict(data)
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "skipped"
+    assert result.evidence["reason"] == "no_matching_targets"
+
+
+def test_validation_engine_reports_failed_missing_path():
+    snapshot = make_snapshot(texture_exists=False)
+    data = make_rule_data(
+        rule_id="common.texture.missing",
+        scope="file_dependency",
+        auto_fix=False,
+        check_type="path_exists",
+    )
+    data["match"] = {"dependency_kind": "texture"}
+    rule = RuleDefinition.from_dict(data)
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "failed"
+    assert result.target_kind == "file_dependency"
+    assert result.current_value == "D:/show/assets/tex/missing_roughness.exr"
+    assert result.expected_value == "existing file"
+    assert result.block_deadline is True
+
+
+def test_validation_engine_returns_skipped_for_unsupported_check_type():
+    snapshot = make_snapshot()
+    data = make_rule_data(check_type="not_implemented")
+    rule = RuleDefinition.from_dict(data)
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "skipped"
+    assert result.evidence["reason"] == "unsupported_check_type:not_implemented"
