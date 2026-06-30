@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "test.texture.missing_why",
+      "name": "Invalid rule missing why",
+      "enabled": true,
+      "renderer": ["common"],
+      "scope": "texture_node",
+      "severity": "critical",
+      "owner": "shader_td",
+      "message": "This rule is intentionally invalid.",
+      "match": {
+        "node_type": ["file"]
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "colorSpace",
+        "expected": "Raw"
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

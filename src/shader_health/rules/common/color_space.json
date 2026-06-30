@@ -1,0 +1,37 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.colorspace.data_raw",
+      "name": "Data textures must use Raw color space",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "texture_node",
+      "severity": "critical",
+      "owner": "shader_td",
+      "message": "Data texture uses a color-managed color space.",
+      "why": "Scalar maps such as roughness, masks, normal, bump, and displacement must not be transformed as color data because color transforms alter numeric values.",
+      "match": {
+        "semantic_slot": ["roughness", "metalness", "normal", "bump", "displacement", "mask"],
+        "node_type": ["file", "VRayBitmap", "aiImage"]
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "colorSpace",
+        "expected": "Raw"
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "set_attr",
+        "attribute": "colorSpace",
+        "value": "Raw",
+        "risk": "low"
+      }
+    }
+  ]
+}

@@ -54,6 +54,9 @@ Issues = "https://github.com/armasonix/maya-shader-health-inspector/issues"
 where = ["src"]
 include = ["shader_health*"]
 
+[tool.setuptools.package-data]
+shader_health = ["rules/**/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -62,11 +65,11 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py39"
-src = ["src", "tests"]
+src = ["src", "tests", "tools"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
-ignore = []
+ignore = ["UP045"]
 
 [tool.mypy]
 python_version = "3.9"
