@@ -1,9 +1,4 @@
-"""Renderer adapter protocol and registry.
-
-Renderer adapters keep renderer-specific node and plug knowledge outside the
-core validation engine. The core should consume semantic information produced by
-adapters instead of hardcoding V-Ray, Arnold, or future renderer behavior.
-"""
+"""Renderer adapter protocol, registry, and common Maya adapter."""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -14,6 +9,56 @@ from shader_health.core import NodeSnapshot
 
 TextureSlotSemantics = dict[str, str]
 ComplexityWeights = dict[str, float]
+
+_COMMON_MAYA_NODE_TYPES = {
+    "file",
+    "shadingEngine",
+    "lambert",
+    "standardSurface",
+    "displacementShader",
+    "bump2d",
+    "place2dTexture",
+    "blendColors",
+    "condition",
+    "clamp",
+    "layeredTexture",
+    "multiplyDivide",
+    "plusMinusAverage",
+    "remapValue",
+    "reverse",
+}
+
+_COMMON_MAYA_TEXTURE_SLOTS = {
+    "lambert.color": "base_color",
+    "lambert.transparency": "opacity",
+    "standardSurface.baseColor": "base_color",
+    "standardSurface.specularRoughness": "roughness",
+    "standardSurface.metalness": "metalness",
+    "standardSurface.normalCamera": "normal",
+    "standardSurface.emissionColor": "emission",
+    "standardSurface.opacity": "opacity",
+    "displacementShader.displacement": "displacement",
+    "bump2d.bumpValue": "bump",
+    "bump2d.normalCamera": "normal",
+}
+
+_COMMON_MAYA_COMPLEXITY_WEIGHTS = {
+    "shadingEngine": 0.25,
+    "file": 1.0,
+    "lambert": 1.0,
+    "standardSurface": 1.0,
+    "displacementShader": 1.25,
+    "bump2d": 1.0,
+    "place2dTexture": 0.25,
+    "blendColors": 0.75,
+    "condition": 0.75,
+    "clamp": 0.5,
+    "layeredTexture": 2.0,
+    "multiplyDivide": 0.5,
+    "plusMinusAverage": 0.5,
+    "remapValue": 0.75,
+    "reverse": 0.5,
+}
 
 
 class RendererAdapterError(ValueError):
@@ -77,6 +122,47 @@ class BaseRendererAdapter:
 
     def default_rule_packs(self) -> list[str]:
         return []
+
+
+@dataclass(frozen=True)
+class CommonMayaAdapter(BaseRendererAdapter):
+    """Adapter for renderer-agnostic Maya shading graph concepts."""
+
+    id: str = "common"
+    display_name: str = "Common Maya"
+
+    def supported_node_types(self) -> set[str]:
+        return set(_COMMON_MAYA_NODE_TYPES)
+
+    def classify_node(self, node: NodeSnapshot) -> list[str]:
+        type_name = node.type_name
+        if type_name not in _COMMON_MAYA_NODE_TYPES:
+            return []
+        if type_name == "shadingEngine":
+            return ["shading_engine"]
+        if type_name == "file":
+            return ["texture", "file"]
+        if type_name in {"lambert", "standardSurface"}:
+            return ["material"]
+        if type_name == "displacementShader":
+            return ["displacement"]
+        if type_name == "bump2d":
+            return ["bump", "utility"]
+        if type_name == "place2dTexture":
+            return ["placement", "utility"]
+        return ["utility"]
+
+    def texture_slot_semantics(self) -> TextureSlotSemantics:
+        return dict(_COMMON_MAYA_TEXTURE_SLOTS)
+
+    def displacement_slots(self) -> list[str]:
+        return ["displacementShader.displacement"]
+
+    def complexity_weights(self) -> ComplexityWeights:
+        return dict(_COMMON_MAYA_COMPLEXITY_WEIGHTS)
+
+    def default_rule_packs(self) -> list[str]:
+        return ["common"]
 
 
 class RendererAdapterRegistry:
