@@ -5,6 +5,7 @@ from shader_health.adapters import (
     CommonMayaAdapter,
     RendererAdapterError,
     RendererAdapterRegistry,
+    VrayAdapter,
 )
 from shader_health.core import NodeSnapshot
 
@@ -117,6 +118,7 @@ def test_fake_adapter_exposes_renderer_semantics_contract():
     assert adapter.complexity_weights()["fakeMaterial"] == 2.0
     assert adapter.default_rule_packs() == ["common", "fake"]
 
+
 def test_common_maya_adapter_has_expected_identity_and_rule_pack():
     adapter = CommonMayaAdapter()
 
@@ -198,3 +200,77 @@ def test_registry_classifies_common_maya_nodes():
 
     assert registry.classify_node(node) == ["texture", "file"]
 
+
+def test_vray_adapter_has_expected_identity_and_rule_packs():
+    adapter = VrayAdapter()
+
+    assert adapter.id == "vray"
+    assert adapter.display_name == "V-Ray"
+    assert adapter.is_available() is True
+    assert adapter.default_rule_packs() == ["common", "vray"]
+
+
+def test_vray_adapter_supports_initial_vray_node_types():
+    supported = VrayAdapter().supported_node_types()
+
+    assert "VRayMtl" in supported
+    assert "VRayBlendMtl" in supported
+    assert "VRayBitmap" in supported
+    assert "VRayNormalMap" in supported
+    assert "VRayDisplacement" in supported
+    assert "VRayLayeredTex" in supported
+
+
+def test_vray_adapter_classifies_vray_nodes():
+    adapter = VrayAdapter()
+
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:mtl", name="mtl", type_name="VRayMtl")
+    ) == ["material"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:bitmap", name="bitmap", type_name="VRayBitmap")
+    ) == ["texture", "file"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:normal", name="normal", type_name="VRayNormalMap")
+    ) == ["bump", "normal", "utility"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:disp", name="disp", type_name="VRayDisplacement")
+    ) == ["displacement"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:unknown", name="unknown", type_name="unknownType")
+    ) == []
+
+
+def test_vray_adapter_exposes_texture_slot_semantics():
+    semantics = VrayAdapter().texture_slot_semantics()
+
+    assert semantics["VRayMtl.diffuseColor"] == "base_color"
+    assert semantics["VRayMtl.reflectionGlossiness"] == "roughness"
+    assert semantics["VRayMtl.reflectionColor"] == "specular_color"
+    assert semantics["VRayMtl.metalness"] == "metalness"
+    assert semantics["VRayMtl.bumpMap"] == "bump"
+    assert semantics["VRayMtl.normalMap"] == "normal"
+    assert semantics["VRayMtl.opacityMap"] == "opacity"
+    assert semantics["VRayBlendMtl.blendAmount"] == "mask"
+    assert semantics["VRayDisplacement.displacement"] == "displacement"
+
+
+def test_vray_adapter_exposes_displacement_and_complexity_contract():
+    adapter = VrayAdapter()
+
+    assert adapter.displacement_slots() == ["VRayDisplacement.displacement"]
+
+    weights = adapter.complexity_weights()
+    assert weights["VRayMtl"] == 1.25
+    assert weights["VRayBlendMtl"] == 3.0
+    assert weights["VRayBitmap"] == 1.0
+    assert weights["VRayDisplacement"] == 1.75
+    assert weights["VRayLayeredTex"] == 2.0
+
+
+def test_registry_classifies_vray_nodes():
+    registry = RendererAdapterRegistry([CommonMayaAdapter(), VrayAdapter()])
+    node = NodeSnapshot(id="node:vray_bitmap", name="vray_bitmap", type_name="VRayBitmap")
+
+    assert registry.classify_node(node) == ["texture", "file"]
+    assert registry.ids() == ["common", "vray"]
