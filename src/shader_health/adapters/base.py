@@ -1,4 +1,4 @@
-"""Renderer adapter protocol, registry, and common Maya adapter."""
+"""Renderer adapter protocol, registry, and renderer adapters."""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -58,6 +58,63 @@ _COMMON_MAYA_COMPLEXITY_WEIGHTS = {
     "plusMinusAverage": 0.5,
     "remapValue": 0.75,
     "reverse": 0.5,
+}
+
+_VRAY_NODE_TYPES = {
+    "VRayMtl",
+    "VRayBlendMtl",
+    "VRayBumpMtl",
+    "VRayFastSSS2",
+    "VRayAlSurface",
+    "VRayBitmap",
+    "VRayNormalMap",
+    "VRayDisplacement",
+    "VRayTriplanarTex",
+    "VRayColor",
+    "VRayDirt",
+    "VRayFresnel",
+    "VRayLayeredTex",
+    "VRayMultiSubTex",
+    "VRayRemap",
+}
+
+_VRAY_TEXTURE_SLOTS = {
+    "VRayMtl.diffuseColor": "base_color",
+    "VRayMtl.reflectionGlossiness": "roughness",
+    "VRayMtl.reflectionColor": "specular_color",
+    "VRayMtl.metalness": "metalness",
+    "VRayMtl.bumpMap": "bump",
+    "VRayMtl.normalMap": "normal",
+    "VRayMtl.opacityMap": "opacity",
+    "VRayMtl.selfIllumination": "emission",
+    "VRayBlendMtl.baseMtl": "material",
+    "VRayBlendMtl.coatMtl": "material",
+    "VRayBlendMtl.blendAmount": "mask",
+    "VRayBumpMtl.bumpMap": "bump",
+    "VRayBumpMtl.normalMap": "normal",
+    "VRayNormalMap.normalMap": "normal",
+    "VRayDisplacement.displacement": "displacement",
+    "VRayFastSSS2.diffuseColor": "base_color",
+    "VRayFastSSS2.specularGlossiness": "roughness",
+    "VRayAlSurface.diffuseColor": "base_color",
+}
+
+_VRAY_COMPLEXITY_WEIGHTS = {
+    "VRayMtl": 1.25,
+    "VRayBlendMtl": 3.0,
+    "VRayBumpMtl": 1.25,
+    "VRayFastSSS2": 2.0,
+    "VRayAlSurface": 2.0,
+    "VRayBitmap": 1.0,
+    "VRayNormalMap": 1.0,
+    "VRayDisplacement": 1.75,
+    "VRayTriplanarTex": 1.5,
+    "VRayColor": 0.25,
+    "VRayDirt": 1.25,
+    "VRayFresnel": 0.75,
+    "VRayLayeredTex": 2.0,
+    "VRayMultiSubTex": 2.0,
+    "VRayRemap": 0.75,
 }
 
 
@@ -163,6 +220,43 @@ class CommonMayaAdapter(BaseRendererAdapter):
 
     def default_rule_packs(self) -> list[str]:
         return ["common"]
+
+
+@dataclass(frozen=True)
+class VrayAdapter(BaseRendererAdapter):
+    """Adapter for V-Ray for Maya material and texture graph concepts."""
+
+    id: str = "vray"
+    display_name: str = "V-Ray"
+
+    def supported_node_types(self) -> set[str]:
+        return set(_VRAY_NODE_TYPES)
+
+    def classify_node(self, node: NodeSnapshot) -> list[str]:
+        type_name = node.type_name
+        if type_name not in _VRAY_NODE_TYPES:
+            return []
+        if type_name == "VRayBitmap":
+            return ["texture", "file"]
+        if type_name in {"VRayMtl", "VRayBlendMtl", "VRayFastSSS2", "VRayAlSurface"}:
+            return ["material"]
+        if type_name in {"VRayBumpMtl", "VRayNormalMap"}:
+            return ["bump", "normal", "utility"]
+        if type_name == "VRayDisplacement":
+            return ["displacement"]
+        return ["utility"]
+
+    def texture_slot_semantics(self) -> TextureSlotSemantics:
+        return dict(_VRAY_TEXTURE_SLOTS)
+
+    def displacement_slots(self) -> list[str]:
+        return ["VRayDisplacement.displacement"]
+
+    def complexity_weights(self) -> ComplexityWeights:
+        return dict(_VRAY_COMPLEXITY_WEIGHTS)
+
+    def default_rule_packs(self) -> list[str]:
+        return ["common", "vray"]
 
 
 class RendererAdapterRegistry:
