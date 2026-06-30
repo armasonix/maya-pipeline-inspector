@@ -23,16 +23,20 @@ from shader_health.core.rule_loader import (
     load_rules_from_path,
 )
 from shader_health.core.rule_schema import (
+    RESULT_STATUSES,
     RULE_SCHEMA_VERSION,
     RuleCheck,
     RuleDefinition,
     RuleFix,
     RuleMatch,
     RulePolicy,
+    RuleResult,
     RuleSchemaError,
+    ValidationEngine,
 )
 
 __all__ = [
+    "RESULT_STATUSES",
     "RULE_SCHEMA_VERSION",
     "SNAPSHOT_SCHEMA_VERSION",
     "ConnectionSnapshot",
@@ -50,8 +54,10 @@ __all__ = [
     "RuleMatch",
     "RuleOverride",
     "RulePolicy",
+    "RuleResult",
     "RuleSchemaError",
     "ShadingEngineSnapshot",
+    "ValidationEngine",
     "apply_profile_overrides",
     "build_rule_search_paths",
     "load_profile",
