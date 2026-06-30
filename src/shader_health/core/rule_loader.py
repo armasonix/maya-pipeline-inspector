@@ -65,7 +65,9 @@ class RuleOverride:
         severity = data.get("severity")
         if severity is not None and severity not in SEVERITIES:
             allowed = ", ".join(sorted(SEVERITIES))
-            raise RuleLoadError(f"override for {rule_id!r} has invalid severity; expected: {allowed}")
+            raise RuleLoadError(
+                f"override for {rule_id!r} has invalid severity; expected: {allowed}"
+            )
 
         for key in sorted(_OVERRIDE_KEYS - {"severity"}):
             value = data.get(key)
