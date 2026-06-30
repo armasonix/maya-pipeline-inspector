@@ -288,3 +288,46 @@ def test_scan_options_can_skip_file_dependency_collection():
     )
 
     assert snapshot.file_dependencies == []
+
+class MutationTrackingCmds(FakeCmds):
+    def __init__(self):
+        super().__init__()
+        self.mutation_calls = []
+
+    def setAttr(self, *args, **kwargs):
+        del args, kwargs
+        self.mutation_calls.append("setAttr")
+
+    def delete(self, *args, **kwargs):
+        del args, kwargs
+        self.mutation_calls.append("delete")
+
+    def connectAttr(self, *args, **kwargs):
+        del args, kwargs
+        self.mutation_calls.append("connectAttr")
+
+    def disconnectAttr(self, *args, **kwargs):
+        del args, kwargs
+        self.mutation_calls.append("disconnectAttr")
+
+
+def test_scan_scene_collects_reference_snapshot_grouping():
+    snapshot = scan_scene(cmds_module=FakeCmds())
+
+    assert len(snapshot.references) == 1
+    reference = snapshot.references[0]
+
+    assert reference.namespace == "char_demo"
+    assert reference.path == "D:/show/assets/char/demo/demo_rig.ma"
+    assert reference.loaded is True
+    assert reference.locked is False
+    assert reference.node_ids == ["node:char_demo:file_albedo"]
+
+
+def test_scan_scene_does_not_call_mutating_maya_commands():
+    cmds = MutationTrackingCmds()
+
+    snapshot = scan_scene(cmds_module=cmds)
+
+    assert snapshot.references
+    assert cmds.mutation_calls == []

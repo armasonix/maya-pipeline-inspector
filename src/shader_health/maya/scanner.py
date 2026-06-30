@@ -20,6 +20,7 @@ from shader_health.core import (
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
+    ReferenceSnapshot,
     ShadingEngineSnapshot,
 )
 
@@ -117,6 +118,7 @@ def _scan_snapshot(
         materials=graph.materials,
         shading_engines=graph.shading_engines,
         file_dependencies=graph.file_dependencies,
+        references=graph.references,
     )
 
 
@@ -127,6 +129,7 @@ class _GraphBuildResult:
     materials: list[MaterialSnapshot]
     shading_engines: list[ShadingEngineSnapshot]
     file_dependencies: list[FileDependencySnapshot]
+    references: list[ReferenceSnapshot]
 
 
 def _collect_shader_graph(
@@ -206,6 +209,7 @@ def _collect_shader_graph(
         if options.include_file_dependencies
         else []
     )
+    references = _collect_reference_snapshots(nodes)
 
     return _GraphBuildResult(
         nodes=nodes,
@@ -213,6 +217,7 @@ def _collect_shader_graph(
         materials=materials,
         shading_engines=shading_engines,
         file_dependencies=file_dependencies,
+        references=references,
     )
 
 
@@ -385,6 +390,32 @@ def _namespace(node_name: str) -> Optional[str]:
         return None
     return short_path.rsplit(":", 1)[0]
 
+
+
+def _collect_reference_snapshots(nodes: dict[str, NodeSnapshot]) -> list[ReferenceSnapshot]:
+    grouped: dict[tuple[str, str], list[NodeSnapshot]] = {}
+
+    for node in nodes.values():
+        if not node.referenced or not node.reference_path:
+            continue
+
+        key = (node.namespace or "", node.reference_path)
+        grouped.setdefault(key, []).append(node)
+
+    references: list[ReferenceSnapshot] = []
+    for namespace, path in sorted(grouped):
+        referenced_nodes = grouped[(namespace, path)]
+        references.append(
+            ReferenceSnapshot(
+                namespace=namespace,
+                path=path,
+                loaded=True,
+                locked=any(node.locked for node in referenced_nodes),
+                node_ids=sorted(node.id for node in referenced_nodes),
+            )
+        )
+
+    return references
 
 def _collect_file_dependencies(nodes: dict[str, NodeSnapshot]) -> list[FileDependencySnapshot]:
     dependencies: list[FileDependencySnapshot] = []
