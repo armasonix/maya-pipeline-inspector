@@ -1,0 +1,66 @@
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local config / secrets
+.env
+*.env
+config.local.json
+config.local.yaml
+config.local.yml
+*.local.json
+*.local.yaml
+*.local.yml
+
+# Runtime output
+logs/
+reports/
+.cache/
+.shader_health_cache/
+*.shader_health_waivers.json
+
+# Maya runtime / temporary files
+*.mayaSwatches/
+*.autosave
+*.ma~
+*.mb~
+workspace.mel
+workspace.mel.bak
+incrementalSave/
+
+# Render / texture outputs generated during local tests
+*.iff
+*.exr.tmp
+*.tx.tmp
+examples/**/renders/
+examples/**/generated/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
