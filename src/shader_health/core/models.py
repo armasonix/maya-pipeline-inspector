@@ -7,8 +7,9 @@ Python data contracts.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 JsonDict = dict[str, Any]
 JsonValue = Any
@@ -60,7 +61,7 @@ class ImageInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ImageInfo":
+    def from_dict(cls, data: Mapping[str, Any]) -> ImageInfo:
         return cls(
             width=data.get("width"),
             height=data.get("height"),
@@ -103,7 +104,7 @@ class NodeSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "NodeSnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> NodeSnapshot:
         return cls(
             id=str(data.get("id", "")),
             name=str(data.get("name", "")),
@@ -139,7 +140,7 @@ class ConnectionSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ConnectionSnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> ConnectionSnapshot:
         return cls(
             src_node=str(data.get("src_node", "")),
             src_attr=str(data.get("src_attr", "")),
@@ -189,7 +190,7 @@ class FileDependencySnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "FileDependencySnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> FileDependencySnapshot:
         image_info_data = data.get("image_info")
         image_info = None
         if image_info_data is not None:
@@ -246,7 +247,7 @@ class MaterialSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "MaterialSnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> MaterialSnapshot:
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -284,7 +285,7 @@ class ShadingEngineSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ShadingEngineSnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> ShadingEngineSnapshot:
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -315,7 +316,7 @@ class ReferenceSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ReferenceSnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> ReferenceSnapshot:
         return cls(
             namespace=str(data.get("namespace", "")),
             path=str(data.get("path", "")),
@@ -359,7 +360,7 @@ class GraphSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "GraphSnapshot":
+    def from_dict(cls, data: Mapping[str, Any]) -> GraphSnapshot:
         return cls(
             schema_version=str(data.get("schema_version", SNAPSHOT_SCHEMA_VERSION)),
             scene_path=str(data.get("scene_path", "")),
@@ -397,6 +398,6 @@ class GraphSnapshot:
         return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
 
     @classmethod
-    def from_json(cls, text: str) -> "GraphSnapshot":
+    def from_json(cls, text: str) -> GraphSnapshot:
         data = json.loads(text)
         return cls.from_dict(_require_mapping(data, "GraphSnapshot JSON"))
