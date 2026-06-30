@@ -9,6 +9,7 @@ from shader_health.core import (
     RulePolicy,
     RuleSchemaError,
     ValidationEngine,
+    summarize_results,
 )
 
 
@@ -253,3 +254,76 @@ def test_validation_engine_returns_skipped_for_unsupported_check_type():
 
     assert result.status == "skipped"
     assert result.evidence["reason"] == "unsupported_check_type:not_implemented"
+
+def test_summary_counts_severity_and_status_independently():
+    engine = ValidationEngine()
+    snapshot = make_snapshot(color_space="ACEScg")
+    failed_rule = RuleDefinition.from_dict(make_rule_data())
+    skipped_rule = RuleDefinition.from_dict(make_rule_data(enabled=False))
+
+    results = engine.validate(snapshot, [failed_rule, skipped_rule])
+    summary = summarize_results(results)
+
+    assert summary.total == 2
+    assert summary.failed == 1
+    assert summary.skipped == 1
+    assert summary.critical == 2
+    assert summary.block_publish is True
+    assert summary.block_deadline is True
+    assert summary.auto_fixable == 1
+    assert summary.to_dict()["critical"] == 2
+
+
+def test_critical_severity_does_not_implicitly_block_without_policy_flags():
+    data = make_rule_data()
+    data["policy"]["block_publish"] = False
+    data["policy"]["block_deadline"] = False
+    rule = RuleDefinition.from_dict(data)
+    snapshot = make_snapshot(color_space="ACEScg")
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+    summary = summarize_results([result])
+
+    assert result.status == "failed"
+    assert result.severity == "critical"
+    assert result.block_publish is False
+    assert result.block_deadline is False
+    assert summary.critical == 1
+    assert summary.block_publish is False
+    assert summary.block_deadline is False
+
+
+def test_warning_can_block_deadline_when_policy_explicitly_says_so():
+    data = make_rule_data(severity="warning", auto_fix=False)
+    data["policy"]["block_publish"] = False
+    data["policy"]["block_deadline"] = True
+    rule = RuleDefinition.from_dict(data)
+    snapshot = make_snapshot(color_space="ACEScg")
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+    summary = summarize_results([result])
+
+    assert result.status == "failed"
+    assert result.severity == "warning"
+    assert result.block_publish is False
+    assert result.block_deadline is True
+    assert summary.warning == 1
+    assert summary.block_publish is False
+    assert summary.block_deadline is True
+
+
+def test_passed_result_never_blocks_even_when_rule_policy_blocks():
+    rule = RuleDefinition.from_dict(make_rule_data())
+    snapshot = make_snapshot(color_space="Raw")
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+    summary = summarize_results([result])
+
+    assert result.status == "passed"
+    assert result.severity == "critical"
+    assert result.block_publish is False
+    assert result.block_deadline is False
+    assert summary.critical == 1
+    assert summary.block_publish is False
+    assert summary.block_deadline is False
+

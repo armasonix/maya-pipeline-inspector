@@ -33,6 +33,8 @@ from shader_health.core.rule_schema import (
     RuleResult,
     RuleSchemaError,
     ValidationEngine,
+    ValidationSummary,
+    summarize_results,
 )
 
 __all__ = [
@@ -58,10 +60,12 @@ __all__ = [
     "RuleSchemaError",
     "ShadingEngineSnapshot",
     "ValidationEngine",
+    "ValidationSummary",
     "apply_profile_overrides",
     "build_rule_search_paths",
     "load_profile",
     "load_rule_file",
     "load_rule_stack",
     "load_rules_from_path",
+    "summarize_results",
 ]

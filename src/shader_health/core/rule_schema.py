@@ -317,6 +317,80 @@ class RuleResult:
 
 
 @dataclass(frozen=True)
+class ValidationSummary:
+    """Aggregated validation result summary.
+
+    Severity and block policy are intentionally separate. A critical issue does
+    not automatically block publish or Deadline. Blocking status is computed
+    only from explicit result block flags.
+    """
+
+    total: int = 0
+    passed: int = 0
+    failed: int = 0
+    skipped: int = 0
+    info: int = 0
+    warning: int = 0
+    error: int = 0
+    critical: int = 0
+    block_publish: bool = False
+    block_deadline: bool = False
+    auto_fixable: int = 0
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "total": self.total,
+            "passed": self.passed,
+            "failed": self.failed,
+            "skipped": self.skipped,
+            "info": self.info,
+            "warning": self.warning,
+            "error": self.error,
+            "critical": self.critical,
+            "block_publish": self.block_publish,
+            "block_deadline": self.block_deadline,
+            "auto_fixable": self.auto_fixable,
+        }
+
+
+def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
+    """Compute severity counts and explicit block status from rule results."""
+
+    total = 0
+    status_counts = {"passed": 0, "failed": 0, "skipped": 0}
+    severity_counts = {"info": 0, "warning": 0, "error": 0, "critical": 0}
+    block_publish = False
+    block_deadline = False
+    auto_fixable = 0
+
+    for result in results:
+        total += 1
+        if result.status in status_counts:
+            status_counts[result.status] += 1
+        if result.severity in severity_counts:
+            severity_counts[result.severity] += 1
+        block_publish = block_publish or result.block_publish
+        block_deadline = block_deadline or result.block_deadline
+        if result.auto_fix_available:
+            auto_fixable += 1
+
+    return ValidationSummary(
+        total=total,
+        passed=status_counts["passed"],
+        failed=status_counts["failed"],
+        skipped=status_counts["skipped"],
+        info=severity_counts["info"],
+        warning=severity_counts["warning"],
+        error=severity_counts["error"],
+        critical=severity_counts["critical"],
+        block_publish=block_publish,
+        block_deadline=block_deadline,
+        auto_fixable=auto_fixable,
+    )
+
+
+
+@dataclass(frozen=True)
 class _TargetContext:
     kind: str
     target_id: str
