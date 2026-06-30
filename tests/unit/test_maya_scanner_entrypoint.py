@@ -1,3 +1,5 @@
+import logging
+
 from shader_health.core import GraphSnapshot
 from shader_health.maya import ScanOptions, scan_scene, scan_selection
 
@@ -12,6 +14,18 @@ class FakeCmds:
             "char_demo:file_albedo": "file",
             "char_demo:file_roughness": "file",
         }
+        self.attrs = {
+            "defaultRenderGlobals.currentRenderer": "vray",
+            "char_demo:file_albedo.fileTextureName": "$ASSET_ROOT/tex/albedo.<UDIM>.exr",
+            "char_demo:file_albedo.colorSpace": "ACEScg",
+            "char_demo:file_albedo.uvTilingMode": 3,
+            "char_demo:file_roughness.fileTextureName": "$ASSET_ROOT/tex/roughness.<UDIM>.exr",
+            "char_demo:file_roughness.uvTilingMode": 3,
+            "char_demo:demo_mtl.diffuseColor": [(1.0, 1.0, 1.0)],
+            "char_demo:demo_mtl.reflectionGlossiness": 0.5,
+        }
+        self.referenced_nodes = {"char_demo:file_albedo"}
+        self.locked_nodes = {"char_demo:file_roughness"}
 
     def file(self, *args, **kwargs):
         del args
@@ -26,9 +40,9 @@ class FakeCmds:
         return ""
 
     def getAttr(self, attr):
-        if attr == "defaultRenderGlobals.currentRenderer":
-            return "vray"
-        return None
+        if attr == "char_demo:file_roughness.colorSpace":
+            raise RuntimeError("colorSpace is unreadable in this test")
+        return self.attrs.get(attr)
 
     def ls(self, *args, **kwargs):
         del args
@@ -70,13 +84,21 @@ class FakeCmds:
 
         return []
 
+    def referenceQuery(self, node, **kwargs):
+        if kwargs.get("isNodeReferenced"):
+            return node in self.referenced_nodes
+        if kwargs.get("filename") and node in self.referenced_nodes:
+            return "D:/show/assets/char/demo/demo_rig.ma"
+        return None
+
+    def lockNode(self, node, **kwargs):
+        if kwargs.get("query") and kwargs.get("lock"):
+            return [node in self.locked_nodes]
+        return [False]
+
 
 class MinimalCmds:
     pass
-
-
-def node_by_id(snapshot: GraphSnapshot, node_id: str):
-    return {node.id: node for node in snapshot.nodes}[node_id]
 
 
 def test_scan_scene_returns_graph_snapshot_metadata_from_injected_cmds():
@@ -147,6 +169,31 @@ def test_scan_scene_collects_upstream_nodes_and_connections():
         "node:char_demo:demoSG",
         "surfaceShader",
     ) in connection_keys
+
+
+def test_scan_scene_collects_node_attrs_reference_lock_and_namespace(caplog):
+    caplog.set_level(logging.DEBUG, logger="shader_health.maya.scanner")
+
+    snapshot = scan_scene(cmds_module=FakeCmds())
+    nodes = {node.id: node for node in snapshot.nodes}
+
+    albedo = nodes["node:char_demo:file_albedo"]
+    assert albedo.namespace == "char_demo"
+    assert albedo.referenced is True
+    assert albedo.reference_path == "D:/show/assets/char/demo/demo_rig.ma"
+    assert albedo.locked is False
+    assert albedo.attrs["fileTextureName"] == "$ASSET_ROOT/tex/albedo.<UDIM>.exr"
+    assert albedo.attrs["colorSpace"] == "ACEScg"
+    assert albedo.attrs["uvTilingMode"] == 3
+
+    roughness = nodes["node:char_demo:file_roughness"]
+    assert roughness.namespace == "char_demo"
+    assert roughness.referenced is False
+    assert roughness.reference_path is None
+    assert roughness.locked is True
+    assert roughness.attrs["fileTextureName"] == "$ASSET_ROOT/tex/roughness.<UDIM>.exr"
+    assert "colorSpace" not in roughness.attrs
+    assert "Skipping unreadable Maya attribute char_demo:file_roughness.colorSpace" in caplog.text
 
 
 def test_scan_selection_collects_connected_shading_engine_graph():

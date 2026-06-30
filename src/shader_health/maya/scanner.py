@@ -5,6 +5,7 @@ loaded lazily only when scan functions run without an injected ``cmds_module``.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -16,6 +17,18 @@ from shader_health.core import (
     NodeSnapshot,
     ShadingEngineSnapshot,
 )
+
+log = logging.getLogger(__name__)
+
+_ATTRS_BY_TYPE = {
+    "file": ("fileTextureName", "colorSpace", "uvTilingMode"),
+    "VRayBitmap": ("file", "colorSpace"),
+    "aiImage": ("filename", "colorSpace"),
+    "VRayMtl": ("diffuseColor", "reflectionGlossiness", "reflectionColor"),
+    "aiStandardSurface": ("baseColor", "specularRoughness", "metalness"),
+    "standardSurface": ("baseColor", "specularRoughness", "metalness"),
+    "lambert": ("color", "transparency"),
+}
 
 
 class MayaUnavailableError(RuntimeError):
@@ -285,15 +298,69 @@ def _add_node_snapshot(cmds: Any, nodes: dict[str, NodeSnapshot], node_name: str
     if node_id in nodes:
         return
     type_name = _node_type(cmds, node_name)
+    referenced = _is_referenced(cmds, node_name)
     nodes[node_id] = NodeSnapshot(
         id=node_id,
         name=_short_name(node_name),
         full_name=node_name,
         type_name=type_name,
         renderer_family=_renderer_family(type_name),
-        attrs={},
+        namespace=_namespace(node_name),
+        referenced=referenced,
+        reference_path=_reference_path(cmds, node_name) if referenced else None,
+        locked=_is_locked(cmds, node_name),
+        attrs=_collect_attrs(cmds, node_name, type_name),
         classification=_classify_node(type_name),
     )
+
+
+def _collect_attrs(cmds: Any, node_name: str, type_name: str) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    for attr_name in _attrs_for_type(type_name):
+        value = _safe_get_attr(cmds, node_name, attr_name)
+        if value is not None:
+            attrs[attr_name] = value
+    return attrs
+
+
+def _attrs_for_type(type_name: str) -> tuple[str, ...]:
+    return _ATTRS_BY_TYPE.get(type_name, ())
+
+
+def _safe_get_attr(cmds: Any, node_name: str, attr_name: str) -> Any:
+    plug = f"{node_name}.{attr_name}"
+    command = getattr(cmds, "getAttr", None)
+    if command is None:
+        return None
+    try:
+        return command(plug)
+    except Exception as exc:
+        log.debug("Skipping unreadable Maya attribute %s: %s", plug, exc)
+        return None
+
+
+def _is_referenced(cmds: Any, node_name: str) -> bool:
+    value = _call_cmds(cmds, "referenceQuery", False, node_name, isNodeReferenced=True)
+    return bool(value)
+
+
+def _reference_path(cmds: Any, node_name: str) -> Optional[str]:
+    value = _call_cmds(cmds, "referenceQuery", None, node_name, filename=True)
+    return str(value) if value else None
+
+
+def _is_locked(cmds: Any, node_name: str) -> bool:
+    value = _call_cmds(cmds, "lockNode", False, node_name, query=True, lock=True)
+    if isinstance(value, list):
+        return bool(value[0]) if value else False
+    return bool(value)
+
+
+def _namespace(node_name: str) -> Optional[str]:
+    short_path = node_name.rsplit("|", 1)[-1]
+    if ":" not in short_path:
+        return None
+    return short_path.rsplit(":", 1)[0]
 
 
 def _connected_node(cmds: Any, plug: str) -> Optional[str]:
