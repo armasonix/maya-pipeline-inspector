@@ -11,8 +11,18 @@ from shader_health.core.models import (
     ReferenceSnapshot,
     ShadingEngineSnapshot,
 )
+from shader_health.core.rule_schema import (
+    RULE_SCHEMA_VERSION,
+    RuleCheck,
+    RuleDefinition,
+    RuleFix,
+    RuleMatch,
+    RulePolicy,
+    RuleSchemaError,
+)
 
 __all__ = [
+    "RULE_SCHEMA_VERSION",
     "SNAPSHOT_SCHEMA_VERSION",
     "ConnectionSnapshot",
     "FileDependencySnapshot",
@@ -21,5 +31,11 @@ __all__ = [
     "MaterialSnapshot",
     "NodeSnapshot",
     "ReferenceSnapshot",
+    "RuleCheck",
+    "RuleDefinition",
+    "RuleFix",
+    "RuleMatch",
+    "RulePolicy",
+    "RuleSchemaError",
     "ShadingEngineSnapshot",
 ]
