@@ -229,3 +229,62 @@ def test_scan_options_are_available_for_future_scanner_expansion():
     assert options.include_references is False
     assert options.include_file_dependencies is False
     assert options.include_connections is False
+
+def test_scan_scene_collects_file_texture_dependencies(tmp_path, monkeypatch):
+    asset_root = tmp_path / "assets"
+    tex_root = asset_root / "tex"
+    tex_root.mkdir(parents=True)
+
+    (tex_root / "albedo_v001.1001.exr").write_bytes(b"albedo-1001")
+    (tex_root / "albedo_v001.1003.exr").write_bytes(b"albedo-1003")
+    (tex_root / "albedo_v002.1001.exr").write_bytes(b"albedo-v002")
+    (tex_root / "roughness_v001.1001.exr").write_bytes(b"roughness-1001")
+
+    monkeypatch.setenv("ASSET_ROOT", str(asset_root).replace("\\", "/"))
+
+    cmds = FakeCmds()
+    cmds.attrs["char_demo:file_albedo.fileTextureName"] = (
+        "$ASSET_ROOT/tex/albedo_v001.<UDIM>.exr"
+    )
+    cmds.attrs["char_demo:file_roughness.fileTextureName"] = (
+        "$ASSET_ROOT/tex/roughness_v001.<UDIM>.exr"
+    )
+
+    snapshot = scan_scene(cmds_module=cmds)
+    dependencies = {item.node_id: item for item in snapshot.file_dependencies}
+
+    assert set(dependencies) == {
+        "node:char_demo:file_albedo",
+        "node:char_demo:file_roughness",
+    }
+
+    albedo = dependencies["node:char_demo:file_albedo"]
+    assert albedo.attr == "fileTextureName"
+    assert albedo.raw_path == "$ASSET_ROOT/tex/albedo_v001.<UDIM>.exr"
+    assert albedo.resolved_path is not None
+    assert albedo.resolved_path.endswith("/tex/albedo_v001.<UDIM>.exr")
+    assert albedo.exists is True
+    assert albedo.is_udim is True
+    assert albedo.udim_tiles == [1001, 1003]
+    assert albedo.missing_udim_tiles == [1002]
+    assert albedo.extension == ".exr"
+    assert albedo.version == "001"
+    assert albedo.latest_version == "002"
+    assert albedo.mtime_utc is not None
+    assert albedo.size_bytes is not None
+
+    roughness = dependencies["node:char_demo:file_roughness"]
+    assert roughness.exists is True
+    assert roughness.udim_tiles == [1001]
+    assert roughness.missing_udim_tiles == []
+    assert roughness.version == "001"
+    assert roughness.latest_version == "001"
+
+
+def test_scan_options_can_skip_file_dependency_collection():
+    snapshot = scan_scene(
+        options=ScanOptions(include_file_dependencies=False),
+        cmds_module=FakeCmds(),
+    )
+
+    assert snapshot.file_dependencies == []

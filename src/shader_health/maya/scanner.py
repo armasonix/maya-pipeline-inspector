@@ -5,13 +5,18 @@ loaded lazily only when scan functions run without an injected ``cmds_module``.
 """
 from __future__ import annotations
 
+import glob
 import logging
+import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from shader_health.core import (
     ConnectionSnapshot,
+    FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
@@ -29,6 +34,15 @@ _ATTRS_BY_TYPE = {
     "standardSurface": ("baseColor", "specularRoughness", "metalness"),
     "lambert": ("color", "transparency"),
 }
+
+_TEXTURE_PATH_ATTRS = {
+    "file": "fileTextureName",
+    "VRayBitmap": "file",
+    "aiImage": "filename",
+}
+
+_UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
+_VERSION_TOKEN_RE = re.compile(r"(?i)v(?P<version>\d+)")
 
 
 class MayaUnavailableError(RuntimeError):
@@ -102,6 +116,7 @@ def _scan_snapshot(
         connections=graph.connections,
         materials=graph.materials,
         shading_engines=graph.shading_engines,
+        file_dependencies=graph.file_dependencies,
     )
 
 
@@ -111,6 +126,7 @@ class _GraphBuildResult:
     connections: list[ConnectionSnapshot]
     materials: list[MaterialSnapshot]
     shading_engines: list[ShadingEngineSnapshot]
+    file_dependencies: list[FileDependencySnapshot]
 
 
 def _collect_shader_graph(
@@ -185,11 +201,18 @@ def _collect_shader_graph(
             for node_name in displacement_nodes:
                 _add_node_snapshot(cmds, nodes, node_name)
 
+    file_dependencies = (
+        _collect_file_dependencies(nodes)
+        if options.include_file_dependencies
+        else []
+    )
+
     return _GraphBuildResult(
         nodes=nodes,
         connections=_dedupe_connections(connections),
         materials=materials,
         shading_engines=shading_engines,
+        file_dependencies=file_dependencies,
     )
 
 
@@ -361,6 +384,162 @@ def _namespace(node_name: str) -> Optional[str]:
     if ":" not in short_path:
         return None
     return short_path.rsplit(":", 1)[0]
+
+
+def _collect_file_dependencies(nodes: dict[str, NodeSnapshot]) -> list[FileDependencySnapshot]:
+    dependencies: list[FileDependencySnapshot] = []
+    for node in nodes.values():
+        path_attr = _texture_path_attr(node.type_name)
+        if path_attr is None:
+            continue
+
+        raw_path = node.attrs.get(path_attr)
+        if raw_path is None or str(raw_path).strip() == "":
+            continue
+
+        raw_path_text = str(raw_path)
+        resolved_path = _resolve_path(raw_path_text)
+        is_udim = _is_udim_path(raw_path_text)
+        udim_tiles = _existing_udim_tiles(resolved_path) if is_udim else []
+        existing_file = _first_existing_file(resolved_path, is_udim)
+        mtime_utc, size_bytes = _file_metadata(existing_file)
+
+        dependencies.append(
+            FileDependencySnapshot(
+                node_id=node.id,
+                attr=path_attr,
+                raw_path=raw_path_text,
+                resolved_path=resolved_path,
+                exists=bool(udim_tiles) if is_udim else Path(resolved_path).is_file(),
+                is_sequence=False,
+                is_udim=is_udim,
+                udim_tiles=udim_tiles,
+                missing_udim_tiles=_missing_udim_tiles(udim_tiles),
+                extension=_path_extension(resolved_path),
+                version=_texture_version(raw_path_text),
+                latest_version=_latest_texture_version(resolved_path),
+                mtime_utc=mtime_utc,
+                size_bytes=size_bytes,
+            )
+        )
+
+    return dependencies
+
+
+def _texture_path_attr(type_name: str) -> Optional[str]:
+    return _TEXTURE_PATH_ATTRS.get(type_name)
+
+
+def _resolve_path(raw_path: str) -> str:
+    expanded = os.path.expanduser(os.path.expandvars(raw_path))
+    return expanded.replace("\\", "/")
+
+
+def _is_udim_path(path: str) -> bool:
+    return "<UDIM>" in path or "<udim>" in path
+
+
+def _udim_glob_pattern(path: str) -> str:
+    return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace(
+        "<udim>",
+        "[0-9][0-9][0-9][0-9]",
+    )
+
+
+def _udim_files(path: str) -> list[Path]:
+    return sorted(Path(item) for item in glob.glob(_udim_glob_pattern(path)))
+
+
+def _existing_udim_tiles(path: str) -> list[int]:
+    tiles: set[int] = set()
+    for file_path in _udim_files(path):
+        matches = _UDIM_TILE_RE.findall(file_path.name)
+        if matches:
+            tiles.add(int(matches[-1]))
+    return sorted(tiles)
+
+
+def _missing_udim_tiles(existing_tiles: list[int]) -> list[int]:
+    if len(existing_tiles) < 2:
+        return []
+    existing = set(existing_tiles)
+    return [tile for tile in range(min(existing), max(existing) + 1) if tile not in existing]
+
+
+def _first_existing_file(path: str, is_udim: bool) -> Optional[Path]:
+    if is_udim:
+        files = _udim_files(path)
+        return files[0] if files else None
+
+    file_path = Path(path)
+    return file_path if file_path.is_file() else None
+
+
+def _file_metadata(path: Optional[Path]) -> tuple[Optional[str], Optional[int]]:
+    if path is None:
+        return None, None
+
+    try:
+        stat = path.stat()
+    except OSError:
+        return None, None
+
+    mtime = datetime.fromtimestamp(stat.st_mtime, timezone.utc)
+    mtime_utc = mtime.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return mtime_utc, stat.st_size
+
+
+def _path_extension(path: str) -> Optional[str]:
+    normalized = path.replace("<UDIM>", "1001").replace("<udim>", "1001")
+    suffix = Path(normalized).suffix
+    return suffix or None
+
+
+def _texture_version(path: str) -> Optional[str]:
+    match = _VERSION_TOKEN_RE.search(Path(path).name)
+    return match.group("version") if match else None
+
+
+def _latest_texture_version(path: str) -> Optional[str]:
+    current_version = _texture_version(path)
+    if current_version is None:
+        return None
+
+    path_obj = Path(path)
+    parent = path_obj.parent
+    if not parent.is_dir():
+        return current_version
+
+    name = path_obj.name
+    match = _VERSION_TOKEN_RE.search(name)
+    if match is None:
+        return current_version
+
+    prefix = name[: match.start("version")]
+    suffix = name[match.end("version") :]
+    suffix_pattern = re.escape(suffix)
+    suffix_pattern = suffix_pattern.replace(re.escape("<UDIM>"), r"\d{4}")
+    suffix_pattern = suffix_pattern.replace(re.escape("<udim>"), r"\d{4}")
+
+    version_pattern = re.compile(
+        "^" + re.escape(prefix) + r"(?P<version>\d+)" + suffix_pattern + "$",
+        re.IGNORECASE,
+    )
+
+    versions = [current_version]
+    try:
+        children = list(parent.iterdir())
+    except OSError:
+        return current_version
+
+    for child in children:
+        child_match = version_pattern.match(child.name)
+        if child_match:
+            versions.append(child_match.group("version"))
+
+    width = max(len(item) for item in versions)
+    latest = max(int(item) for item in versions)
+    return str(latest).zfill(width)
 
 
 def _connected_node(cmds: Any, plug: str) -> Optional[str]:
