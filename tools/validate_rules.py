@@ -6,7 +6,7 @@ import json
 import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src"
@@ -51,12 +51,20 @@ def iter_rule_objects(payload: Any, path: Path) -> list[Mapping[str, Any]]:
         rules = payload["rules"]
         if not isinstance(rules, list):
             raise RuleValidationFailure(f"{path}: 'rules' must be a list")
-        return [_require_mapping(item, path, index) for index, item in enumerate(rules, start=1)]
+        return [
+            _require_mapping(item, path, index)
+            for index, item in enumerate(rules, start=1)
+        ]
 
     if isinstance(payload, list):
-        return [_require_mapping(item, path, index) for index, item in enumerate(payload, start=1)]
+        return [
+            _require_mapping(item, path, index)
+            for index, item in enumerate(payload, start=1)
+        ]
 
-    raise RuleValidationFailure(f"{path}: root must be an object, a list, or an object with 'rules'")
+    raise RuleValidationFailure(
+        f"{path}: root must be an object, a list, or an object with 'rules'"
+    )
 
 
 def _require_mapping(value: Any, path: Path, index: int) -> Mapping[str, Any]:
@@ -108,7 +116,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
 
     try:
