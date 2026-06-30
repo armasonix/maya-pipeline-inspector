@@ -356,7 +356,11 @@ class ValidationEngine:
             return self._evaluate_attribute_in(rule, target)
         if check_type == "path_exists":
             return self._evaluate_path_exists(rule, target)
-        return self._skipped(rule, target=target, reason=f"unsupported_check_type:{check_type}")
+        return self._skipped(
+            rule,
+            target=target,
+            reason=f"unsupported_check_type:{check_type}",
+        )
 
     def _evaluate_attribute_equals(
         self,
@@ -382,7 +386,9 @@ class ValidationEngine:
         target: _TargetContext,
     ) -> RuleResult:
         attribute = str(rule.check.params.get("attribute", ""))
-        expected_values = rule.check.params.get("expected") or rule.check.params.get("allowed") or []
+        expected_values = rule.check.params.get("expected")
+        if expected_values is None:
+            expected_values = rule.check.params.get("allowed", [])
         allowed = expected_values if isinstance(expected_values, list) else [expected_values]
         current = self._read_value(target, attribute)
         status = "passed" if current in allowed else "failed"
@@ -397,7 +403,11 @@ class ValidationEngine:
 
     def _evaluate_path_exists(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         if not isinstance(target.obj, FileDependencySnapshot):
-            return self._skipped(rule, target=target, reason="path_exists_requires_file_dependency")
+            return self._skipped(
+                rule,
+                target=target,
+                reason="path_exists_requires_file_dependency",
+            )
 
         status = "passed" if target.obj.exists else "failed"
         return self._result(
@@ -413,16 +423,30 @@ class ValidationEngine:
         if scope in {"node", "texture_node"}:
             return [_TargetContext("node", node.id, node) for node in snapshot.nodes]
         if scope == "material":
-            return [_TargetContext("material", item.node_id, item) for item in snapshot.materials]
+            return [
+                _TargetContext("material", item.node_id, item)
+                for item in snapshot.materials
+            ]
         if scope == "file_dependency":
-            return [_TargetContext("file_dependency", item.node_id, item) for item in snapshot.file_dependencies]
+            return [
+                _TargetContext("file_dependency", item.node_id, item)
+                for item in snapshot.file_dependencies
+            ]
         if scope == "connection":
             return [
-                _TargetContext("connection", f"{item.src_node}->{item.dst_node}", item, item.semantic)
+                _TargetContext(
+                    "connection",
+                    f"{item.src_node}->{item.dst_node}",
+                    item,
+                    item.semantic,
+                )
                 for item in snapshot.connections
             ]
         if scope == "shading_engine":
-            return [_TargetContext("shading_engine", item.node_id, item) for item in snapshot.shading_engines]
+            return [
+                _TargetContext("shading_engine", item.node_id, item)
+                for item in snapshot.shading_engines
+            ]
         if scope in {"scene", "graph"}:
             return [_TargetContext(scope, snapshot.scene_path, snapshot)]
         return []
