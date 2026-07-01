@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from shader_health.core import (
-    SNAPSHOT_SCHEMA_VERSION,
     GraphSnapshot,
     RuleResult,
     compute_health_score,
