@@ -1,7 +1,7 @@
 """Maya Shader Health Inspector panel content."""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -24,6 +24,10 @@ DETAILS_WHY_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsWhy"
 DETAILS_VALUES_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsValues"
 DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsGraphTrace"
 DETAILS_FIX_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsFix"
+EXPORT_ACTIONS_OBJECT_NAME = "shaderHealthInspectorExportActions"
+EXPORT_JSON_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportJsonButton"
+EXPORT_HTML_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportHtmlButton"
+EXPORT_MANIFEST_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportManifestButton"
 DEFAULT_PROFILE_OPTIONS = (
     "artist_relaxed",
     "publish_strict",
@@ -94,7 +98,19 @@ class IssueDetailsState:
     fix_description: str = "No safe fix selected."
 
 
-def build_main_widget(qt_widgets: Any) -> Any:
+@dataclass(frozen=True)
+class ExportActionCallbacks:
+    """Optional callbacks for report export UI buttons."""
+
+    on_export_json: Optional[Callable[[], None]] = None
+    on_export_html: Optional[Callable[[], None]] = None
+    on_export_manifest: Optional[Callable[[], None]] = None
+
+
+def build_main_widget(
+    qt_widgets: Any,
+    export_callbacks: Optional[ExportActionCallbacks] = None,
+) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
     widget = qt_widgets.QWidget()
@@ -111,10 +127,11 @@ def build_main_widget(qt_widgets: Any) -> Any:
     layout.addWidget(build_summary_header(qt_widgets))
     layout.addWidget(build_issues_table(qt_widgets))
     layout.addWidget(build_issue_details_panel(qt_widgets))
+    layout.addWidget(build_export_actions(qt_widgets, callbacks=export_callbacks))
 
     description = qt_widgets.QLabel(
-        "Issue details baseline. Scene validation, row selection, and export "
-        "actions will be added by the next Milestone 6 issues."
+        "Export actions are available for the current scene snapshot. Live "
+        "validation result wiring is added in a later production milestone."
     )
     description.setObjectName("shaderHealthInspectorDescription")
     description.setWordWrap(True)
@@ -271,6 +288,53 @@ def build_issue_details_panel(
     return widget
 
 
+def build_export_actions(
+    qt_widgets: Any,
+    callbacks: Optional[ExportActionCallbacks] = None,
+) -> Any:
+    """Build report export buttons for the Maya panel."""
+
+    export_callbacks = callbacks or ExportActionCallbacks()
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(EXPORT_ACTIONS_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(4)
+
+    title_label = qt_widgets.QLabel("Report Exports")
+    layout.addWidget(title_label)
+
+    json_button = _export_button(
+        qt_widgets,
+        "Export JSON Report",
+        EXPORT_JSON_BUTTON_OBJECT_NAME,
+        "Write the current shader health JSON report next to the scene.",
+        export_callbacks.on_export_json,
+    )
+    layout.addWidget(json_button)
+
+    html_button = _export_button(
+        qt_widgets,
+        "Export HTML Report",
+        EXPORT_HTML_BUTTON_OBJECT_NAME,
+        "Write the current shader health HTML report next to the scene.",
+        export_callbacks.on_export_html,
+    )
+    layout.addWidget(html_button)
+
+    manifest_button = _export_button(
+        qt_widgets,
+        "Export Shader Manifest",
+        EXPORT_MANIFEST_BUTTON_OBJECT_NAME,
+        "Write the current Material Passport / Shader Manifest next to the scene.",
+        export_callbacks.on_export_manifest,
+    )
+    layout.addWidget(manifest_button)
+
+    return widget
+
+
 def populate_issues_table(
     qt_widgets: Any,
     table: Any,
@@ -381,6 +445,29 @@ def _details_graph_trace_text(state: IssueDetailsState) -> str:
 def _details_fix_text(state: IssueDetailsState) -> str:
     fix_status = _yes_no(state.fix_available)
     return f"Fix Available: {fix_status}   {state.fix_description}"
+
+
+def _export_button(
+    qt_widgets: Any,
+    label: str,
+    object_name: str,
+    tooltip: str,
+    callback: Optional[Callable[[], None]],
+) -> Any:
+    button = qt_widgets.QPushButton(label)
+    button.setObjectName(object_name)
+    button.setToolTip(tooltip)
+    _connect_button(button, callback)
+    return button
+
+
+def _connect_button(button: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        return
+    clicked = getattr(button, "clicked", None)
+    connect = getattr(clicked, "connect", None)
+    if connect is not None:
+        connect(callback)
 
 
 def _issue_sort_value(row: IssueTableRow, sort_key: str) -> tuple[int, str]:
