@@ -33,6 +33,24 @@ def install_menu() -> str:
     return _install_menu()
 
 
+def install_shelf() -> str:
+    """Install the Maya shelf tab and button that opens the panel."""
+
+    _ensure_source_path()
+    from shader_health.maya.commands import install_shelf as _install_shelf
+
+    return _install_shelf()
+
+
+def install_ui() -> None:
+    """Install all Maya UI entrypoints for this session."""
+
+    _ensure_source_path()
+    from shader_health.maya.commands import install_ui as _install_ui
+
+    _install_ui()
+
+
 def _ensure_source_path() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     src_path = repo_root / "src"
