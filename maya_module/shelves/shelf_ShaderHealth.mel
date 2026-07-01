@@ -1,0 +1,9 @@
+global proc shelf_ShaderHealth()
+{
+    shelfButton
+        -label "Shader Health"
+        -annotation "Open Maya Shader Health Inspector"
+        -image1 "commandButton.png"
+        -sourceType "mel"
+        -command "python(\"import shader_health_inspector_bootstrap; shader_health_inspector_bootstrap.show()\")";
+}
