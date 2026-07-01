@@ -92,7 +92,7 @@ def install_ui() -> None:
 
 def _maya_shelf_top_level() -> str:
     try:
-        from maya import mel  # type: ignore[import-not-found]
+        from maya import mel
     except ImportError as exc:
         raise RuntimeError("Maya shelf commands can only run inside Autodesk Maya.") from exc
     return str(mel.eval("$tmp = $gShelfTopLevel"))
