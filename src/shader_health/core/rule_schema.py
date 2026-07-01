@@ -663,6 +663,7 @@ def _path_policy_violations(
     dependency: FileDependencySnapshot,
     params: Mapping[str, Any],
 ) -> list[str]:
+    authored_paths = [dependency.raw_path] if dependency.raw_path else []
     paths = _dependency_paths(dependency)
     disallowed = params.get("disallow", [])
     if not isinstance(disallowed, list):
@@ -671,15 +672,25 @@ def _path_policy_violations(
     violations: list[str] = []
     for policy in disallowed:
         policy_name = str(policy)
-        if policy_name == "local_drive" and any(_is_local_drive_path(path) for path in paths):
+        if policy_name == "local_drive" and any(
+            _is_local_drive_path(path) for path in authored_paths
+        ):
             violations.append("local_drive")
-        elif policy_name == "user_home" and any(_is_user_home_path(path) for path in paths):
+        elif policy_name == "user_home" and any(
+            _is_user_home_path(path) for path in authored_paths
+        ):
             violations.append("user_home")
-        elif policy_name == "desktop" and any(_has_path_segment(path, "desktop") for path in paths):
+        elif policy_name == "desktop" and any(
+            _has_path_segment(path, "desktop") for path in authored_paths
+        ):
             violations.append("desktop")
-        elif policy_name == "downloads" and any(_has_path_segment(path, "downloads") for path in paths):
+        elif policy_name == "downloads" and any(
+            _has_path_segment(path, "downloads") for path in authored_paths
+        ):
             violations.append("downloads")
-        elif policy_name == "temp" and any(_is_temp_path(path) for path in paths):
+        elif policy_name == "temp" and any(
+            _is_temp_path(path) for path in authored_paths
+        ):
             violations.append("temp")
 
     allowed_prefixes = params.get("allowed_prefixes", [])

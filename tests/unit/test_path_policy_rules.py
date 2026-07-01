@@ -1,7 +1,12 @@
 from pathlib import Path
 
-from shader_health.core import FileDependencySnapshot, GraphSnapshot, RuleDefinition, ValidationEngine
-from shader_health.core import load_rule_file
+from shader_health.core import (
+    FileDependencySnapshot,
+    GraphSnapshot,
+    RuleDefinition,
+    ValidationEngine,
+    load_rule_file,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "texture_paths.json"
