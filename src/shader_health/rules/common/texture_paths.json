@@ -1,0 +1,28 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.missing",
+      "name": "Texture file must exist",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "shader_td",
+      "message": "Texture file is missing or cannot be resolved.",
+      "why": "Missing texture files render incorrectly in Maya and on the render farm. Blocking them before publish prevents wasted farm time and broken lookdev handoffs.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "path_exists"
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
