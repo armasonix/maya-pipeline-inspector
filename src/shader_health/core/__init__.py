@@ -1,5 +1,10 @@
 """Core data contracts and validation primitives."""
 
+from shader_health.core.fix_plan import (
+    FixAction,
+    FixPlan,
+    build_fix_plan,
+)
 from shader_health.core.models import (
     SNAPSHOT_SCHEMA_VERSION,
     ConnectionSnapshot,
@@ -47,6 +52,8 @@ __all__ = [
     "SNAPSHOT_SCHEMA_VERSION",
     "ConnectionSnapshot",
     "FileDependencySnapshot",
+    "FixAction",
+    "FixPlan",
     "GraphSnapshot",
     "HealthScore",
     "ImageInfo",
@@ -67,6 +74,7 @@ __all__ = [
     "ValidationEngine",
     "ValidationSummary",
     "apply_profile_overrides",
+    "build_fix_plan",
     "build_rule_search_paths",
     "compute_health_score",
     "load_profile",
