@@ -59,20 +59,21 @@ def _create_dockable_panel() -> Any:
         MayaQWidgetDockableMixin,
     )
 
-    class ShaderHealthInspectorDock(  # type: ignore[name-defined]
-        MayaQWidgetDockableMixin,
-        qt_widgets.QWidget,
-    ):
-        def __init__(self) -> None:
-            super().__init__()
-            self.setObjectName(PANEL_OBJECT_NAME)
-            self.setWindowTitle(PANEL_TITLE)
+    def init_panel(self: Any) -> None:
+        super(type(self), self).__init__()
+        self.setObjectName(PANEL_OBJECT_NAME)
+        self.setWindowTitle(PANEL_TITLE)
 
-            layout = qt_widgets.QVBoxLayout(self)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.addWidget(build_main_widget(qt_widgets))
+        layout = qt_widgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(build_main_widget(qt_widgets))
 
-    return ShaderHealthInspectorDock()
+    panel_class = type(
+        "ShaderHealthInspectorDock",
+        (MayaQWidgetDockableMixin, qt_widgets.QWidget),
+        {"__init__": init_panel, "__module__": __name__},
+    )
+    return panel_class()
 
 
 def _workspace_control_exists(cmds: Any) -> bool:
