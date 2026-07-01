@@ -1,0 +1,28 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.version.latest",
+      "name": "Texture version should be latest available",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "texture_td",
+      "message": "Texture dependency is not using the latest detected version.",
+      "why": "Keeping texture dependencies on the latest approved version helps keep publishes consistent with current lookdev handoff.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "texture_version_latest"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

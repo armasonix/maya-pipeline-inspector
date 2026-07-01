@@ -33,6 +33,12 @@ def _as_int_list(value: Optional[list[Any]]) -> list[int]:
     return [int(item) for item in value]
 
 
+def _as_optional_bool(value: Any) -> Optional[bool]:
+    if value is None:
+        return None
+    return bool(value)
+
+
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{label} must be a mapping, got {type(value).__name__}")
@@ -167,6 +173,10 @@ class FileDependencySnapshot:
     version: Optional[str] = None
     latest_version: Optional[str] = None
     mtime_utc: Optional[str] = None
+    optimized_path: Optional[str] = None
+    optimized_exists: Optional[bool] = None
+    optimized_mtime_utc: Optional[str] = None
+    optimized_is_stale: Optional[bool] = None
     size_bytes: Optional[int] = None
     image_info: Optional[ImageInfo] = None
 
@@ -185,6 +195,10 @@ class FileDependencySnapshot:
             "version": self.version,
             "latest_version": self.latest_version,
             "mtime_utc": self.mtime_utc,
+            "optimized_path": self.optimized_path,
+            "optimized_exists": self.optimized_exists,
+            "optimized_mtime_utc": self.optimized_mtime_utc,
+            "optimized_is_stale": self.optimized_is_stale,
             "size_bytes": self.size_bytes,
             "image_info": self.image_info.to_dict() if self.image_info else None,
         }
@@ -210,6 +224,10 @@ class FileDependencySnapshot:
             version=data.get("version"),
             latest_version=data.get("latest_version"),
             mtime_utc=data.get("mtime_utc"),
+            optimized_path=data.get("optimized_path"),
+            optimized_exists=_as_optional_bool(data.get("optimized_exists")),
+            optimized_mtime_utc=data.get("optimized_mtime_utc"),
+            optimized_is_stale=_as_optional_bool(data.get("optimized_is_stale")),
             size_bytes=data.get("size_bytes"),
             image_info=image_info,
         )

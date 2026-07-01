@@ -1,0 +1,108 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.missing",
+      "name": "Texture file must exist",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "shader_td",
+      "message": "Texture file is missing or cannot be resolved.",
+      "why": "Missing texture files render incorrectly in Maya and on the render farm. Blocking them before publish prevents wasted farm time and broken lookdev handoffs.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "path_exists"
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.path.local_drive",
+      "name": "Texture path must not use a local drive root",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "pipeline_td",
+      "message": "Texture path points to a local drive and may not resolve on the farm.",
+      "why": "Local drive paths are machine-specific. Render farm workers and other artists may not be able to resolve them, causing missing textures or inconsistent renders.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "path_policy",
+        "disallow": ["local_drive"]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.path.user_location",
+      "name": "Texture path must not use a user-local folder",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "pipeline_td",
+      "message": "Texture path points to a user-local folder such as Desktop, Downloads, or Temp.",
+      "why": "User-local folders are not production storage. They are commonly unavailable to farm machines and are unsafe for publish handoff.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "path_policy",
+        "disallow": ["user_home", "desktop", "downloads", "temp"]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.path.project_root",
+      "name": "Texture path must use an approved project root",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "Texture path is outside the approved project texture roots.",
+      "why": "Project-rooted paths keep scene dependencies portable between artists, publish tools, and render farm workers. Paths outside approved roots are harder to audit and reproduce.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "path_policy",
+        "allowed_prefixes": [
+          "$ASSET_ROOT",
+          "${ASSET_ROOT}",
+          "$TEXTURE_ROOT",
+          "${TEXTURE_ROOT}"
+        ]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

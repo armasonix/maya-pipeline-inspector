@@ -389,7 +389,6 @@ def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
     )
 
 
-
 @dataclass(frozen=True)
 class _TargetContext:
     kind: str
@@ -428,8 +427,22 @@ class ValidationEngine:
             return self._evaluate_attribute_equals(rule, target)
         if check_type == "attribute_in":
             return self._evaluate_attribute_in(rule, target)
+        if check_type == "default_material_assignment":
+            return self._evaluate_default_material_assignment(rule, target)
+        if check_type == "duplicate_file_dependencies":
+            return self._evaluate_duplicate_file_dependencies(rule, target)
+        if check_type == "list_length_max":
+            return self._evaluate_list_length_max(rule, target)
+        if check_type == "list_length_min":
+            return self._evaluate_list_length_min(rule, target)
+        if check_type == "numeric_max":
+            return self._evaluate_numeric_max(rule, target)
         if check_type == "path_exists":
             return self._evaluate_path_exists(rule, target)
+        if check_type == "path_policy":
+            return self._evaluate_path_policy(rule, target)
+        if check_type == "texture_version_latest":
+            return self._evaluate_texture_version_latest(rule, target)
         return self._skipped(
             rule,
             target=target,
@@ -475,6 +488,140 @@ class ValidationEngine:
             plug=attribute,
         )
 
+    def _evaluate_default_material_assignment(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="default_material_assignment_requires_graph_snapshot",
+            )
+
+        assignments = _default_material_assignments(target.obj, rule.check.params)
+        status = "failed" if assignments else "passed"
+        evidence = {"assignments": assignments} if assignments else {}
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=len(assignments),
+            expected_value=0,
+            plug="shading_engines",
+            evidence=evidence,
+        )
+
+    def _evaluate_duplicate_file_dependencies(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="duplicate_file_dependencies_requires_graph_snapshot",
+            )
+
+        groups = _duplicate_file_dependency_groups(target.obj)
+        status = "failed" if groups else "passed"
+        evidence = {"duplicate_groups": groups} if groups else {}
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=len(groups),
+            expected_value=0,
+            plug="file_dependencies",
+            evidence=evidence,
+        )
+
+    def _evaluate_list_length_max(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        attribute = str(rule.check.params.get("attribute", ""))
+        maximum = rule.check.params.get("max")
+        current = self._read_value(target, attribute)
+        maximum_number = _as_float(maximum)
+        if not isinstance(current, list) or maximum_number is None:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="list_length_max_requires_list_and_numeric_max",
+            )
+
+        current_length = len(current)
+        status = "passed" if current_length <= maximum_number else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current_length,
+            expected_value=maximum,
+            plug=attribute,
+            evidence={"max": maximum_number},
+        )
+
+    def _evaluate_list_length_min(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        attribute = str(rule.check.params.get("attribute", ""))
+        minimum = rule.check.params.get("min")
+        current = self._read_value(target, attribute)
+        minimum_number = _as_float(minimum)
+        if not isinstance(current, list) or minimum_number is None:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="list_length_min_requires_list_and_numeric_min",
+            )
+
+        current_length = len(current)
+        status = "passed" if current_length >= minimum_number else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current_length,
+            expected_value=minimum,
+            plug=attribute,
+            evidence={"min": minimum_number},
+        )
+
+    def _evaluate_numeric_max(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        attribute = str(rule.check.params.get("attribute", ""))
+        maximum = rule.check.params.get("max")
+        current = self._read_value(target, attribute)
+        current_number = _as_float(current)
+        maximum_number = _as_float(maximum)
+        if current_number is None or maximum_number is None:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="numeric_max_requires_numeric_values",
+            )
+
+        status = "passed" if current_number <= maximum_number else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current,
+            expected_value=maximum,
+            plug=attribute,
+            evidence={"max": maximum_number},
+        )
+
     def _evaluate_path_exists(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         if not isinstance(target.obj, FileDependencySnapshot):
             return self._skipped(
@@ -493,6 +640,59 @@ class ValidationEngine:
             plug=target.obj.attr,
         )
 
+    def _evaluate_path_policy(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
+        if not isinstance(target.obj, FileDependencySnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="path_policy_requires_file_dependency",
+            )
+
+        violations = _path_policy_violations(target.obj, rule.check.params)
+        status = "failed" if violations else "passed"
+        evidence = {"violations": violations} if violations else {}
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=target.obj.resolved_path or target.obj.raw_path,
+            expected_value="path policy compliant",
+            plug=target.obj.attr,
+            evidence=evidence,
+        )
+
+    def _evaluate_texture_version_latest(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, FileDependencySnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="texture_version_latest_requires_file_dependency",
+            )
+
+        current_version = target.obj.version
+        latest_version = target.obj.latest_version
+        if not current_version or not latest_version:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="texture_version_latest_requires_version_metadata",
+            )
+
+        status = "passed" if current_version == latest_version else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current_version,
+            expected_value=latest_version,
+            plug="version",
+            evidence={"latest_version": latest_version},
+        )
+
     def _targets_for_scope(self, snapshot: GraphSnapshot, scope: str) -> list[_TargetContext]:
         if scope in {"node", "texture_node"}:
             return [_TargetContext("node", node.id, node) for node in snapshot.nodes]
@@ -502,8 +702,14 @@ class ValidationEngine:
                 for item in snapshot.materials
             ]
         if scope == "file_dependency":
+            node_semantics = _node_semantics_by_id(snapshot)
             return [
-                _TargetContext("file_dependency", item.node_id, item)
+                _TargetContext(
+                    "file_dependency",
+                    item.node_id,
+                    item,
+                    node_semantics.get(item.node_id),
+                )
                 for item in snapshot.file_dependencies
             ]
         if scope == "connection":
@@ -635,6 +841,208 @@ _REQUIRED_RULE_KEYS = frozenset(
         "policy",
     }
 )
+
+
+def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
+    semantics: dict[str, str] = {}
+    for node in snapshot.nodes:
+        semantic = node.attrs.get("semantic_slot")
+        if isinstance(semantic, str) and semantic:
+            semantics[node.id] = semantic
+    return semantics
+
+
+def _default_material_assignments(
+    snapshot: GraphSnapshot,
+    params: Mapping[str, Any],
+) -> list[JsonDict]:
+    default_materials = _normalized_identifier_set(
+        params.get("default_materials", ["lambert1", "node:lambert1"])
+    )
+    default_engines = _normalized_identifier_set(
+        params.get("default_shading_engines", ["initialShadingGroup"])
+    )
+
+    assignments: list[JsonDict] = []
+    for engine in snapshot.shading_engines:
+        if not engine.members:
+            continue
+        is_default_material = _matches_identifier(engine.surface_shader, default_materials)
+        is_default_engine = _matches_identifier(engine.name, default_engines)
+        is_default_engine = is_default_engine or _matches_identifier(
+            engine.node_id,
+            default_engines,
+        )
+        if is_default_material or is_default_engine:
+            assignments.append(
+                {
+                    "shading_engine": engine.node_id,
+                    "surface_shader": engine.surface_shader,
+                    "members": list(engine.members),
+                    "count": len(engine.members),
+                }
+            )
+    return assignments
+
+
+def _duplicate_file_dependency_groups(snapshot: GraphSnapshot) -> list[JsonDict]:
+    grouped: dict[str, list[FileDependencySnapshot]] = {}
+    for dependency in snapshot.file_dependencies:
+        key = _duplicate_file_dependency_key(dependency)
+        if key:
+            grouped.setdefault(key, []).append(dependency)
+
+    groups: list[JsonDict] = []
+    for path, dependencies in sorted(grouped.items()):
+        node_ids = sorted({dependency.node_id for dependency in dependencies})
+        if len(node_ids) > 1:
+            groups.append(
+                {
+                    "path": path,
+                    "node_ids": node_ids,
+                    "count": len(node_ids),
+                }
+            )
+    return groups
+
+
+def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
+    path = dependency.resolved_path or dependency.raw_path
+    return _normalize_path(path) if path else ""
+
+
+def _normalized_identifier_set(value: Any) -> set[str]:
+    identifiers: set[str] = set()
+    for item in _as_string_list(value):
+        identifiers.update(_identifier_candidates(item))
+    return identifiers
+
+
+def _matches_identifier(value: Optional[str], identifiers: set[str]) -> bool:
+    return bool(_identifier_candidates(value).intersection(identifiers))
+
+
+def _identifier_candidates(value: Optional[str]) -> set[str]:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return set()
+    return {normalized, normalized.rsplit(":", 1)[-1]}
+
+
+def _as_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
+def _as_float(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _path_policy_violations(
+    dependency: FileDependencySnapshot,
+    params: Mapping[str, Any],
+) -> list[str]:
+    authored_paths = [dependency.raw_path] if dependency.raw_path else []
+    paths = _dependency_paths(dependency)
+    disallowed = params.get("disallow", [])
+    if not isinstance(disallowed, list):
+        disallowed = [disallowed]
+
+    violations: list[str] = []
+    for policy in disallowed:
+        policy_name = str(policy)
+        if policy_name == "local_drive" and any(
+            _is_local_drive_path(path) for path in authored_paths
+        ):
+            violations.append("local_drive")
+        elif policy_name == "user_home" and any(
+            _is_user_home_path(path) for path in authored_paths
+        ):
+            violations.append("user_home")
+        elif policy_name == "desktop" and any(
+            _has_path_segment(path, "desktop") for path in authored_paths
+        ):
+            violations.append("desktop")
+        elif policy_name == "downloads" and any(
+            _has_path_segment(path, "downloads") for path in authored_paths
+        ):
+            violations.append("downloads")
+        elif policy_name == "temp" and any(
+            _is_temp_path(path) for path in authored_paths
+        ):
+            violations.append("temp")
+
+    allowed_prefixes = params.get("allowed_prefixes", [])
+    if allowed_prefixes and not _matches_allowed_prefix(paths, allowed_prefixes):
+        violations.append("outside_project_root")
+
+    return violations
+
+
+def _dependency_paths(dependency: FileDependencySnapshot) -> list[str]:
+    return [
+        path
+        for path in (dependency.raw_path, dependency.resolved_path or "")
+        if path
+    ]
+
+
+def _normalize_path(path: str) -> str:
+    return path.replace("\\", "/").strip().rstrip("/").lower()
+
+
+def _is_local_drive_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").strip()
+    return len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/"
+
+
+def _is_user_home_path(path: str) -> bool:
+    normalized = _normalize_path(path)
+    return (
+        normalized.startswith("~/")
+        or normalized.startswith("/users/")
+        or normalized.startswith("/home/")
+        or _starts_with_drive_user_path(normalized)
+    )
+
+
+def _starts_with_drive_user_path(path: str) -> bool:
+    return len(path) >= 9 and path[1:9] == ":/users/"
+
+
+def _has_path_segment(path: str, segment: str) -> bool:
+    parts = [part for part in _normalize_path(path).split("/") if part]
+    return segment.lower() in parts
+
+
+def _is_temp_path(path: str) -> bool:
+    normalized = _normalize_path(path)
+    return (
+        _has_path_segment(normalized, "temp")
+        or _has_path_segment(normalized, "tmp")
+        or "/appdata/local/temp/" in f"/{normalized}/"
+    )
+
+
+def _matches_allowed_prefix(paths: list[str], allowed_prefixes: Any) -> bool:
+    prefixes = allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
+    normalized_prefixes = [_normalize_path(str(prefix)) for prefix in prefixes if str(prefix)]
+    if not normalized_prefixes:
+        return True
+
+    normalized_paths = [_normalize_path(path) for path in paths]
+    for path in normalized_paths:
+        if any(path == prefix or path.startswith(f"{prefix}/") for prefix in normalized_prefixes):
+            return True
+    return False
 
 
 def _validate_required_rule_keys(data: Mapping[str, Any]) -> None:

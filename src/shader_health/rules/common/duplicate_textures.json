@@ -1,0 +1,26 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.duplicates.same_path",
+      "name": "Duplicate texture file usage should be reviewed",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "graph",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Multiple texture nodes reference the same resolved texture path.",
+      "why": "Duplicate texture nodes that point to the same file increase graph complexity and make material reviews harder. Reporting duplicate file usage helps consolidate redundant texture nodes when it is safe to do so.",
+      "match": {},
+      "check": {
+        "type": "duplicate_file_dependencies"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

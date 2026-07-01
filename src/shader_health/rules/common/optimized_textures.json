@@ -1,0 +1,58 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.optimized.exists",
+      "name": "Optimized texture file should exist when tracked",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "pipeline_td",
+      "message": "Optimized texture derivative is missing.",
+      "why": "Missing optimized texture derivatives such as .tx files can increase render startup cost, texture IO, and farm memory pressure. When scanner metadata tracks an optimized derivative, the derivative should exist.",
+      "match": {
+        "dependency_kind": "texture",
+        "optimized_exists": [true, false]
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "optimized_exists",
+        "expected": true
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.optimized.fresh",
+      "name": "Optimized texture derivative should be fresh",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "pipeline_td",
+      "message": "Optimized texture derivative is stale compared with its source texture.",
+      "why": "Stale optimized derivatives can render older pixels than the source texture and make local lookdev diverge from farm rendering. Freshness should be reported when scanner metadata detects a stale optimized derivative.",
+      "match": {
+        "dependency_kind": "texture",
+        "optimized_is_stale": [true, false]
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "optimized_is_stale",
+        "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_complexity.graph_nodes.max",
+      "name": "Material graph node count must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material shader graph has more nodes than the configured budget.",
+      "why": "Large shader graphs are harder to review, slower to evaluate, and more likely to hide expensive or broken branches. Budget checks keep material networks maintainable before publish.",
+      "match": {},
+      "check": {
+        "type": "numeric_max",
+        "attribute": "graph_node_count",
+        "max": 80
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_complexity.texture_count.max",
+      "name": "Material texture count must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material uses more texture nodes than the configured budget.",
+      "why": "Excessive texture count increases memory pressure, IO cost, review complexity, and farm risk. Keeping texture count within budget helps maintain predictable rendering cost.",
+      "match": {},
+      "check": {
+        "type": "list_length_max",
+        "attribute": "texture_nodes",
+        "max": 32
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_complexity.graph_depth.max",
+      "name": "Material graph depth must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material shader graph is deeper than the configured budget.",
+      "why": "Deep shader graphs are costly to inspect and can signal overly complex procedural or layered networks. Depth budgets help identify networks that need TD review.",
+      "match": {},
+      "check": {
+        "type": "numeric_max",
+        "attribute": "graph_depth",
+        "max": 12
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
