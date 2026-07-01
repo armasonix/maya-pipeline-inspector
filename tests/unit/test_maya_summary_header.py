@@ -151,11 +151,10 @@ def test_main_widget_contains_summary_header():
 
 
 def _find(widget: Any, object_name: str) -> Any:
-    if getattr(widget, "object_name", None) == object_name:
-        return widget
-    for child in getattr(widget, "children", []):
-        try:
-            return _find(child, object_name)
-        except AssertionError:
-            pass
+    stack = [widget]
+    while stack:
+        current = stack.pop()
+        if getattr(current, "object_name", None) == object_name:
+            return current
+        stack.extend(getattr(current, "children", []))
     raise AssertionError(f"Could not find object named {object_name!r}")
