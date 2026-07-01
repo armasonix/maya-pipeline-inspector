@@ -6,11 +6,15 @@ from shader_health.maya import commands
 
 
 class FakeCmds:
-    def __init__(self, *, menu_exists: bool) -> None:
+    def __init__(self, *, menu_exists: bool, shelf_exists: bool = False) -> None:
         self.menu_exists = menu_exists
+        self.shelf_exists = shelf_exists
+        self.button_exists = False
         self.deleted: list[tuple[str, dict[str, Any]]] = []
         self.created_menu: Optional[tuple[str, dict[str, Any]]] = None
         self.created_items: list[dict[str, Any]] = []
+        self.created_shelf: Optional[tuple[str, dict[str, Any]]] = None
+        self.created_buttons: list[tuple[str, dict[str, Any]]] = []
 
     def menu(self, name: str, **kwargs: Any) -> object:
         if kwargs.get("query") and kwargs.get("exists"):
@@ -22,9 +26,26 @@ class FakeCmds:
     def menuItem(self, **kwargs: Any) -> None:
         self.created_items.append(dict(kwargs))
 
+    def shelfLayout(self, name: str, **kwargs: Any) -> object:
+        if kwargs.get("query") and kwargs.get("exists"):
+            return self.shelf_exists
+        self.created_shelf = (name, dict(kwargs))
+        self.shelf_exists = True
+        return name
+
+    def shelfButton(self, name: str, **kwargs: Any) -> object:
+        if kwargs.get("query") and kwargs.get("exists"):
+            return self.button_exists
+        self.created_buttons.append((name, dict(kwargs)))
+        self.button_exists = True
+        return name
+
     def deleteUI(self, name: str, **kwargs: Any) -> None:
         self.deleted.append((name, dict(kwargs)))
-        self.menu_exists = False
+        if kwargs.get("menu"):
+            self.menu_exists = False
+        if kwargs.get("control") and name == commands.SHELF_BUTTON_NAME:
+            self.button_exists = False
 
 
 def test_show_ui_delegates_to_panel_launcher(monkeypatch: Any):
@@ -63,13 +84,11 @@ def test_install_menu_replaces_existing_menu(monkeypatch: Any):
             "tearOff": True,
         },
     )
-    assert cmds.created_items == [
-        {
-            "label": commands.MENU_ITEM_LABEL,
-            "parent": commands.MENU_NAME,
-            "command": commands.MENU_COMMAND,
-        }
-    ]
+    assert cmds.created_items[0]["label"] == commands.OPEN_MENU_ITEM_LABEL
+    assert callable(cmds.created_items[0]["command"])
+    assert cmds.created_items[1] == {"divider": True, "parent": commands.MENU_NAME}
+    assert cmds.created_items[2]["label"] == commands.CLOSE_MENU_ITEM_LABEL
+    assert callable(cmds.created_items[2]["command"])
 
 
 def test_uninstall_menu_deletes_existing_menu(monkeypatch: Any):
@@ -79,3 +98,60 @@ def test_uninstall_menu_deletes_existing_menu(monkeypatch: Any):
     commands.uninstall_menu()
 
     assert cmds.deleted == [(commands.MENU_NAME, {"menu": True})]
+
+
+def test_install_shelf_creates_shelf_and_button(monkeypatch: Any):
+    cmds = FakeCmds(menu_exists=False, shelf_exists=False)
+    monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
+
+    shelf_name = commands.install_shelf()
+
+    assert shelf_name == commands.SHELF_NAME
+    assert cmds.created_shelf == (commands.SHELF_NAME, {"parent": "ShelfLayout"})
+    assert cmds.created_buttons == [
+        (
+            commands.SHELF_BUTTON_NAME,
+            {
+                "parent": commands.SHELF_NAME,
+                "label": commands.SHELF_BUTTON_LABEL,
+                "annotation": commands.SHELF_BUTTON_ANNOTATION,
+                "image1": "commandButton.png",
+                "sourceType": "python",
+                "command": commands.OPEN_UI_PYTHON_COMMAND,
+            },
+        )
+    ]
+
+
+def test_install_shelf_replaces_existing_button(monkeypatch: Any):
+    cmds = FakeCmds(menu_exists=False, shelf_exists=True)
+    cmds.button_exists = True
+    monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
+
+    commands.install_shelf()
+
+    assert cmds.deleted == [(commands.SHELF_BUTTON_NAME, {"control": True})]
+    assert cmds.created_shelf is None
+    assert len(cmds.created_buttons) == 1
+
+
+def test_uninstall_shelf_deletes_existing_button(monkeypatch: Any):
+    cmds = FakeCmds(menu_exists=False, shelf_exists=True)
+    cmds.button_exists = True
+    monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
+
+    commands.uninstall_shelf()
+
+    assert cmds.deleted == [(commands.SHELF_BUTTON_NAME, {"control": True})]
+
+
+def test_install_ui_installs_menu_and_shelf(monkeypatch: Any):
+    calls: list[str] = []
+    monkeypatch.setattr(commands, "install_menu", lambda: calls.append("menu"))
+    monkeypatch.setattr(commands, "install_shelf", lambda: calls.append("shelf"))
+
+    commands.install_ui()
+
+    assert calls == ["menu", "shelf"]
