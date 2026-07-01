@@ -4,6 +4,13 @@ from __future__ import annotations
 import importlib
 from typing import Any, Optional
 
+from shader_health.maya.navigation import (
+    NavigationActionResult,
+    copy_path,
+    open_attribute_editor,
+    reveal_file,
+    select_node,
+)
 from shader_health.maya.ui_launcher import close_panel, show_panel
 
 MENU_NAME = "shaderHealthInspectorMenu"
@@ -28,6 +35,30 @@ def close_ui(*, delete: bool = True) -> None:
     """Close the dockable Maya Shader Health Inspector panel."""
 
     close_panel(delete=delete)
+
+
+def select_node_action(node_name: str) -> NavigationActionResult:
+    """Select a Maya node from a UI action."""
+
+    return select_node(node_name)
+
+
+def open_attribute_editor_action(node_name: str) -> NavigationActionResult:
+    """Open Maya Attribute Editor for a node from a UI action."""
+
+    return open_attribute_editor(node_name)
+
+
+def copy_path_action(path: str) -> NavigationActionResult:
+    """Copy a path from a UI action."""
+
+    return copy_path(path)
+
+
+def reveal_file_action(path: str) -> NavigationActionResult:
+    """Reveal a file from a UI action where the host OS supports it."""
+
+    return reveal_file(path)
 
 
 def install_menu(parent: Optional[str] = None) -> str:
