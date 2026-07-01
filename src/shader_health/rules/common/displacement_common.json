@@ -1,0 +1,55 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.displacement.texture.missing",
+      "name": "Displacement texture file must exist",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "shader_td",
+      "message": "Displacement texture file is missing or cannot be resolved.",
+      "why": "Missing displacement maps can change object silhouettes, create render holes, or make farm renders diverge from approved lookdev. Displacement dependencies must be resolved before publish or farm submission.",
+      "match": {
+        "dependency_kind": "texture",
+        "semantic_slot": "displacement"
+      },
+      "check": {
+        "type": "path_exists"
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.displacement.amount.max",
+      "name": "Displacement amount must stay within the risk budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "node",
+      "severity": "error",
+      "owner": "shader_td",
+      "message": "Displacement amount is above the configured production risk budget.",
+      "why": "Excessive displacement can explode render time, memory, tessellation, and silhouette changes. Keeping amount within a profile-defined budget reduces farm risk.",
+      "match": {
+        "node_type": ["displacementShader", "VRayDisplacement"]
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "amount",
+        "max": 1.0
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
