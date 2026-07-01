@@ -1,6 +1,7 @@
 import pytest
 
 from shader_health.adapters import (
+    ArnoldAdapter,
     BaseRendererAdapter,
     CommonMayaAdapter,
     RendererAdapterError,
@@ -270,7 +271,91 @@ def test_vray_adapter_exposes_displacement_and_complexity_contract():
 
 def test_registry_classifies_vray_nodes():
     registry = RendererAdapterRegistry([CommonMayaAdapter(), VrayAdapter()])
-    node = NodeSnapshot(id="node:vray_bitmap", name="vray_bitmap", type_name="VRayBitmap")
+    node = NodeSnapshot(
+        id="node:vray_bitmap",
+        name="vray_bitmap",
+        type_name="VRayBitmap",
+    )
 
     assert registry.classify_node(node) == ["texture", "file"]
     assert registry.ids() == ["common", "vray"]
+
+
+def test_arnold_adapter_has_expected_identity_and_rule_packs():
+    adapter = ArnoldAdapter()
+
+    assert adapter.id == "arnold"
+    assert adapter.display_name == "Arnold"
+    assert adapter.is_available() is True
+    assert adapter.default_rule_packs() == ["common", "arnold"]
+
+
+def test_arnold_adapter_supports_initial_arnold_node_types():
+    supported = ArnoldAdapter().supported_node_types()
+
+    assert "aiStandardSurface" in supported
+    assert "aiImage" in supported
+    assert "aiNormalMap" in supported
+    assert "aiBump2d" in supported
+    assert "aiLayerShader" in supported
+    assert "aiMixShader" in supported
+    assert "aiTriplanar" in supported
+
+
+def test_arnold_adapter_classifies_arnold_nodes():
+    adapter = ArnoldAdapter()
+
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:mtl", name="mtl", type_name="aiStandardSurface")
+    ) == ["material"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:image", name="image", type_name="aiImage")
+    ) == ["texture", "file"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:normal", name="normal", type_name="aiNormalMap")
+    ) == ["normal", "utility"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:bump", name="bump", type_name="aiBump2d")
+    ) == ["bump", "utility"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:noise", name="noise", type_name="aiNoise")
+    ) == ["texture", "procedural", "utility"]
+    assert adapter.classify_node(
+        NodeSnapshot(id="node:unknown", name="unknown", type_name="unknownType")
+    ) == []
+
+
+def test_arnold_adapter_exposes_texture_slot_semantics():
+    semantics = ArnoldAdapter().texture_slot_semantics()
+
+    assert semantics["aiStandardSurface.baseColor"] == "base_color"
+    assert semantics["aiStandardSurface.specularRoughness"] == "roughness"
+    assert semantics["aiStandardSurface.metalness"] == "metalness"
+    assert semantics["aiStandardSurface.normalCamera"] == "normal"
+    assert semantics["aiStandardSurface.opacity"] == "opacity"
+    assert semantics["aiImage.filename"] == "texture_file"
+    assert semantics["aiNormalMap.input"] == "normal"
+    assert semantics["aiBump2d.bumpMap"] == "bump"
+    assert semantics["aiLayerShader.mix"] == "mask"
+    assert semantics["displacementShader.displacement"] == "displacement"
+
+
+def test_arnold_adapter_exposes_displacement_and_complexity_contract():
+    adapter = ArnoldAdapter()
+
+    assert adapter.displacement_slots() == ["displacementShader.displacement"]
+
+    weights = adapter.complexity_weights()
+    assert weights["aiStandardSurface"] == 1.25
+    assert weights["aiImage"] == 1.0
+    assert weights["aiLayerShader"] == 2.5
+    assert weights["aiMixShader"] == 2.0
+    assert weights["aiTriplanar"] == 1.5
+
+
+def test_registry_classifies_arnold_nodes():
+    registry = RendererAdapterRegistry([CommonMayaAdapter(), VrayAdapter(), ArnoldAdapter()])
+    node = NodeSnapshot(id="node:image", name="image", type_name="aiImage")
+
+    assert registry.classify_node(node) == ["texture", "file"]
+    assert registry.ids() == ["arnold", "common", "vray"]
