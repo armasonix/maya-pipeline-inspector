@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 from shader_health.reports.manifest_diff import (
-    MANIFEST_DIFF_SCHEMA_VERSION,
     build_manifest_diff,
     dumps_manifest_diff,
+    MANIFEST_DIFF_SCHEMA_VERSION,
 )
 from tools.diff_manifests import main as diff_manifests_main
 
