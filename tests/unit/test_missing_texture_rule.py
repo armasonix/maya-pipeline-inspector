@@ -33,9 +33,8 @@ def make_file_dependency_snapshot(*, exists: bool) -> GraphSnapshot:
 
 
 def load_missing_texture_rule() -> RuleDefinition:
-    rules = load_rule_file(RULE_PATH)
-    assert len(rules) == 1
-    return rules[0]
+    rules = {rule.id: rule for rule in load_rule_file(RULE_PATH)}
+    return rules["common.texture.missing"]
 
 
 def test_missing_texture_rule_pack_has_production_defaults():
