@@ -1,7 +1,12 @@
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot, NodeSnapshot, RuleDefinition, ValidationEngine
-from shader_health.core import load_rule_file
+from shader_health.core import (
+    GraphSnapshot,
+    NodeSnapshot,
+    RuleDefinition,
+    ValidationEngine,
+    load_rule_file,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "color_space.json"
@@ -118,7 +123,11 @@ def test_color_managed_rule_pack_has_production_defaults():
 
     assert rule.scope == "texture_node"
     assert rule.severity == "error"
-    assert rule.match.criteria["semantic_slot"] == ["base_color", "specular_color", "emission"]
+    assert rule.match.criteria["semantic_slot"] == [
+        "base_color",
+        "specular_color",
+        "emission",
+    ]
     assert rule.check.type == "attribute_in"
     assert rule.check.params["attribute"] == "colorSpace"
     assert rule.check.params["expected"] == ["sRGB", "ACEScg"]
