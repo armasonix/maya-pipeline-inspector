@@ -117,6 +117,57 @@ _VRAY_COMPLEXITY_WEIGHTS = {
     "VRayRemap": 0.75,
 }
 
+_ARNOLD_NODE_TYPES = {
+    "aiStandardSurface",
+    "aiImage",
+    "aiNormalMap",
+    "aiBump2d",
+    "aiLayerShader",
+    "aiMixShader",
+    "aiColorCorrect",
+    "aiRange",
+    "aiMultiply",
+    "aiNoise",
+    "aiTriplanar",
+    "aiUserDataColor",
+    "aiUserDataFloat",
+    "aiUtility",
+}
+
+_ARNOLD_TEXTURE_SLOTS = {
+    "aiStandardSurface.baseColor": "base_color",
+    "aiStandardSurface.specularRoughness": "roughness",
+    "aiStandardSurface.metalness": "metalness",
+    "aiStandardSurface.normalCamera": "normal",
+    "aiStandardSurface.opacity": "opacity",
+    "aiStandardSurface.emissionColor": "emission",
+    "aiStandardSurface.transmission": "transmission",
+    "aiImage.filename": "texture_file",
+    "aiNormalMap.input": "normal",
+    "aiBump2d.bumpMap": "bump",
+    "aiLayerShader.input": "material",
+    "aiLayerShader.mix": "mask",
+    "aiMixShader.mix": "mask",
+    "displacementShader.displacement": "displacement",
+}
+
+_ARNOLD_COMPLEXITY_WEIGHTS = {
+    "aiStandardSurface": 1.25,
+    "aiImage": 1.0,
+    "aiNormalMap": 1.0,
+    "aiBump2d": 1.0,
+    "aiLayerShader": 2.5,
+    "aiMixShader": 2.0,
+    "aiColorCorrect": 0.75,
+    "aiRange": 0.75,
+    "aiMultiply": 0.5,
+    "aiNoise": 1.25,
+    "aiTriplanar": 1.5,
+    "aiUserDataColor": 0.5,
+    "aiUserDataFloat": 0.5,
+    "aiUtility": 0.75,
+}
+
 
 class RendererAdapterError(ValueError):
     """Raised when renderer adapter registration or lookup fails."""
@@ -257,6 +308,45 @@ class VrayAdapter(BaseRendererAdapter):
 
     def default_rule_packs(self) -> list[str]:
         return ["common", "vray"]
+
+
+@dataclass(frozen=True)
+class ArnoldAdapter(BaseRendererAdapter):
+    """Adapter for Arnold for Maya material and texture graph concepts."""
+
+    id: str = "arnold"
+    display_name: str = "Arnold"
+
+    def supported_node_types(self) -> set[str]:
+        return set(_ARNOLD_NODE_TYPES)
+
+    def classify_node(self, node: NodeSnapshot) -> list[str]:
+        type_name = node.type_name
+        if type_name not in _ARNOLD_NODE_TYPES:
+            return []
+        if type_name == "aiImage":
+            return ["texture", "file"]
+        if type_name in {"aiStandardSurface", "aiLayerShader", "aiMixShader"}:
+            return ["material"]
+        if type_name == "aiNormalMap":
+            return ["normal", "utility"]
+        if type_name == "aiBump2d":
+            return ["bump", "utility"]
+        if type_name in {"aiNoise", "aiTriplanar"}:
+            return ["texture", "procedural", "utility"]
+        return ["utility"]
+
+    def texture_slot_semantics(self) -> TextureSlotSemantics:
+        return dict(_ARNOLD_TEXTURE_SLOTS)
+
+    def displacement_slots(self) -> list[str]:
+        return ["displacementShader.displacement"]
+
+    def complexity_weights(self) -> ComplexityWeights:
+        return dict(_ARNOLD_COMPLEXITY_WEIGHTS)
+
+    def default_rule_packs(self) -> list[str]:
+        return ["common", "arnold"]
 
 
 class RendererAdapterRegistry:
