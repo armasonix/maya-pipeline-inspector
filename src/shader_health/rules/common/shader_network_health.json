@@ -1,0 +1,76 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_network.material.unassigned",
+      "name": "Material should be assigned to production geometry",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material has no assigned geometry.",
+      "why": "Unassigned materials are often dead shader networks. Reporting them keeps assets easier to review and prevents stale lookdev nodes from hiding in production scenes.",
+      "match": {},
+      "check": {
+        "type": "list_length_min",
+        "attribute": "assigned_shapes",
+        "min": 1
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_network.shading_engine.empty",
+      "name": "Shading engine should have assigned members",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "shading_engine",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Shading engine has no assigned members.",
+      "why": "Empty shading engines usually indicate dead assignment state or leftover shader network scaffolding. Reporting them helps clean asset shading graphs before publish.",
+      "match": {},
+      "check": {
+        "type": "list_length_min",
+        "attribute": "members",
+        "min": 1
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_network.default_material.assigned",
+      "name": "Production geometry should not use the default material",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "graph",
+      "severity": "error",
+      "owner": "shader_td",
+      "message": "Production geometry is assigned to the default material.",
+      "why": "Default material assignments usually mean geometry lost its intended lookdev assignment. Detecting this prevents publishes with unshaded or fallback-looking production geometry.",
+      "match": {},
+      "check": {
+        "type": "default_material_assignment",
+        "default_materials": ["lambert1", "node:lambert1"],
+        "default_shading_engines": ["initialShadingGroup", "node:initialShadingGroup"]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
