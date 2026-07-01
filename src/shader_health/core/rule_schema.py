@@ -869,7 +869,10 @@ def _default_material_assignments(
             continue
         is_default_material = _matches_identifier(engine.surface_shader, default_materials)
         is_default_engine = _matches_identifier(engine.name, default_engines)
-        is_default_engine = is_default_engine or _matches_identifier(engine.node_id, default_engines)
+        is_default_engine = is_default_engine or _matches_identifier(
+            engine.node_id,
+            default_engines,
+        )
         if is_default_material or is_default_engine:
             assignments.append(
                 {
