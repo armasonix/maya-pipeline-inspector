@@ -18,6 +18,12 @@ ISSUES_TABLE_WIDGET_OBJECT_NAME = "shaderHealthInspectorIssuesTableWidget"
 ISSUES_SEVERITY_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesSeverityFilter"
 ISSUES_SORT_DROPDOWN_OBJECT_NAME = "shaderHealthInspectorIssuesSortDropdown"
 ISSUES_TABLE_OBJECT_NAME = "shaderHealthInspectorIssuesTable"
+DETAILS_PANEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsPanel"
+DETAILS_MESSAGE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsMessage"
+DETAILS_WHY_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsWhy"
+DETAILS_VALUES_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsValues"
+DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsGraphTrace"
+DETAILS_FIX_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsFix"
 DEFAULT_PROFILE_OPTIONS = (
     "artist_relaxed",
     "publish_strict",
@@ -75,6 +81,19 @@ class IssueTableRow:
     rule: str
 
 
+@dataclass(frozen=True)
+class IssueDetailsState:
+    """Display data for the Maya UI issue details panel."""
+
+    message: str = "No issue selected"
+    why: str = "Select an issue row to inspect why it failed."
+    current_value: str = "N/A"
+    expected_value: str = "N/A"
+    graph_trace: str = "N/A"
+    fix_available: bool = False
+    fix_description: str = "No safe fix selected."
+
+
 def build_main_widget(qt_widgets: Any) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
@@ -91,10 +110,11 @@ def build_main_widget(qt_widgets: Any) -> Any:
 
     layout.addWidget(build_summary_header(qt_widgets))
     layout.addWidget(build_issues_table(qt_widgets))
+    layout.addWidget(build_issue_details_panel(qt_widgets))
 
     description = qt_widgets.QLabel(
-        "Issues table baseline. Scene validation, details, and export actions "
-        "will be added by the next Milestone 6 issues."
+        "Issue details baseline. Scene validation, row selection, and export "
+        "actions will be added by the next Milestone 6 issues."
     )
     description.setObjectName("shaderHealthInspectorDescription")
     description.setWordWrap(True)
@@ -196,6 +216,61 @@ def build_issues_table(
     return widget
 
 
+def build_issue_details_panel(
+    qt_widgets: Any,
+    state: Optional[IssueDetailsState] = None,
+) -> Any:
+    """Build the selected issue details panel."""
+
+    details_state = state or IssueDetailsState()
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(DETAILS_PANEL_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(4)
+
+    title_label = qt_widgets.QLabel("Issue Details")
+    layout.addWidget(title_label)
+
+    message_label = _details_label(
+        qt_widgets,
+        DETAILS_MESSAGE_LABEL_OBJECT_NAME,
+        _details_message_text(details_state),
+    )
+    layout.addWidget(message_label)
+
+    why_label = _details_label(
+        qt_widgets,
+        DETAILS_WHY_LABEL_OBJECT_NAME,
+        _details_why_text(details_state),
+    )
+    layout.addWidget(why_label)
+
+    values_label = _details_label(
+        qt_widgets,
+        DETAILS_VALUES_LABEL_OBJECT_NAME,
+        _details_values_text(details_state),
+    )
+    layout.addWidget(values_label)
+
+    graph_trace_label = _details_label(
+        qt_widgets,
+        DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME,
+        _details_graph_trace_text(details_state),
+    )
+    layout.addWidget(graph_trace_label)
+
+    fix_label = _details_label(
+        qt_widgets,
+        DETAILS_FIX_LABEL_OBJECT_NAME,
+        _details_fix_text(details_state),
+    )
+    layout.addWidget(fix_label)
+
+    return widget
+
+
 def populate_issues_table(
     qt_widgets: Any,
     table: Any,
@@ -278,6 +353,34 @@ def _block_status_text(state: SummaryHeaderState) -> str:
     publish_status = _yes_no(state.block_publish)
     deadline_status = _yes_no(state.block_deadline)
     return f"Publish Block: {publish_status}   Deadline Block: {deadline_status}"
+
+
+def _details_label(qt_widgets: Any, object_name: str, text: str) -> Any:
+    label = qt_widgets.QLabel(text)
+    label.setObjectName(object_name)
+    label.setWordWrap(True)
+    return label
+
+
+def _details_message_text(state: IssueDetailsState) -> str:
+    return f"Message: {state.message}"
+
+
+def _details_why_text(state: IssueDetailsState) -> str:
+    return f"Why: {state.why}"
+
+
+def _details_values_text(state: IssueDetailsState) -> str:
+    return f"Current: {state.current_value}   Expected: {state.expected_value}"
+
+
+def _details_graph_trace_text(state: IssueDetailsState) -> str:
+    return f"Graph Trace: {state.graph_trace}"
+
+
+def _details_fix_text(state: IssueDetailsState) -> str:
+    fix_status = _yes_no(state.fix_available)
+    return f"Fix Available: {fix_status}   {state.fix_description}"
 
 
 def _issue_sort_value(row: IssueTableRow, sort_key: str) -> tuple[int, str]:
