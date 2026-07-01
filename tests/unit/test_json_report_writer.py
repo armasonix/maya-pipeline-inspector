@@ -125,8 +125,6 @@ def test_json_report_passed_status_without_failed_results():
         "common.texture.colorspace.data_raw",
         "critical",
         status="passed",
-        block_publish=True,
-        block_deadline=True,
     )
 
     report = build_json_report(snapshot, [result])
