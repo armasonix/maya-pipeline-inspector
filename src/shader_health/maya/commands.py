@@ -4,12 +4,6 @@ from __future__ import annotations
 import importlib
 from typing import Any, Optional
 
-from shader_health.maya.export_actions import (
-    ExportActionResult,
-    export_html_report,
-    export_json_report,
-    export_shader_manifest,
-)
 from shader_health.maya.navigation import (
     NavigationActionResult,
     copy_path,
@@ -67,22 +61,22 @@ def reveal_file_action(path: str) -> NavigationActionResult:
     return reveal_file(path)
 
 
-def export_json_report_action(path: Optional[str] = None) -> ExportActionResult:
+def export_json_report_action(path: Optional[str] = None) -> Any:
     """Export the current shader health JSON report from a UI action."""
 
-    return export_json_report(path)
+    return _export_json_report(path)
 
 
-def export_html_report_action(path: Optional[str] = None) -> ExportActionResult:
+def export_html_report_action(path: Optional[str] = None) -> Any:
     """Export the current shader health HTML report from a UI action."""
 
-    return export_html_report(path)
+    return _export_html_report(path)
 
 
-def export_shader_manifest_action(path: Optional[str] = None) -> ExportActionResult:
+def export_shader_manifest_action(path: Optional[str] = None) -> Any:
     """Export the current shader manifest from a UI action."""
 
-    return export_shader_manifest(path)
+    return _export_shader_manifest(path)
 
 
 def install_menu(parent: Optional[str] = None) -> str:
@@ -144,6 +138,24 @@ def install_ui() -> None:
 
     install_menu()
     install_shelf()
+
+
+def _export_json_report(path: Optional[str]) -> Any:
+    from shader_health.maya.export_actions import export_json_report
+
+    return export_json_report(path)
+
+
+def _export_html_report(path: Optional[str]) -> Any:
+    from shader_health.maya.export_actions import export_html_report
+
+    return export_html_report(path)
+
+
+def _export_shader_manifest(path: Optional[str]) -> Any:
+    from shader_health.maya.export_actions import export_shader_manifest
+
+    return export_shader_manifest(path)
 
 
 def _maya_shelf_top_level() -> str:
