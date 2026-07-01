@@ -6,9 +6,11 @@ from shader_health.adapters import (
     CommonMayaAdapter,
     RendererAdapterError,
     RendererAdapterRegistry,
+    SemanticTextureSlotResolver,
     VrayAdapter,
+    classify_semantic_data_kind,
 )
-from shader_health.core import NodeSnapshot
+from shader_health.core import ConnectionSnapshot, GraphSnapshot, NodeSnapshot
 
 
 class FakeAdapter(BaseRendererAdapter):
@@ -359,3 +361,144 @@ def test_registry_classifies_arnold_nodes():
 
     assert registry.classify_node(node) == ["texture", "file"]
     assert registry.ids() == ["arnold", "common", "vray"]
+
+def make_semantic_snapshot() -> GraphSnapshot:
+    return GraphSnapshot(
+        nodes=[
+            NodeSnapshot(id="node:file_albedo", name="file_albedo", type_name="file"),
+            NodeSnapshot(id="node:file_roughness", name="file_roughness", type_name="file"),
+            NodeSnapshot(id="node:mtl", name="mtl", type_name="VRayMtl"),
+        ],
+        connections=[
+            ConnectionSnapshot(
+                src_node="node:file_albedo",
+                src_attr="outColor",
+                dst_node="node:mtl",
+                dst_attr="diffuseColor",
+            ),
+            ConnectionSnapshot(
+                src_node="node:file_roughness",
+                src_attr="outAlpha",
+                dst_node="node:mtl",
+                dst_attr="reflectionGlossiness",
+            ),
+        ],
+    )
+
+
+def test_semantic_resolver_uses_connection_destination_for_vray_slots():
+    resolver = SemanticTextureSlotResolver(RendererAdapterRegistry([VrayAdapter()]))
+
+    results = resolver.resolve_all(make_semantic_snapshot())
+
+    assert [item.status for item in results] == ["resolved", "resolved"]
+    assert [item.semantic for item in results] == ["base_color", "roughness"]
+    assert [item.data_kind for item in results] == ["color", "data"]
+    assert results[0].adapter_id == "vray"
+    assert results[0].is_resolved is True
+
+
+def test_semantic_resolver_marks_unknown_when_no_mapping_exists():
+    snapshot = GraphSnapshot(
+        nodes=[
+            NodeSnapshot(id="node:file1", name="file1", type_name="file"),
+            NodeSnapshot(id="node:mtl", name="mtl", type_name="VRayMtl"),
+        ],
+        connections=[
+            ConnectionSnapshot(
+                src_node="node:file1",
+                src_attr="outColor",
+                dst_node="node:mtl",
+                dst_attr="notMapped",
+            )
+        ],
+    )
+    resolver = SemanticTextureSlotResolver(RendererAdapterRegistry([VrayAdapter()]))
+
+    result = resolver.resolve_all(snapshot)[0]
+
+    assert result.status == "unknown"
+    assert result.semantic == "unknown"
+    assert result.data_kind == "unknown"
+    assert "no semantic mapping" in result.reason
+
+
+def test_semantic_resolver_marks_missing_destination_node_as_unknown():
+    snapshot = GraphSnapshot(
+        nodes=[NodeSnapshot(id="node:file1", name="file1", type_name="file")],
+        connections=[
+            ConnectionSnapshot(
+                src_node="node:file1",
+                src_attr="outColor",
+                dst_node="node:missing",
+                dst_attr="diffuseColor",
+            )
+        ],
+    )
+    resolver = SemanticTextureSlotResolver(RendererAdapterRegistry([VrayAdapter()]))
+
+    result = resolver.resolve_all(snapshot)[0]
+
+    assert result.status == "unknown"
+    assert result.semantic == "unknown"
+    assert "destination node not found" in result.reason
+
+
+class ColorOnlyAdapter(BaseRendererAdapter):
+    def texture_slot_semantics(self) -> dict[str, str]:
+        return {"fakeMaterial.input": "base_color"}
+
+
+class DataOnlyAdapter(BaseRendererAdapter):
+    def texture_slot_semantics(self) -> dict[str, str]:
+        return {"fakeMaterial.input": "roughness"}
+
+
+def test_semantic_resolver_marks_ambiguous_slots_as_unknown():
+    snapshot = GraphSnapshot(
+        nodes=[
+            NodeSnapshot(id="node:file1", name="file1", type_name="file"),
+            NodeSnapshot(id="node:fake", name="fake", type_name="fakeMaterial"),
+        ],
+        connections=[
+            ConnectionSnapshot(
+                src_node="node:file1",
+                src_attr="outColor",
+                dst_node="node:fake",
+                dst_attr="input",
+            )
+        ],
+    )
+    registry = RendererAdapterRegistry(
+        [
+            ColorOnlyAdapter(id="color", display_name="Color"),
+            DataOnlyAdapter(id="data", display_name="Data"),
+        ]
+    )
+    resolver = SemanticTextureSlotResolver(registry)
+
+    result = resolver.resolve_all(snapshot)[0]
+
+    assert result.status == "ambiguous"
+    assert result.semantic == "unknown"
+    assert result.data_kind == "unknown"
+    assert "ambiguous semantic mapping" in result.reason
+
+
+def test_semantic_resolver_can_apply_semantics_to_snapshot_connections():
+    resolver = SemanticTextureSlotResolver(RendererAdapterRegistry([VrayAdapter()]))
+
+    updated = resolver.apply_to_snapshot(make_semantic_snapshot())
+
+    assert [item.semantic for item in updated.connections] == ["base_color", "roughness"]
+    assert make_semantic_snapshot().connections[0].semantic is None
+
+
+def test_semantic_data_kind_classification():
+    assert classify_semantic_data_kind("base_color") == "color"
+    assert classify_semantic_data_kind("emission") == "color"
+    assert classify_semantic_data_kind("roughness") == "data"
+    assert classify_semantic_data_kind("normal") == "data"
+    assert classify_semantic_data_kind("material") == "material"
+    assert classify_semantic_data_kind("custom") == "unknown"
+

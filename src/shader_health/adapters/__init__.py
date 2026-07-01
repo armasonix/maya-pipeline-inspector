@@ -11,6 +11,11 @@ from shader_health.adapters.base import (
     TextureSlotSemantics,
     VrayAdapter,
 )
+from shader_health.adapters.semantic import (
+    SemanticSlotResolution,
+    SemanticTextureSlotResolver,
+    classify_semantic_data_kind,
+)
 
 __all__ = [
     "ArnoldAdapter",
@@ -20,6 +25,9 @@ __all__ = [
     "RendererAdapter",
     "RendererAdapterError",
     "RendererAdapterRegistry",
+    "SemanticSlotResolution",
+    "SemanticTextureSlotResolver",
     "TextureSlotSemantics",
     "VrayAdapter",
+    "classify_semantic_data_kind",
 ]
