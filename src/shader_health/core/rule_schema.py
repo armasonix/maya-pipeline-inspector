@@ -427,6 +427,8 @@ class ValidationEngine:
             return self._evaluate_attribute_equals(rule, target)
         if check_type == "attribute_in":
             return self._evaluate_attribute_in(rule, target)
+        if check_type == "duplicate_file_dependencies":
+            return self._evaluate_duplicate_file_dependencies(rule, target)
         if check_type == "list_length_max":
             return self._evaluate_list_length_max(rule, target)
         if check_type == "numeric_max":
@@ -480,6 +482,31 @@ class ValidationEngine:
             current_value=current,
             expected_value=allowed,
             plug=attribute,
+        )
+
+    def _evaluate_duplicate_file_dependencies(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="duplicate_file_dependencies_requires_graph_snapshot",
+            )
+
+        groups = _duplicate_file_dependency_groups(target.obj)
+        status = "failed" if groups else "passed"
+        evidence = {"duplicate_groups": groups} if groups else {}
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=len(groups),
+            expected_value=0,
+            plug="file_dependencies",
+            evidence=evidence,
         )
 
     def _evaluate_list_length_max(
@@ -766,6 +793,32 @@ def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
         if isinstance(semantic, str) and semantic:
             semantics[node.id] = semantic
     return semantics
+
+
+def _duplicate_file_dependency_groups(snapshot: GraphSnapshot) -> list[JsonDict]:
+    grouped: dict[str, list[FileDependencySnapshot]] = {}
+    for dependency in snapshot.file_dependencies:
+        key = _duplicate_file_dependency_key(dependency)
+        if key:
+            grouped.setdefault(key, []).append(dependency)
+
+    groups: list[JsonDict] = []
+    for path, dependencies in sorted(grouped.items()):
+        node_ids = sorted({dependency.node_id for dependency in dependencies})
+        if len(node_ids) > 1:
+            groups.append(
+                {
+                    "path": path,
+                    "node_ids": node_ids,
+                    "count": len(node_ids),
+                }
+            )
+    return groups
+
+
+def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
+    path = dependency.resolved_path or dependency.raw_path
+    return _normalize_path(path) if path else ""
 
 
 def _as_float(value: Any) -> Optional[float]:
