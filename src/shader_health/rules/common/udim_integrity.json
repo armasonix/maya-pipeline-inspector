@@ -1,0 +1,31 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.udim.missing_tiles",
+      "name": "UDIM texture set must not have missing tiles",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "texture_td",
+      "message": "UDIM texture set has missing tiles.",
+      "why": "Missing UDIM tiles create visible render holes or fallback texture samples. Detecting incomplete tile sets before publish prevents broken assets and wasted farm renders.",
+      "match": {
+        "dependency_kind": "texture",
+        "is_udim": true
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "missing_udim_tiles",
+        "expected": []
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
