@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
 PANEL_TITLE = "Maya Shader Health Inspector"
@@ -71,7 +71,7 @@ def build_main_widget(qt_widgets: Any) -> Any:
 
 def build_summary_header(
     qt_widgets: Any,
-    state: SummaryHeaderState | None = None,
+    state: Optional[SummaryHeaderState] = None,
     profile_options: Sequence[str] = DEFAULT_PROFILE_OPTIONS,
 ) -> Any:
     """Build the summary/header widget shown at the top of the Maya panel."""
