@@ -427,6 +427,8 @@ class ValidationEngine:
             return self._evaluate_attribute_equals(rule, target)
         if check_type == "attribute_in":
             return self._evaluate_attribute_in(rule, target)
+        if check_type == "numeric_max":
+            return self._evaluate_numeric_max(rule, target)
         if check_type == "path_exists":
             return self._evaluate_path_exists(rule, target)
         if check_type == "path_policy":
@@ -476,6 +478,34 @@ class ValidationEngine:
             current_value=current,
             expected_value=allowed,
             plug=attribute,
+        )
+
+    def _evaluate_numeric_max(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        attribute = str(rule.check.params.get("attribute", ""))
+        maximum = rule.check.params.get("max")
+        current = self._read_value(target, attribute)
+        current_number = _as_float(current)
+        maximum_number = _as_float(maximum)
+        if current_number is None or maximum_number is None:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="numeric_max_requires_numeric_values",
+            )
+
+        status = "passed" if current_number <= maximum_number else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current,
+            expected_value=maximum,
+            plug=attribute,
+            evidence={"max": maximum_number},
         )
 
     def _evaluate_path_exists(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
@@ -558,8 +588,14 @@ class ValidationEngine:
                 for item in snapshot.materials
             ]
         if scope == "file_dependency":
+            node_semantics = _node_semantics_by_id(snapshot)
             return [
-                _TargetContext("file_dependency", item.node_id, item)
+                _TargetContext(
+                    "file_dependency",
+                    item.node_id,
+                    item,
+                    node_semantics.get(item.node_id),
+                )
                 for item in snapshot.file_dependencies
             ]
         if scope == "connection":
@@ -691,6 +727,24 @@ _REQUIRED_RULE_KEYS = frozenset(
         "policy",
     }
 )
+
+
+def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
+    semantics: dict[str, str] = {}
+    for node in snapshot.nodes:
+        semantic = node.attrs.get("semantic_slot")
+        if isinstance(semantic, str) and semantic:
+            semantics[node.id] = semantic
+    return semantics
+
+
+def _as_float(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _path_policy_violations(
