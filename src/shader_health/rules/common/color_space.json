@@ -10,9 +10,17 @@
       "severity": "critical",
       "owner": "shader_td",
       "message": "Data texture uses a color-managed color space.",
-      "why": "Scalar maps such as roughness, masks, normal, bump, and displacement must not be transformed as color data because color transforms alter numeric values.",
+      "why": "Scalar maps such as roughness, masks, normal, bump, displacement, and opacity must not be transformed as color data because color transforms alter numeric values.",
       "match": {
-        "semantic_slot": ["roughness", "metalness", "normal", "bump", "displacement", "mask"],
+        "semantic_slot": [
+          "roughness",
+          "metalness",
+          "normal",
+          "bump",
+          "displacement",
+          "mask",
+          "opacity"
+        ],
         "node_type": ["file", "VRayBitmap", "aiImage"]
       },
       "check": {
@@ -31,6 +39,33 @@
         "attribute": "colorSpace",
         "value": "Raw",
         "risk": "low"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.colorspace.color_managed",
+      "name": "Color textures must use a color-managed color space",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "texture_node",
+      "severity": "error",
+      "owner": "shader_td",
+      "message": "Color texture is configured as non-color data.",
+      "why": "Base color, specular color, and emission maps represent color information. They should remain color-managed so viewport, lookdev, and final renders interpret them consistently.",
+      "match": {
+        "semantic_slot": ["base_color", "specular_color", "emission"],
+        "node_type": ["file", "VRayBitmap", "aiImage"]
+      },
+      "check": {
+        "type": "attribute_in",
+        "attribute": "colorSpace",
+        "expected": ["sRGB", "ACEScg"]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
       }
     }
   ]
