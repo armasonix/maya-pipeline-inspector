@@ -59,7 +59,10 @@ def _create_dockable_panel() -> Any:
         MayaQWidgetDockableMixin,
     )
 
-    class ShaderHealthInspectorDock(MayaQWidgetDockableMixin, qt_widgets.QWidget):
+    class ShaderHealthInspectorDock(  # type: ignore[name-defined]
+        MayaQWidgetDockableMixin,
+        qt_widgets.QWidget,
+    ):
         def __init__(self) -> None:
             super().__init__()
             self.setObjectName(PANEL_OBJECT_NAME)
