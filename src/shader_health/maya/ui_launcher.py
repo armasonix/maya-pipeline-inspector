@@ -3,7 +3,18 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from shader_health.ui.main_window import PANEL_OBJECT_NAME, PANEL_TITLE, build_main_widget
+from shader_health.maya.export_actions import (
+    ExportActionResult,
+    export_html_report,
+    export_json_report,
+    export_shader_manifest,
+)
+from shader_health.ui.main_window import (
+    ExportActionCallbacks,
+    PANEL_OBJECT_NAME,
+    PANEL_TITLE,
+    build_main_widget,
+)
 from shader_health.ui.qt import load_qt_widgets
 
 WORKSPACE_CONTROL_NAME = f"{PANEL_OBJECT_NAME}WorkspaceControl"
@@ -66,7 +77,12 @@ def _create_dockable_panel() -> Any:
 
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(build_main_widget(qt_widgets))
+        layout.addWidget(
+            build_main_widget(
+                qt_widgets,
+                export_callbacks=_export_action_callbacks(),
+            )
+        )
 
     panel_class = type(
         "ShaderHealthInspectorDock",
@@ -74,6 +90,30 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _export_action_callbacks() -> ExportActionCallbacks:
+    return ExportActionCallbacks(
+        on_export_json=_export_json_from_ui,
+        on_export_html=_export_html_from_ui,
+        on_export_manifest=_export_manifest_from_ui,
+    )
+
+
+def _export_json_from_ui() -> None:
+    _print_export_result(export_json_report())
+
+
+def _export_html_from_ui() -> None:
+    _print_export_result(export_html_report())
+
+
+def _export_manifest_from_ui() -> None:
+    _print_export_result(export_shader_manifest())
+
+
+def _print_export_result(result: ExportActionResult) -> None:
+    print(f"{result.message} {result.path}")
 
 
 def _workspace_control_exists(cmds: Any) -> bool:
