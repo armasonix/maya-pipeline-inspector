@@ -1,6 +1,7 @@
 """Maya command entrypoints for Shader Health Inspector."""
 from __future__ import annotations
 
+import importlib
 from typing import Any, Optional
 
 from shader_health.maya.ui_launcher import close_panel, show_panel
@@ -91,16 +92,16 @@ def install_ui() -> None:
 
 
 def _maya_shelf_top_level() -> str:
-    try:
-        from maya import mel
-    except ImportError as exc:
-        raise RuntimeError("Maya shelf commands can only run inside Autodesk Maya.") from exc
+    mel: Any = _maya_module("maya.mel")
     return str(mel.eval("$tmp = $gShelfTopLevel"))
 
 
 def _maya_cmds() -> Any:
+    return _maya_module("maya.cmds")
+
+
+def _maya_module(module_name: str) -> Any:
     try:
-        from maya import cmds  # type: ignore[import-not-found]
+        return importlib.import_module(module_name)
     except ImportError as exc:
         raise RuntimeError("Maya commands can only run inside Autodesk Maya.") from exc
-    return cmds
