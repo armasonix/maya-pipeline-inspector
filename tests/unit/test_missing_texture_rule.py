@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from shader_health.core import (
     FileDependencySnapshot,
@@ -9,6 +10,8 @@ from shader_health.core import (
     load_profile,
     load_rule_file,
 )
+
+RULE_PATH = Path("src/shader_health/rules/common/texture_paths.json")
 
 
 def make_file_dependency_snapshot(*, exists: bool) -> GraphSnapshot:
@@ -29,9 +32,7 @@ def make_file_dependency_snapshot(*, exists: bool) -> GraphSnapshot:
 
 
 def load_missing_texture_rule() -> RuleDefinition:
-    rules = load_rule_file(
-        __import__("pathlib").Path("src/shader_health/rules/common/texture_paths.json")
-    )
+    rules = load_rule_file(RULE_PATH)
     assert len(rules) == 1
     return rules[0]
 
