@@ -1,6 +1,7 @@
 """Renderer adapter layer."""
 
 from shader_health.adapters.base import (
+    ArnoldAdapter,
     BaseRendererAdapter,
     CommonMayaAdapter,
     ComplexityWeights,
@@ -12,6 +13,7 @@ from shader_health.adapters.base import (
 )
 
 __all__ = [
+    "ArnoldAdapter",
     "BaseRendererAdapter",
     "CommonMayaAdapter",
     "ComplexityWeights",
