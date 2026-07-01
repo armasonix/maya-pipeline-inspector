@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from shader_health.core.fix_plan import build_fix_plan
 from shader_health.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
 from shader_health.core.rule_schema import (
@@ -46,7 +48,7 @@ def test_fix_planner_builds_action_for_failed_result_with_rule_fix():
 def test_fix_planner_skips_non_failed_results_and_rules_without_fix():
     snapshot = _snapshot(NodeSnapshot(id="node:file1", name="file1", type_name="file"))
     passed = _failed_result(status="passed")
-    no_fix_rule = _rule_with_fix(fix=None)
+    no_fix_rule = _rule_without_fix()
 
     plan = build_fix_plan([passed, _failed_result()], [no_fix_rule], snapshot)
 
@@ -140,13 +142,19 @@ def test_fix_planner_resolves_material_target_to_underlying_node():
     assert action.block_reasons == ["target_referenced"]
 
 
-def _rule_with_fix(fix: RuleFix | None = None) -> RuleDefinition:
-    if fix is None:
-        fix = RuleFix(
-            type="set_attr",
-            risk="low",
-            params={"attribute": "colorSpace", "value": "Raw"},
-        )
+def _rule_with_fix(fix: Optional[RuleFix] = None) -> RuleDefinition:
+    return _rule(fix=_default_fix() if fix is None else fix)
+
+
+def _rule_without_fix() -> RuleDefinition:
+    return _rule(fix=None, auto_fix_allowed=False)
+
+
+def _rule(
+    *,
+    fix: Optional[RuleFix],
+    auto_fix_allowed: bool = True,
+) -> RuleDefinition:
     return RuleDefinition(
         id="common.texture.colorspace.data_raw",
         name="Data textures must use Raw color space",
@@ -159,8 +167,16 @@ def _rule_with_fix(fix: RuleFix | None = None) -> RuleDefinition:
         why="Data textures must not be color transformed.",
         match=RuleMatch(criteria={"node_type": ["file"]}),
         check=RuleCheck(type="attribute_equals", params={"attribute": "colorSpace"}),
-        policy=RulePolicy(auto_fix_allowed=True),
+        policy=RulePolicy(auto_fix_allowed=auto_fix_allowed),
         fix=fix,
+    )
+
+
+def _default_fix() -> RuleFix:
+    return RuleFix(
+        type="set_attr",
+        risk="low",
+        params={"attribute": "colorSpace", "value": "Raw"},
     )
 
 
