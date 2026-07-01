@@ -1,0 +1,495 @@
+"""Maya Shader Health Inspector panel content."""
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import Any, Optional
+
+PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
+PANEL_TITLE = "Maya Shader Health Inspector"
+PANEL_CONTENT_OBJECT_NAME = "shaderHealthInspectorPanelContent"
+SUMMARY_HEADER_OBJECT_NAME = "shaderHealthInspectorSummaryHeader"
+HEALTH_SCORE_LABEL_OBJECT_NAME = "shaderHealthInspectorHealthScoreLabel"
+SEVERITY_COUNTS_LABEL_OBJECT_NAME = "shaderHealthInspectorSeverityCountsLabel"
+BLOCK_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorBlockStatusLabel"
+PROFILE_LABEL_OBJECT_NAME = "shaderHealthInspectorProfileLabel"
+PROFILE_DROPDOWN_OBJECT_NAME = "shaderHealthInspectorProfileDropdown"
+ISSUES_TABLE_WIDGET_OBJECT_NAME = "shaderHealthInspectorIssuesTableWidget"
+ISSUES_SEVERITY_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesSeverityFilter"
+ISSUES_SORT_DROPDOWN_OBJECT_NAME = "shaderHealthInspectorIssuesSortDropdown"
+ISSUES_TABLE_OBJECT_NAME = "shaderHealthInspectorIssuesTable"
+DETAILS_PANEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsPanel"
+DETAILS_MESSAGE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsMessage"
+DETAILS_WHY_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsWhy"
+DETAILS_VALUES_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsValues"
+DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsGraphTrace"
+DETAILS_FIX_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsFix"
+EXPORT_ACTIONS_OBJECT_NAME = "shaderHealthInspectorExportActions"
+EXPORT_JSON_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportJsonButton"
+EXPORT_HTML_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportHtmlButton"
+EXPORT_MANIFEST_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportManifestButton"
+DEFAULT_PROFILE_OPTIONS = (
+    "artist_relaxed",
+    "publish_strict",
+    "deadline_critical",
+    "supervisor_full",
+)
+ISSUES_TABLE_COLUMNS = (
+    "Severity",
+    "Material",
+    "Node",
+    "Issue",
+    "Owner",
+    "Rule",
+)
+ISSUES_SORT_KEYS = (
+    "severity",
+    "material",
+    "node",
+    "issue",
+    "owner",
+    "rule",
+)
+ALL_SEVERITIES_LABEL = "All severities"
+SEVERITY_SORT_ORDER = {
+    "critical": 0,
+    "error": 1,
+    "warning": 2,
+    "info": 3,
+}
+
+
+@dataclass(frozen=True)
+class SummaryHeaderState:
+    """Display data for the Maya UI summary/header widget."""
+
+    health_score: int = 100
+    critical_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+    block_publish: bool = False
+    block_deadline: bool = False
+    profile_id: str = "artist_relaxed"
+
+
+@dataclass(frozen=True)
+class IssueTableRow:
+    """Display row for the Maya UI issues table."""
+
+    severity: str
+    material: str
+    node: str
+    issue: str
+    owner: str
+    rule: str
+
+
+@dataclass(frozen=True)
+class IssueDetailsState:
+    """Display data for the Maya UI issue details panel."""
+
+    message: str = "No issue selected"
+    why: str = "Select an issue row to inspect why it failed."
+    current_value: str = "N/A"
+    expected_value: str = "N/A"
+    graph_trace: str = "N/A"
+    fix_available: bool = False
+    fix_description: str = "No safe fix selected."
+
+
+@dataclass(frozen=True)
+class ExportActionCallbacks:
+    """Optional callbacks for report export UI buttons."""
+
+    on_export_json: Optional[Callable[[], None]] = None
+    on_export_html: Optional[Callable[[], None]] = None
+    on_export_manifest: Optional[Callable[[], None]] = None
+
+
+def build_main_widget(
+    qt_widgets: Any,
+    export_callbacks: Optional[ExportActionCallbacks] = None,
+) -> Any:
+    """Build the visible UI shell for the dockable Maya panel."""
+
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setSpacing(8)
+
+    title = qt_widgets.QLabel(PANEL_TITLE)
+    title.setObjectName("shaderHealthInspectorTitle")
+    layout.addWidget(title)
+
+    layout.addWidget(build_summary_header(qt_widgets))
+    layout.addWidget(build_issues_table(qt_widgets))
+    layout.addWidget(build_issue_details_panel(qt_widgets))
+    layout.addWidget(build_export_actions(qt_widgets, callbacks=export_callbacks))
+
+    description = qt_widgets.QLabel(
+        "Export actions are available for the current scene snapshot. Live "
+        "validation result wiring is added in a later production milestone."
+    )
+    description.setObjectName("shaderHealthInspectorDescription")
+    description.setWordWrap(True)
+    layout.addWidget(description)
+
+    validate_button = qt_widgets.QPushButton("Validate Scene")
+    validate_button.setObjectName("shaderHealthInspectorValidateSceneButton")
+    validate_button.setEnabled(False)
+    validate_button.setToolTip("Validation is added in a later Maya UI issue.")
+    layout.addWidget(validate_button)
+
+    layout.addStretch(1)
+    return widget
+
+
+def build_summary_header(
+    qt_widgets: Any,
+    state: Optional[SummaryHeaderState] = None,
+    profile_options: Sequence[str] = DEFAULT_PROFILE_OPTIONS,
+) -> Any:
+    """Build the summary/header widget shown at the top of the Maya panel."""
+
+    summary_state = state or SummaryHeaderState()
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(SUMMARY_HEADER_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(4)
+
+    health_score_label = qt_widgets.QLabel(_health_score_text(summary_state))
+    health_score_label.setObjectName(HEALTH_SCORE_LABEL_OBJECT_NAME)
+    layout.addWidget(health_score_label)
+
+    severity_counts_label = qt_widgets.QLabel(_severity_counts_text(summary_state))
+    severity_counts_label.setObjectName(SEVERITY_COUNTS_LABEL_OBJECT_NAME)
+    layout.addWidget(severity_counts_label)
+
+    block_status_label = qt_widgets.QLabel(_block_status_text(summary_state))
+    block_status_label.setObjectName(BLOCK_STATUS_LABEL_OBJECT_NAME)
+    layout.addWidget(block_status_label)
+
+    profile_label = qt_widgets.QLabel("Profile")
+    profile_label.setObjectName(PROFILE_LABEL_OBJECT_NAME)
+    layout.addWidget(profile_label)
+
+    profile_dropdown = qt_widgets.QComboBox()
+    profile_dropdown.setObjectName(PROFILE_DROPDOWN_OBJECT_NAME)
+    profile_dropdown.addItems(list(profile_options))
+    if summary_state.profile_id in profile_options:
+        profile_dropdown.setCurrentText(summary_state.profile_id)
+    profile_dropdown.setToolTip("Validation profile selection is wired in a later issue.")
+    layout.addWidget(profile_dropdown)
+
+    return widget
+
+
+def build_issues_table(
+    qt_widgets: Any,
+    rows: Sequence[IssueTableRow] = (),
+) -> Any:
+    """Build the filterable/sortable issues table widget."""
+
+    issue_rows = tuple(rows)
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(ISSUES_TABLE_WIDGET_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(4)
+
+    severity_filter_label = qt_widgets.QLabel("Severity Filter")
+    layout.addWidget(severity_filter_label)
+
+    severity_filter = qt_widgets.QComboBox()
+    severity_filter.setObjectName(ISSUES_SEVERITY_FILTER_OBJECT_NAME)
+    severity_filter.addItems(list(severity_filter_options(issue_rows)))
+    severity_filter.setToolTip("Severity filtering is wired to validation results later.")
+    layout.addWidget(severity_filter)
+
+    sort_label = qt_widgets.QLabel("Sort By")
+    layout.addWidget(sort_label)
+
+    sort_dropdown = qt_widgets.QComboBox()
+    sort_dropdown.setObjectName(ISSUES_SORT_DROPDOWN_OBJECT_NAME)
+    sort_dropdown.addItems(list(ISSUES_SORT_KEYS))
+    sort_dropdown.setCurrentText("severity")
+    sort_dropdown.setToolTip("Column sorting is enabled on the issues table.")
+    layout.addWidget(sort_dropdown)
+
+    table = qt_widgets.QTableWidget()
+    table.setObjectName(ISSUES_TABLE_OBJECT_NAME)
+    table.setColumnCount(len(ISSUES_TABLE_COLUMNS))
+    table.setHorizontalHeaderLabels(list(ISSUES_TABLE_COLUMNS))
+    table.setSortingEnabled(True)
+    populate_issues_table(qt_widgets, table, issue_rows)
+    layout.addWidget(table)
+
+    return widget
+
+
+def build_issue_details_panel(
+    qt_widgets: Any,
+    state: Optional[IssueDetailsState] = None,
+) -> Any:
+    """Build the selected issue details panel."""
+
+    details_state = state or IssueDetailsState()
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(DETAILS_PANEL_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(4)
+
+    title_label = qt_widgets.QLabel("Issue Details")
+    layout.addWidget(title_label)
+
+    message_label = _details_label(
+        qt_widgets,
+        DETAILS_MESSAGE_LABEL_OBJECT_NAME,
+        _details_message_text(details_state),
+    )
+    layout.addWidget(message_label)
+
+    why_label = _details_label(
+        qt_widgets,
+        DETAILS_WHY_LABEL_OBJECT_NAME,
+        _details_why_text(details_state),
+    )
+    layout.addWidget(why_label)
+
+    values_label = _details_label(
+        qt_widgets,
+        DETAILS_VALUES_LABEL_OBJECT_NAME,
+        _details_values_text(details_state),
+    )
+    layout.addWidget(values_label)
+
+    graph_trace_label = _details_label(
+        qt_widgets,
+        DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME,
+        _details_graph_trace_text(details_state),
+    )
+    layout.addWidget(graph_trace_label)
+
+    fix_label = _details_label(
+        qt_widgets,
+        DETAILS_FIX_LABEL_OBJECT_NAME,
+        _details_fix_text(details_state),
+    )
+    layout.addWidget(fix_label)
+
+    return widget
+
+
+def build_export_actions(
+    qt_widgets: Any,
+    callbacks: Optional[ExportActionCallbacks] = None,
+) -> Any:
+    """Build report export buttons for the Maya panel."""
+
+    export_callbacks = callbacks or ExportActionCallbacks()
+    widget = qt_widgets.QWidget()
+    widget.setObjectName(EXPORT_ACTIONS_OBJECT_NAME)
+
+    layout = qt_widgets.QVBoxLayout(widget)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(4)
+
+    title_label = qt_widgets.QLabel("Report Exports")
+    layout.addWidget(title_label)
+
+    json_button = _export_button(
+        qt_widgets,
+        "Export JSON Report",
+        EXPORT_JSON_BUTTON_OBJECT_NAME,
+        "Write the current shader health JSON report next to the scene.",
+        export_callbacks.on_export_json,
+    )
+    layout.addWidget(json_button)
+
+    html_button = _export_button(
+        qt_widgets,
+        "Export HTML Report",
+        EXPORT_HTML_BUTTON_OBJECT_NAME,
+        "Write the current shader health HTML report next to the scene.",
+        export_callbacks.on_export_html,
+    )
+    layout.addWidget(html_button)
+
+    manifest_button = _export_button(
+        qt_widgets,
+        "Export Shader Manifest",
+        EXPORT_MANIFEST_BUTTON_OBJECT_NAME,
+        "Write the current Material Passport / Shader Manifest next to the scene.",
+        export_callbacks.on_export_manifest,
+    )
+    layout.addWidget(manifest_button)
+
+    return widget
+
+
+def populate_issues_table(
+    qt_widgets: Any,
+    table: Any,
+    rows: Sequence[IssueTableRow],
+) -> None:
+    """Populate a Qt table widget with issue display rows."""
+
+    table.setRowCount(len(rows))
+    for row_index, row in enumerate(rows):
+        for column_index, value in enumerate(issue_row_cells(row)):
+            table.setItem(row_index, column_index, qt_widgets.QTableWidgetItem(value))
+
+
+def filter_issue_rows(
+    rows: Sequence[IssueTableRow],
+    severity_filter: str = ALL_SEVERITIES_LABEL,
+) -> tuple[IssueTableRow, ...]:
+    """Return issue rows matching the selected severity filter."""
+
+    if severity_filter == ALL_SEVERITIES_LABEL:
+        return tuple(rows)
+    severity = _normalized_text(severity_filter)
+    return tuple(row for row in rows if _normalized_text(row.severity) == severity)
+
+
+def sort_issue_rows(
+    rows: Sequence[IssueTableRow],
+    sort_key: str = "severity",
+    *,
+    descending: bool = False,
+) -> tuple[IssueTableRow, ...]:
+    """Return issue rows sorted by a supported issues table column."""
+
+    return tuple(
+        sorted(
+            rows,
+            key=lambda row: _issue_sort_value(row, sort_key),
+            reverse=descending,
+        )
+    )
+
+
+def severity_filter_options(rows: Sequence[IssueTableRow]) -> tuple[str, ...]:
+    """Return deterministic severity filter options for the supplied rows."""
+
+    severities = sorted(
+        {_normalized_text(row.severity) for row in rows if row.severity},
+        key=lambda severity: (SEVERITY_SORT_ORDER.get(severity, 999), severity),
+    )
+    return (ALL_SEVERITIES_LABEL, *severities)
+
+
+def issue_row_cells(row: IssueTableRow) -> tuple[str, str, str, str, str, str]:
+    """Return display cells in issues table column order."""
+
+    return (
+        row.severity,
+        row.material,
+        row.node,
+        row.issue,
+        row.owner,
+        row.rule,
+    )
+
+
+def _health_score_text(state: SummaryHeaderState) -> str:
+    return f"Health: {state.health_score} / 100"
+
+
+def _severity_counts_text(state: SummaryHeaderState) -> str:
+    return (
+        f"Critical: {state.critical_count}   "
+        f"Error: {state.error_count}   "
+        f"Warning: {state.warning_count}   "
+        f"Info: {state.info_count}"
+    )
+
+
+def _block_status_text(state: SummaryHeaderState) -> str:
+    publish_status = _yes_no(state.block_publish)
+    deadline_status = _yes_no(state.block_deadline)
+    return f"Publish Block: {publish_status}   Deadline Block: {deadline_status}"
+
+
+def _details_label(qt_widgets: Any, object_name: str, text: str) -> Any:
+    label = qt_widgets.QLabel(text)
+    label.setObjectName(object_name)
+    label.setWordWrap(True)
+    return label
+
+
+def _details_message_text(state: IssueDetailsState) -> str:
+    return f"Message: {state.message}"
+
+
+def _details_why_text(state: IssueDetailsState) -> str:
+    return f"Why: {state.why}"
+
+
+def _details_values_text(state: IssueDetailsState) -> str:
+    return f"Current: {state.current_value}   Expected: {state.expected_value}"
+
+
+def _details_graph_trace_text(state: IssueDetailsState) -> str:
+    return f"Graph Trace: {state.graph_trace}"
+
+
+def _details_fix_text(state: IssueDetailsState) -> str:
+    fix_status = _yes_no(state.fix_available)
+    return f"Fix Available: {fix_status}   {state.fix_description}"
+
+
+def _export_button(
+    qt_widgets: Any,
+    label: str,
+    object_name: str,
+    tooltip: str,
+    callback: Optional[Callable[[], None]],
+) -> Any:
+    button = qt_widgets.QPushButton(label)
+    button.setObjectName(object_name)
+    button.setToolTip(tooltip)
+    _connect_button(button, callback)
+    return button
+
+
+def _connect_button(button: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        return
+    clicked = getattr(button, "clicked", None)
+    connect = getattr(clicked, "connect", None)
+    if connect is not None:
+        connect(callback)
+
+
+def _issue_sort_value(row: IssueTableRow, sort_key: str) -> tuple[int, str]:
+    if sort_key == "severity":
+        severity = _normalized_text(row.severity)
+        return (SEVERITY_SORT_ORDER.get(severity, 999), severity)
+    if sort_key == "material":
+        return (0, _normalized_text(row.material))
+    if sort_key == "node":
+        return (0, _normalized_text(row.node))
+    if sort_key == "issue":
+        return (0, _normalized_text(row.issue))
+    if sort_key == "owner":
+        return (0, _normalized_text(row.owner))
+    if sort_key == "rule":
+        return (0, _normalized_text(row.rule))
+    raise ValueError(f"Unsupported issue table sort key: {sort_key}")
+
+
+def _normalized_text(value: str) -> str:
+    return value.casefold()
+
+
+def _yes_no(value: bool) -> str:
+    return "YES" if value else "NO"
