@@ -431,6 +431,8 @@ class ValidationEngine:
             return self._evaluate_path_exists(rule, target)
         if check_type == "path_policy":
             return self._evaluate_path_policy(rule, target)
+        if check_type == "texture_version_latest":
+            return self._evaluate_texture_version_latest(rule, target)
         return self._skipped(
             rule,
             target=target,
@@ -513,6 +515,38 @@ class ValidationEngine:
             expected_value="path policy compliant",
             plug=target.obj.attr,
             evidence=evidence,
+        )
+
+    def _evaluate_texture_version_latest(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, FileDependencySnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="texture_version_latest_requires_file_dependency",
+            )
+
+        current_version = target.obj.version
+        latest_version = target.obj.latest_version
+        if not current_version or not latest_version:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="texture_version_latest_requires_version_metadata",
+            )
+
+        status = "passed" if current_version == latest_version else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current_version,
+            expected_value=latest_version,
+            plug="version",
+            evidence={"latest_version": latest_version},
         )
 
     def _targets_for_scope(self, snapshot: GraphSnapshot, scope: str) -> list[_TargetContext]:
