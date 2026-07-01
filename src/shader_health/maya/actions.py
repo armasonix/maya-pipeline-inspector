@@ -5,12 +5,12 @@ without Autodesk Maya installed.
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
-import sys
-from typing import Any
+from typing import Any, Optional
 
 from shader_health.ui.qt import load_qt_widgets
 
@@ -86,7 +86,7 @@ def reveal_file(path: str) -> MayaActionResult:
     return MayaActionResult(True, f"Revealed file path: {normalized_path}")
 
 
-def _existing_reveal_target(target: Path) -> Path | None:
+def _existing_reveal_target(target: Path) -> Optional[Path]:
     if target.exists():
         return target
     parent = target.parent
@@ -95,7 +95,7 @@ def _existing_reveal_target(target: Path) -> Path | None:
     return None
 
 
-def _reveal_command(target: Path) -> list[str] | None:
+def _reveal_command(target: Path) -> Optional[list[str]]:
     target_text = str(target)
     if sys.platform.startswith("win"):
         if target.is_file():
