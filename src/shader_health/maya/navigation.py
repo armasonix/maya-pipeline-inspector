@@ -4,9 +4,10 @@ from __future__ import annotations
 import importlib
 import platform
 import subprocess
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Optional
 
 from shader_health.ui.qt import load_qt_widgets
 
