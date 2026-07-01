@@ -55,6 +55,32 @@ class FakePushButton(FakeLabel):
         self.tooltip = text
 
 
+class FakeTableWidget(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.column_count = 0
+        self.row_count = 0
+        self.headers: list[str] = []
+        self.sorting_enabled = False
+
+    def setColumnCount(self, count: int) -> None:
+        self.column_count = count
+
+    def setRowCount(self, count: int) -> None:
+        self.row_count = count
+
+    def setHorizontalHeaderLabels(self, headers: list[str]) -> None:
+        self.headers = headers
+
+    def setSortingEnabled(self, enabled: bool) -> None:
+        self.sorting_enabled = enabled
+
+
+class FakeTableWidgetItem:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
 class FakeVBoxLayout:
     def __init__(self, parent: FakeWidget) -> None:
         self.parent = parent
@@ -83,6 +109,8 @@ class FakeQtWidgets:
     QLabel = FakeLabel
     QComboBox = FakeComboBox
     QPushButton = FakePushButton
+    QTableWidget = FakeTableWidget
+    QTableWidgetItem = FakeTableWidgetItem
     QVBoxLayout = FakeVBoxLayout
 
 
