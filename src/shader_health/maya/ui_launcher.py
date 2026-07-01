@@ -90,33 +90,21 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
 
 
 def _export_json_from_ui() -> None:
-    _print_export_result(_export_json_report())
+    from shader_health.maya.commands import export_json_report_action
+
+    _print_export_result(export_json_report_action())
 
 
 def _export_html_from_ui() -> None:
-    _print_export_result(_export_html_report())
+    from shader_health.maya.commands import export_html_report_action
+
+    _print_export_result(export_html_report_action())
 
 
 def _export_manifest_from_ui() -> None:
-    _print_export_result(_export_shader_manifest())
+    from shader_health.maya.commands import export_shader_manifest_action
 
-
-def _export_json_report() -> Any:
-    from shader_health.maya.export_actions import export_json_report
-
-    return export_json_report()
-
-
-def _export_html_report() -> Any:
-    from shader_health.maya.export_actions import export_html_report
-
-    return export_html_report()
-
-
-def _export_shader_manifest() -> Any:
-    from shader_health.maya.export_actions import export_shader_manifest
-
-    return export_shader_manifest()
+    _print_export_result(export_shader_manifest_action())
 
 
 def _print_export_result(result: Any) -> None:
