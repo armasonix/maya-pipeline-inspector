@@ -19,6 +19,23 @@ class FakeLabel(FakeWidget):
     def __init__(self, text: str = "") -> None:
         super().__init__()
         self.text = text
+        self.word_wrap = False
+
+    def setWordWrap(self, enabled: bool) -> None:
+        self.word_wrap = enabled
+
+
+class FakePushButton(FakeLabel):
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self.enabled = True
+        self.tooltip = ""
+
+    def setEnabled(self, enabled: bool) -> None:
+        self.enabled = enabled
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
 
 
 class FakeComboBox(FakeWidget):
@@ -59,7 +76,7 @@ class FakeTableWidget(FakeWidget):
     def setSortingEnabled(self, enabled: bool) -> None:
         self.sorting_enabled = enabled
 
-    def setItem(self, row: int, column: int, item: "FakeTableWidgetItem") -> None:
+    def setItem(self, row: int, column: int, item: FakeTableWidgetItem) -> None:
         self.items[(row, column)] = item
 
 
@@ -92,6 +109,7 @@ class FakeVBoxLayout:
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
+    QPushButton = FakePushButton
     QComboBox = FakeComboBox
     QTableWidget = FakeTableWidget
     QTableWidgetItem = FakeTableWidgetItem
