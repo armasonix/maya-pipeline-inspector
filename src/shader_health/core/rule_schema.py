@@ -427,10 +427,14 @@ class ValidationEngine:
             return self._evaluate_attribute_equals(rule, target)
         if check_type == "attribute_in":
             return self._evaluate_attribute_in(rule, target)
+        if check_type == "default_material_assignment":
+            return self._evaluate_default_material_assignment(rule, target)
         if check_type == "duplicate_file_dependencies":
             return self._evaluate_duplicate_file_dependencies(rule, target)
         if check_type == "list_length_max":
             return self._evaluate_list_length_max(rule, target)
+        if check_type == "list_length_min":
+            return self._evaluate_list_length_min(rule, target)
         if check_type == "numeric_max":
             return self._evaluate_numeric_max(rule, target)
         if check_type == "path_exists":
@@ -484,6 +488,31 @@ class ValidationEngine:
             plug=attribute,
         )
 
+    def _evaluate_default_material_assignment(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="default_material_assignment_requires_graph_snapshot",
+            )
+
+        assignments = _default_material_assignments(target.obj, rule.check.params)
+        status = "failed" if assignments else "passed"
+        evidence = {"assignments": assignments} if assignments else {}
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=len(assignments),
+            expected_value=0,
+            plug="shading_engines",
+            evidence=evidence,
+        )
+
     def _evaluate_duplicate_file_dependencies(
         self,
         rule: RuleDefinition,
@@ -535,6 +564,34 @@ class ValidationEngine:
             expected_value=maximum,
             plug=attribute,
             evidence={"max": maximum_number},
+        )
+
+    def _evaluate_list_length_min(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        attribute = str(rule.check.params.get("attribute", ""))
+        minimum = rule.check.params.get("min")
+        current = self._read_value(target, attribute)
+        minimum_number = _as_float(minimum)
+        if not isinstance(current, list) or minimum_number is None:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="list_length_min_requires_list_and_numeric_min",
+            )
+
+        current_length = len(current)
+        status = "passed" if current_length >= minimum_number else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current_length,
+            expected_value=minimum,
+            plug=attribute,
+            evidence={"min": minimum_number},
         )
 
     def _evaluate_numeric_max(
@@ -795,6 +852,36 @@ def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
     return semantics
 
 
+def _default_material_assignments(
+    snapshot: GraphSnapshot,
+    params: Mapping[str, Any],
+) -> list[JsonDict]:
+    default_materials = _normalized_identifier_set(
+        params.get("default_materials", ["lambert1", "node:lambert1"])
+    )
+    default_engines = _normalized_identifier_set(
+        params.get("default_shading_engines", ["initialShadingGroup"])
+    )
+
+    assignments: list[JsonDict] = []
+    for engine in snapshot.shading_engines:
+        if not engine.members:
+            continue
+        is_default_material = _matches_identifier(engine.surface_shader, default_materials)
+        is_default_engine = _matches_identifier(engine.name, default_engines)
+        is_default_engine = is_default_engine or _matches_identifier(engine.node_id, default_engines)
+        if is_default_material or is_default_engine:
+            assignments.append(
+                {
+                    "shading_engine": engine.node_id,
+                    "surface_shader": engine.surface_shader,
+                    "members": list(engine.members),
+                    "count": len(engine.members),
+                }
+            )
+    return assignments
+
+
 def _duplicate_file_dependency_groups(snapshot: GraphSnapshot) -> list[JsonDict]:
     grouped: dict[str, list[FileDependencySnapshot]] = {}
     for dependency in snapshot.file_dependencies:
@@ -819,6 +906,32 @@ def _duplicate_file_dependency_groups(snapshot: GraphSnapshot) -> list[JsonDict]
 def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
     path = dependency.resolved_path or dependency.raw_path
     return _normalize_path(path) if path else ""
+
+
+def _normalized_identifier_set(value: Any) -> set[str]:
+    identifiers: set[str] = set()
+    for item in _as_string_list(value):
+        identifiers.update(_identifier_candidates(item))
+    return identifiers
+
+
+def _matches_identifier(value: Optional[str], identifiers: set[str]) -> bool:
+    return bool(_identifier_candidates(value).intersection(identifiers))
+
+
+def _identifier_candidates(value: Optional[str]) -> set[str]:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return set()
+    return {normalized, normalized.rsplit(":", 1)[-1]}
+
+
+def _as_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
 
 
 def _as_float(value: Any) -> Optional[float]:
