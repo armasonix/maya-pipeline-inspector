@@ -427,6 +427,8 @@ class ValidationEngine:
             return self._evaluate_attribute_equals(rule, target)
         if check_type == "attribute_in":
             return self._evaluate_attribute_in(rule, target)
+        if check_type == "list_length_max":
+            return self._evaluate_list_length_max(rule, target)
         if check_type == "numeric_max":
             return self._evaluate_numeric_max(rule, target)
         if check_type == "path_exists":
@@ -478,6 +480,34 @@ class ValidationEngine:
             current_value=current,
             expected_value=allowed,
             plug=attribute,
+        )
+
+    def _evaluate_list_length_max(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        attribute = str(rule.check.params.get("attribute", ""))
+        maximum = rule.check.params.get("max")
+        current = self._read_value(target, attribute)
+        maximum_number = _as_float(maximum)
+        if not isinstance(current, list) or maximum_number is None:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="list_length_max_requires_list_and_numeric_max",
+            )
+
+        current_length = len(current)
+        status = "passed" if current_length <= maximum_number else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current_length,
+            expected_value=maximum,
+            plug=attribute,
+            evidence={"max": maximum_number},
         )
 
     def _evaluate_numeric_max(
