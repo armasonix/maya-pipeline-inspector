@@ -11,7 +11,8 @@ from shader_health.core import (
     load_rule_file,
 )
 
-RULE_PATH = Path("src/shader_health/rules/common/texture_paths.json")
+ROOT = Path(__file__).resolve().parents[2]
+RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "texture_paths.json"
 
 
 def make_file_dependency_snapshot(*, exists: bool) -> GraphSnapshot:
