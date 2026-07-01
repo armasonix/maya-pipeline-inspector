@@ -389,7 +389,6 @@ def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
     )
 
 
-
 @dataclass(frozen=True)
 class _TargetContext:
     kind: str
@@ -430,6 +429,8 @@ class ValidationEngine:
             return self._evaluate_attribute_in(rule, target)
         if check_type == "path_exists":
             return self._evaluate_path_exists(rule, target)
+        if check_type == "path_policy":
+            return self._evaluate_path_policy(rule, target)
         return self._skipped(
             rule,
             target=target,
@@ -491,6 +492,27 @@ class ValidationEngine:
             current_value=target.obj.resolved_path or target.obj.raw_path,
             expected_value="existing file",
             plug=target.obj.attr,
+        )
+
+    def _evaluate_path_policy(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
+        if not isinstance(target.obj, FileDependencySnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="path_policy_requires_file_dependency",
+            )
+
+        violations = _path_policy_violations(target.obj, rule.check.params)
+        status = "failed" if violations else "passed"
+        evidence = {"violations": violations} if violations else {}
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=target.obj.resolved_path or target.obj.raw_path,
+            expected_value="path policy compliant",
+            plug=target.obj.attr,
+            evidence=evidence,
         )
 
     def _targets_for_scope(self, snapshot: GraphSnapshot, scope: str) -> list[_TargetContext]:
@@ -635,6 +657,94 @@ _REQUIRED_RULE_KEYS = frozenset(
         "policy",
     }
 )
+
+
+def _path_policy_violations(
+    dependency: FileDependencySnapshot,
+    params: Mapping[str, Any],
+) -> list[str]:
+    paths = _dependency_paths(dependency)
+    disallowed = params.get("disallow", [])
+    if not isinstance(disallowed, list):
+        disallowed = [disallowed]
+
+    violations: list[str] = []
+    for policy in disallowed:
+        policy_name = str(policy)
+        if policy_name == "local_drive" and any(_is_local_drive_path(path) for path in paths):
+            violations.append("local_drive")
+        elif policy_name == "user_home" and any(_is_user_home_path(path) for path in paths):
+            violations.append("user_home")
+        elif policy_name == "desktop" and any(_has_path_segment(path, "desktop") for path in paths):
+            violations.append("desktop")
+        elif policy_name == "downloads" and any(_has_path_segment(path, "downloads") for path in paths):
+            violations.append("downloads")
+        elif policy_name == "temp" and any(_is_temp_path(path) for path in paths):
+            violations.append("temp")
+
+    allowed_prefixes = params.get("allowed_prefixes", [])
+    if allowed_prefixes and not _matches_allowed_prefix(paths, allowed_prefixes):
+        violations.append("outside_project_root")
+
+    return violations
+
+
+def _dependency_paths(dependency: FileDependencySnapshot) -> list[str]:
+    return [
+        path
+        for path in (dependency.raw_path, dependency.resolved_path or "")
+        if path
+    ]
+
+
+def _normalize_path(path: str) -> str:
+    return path.replace("\\", "/").strip().rstrip("/").lower()
+
+
+def _is_local_drive_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").strip()
+    return len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/"
+
+
+def _is_user_home_path(path: str) -> bool:
+    normalized = _normalize_path(path)
+    return (
+        normalized.startswith("~/")
+        or normalized.startswith("/users/")
+        or normalized.startswith("/home/")
+        or _starts_with_drive_user_path(normalized)
+    )
+
+
+def _starts_with_drive_user_path(path: str) -> bool:
+    return len(path) >= 9 and path[1:9] == ":/users/"
+
+
+def _has_path_segment(path: str, segment: str) -> bool:
+    parts = [part for part in _normalize_path(path).split("/") if part]
+    return segment.lower() in parts
+
+
+def _is_temp_path(path: str) -> bool:
+    normalized = _normalize_path(path)
+    return (
+        _has_path_segment(normalized, "temp")
+        or _has_path_segment(normalized, "tmp")
+        or "/appdata/local/temp/" in f"/{normalized}/"
+    )
+
+
+def _matches_allowed_prefix(paths: list[str], allowed_prefixes: Any) -> bool:
+    prefixes = allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
+    normalized_prefixes = [_normalize_path(str(prefix)) for prefix in prefixes if str(prefix)]
+    if not normalized_prefixes:
+        return True
+
+    normalized_paths = [_normalize_path(path) for path in paths]
+    for path in normalized_paths:
+        if any(path == prefix or path.startswith(f"{prefix}/") for prefix in normalized_prefixes):
+            return True
+    return False
 
 
 def _validate_required_rule_keys(data: Mapping[str, Any]) -> None:
