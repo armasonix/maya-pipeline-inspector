@@ -75,18 +75,18 @@ def test_export_command_wrappers_delegate(monkeypatch: Any):
 
     monkeypatch.setattr(
         commands,
-        "export_json_report",
-        lambda path=None: calls.append(("json", path)) or result,
+        "_export_json_report",
+        lambda path: calls.append(("json", path)) or result,
     )
     monkeypatch.setattr(
         commands,
-        "export_html_report",
-        lambda path=None: calls.append(("html", path)) or result,
+        "_export_html_report",
+        lambda path: calls.append(("html", path)) or result,
     )
     monkeypatch.setattr(
         commands,
-        "export_shader_manifest",
-        lambda path=None: calls.append(("manifest", path)) or result,
+        "_export_shader_manifest",
+        lambda path: calls.append(("manifest", path)) or result,
     )
 
     assert commands.export_json_report_action("report.json") is result
