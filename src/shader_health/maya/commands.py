@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import importlib
 import json
-from html import escape
+from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
@@ -182,78 +182,38 @@ def _validate_scene() -> Any:
 
 
 def _export_json_report(path: Optional[str]) -> Any:
-    scene = _runtime_scene_metadata()
-    output_path = _runtime_output_path(path, scene["scene_path"], "report", "json")
-    payload = {
-        "report_schema_version": "maya-runtime-1.0",
-        "status": "not_validated",
-        "summary": {},
-        "results": [],
-        "snapshot": scene,
-    }
-    _write_json(output_path, payload)
+    from shader_health.reports import write_json_report
+
+    validation = _validate_scene()
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "json")
+    write_json_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_json_report", output_path, "JSON report exported.")
 
 
 def _export_html_report(path: Optional[str]) -> Any:
-    scene = _runtime_scene_metadata()
-    output_path = _runtime_output_path(path, scene["scene_path"], "report", "html")
-    lines = [
-        "<!doctype html>",
-        '<html lang="en">',
-        "<head>",
-        '<meta charset="utf-8">',
-        "<title>Maya Shader Health Report</title>",
-        "</head>",
-        "<body>",
-        "<main>",
-        "<h1>Maya Shader Health Report</h1>",
-        "<h2>Runtime Export</h2>",
-        f"<p><strong>Scene:</strong> {_html(scene['scene_path'])}</p>",
-        f"<p><strong>Maya:</strong> {_html(scene['maya_version'])}</p>",
-        f"<p><strong>Renderer:</strong> {_html(scene['renderer'])}</p>",
-        "<p>Status: not_validated</p>",
-        "</main>",
-        "</body>",
-        "</html>",
-    ]
-    _write_text(output_path, "\n".join(lines) + "\n")
+    from shader_health.reports.html_report import write_html_report
+
+    validation = _validate_scene()
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "html")
+    write_html_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_html_report", output_path, "HTML report exported.")
 
 
 def _export_shader_manifest(path: Optional[str]) -> Any:
-    scene = _runtime_scene_metadata()
-    output_path = _runtime_output_path(path, scene["scene_path"], "manifest", "json")
+    validation = _validate_scene()
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "manifest", "json")
     payload = {
         "manifest_schema_version": "maya-runtime-1.0",
-        "scene_path": scene["scene_path"],
-        "maya_version": scene["maya_version"],
-        "renderer": scene["renderer"],
-        "scan_scope": "scene",
-        "materials": [],
+        "scene_path": validation.snapshot.scene_path,
+        "maya_version": validation.snapshot.maya_version,
+        "renderer": validation.snapshot.renderer,
+        "scan_scope": validation.snapshot.scan_scope,
+        "materials": [asdict(material) for material in validation.snapshot.materials],
+        "file_dependencies": [asdict(item) for item in validation.snapshot.file_dependencies],
+        "results": [result.to_dict() for result in validation.results],
     }
     _write_json(output_path, payload)
     return _runtime_result("export_shader_manifest", output_path, "Shader manifest exported.")
-
-
-def _runtime_scene_metadata() -> dict[str, str]:
-    cmds = _maya_cmds()
-    scene_path = str(cmds.file(query=True, sceneName=True) or "")
-    maya_version = str(cmds.about(version=True) or "")
-    renderer = _runtime_renderer(cmds)
-    return {
-        "scene_path": scene_path,
-        "maya_version": maya_version,
-        "renderer": renderer,
-        "scan_scope": "scene",
-    }
-
-
-def _runtime_renderer(cmds: Any) -> str:
-    try:
-        return str(cmds.getAttr("defaultRenderGlobals.currentRenderer") or "")
-    except Exception:  # noqa: BLE001
-        return ""
 
 
 def _runtime_output_path(
@@ -281,10 +241,6 @@ def _write_json(path: Path, payload: Any) -> None:
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
-
-
-def _html(value: Any) -> str:
-    return escape(str(value), quote=False)
 
 
 def _runtime_result(action: str, path: Path, message: str) -> Any:
