@@ -45,11 +45,23 @@ from shader_health.core.scoring import (
     HealthScore,
     compute_health_score,
 )
+from shader_health.core.waivers import (
+    WAIVED_STATUS,
+    WAIVER_SCHEMA_VERSION,
+    WaiverRecord,
+    WaiverSidecar,
+    apply_waivers,
+    create_waiver_from_result,
+    load_waiver_sidecar,
+    write_waiver_sidecar,
+)
 
 __all__ = [
     "RESULT_STATUSES",
     "RULE_SCHEMA_VERSION",
     "SNAPSHOT_SCHEMA_VERSION",
+    "WAIVED_STATUS",
+    "WAIVER_SCHEMA_VERSION",
     "ConnectionSnapshot",
     "FileDependencySnapshot",
     "FixAction",
@@ -73,13 +85,19 @@ __all__ = [
     "ShadingEngineSnapshot",
     "ValidationEngine",
     "ValidationSummary",
+    "WaiverRecord",
+    "WaiverSidecar",
     "apply_profile_overrides",
+    "apply_waivers",
     "build_fix_plan",
     "build_rule_search_paths",
     "compute_health_score",
+    "create_waiver_from_result",
     "load_profile",
     "load_rule_file",
     "load_rule_stack",
     "load_rules_from_path",
+    "load_waiver_sidecar",
     "summarize_results",
+    "write_waiver_sidecar",
 ]
