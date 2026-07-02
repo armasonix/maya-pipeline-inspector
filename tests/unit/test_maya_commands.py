@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from shader_health.core import GraphSnapshot
 from shader_health.maya import commands
 
 
@@ -66,6 +67,24 @@ def test_close_ui_delegates_to_panel_launcher(monkeypatch: Any):
     commands.close_ui(delete=False)
 
     assert calls == [{"delete": False}]
+
+
+def test_validate_scene_action_runs_scanner_and_validator(monkeypatch: Any):
+    from shader_health.maya import scanner
+
+    monkeypatch.setattr(
+        scanner,
+        "scan_scene",
+        lambda: GraphSnapshot(scene_path="demo.ma", renderer="common"),
+    )
+
+    result = commands.validate_scene_action()
+
+    assert result.action == "validate_scene"
+    assert result.succeeded is True
+    assert result.snapshot.scene_path == "demo.ma"
+    assert result.health_score.score == 100
+    assert "Scene validated" in result.message
 
 
 def test_install_menu_replaces_existing_menu(monkeypatch: Any):
