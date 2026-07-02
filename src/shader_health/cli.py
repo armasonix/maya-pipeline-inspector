@@ -3,10 +3,18 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional
 
-from shader_health.core import GraphSnapshot, RuleLoadError, ValidationEngine, load_rule_stack, summarize_results
+from shader_health.core import (
+    GraphSnapshot,
+    RuleLoadError,
+    RuleResult,
+    ValidationEngine,
+    load_rule_stack,
+    summarize_results,
+)
 from shader_health.reports import write_json_report
 
 EXIT_OK = 0
@@ -32,21 +40,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shader_health")
     subparsers = parser.add_subparsers(dest="command")
-    validate = subparsers.add_parser("validate", help="Validate a Maya scene or snapshot.")
+    validate = subparsers.add_parser(
+        "validate",
+        help="Validate a Maya scene or snapshot.",
+    )
     validate.add_argument("input_path", help="Maya scene path or GraphSnapshot JSON path.")
-    validate.add_argument("--input-kind", choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT), default=INPUT_AUTO)
+    validate.add_argument(
+        "--input-kind",
+        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT),
+        default=INPUT_AUTO,
+    )
     validate.add_argument("--report", required=True, help="Output JSON report path.")
     validate.add_argument("--rule-root", help="Rule root folder. Defaults to packaged rules.")
     validate.add_argument("--profile", help="Profile JSON path.")
-    validate.add_argument("--renderer", action="append", default=[], help="Renderer rule pack id to include.")
-    validate.add_argument("--extra-rules", action="append", default=[], help="Extra rule file or folder.")
+    validate.add_argument(
+        "--renderer",
+        action="append",
+        default=[],
+        help="Renderer rule pack id to include.",
+    )
+    validate.add_argument(
+        "--extra-rules",
+        action="append",
+        default=[],
+        help="Extra rule file or folder.",
+    )
     return parser
 
 
 def validate_command(args: argparse.Namespace) -> int:
     try:
         snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
-        renderer_ids = tuple(args.renderer or ([snapshot.renderer] if snapshot.renderer else []))
+        renderer_ids = tuple(args.renderer or _snapshot_renderer_ids(snapshot))
         rules = load_rule_stack(
             **_rule_stack_kwargs(
                 args.rule_root,
@@ -64,6 +89,10 @@ def validate_command(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"Runtime error: {exc}", file=sys.stderr)
         return EXIT_RUNTIME_ERROR
+
+
+def _snapshot_renderer_ids(snapshot: GraphSnapshot) -> tuple[str, ...]:
+    return (snapshot.renderer,) if snapshot.renderer else ()
 
 
 def _rule_stack_kwargs(
@@ -106,7 +135,7 @@ def _snapshot_from_scene(path: Path) -> GraphSnapshot:
     return scan_scene()
 
 
-def _exit_code(results: Sequence[object]) -> int:
+def _exit_code(results: Sequence[RuleResult]) -> int:
     summary = summarize_results(results)
     if summary.block_deadline:
         return EXIT_DEADLINE_BLOCK
