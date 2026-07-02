@@ -8,23 +8,30 @@ from __future__ import annotations
 from typing import Any
 
 __all__ = [
+    "AppliedFixRecord",
+    "ApplyFixReport",
     "MayaUnavailableError",
     "ScanOptions",
+    "apply_fix_actions",
     "scan_scene",
     "scan_selection",
 ]
 
 
 def __getattr__(name: str) -> Any:
-    """Load scanner exports lazily.
+    """Load Maya-layer exports lazily.
 
     Importing shader_health.maya must stay lightweight because Maya UI commands
-    are imported from this package before the scanner/core compatibility layer is
-    needed.
+    are imported from this package before scanner, applier, or core compatibility
+    layers are needed.
     """
 
-    if name in __all__:
+    if name in {"MayaUnavailableError", "ScanOptions", "scan_scene", "scan_selection"}:
         from shader_health.maya import scanner
 
         return getattr(scanner, name)
+    if name in {"AppliedFixRecord", "ApplyFixReport", "apply_fix_actions"}:
+        from shader_health.maya import fix_applier
+
+        return getattr(fix_applier, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
