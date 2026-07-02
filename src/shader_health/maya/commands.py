@@ -41,6 +41,12 @@ def close_ui(*, delete: bool = True) -> None:
     close_panel(delete=delete)
 
 
+def validate_scene_action() -> Any:
+    """Validate the current Maya scene and return a UI-friendly result object."""
+
+    return _validate_scene()
+
+
 def select_node_action(node_name: str) -> NavigationActionResult:
     """Select a Maya node from a UI action."""
 
@@ -142,6 +148,37 @@ def install_ui() -> None:
 
     install_menu()
     install_shelf()
+
+
+def _validate_scene() -> Any:
+    from shader_health.core import (
+        ValidationEngine,
+        compute_health_score,
+        load_rule_stack,
+        summarize_results,
+    )
+    from shader_health.maya.scanner import scan_scene
+
+    snapshot = scan_scene()
+    renderer_ids = (snapshot.renderer,) if snapshot.renderer else ()
+    rules = load_rule_stack(renderer_ids=renderer_ids)
+    results = tuple(ValidationEngine().validate(snapshot, rules))
+    summary = summarize_results(results)
+    health_score = compute_health_score(results)
+    failed_count = sum(1 for result in results if result.status == "failed")
+    message = (
+        f"Scene validated. {failed_count} failed issue(s). "
+        f"Health: {health_score.score}/100."
+    )
+    return SimpleNamespace(
+        action="validate_scene",
+        succeeded=True,
+        snapshot=snapshot,
+        results=results,
+        summary=summary,
+        health_score=health_score,
+        message=message,
+    )
 
 
 def _export_json_report(path: Optional[str]) -> Any:
@@ -260,16 +297,20 @@ def _runtime_result(action: str, path: Path, message: str) -> Any:
 
 
 def _maya_shelf_top_level() -> str:
-    mel: Any = _maya_module("maya.mel")
-    return str(mel.eval("$tmp = $gShelfTopLevel"))
+    mel = _maya_mel()
+    shelf_top_level = mel.eval("$tmp=$gShelfTopLevel")
+    return str(shelf_top_level)
 
 
 def _maya_cmds() -> Any:
-    return _maya_module("maya.cmds")
-
-
-def _maya_module(module_name: str) -> Any:
     try:
-        return importlib.import_module(module_name)
+        return importlib.import_module("maya.cmds")
     except ImportError as exc:
-        raise RuntimeError("Maya commands can only run inside Autodesk Maya.") from exc
+        raise RuntimeError("Maya commands are available only inside Autodesk Maya.") from exc
+
+
+def _maya_mel() -> Any:
+    try:
+        return importlib.import_module("maya.mel")
+    except ImportError as exc:
+        raise RuntimeError("Maya MEL is available only inside Autodesk Maya.") from exc
