@@ -149,8 +149,8 @@ def _snapshot_from_scene(path: Path) -> GraphSnapshot:
     except ImportError as exc:
         raise RuntimeError("scene validation requires Autodesk Maya / mayapy") from exc
 
-    cmds.file(str(path), open=True, force=True)  # type: ignore[attr-defined]
-    snapshot = scanner.scan_scene()  # type: ignore[attr-defined]
+    cmds.file(str(path), open=True, force=True)
+    snapshot = scanner.scan_scene()
     if not isinstance(snapshot, GraphSnapshot):
         raise RuntimeError("Maya scanner did not return a GraphSnapshot")
     return snapshot
