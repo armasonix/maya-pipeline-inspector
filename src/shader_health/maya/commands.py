@@ -158,8 +158,9 @@ def _validate_scene() -> Any:
         summarize_results,
     )
     from shader_health.maya.scanner import scan_scene
+    from shader_health.maya.snapshot_enrichment import enrich_snapshot
 
-    snapshot = scan_scene()
+    snapshot = enrich_snapshot(scan_scene())
     renderer_ids = (snapshot.renderer,) if snapshot.renderer else ()
     rules = load_rule_stack(renderer_ids=renderer_ids)
     results = tuple(ValidationEngine().validate(snapshot, rules))
