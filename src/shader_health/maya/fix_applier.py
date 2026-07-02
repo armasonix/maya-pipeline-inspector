@@ -4,9 +4,10 @@ from __future__ import annotations
 import importlib
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from shader_health.core.fix_plan import FixAction
+if TYPE_CHECKING:
+    from shader_health.core.fix_plan import FixAction
 
 SUPPORTED_FIX_TYPES = frozenset({"set_attr"})
 DEFAULT_UNDO_CHUNK_NAME = "Shader Health Apply Fixes"
