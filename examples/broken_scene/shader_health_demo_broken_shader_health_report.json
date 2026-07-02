@@ -1,0 +1,12 @@
+{
+  "report_schema_version": "maya-runtime-1.0",
+  "results": [],
+  "snapshot": {
+    "maya_version": "2024",
+    "renderer": "vray",
+    "scan_scope": "scene",
+    "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma"
+  },
+  "status": "not_validated",
+  "summary": {}
+}
