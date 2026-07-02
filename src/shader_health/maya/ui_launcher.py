@@ -433,7 +433,7 @@ def _refresh_issues_table_view(content: Any, qt_widgets: Any) -> None:
     )()
     sort_key = getattr(sort_dropdown, "currentText", lambda: "severity")()
 
-    pairs = list(zip(rows, failed_results, strict=True))
+    pairs = list(zip(rows, failed_results))
     if (
         filter_label
         and filter_label != main_window.ALL_SEVERITIES_LABEL

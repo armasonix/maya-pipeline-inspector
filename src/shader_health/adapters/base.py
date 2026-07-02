@@ -183,8 +183,13 @@ class RendererAdapterError(ValueError):
 class RendererAdapter(Protocol):
     """Protocol implemented by renderer-specific adapter classes."""
 
-    id: str
-    display_name: str
+    @property
+    def id(self) -> str:
+        """Stable renderer adapter identifier."""
+
+    @property
+    def display_name(self) -> str:
+        """Human-readable renderer adapter label."""
 
     def is_available(self) -> bool:
         """Return whether this renderer adapter can run in the current environment."""
