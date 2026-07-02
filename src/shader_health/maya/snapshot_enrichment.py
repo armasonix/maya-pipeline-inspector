@@ -152,7 +152,8 @@ def _semantic_from_destination(
         return "displacement"
     if attr in {"d", "disp", "displacement"}:
         return "displacement"
-    if "rough" in attr or "gloss" in attr or attr in {"rlg", "specular_roughness", "diffuse_roughness"}:
+    roughness_attrs = {"rlg", "specular_roughness", "diffuse_roughness"}
+    if "rough" in attr or "gloss" in attr or attr in roughness_attrs:
         return "roughness"
     if "metal" in attr:
         return "metalness"

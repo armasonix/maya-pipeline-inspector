@@ -4,7 +4,12 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from shader_health.ui import main_window
-from shader_health.ui.fix_queue import FixQueueRow, populate_fix_queue, safe_fix_rows, selected_fix_rows
+from shader_health.ui.fix_queue import (
+    FixQueueRow,
+    populate_fix_queue,
+    safe_fix_rows,
+    selected_fix_rows,
+)
 from shader_health.ui.qt import load_qt_widgets
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
@@ -420,7 +425,12 @@ def _refresh_issues_table_view(content: Any, qt_widgets: Any) -> None:
         qt_widgets.QComboBox,
         main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME,
     )
-    filter_label = getattr(severity_filter, "currentText", lambda: main_window.ALL_SEVERITIES_LABEL)()
+    default_filter = main_window.ALL_SEVERITIES_LABEL
+    filter_label = getattr(
+        severity_filter,
+        "currentText",
+        lambda: default_filter,
+    )()
     sort_key = getattr(sort_dropdown, "currentText", lambda: "severity")()
 
     pairs = list(zip(rows, failed_results, strict=True))
