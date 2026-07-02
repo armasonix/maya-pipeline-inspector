@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from shader_health.core import (
     GraphSnapshot,
+    RuleDefinition,
     RuleLoadError,
     RuleResult,
     ValidationEngine,
@@ -72,13 +74,11 @@ def validate_command(args: argparse.Namespace) -> int:
     try:
         snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
         renderer_ids = tuple(args.renderer or _snapshot_renderer_ids(snapshot))
-        rules = load_rule_stack(
-            **_rule_stack_kwargs(
-                args.rule_root,
-                args.profile,
-                renderer_ids,
-                args.extra_rules,
-            )
+        rules = _load_rules(
+            rule_root=_rule_root_path(args.rule_root),
+            profile_path=_optional_path(args.profile),
+            renderer_ids=renderer_ids,
+            extra_rule_paths=tuple(Path(path) for path in args.extra_rules),
         )
         results = ValidationEngine().validate(snapshot, rules)
         write_json_report(args.report, snapshot, results)
@@ -91,25 +91,42 @@ def validate_command(args: argparse.Namespace) -> int:
         return EXIT_RUNTIME_ERROR
 
 
+def _load_rules(
+    *,
+    rule_root: Optional[Path],
+    profile_path: Optional[Path],
+    renderer_ids: tuple[str, ...],
+    extra_rule_paths: tuple[Path, ...],
+) -> list[RuleDefinition]:
+    if rule_root is None:
+        return load_rule_stack(
+            renderer_ids=renderer_ids,
+            profile_path=profile_path,
+            extra_rule_paths=extra_rule_paths,
+        )
+    return load_rule_stack(
+        rule_root=rule_root,
+        renderer_ids=renderer_ids,
+        profile_path=profile_path,
+        extra_rule_paths=extra_rule_paths,
+    )
+
+
+def _rule_root_path(value: Optional[str]) -> Optional[Path]:
+    if not value:
+        return None
+    path = Path(value)
+    if not path.exists():
+        raise RuleLoadError(f"Rule root does not exist: {path}")
+    return path
+
+
+def _optional_path(value: Optional[str]) -> Optional[Path]:
+    return Path(value) if value else None
+
+
 def _snapshot_renderer_ids(snapshot: GraphSnapshot) -> tuple[str, ...]:
     return (snapshot.renderer,) if snapshot.renderer else ()
-
-
-def _rule_stack_kwargs(
-    rule_root: Optional[str],
-    profile: Optional[str],
-    renderer_ids: tuple[str, ...],
-    extra_rules: Sequence[str],
-) -> dict[str, object]:
-    kwargs: dict[str, object] = {
-        "renderer_ids": renderer_ids,
-        "extra_rule_paths": tuple(Path(path) for path in extra_rules),
-    }
-    if rule_root:
-        kwargs["rule_root"] = Path(rule_root)
-    if profile:
-        kwargs["profile_path"] = Path(profile)
-    return kwargs
 
 
 def _load_snapshot(path: Path, input_kind: str) -> GraphSnapshot:
@@ -127,12 +144,18 @@ def _resolve_input_kind(path: Path, input_kind: str) -> str:
 
 def _snapshot_from_scene(path: Path) -> GraphSnapshot:
     try:
-        from maya import cmds  # type: ignore[import-not-found]
-        from shader_health.maya.scanner import scan_scene
+        cmds = importlib.import_module("maya.cmds")
+        scanner = importlib.import_module("shader_health.maya.scanner")
     except ImportError as exc:
         raise RuntimeError("scene validation requires Autodesk Maya / mayapy") from exc
-    cmds.file(str(path), open=True, force=True)
-    return scan_scene()
+
+    file_cmd: Any = getattr(cmds, "file")
+    scan_scene: Any = getattr(scanner, "scan_scene")
+    file_cmd(str(path), open=True, force=True)
+    snapshot = scan_scene()
+    if not isinstance(snapshot, GraphSnapshot):
+        raise RuntimeError("Maya scanner did not return a GraphSnapshot")
+    return snapshot
 
 
 def _exit_code(results: Sequence[RuleResult]) -> int:
