@@ -30,6 +30,7 @@ from shader_health.core import (
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
+_DISPLACEMENT_NODE_TYPES = {"displacementShader", "VRayDisplacement", "VRayDisplacementTex"}
 
 
 def prepare_snapshot_for_validation(snapshot: GraphSnapshot) -> GraphSnapshot:
@@ -80,13 +81,19 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
 def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
     """Return a validation-ready snapshot enriched with runtime semantics."""
 
-    nodes = tuple(_enrich_node(node) for node in snapshot.nodes)
+    base_nodes = tuple(_enrich_node(node) for node in snapshot.nodes)
+    base_nodes_by_id = {node.id: node for node in base_nodes}
+    connections = tuple(
+        _enrich_connection(connection, base_nodes_by_id)
+        for connection in snapshot.connections
+    )
+    node_semantics = _node_semantics_from_connections(connections)
+    nodes = tuple(_apply_node_semantic(node, node_semantics.get(node.id)) for node in base_nodes)
     nodes_by_id = {node.id: node for node in nodes}
-    connections = tuple(_enrich_connection(item, nodes_by_id) for item in snapshot.connections)
     scene_dir = Path(snapshot.scene_path).parent if snapshot.scene_path else Path.cwd()
     file_dependencies = tuple(
-        _enrich_file_dependency(item, nodes_by_id.get(item.node_id), scene_dir)
-        for item in snapshot.file_dependencies
+        _enrich_file_dependency(dependency, nodes_by_id.get(dependency.node_id), scene_dir)
+        for dependency in snapshot.file_dependencies
     )
     return replace(
         snapshot,
@@ -98,11 +105,19 @@ def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
 
 def _enrich_node(node: NodeSnapshot) -> NodeSnapshot:
     attrs = dict(node.attrs)
-    if node.type_name == "displacementShader" and "amount" not in attrs:
+    if _is_displacement_node(node) and "amount" not in attrs:
         for alias in ("scale", "displacement", "displacementAmount"):
             if alias in attrs:
                 attrs["amount"] = attrs[alias]
                 break
+    return replace(node, attrs=attrs)
+
+
+def _apply_node_semantic(node: NodeSnapshot, semantic: Optional[str]) -> NodeSnapshot:
+    if not semantic:
+        return node
+    attrs = dict(node.attrs)
+    attrs.setdefault("semantic_slot", semantic)
     return replace(node, attrs=attrs)
 
 
@@ -115,6 +130,16 @@ def _enrich_connection(
     dst_node = nodes_by_id.get(connection.dst_node)
     semantic = _semantic_from_destination(connection.dst_attr, dst_node)
     return replace(connection, semantic=semantic) if semantic else connection
+
+
+def _node_semantics_from_connections(
+    connections: tuple[ConnectionSnapshot, ...],
+) -> dict[str, str]:
+    semantics: dict[str, str] = {}
+    for connection in connections:
+        if connection.semantic:
+            semantics.setdefault(connection.src_node, connection.semantic)
+    return semantics
 
 
 def _semantic_from_destination(
@@ -179,11 +204,10 @@ def _udim_pattern(raw_path: str, node: Optional[NodeSnapshot]) -> Optional[str]:
     if not _uses_maya_udim_mode(node):
         return None
     path = Path(raw_path.replace("\\", "/"))
-    match = None
-    for match in _UDIM_TILE_RE.finditer(path.name):
-        pass
-    if match is None:
+    matches = list(_UDIM_TILE_RE.finditer(path.name))
+    if not matches:
         return None
+    match = matches[-1]
     name = path.name[: match.start()] + "<UDIM>" + path.name[match.end() :]
     return str(path.with_name(name)).replace("\\", "/")
 
@@ -192,6 +216,10 @@ def _uses_maya_udim_mode(node: Optional[NodeSnapshot]) -> bool:
     if node is None:
         return False
     return node.attrs.get("uvTilingMode") in _UDIM_MODE_VALUES
+
+
+def _is_displacement_node(node: NodeSnapshot) -> bool:
+    return node.type_name in _DISPLACEMENT_NODE_TYPES or "displacement" in node.type_name.lower()
 
 
 def _resolve_path(raw_path: str, scene_dir: Path) -> str:
