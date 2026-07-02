@@ -1,9 +1,4 @@
-"""Maya safe-fix applier.
-
-The core fix planner is non-mutating. This module is the Maya-side execution
-layer that applies selected fix actions with undo support and conservative
-reference/lock safety gates.
-"""
+"""Maya-side execution for planned safe actions."""
 from __future__ import annotations
 
 import importlib
@@ -24,8 +19,6 @@ MISSING_ATTR_REASON = "target_attr_missing"
 
 @dataclass(frozen=True)
 class AppliedFixRecord:
-    """Audit record for one attempted fix action."""
-
     fix_id: str
     rule_id: str
     fix_type: str
@@ -56,8 +49,6 @@ class AppliedFixRecord:
 
 @dataclass(frozen=True)
 class ApplyFixReport:
-    """Batch result for applied fix actions."""
-
     records: tuple[AppliedFixRecord, ...]
 
     @property
@@ -74,11 +65,7 @@ class ApplyFixReport:
 
     @property
     def failed_count(self) -> int:
-        return sum(
-            1
-            for record in self.records
-            if not record.applied and not record.blocked
-        )
+        return sum(1 for record in self.records if not record.applied and not record.blocked)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -98,51 +85,34 @@ def apply_fix_actions(
     allow_locked: bool = False,
     undo_chunk_name: str = DEFAULT_UNDO_CHUNK_NAME,
 ) -> ApplyFixReport:
-    """Apply selected fix actions in a single Maya undo chunk."""
-
     maya_cmds = cmds or _maya_cmds()
-    action_list = tuple(actions)
-    if not action_list:
+    queued = tuple(actions)
+    if not queued:
         return ApplyFixReport(records=())
 
     records: list[AppliedFixRecord] = []
     maya_cmds.undoInfo(openChunk=True, chunkName=undo_chunk_name)
     try:
-        for action in action_list:
-            records.append(
-                _apply_fix_action(
-                    action,
-                    maya_cmds,
-                    allow_referenced=allow_referenced,
-                    allow_locked=allow_locked,
-                )
-            )
+        for action in queued:
+            records.append(_apply_one(action, maya_cmds, allow_referenced, allow_locked))
     finally:
         maya_cmds.undoInfo(closeChunk=True)
     return ApplyFixReport(records=tuple(records))
 
 
-def _apply_fix_action(
+def _apply_one(
     action: FixAction,
     cmds: Any,
-    *,
     allow_referenced: bool,
     allow_locked: bool,
 ) -> AppliedFixRecord:
-    block_reasons = _block_reasons(
-        action,
-        allow_referenced=allow_referenced,
-        allow_locked=allow_locked,
-    )
-    if block_reasons:
-        return _blocked(action, block_reasons)
-
+    reasons = _reasons(action, allow_referenced, allow_locked)
+    if reasons:
+        return _blocked(action, reasons)
     if action.fix_type not in SUPPORTED_FIX_TYPES:
         return _blocked(action, [UNSUPPORTED_FIX_REASON])
-
-    if not _obj_exists(cmds, action.target_node):
+    if not cmds.objExists(action.target_node):
         return _blocked(action, [MISSING_TARGET_REASON])
-
     if not action.target_attr:
         return _blocked(action, [MISSING_ATTR_REASON])
 
@@ -151,27 +121,28 @@ def _apply_fix_action(
     _set_attr(cmds, plug, action.after_value)
     after_value = cmds.getAttr(plug)
     return AppliedFixRecord(
-        fix_id=action.fix_id,
-        rule_id=action.rule_id,
-        fix_type=action.fix_type,
-        target_node=action.target_node,
-        target_attr=action.target_attr,
-        before_value=before_value,
-        after_value=after_value,
-        applied=True,
-        blocked=False,
-        message="Fix applied.",
-        block_reasons=[],
+        action.fix_id,
+        action.rule_id,
+        action.fix_type,
+        action.target_node,
+        action.target_attr,
+        before_value,
+        after_value,
+        True,
+        False,
+        "Fix applied.",
+        [],
     )
 
 
-def _block_reasons(
-    action: FixAction,
-    *,
-    allow_referenced: bool,
-    allow_locked: bool,
-) -> list[str]:
-    reasons = list(action.block_reasons)
+def _reasons(action: FixAction, allow_referenced: bool, allow_locked: bool) -> list[str]:
+    reasons: list[str] = []
+    for reason in action.block_reasons:
+        if reason == REFERENCED_BLOCK_REASON and allow_referenced:
+            continue
+        if reason == LOCKED_BLOCK_REASON and allow_locked:
+            continue
+        _append_unique(reasons, reason)
     if action.referenced and not allow_referenced:
         _append_unique(reasons, REFERENCED_BLOCK_REASON)
     if action.locked and not allow_locked:
@@ -186,22 +157,18 @@ def _append_unique(items: list[str], item: str) -> None:
 
 def _blocked(action: FixAction, reasons: list[str]) -> AppliedFixRecord:
     return AppliedFixRecord(
-        fix_id=action.fix_id,
-        rule_id=action.rule_id,
-        fix_type=action.fix_type,
-        target_node=action.target_node,
-        target_attr=action.target_attr,
-        before_value=action.before_value,
-        after_value=action.after_value,
-        applied=False,
-        blocked=True,
-        message="Fix blocked.",
-        block_reasons=reasons,
+        action.fix_id,
+        action.rule_id,
+        action.fix_type,
+        action.target_node,
+        action.target_attr,
+        action.before_value,
+        action.after_value,
+        False,
+        True,
+        "Fix blocked.",
+        reasons,
     )
-
-
-def _obj_exists(cmds: Any, target_node: str) -> bool:
-    return bool(cmds.objExists(target_node))
 
 
 def _set_attr(cmds: Any, plug: str, value: Any) -> None:
