@@ -13,15 +13,68 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Optional
 
+from shader_health.adapters import (
+    ArnoldAdapter,
+    CommonMayaAdapter,
+    RendererAdapterRegistry,
+    SemanticTextureSlotResolver,
+    VrayAdapter,
+)
 from shader_health.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
     NodeSnapshot,
+    RuleResult,
 )
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
+
+
+def prepare_snapshot_for_validation(snapshot: GraphSnapshot) -> GraphSnapshot:
+    """Return a validation-ready snapshot with runtime semantics and UDIM metadata."""
+
+    enriched = enrich_snapshot(snapshot)
+    resolver = SemanticTextureSlotResolver(_default_adapter_registry())
+    resolved = resolver.apply_to_snapshot(enriched)
+    return _with_propagated_semantic_slots(resolved)
+
+
+def enrich_rule_results(
+    snapshot: GraphSnapshot,
+    results: list[RuleResult],
+) -> list[RuleResult]:
+    """Attach owning material names to validation results when possible."""
+
+    material_index = build_material_index(snapshot)
+    enriched: list[RuleResult] = []
+    for result in results:
+        if result.material:
+            enriched.append(result)
+            continue
+        material = _resolve_result_material(result, material_index)
+        if material is None:
+            enriched.append(result)
+        else:
+            enriched.append(replace(result, material=material))
+    return enriched
+
+
+def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
+    """Map node ids and short names to owning material names."""
+
+    index: dict[str, str] = {}
+    for material in snapshot.materials:
+        index[material.node_id] = material.name
+        index[material.name] = material.name
+        for node_id in material.texture_nodes:
+            index[node_id] = material.name
+            index[_short_node_id(node_id)] = material.name
+        for node_id in material.displacement_nodes:
+            index[node_id] = material.name
+            index[_short_node_id(node_id)] = material.name
+    return index
 
 
 def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
@@ -72,7 +125,9 @@ def _semantic_from_destination(
     dst_type = (dst_node.type_name if dst_node else "").lower()
     if "displacement" in attr or "displacement" in dst_type:
         return "displacement"
-    if "rough" in attr or "gloss" in attr:
+    if attr in {"d", "disp", "displacement"}:
+        return "displacement"
+    if "rough" in attr or "gloss" in attr or attr in {"rlg", "specular_roughness", "diffuse_roughness"}:
         return "roughness"
     if "metal" in attr:
         return "metalness"
@@ -189,3 +244,51 @@ def _missing_udim_tiles(existing_tiles: list[int]) -> list[int]:
         return []
     existing = set(existing_tiles)
     return [tile for tile in range(min(existing), max(existing) + 1) if tile not in existing]
+
+
+def _default_adapter_registry() -> RendererAdapterRegistry:
+    return RendererAdapterRegistry([CommonMayaAdapter(), VrayAdapter(), ArnoldAdapter()])
+
+
+def _with_propagated_semantic_slots(snapshot: GraphSnapshot) -> GraphSnapshot:
+    semantics_by_src: dict[str, str] = {}
+    for connection in snapshot.connections:
+        if connection.semantic:
+            semantics_by_src[connection.src_node] = connection.semantic
+
+    nodes: list[NodeSnapshot] = []
+    for node in snapshot.nodes:
+        semantic = semantics_by_src.get(node.id)
+        if semantic and not node.attrs.get("semantic_slot"):
+            attrs = dict(node.attrs)
+            attrs["semantic_slot"] = semantic
+            nodes.append(replace(node, attrs=attrs))
+        else:
+            nodes.append(node)
+    return replace(snapshot, nodes=nodes)
+
+
+def _resolve_result_material(
+    result: RuleResult,
+    material_index: dict[str, str],
+) -> Optional[str]:
+    if result.target_kind == "material":
+        return result.node or material_index.get(result.target_id)
+
+    for key in (result.target_id, result.node):
+        if not key:
+            continue
+        material = material_index.get(str(key))
+        if material:
+            return material
+        prefixed = f"node:{key}"
+        material = material_index.get(prefixed)
+        if material:
+            return material
+    return None
+
+
+def _short_node_id(node_id: str) -> str:
+    if node_id.startswith("node:"):
+        return node_id.split(":", 1)[1]
+    return node_id

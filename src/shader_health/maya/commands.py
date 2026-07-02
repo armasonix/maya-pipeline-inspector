@@ -153,19 +153,28 @@ def install_ui() -> None:
 def _validate_scene() -> Any:
     from shader_health.core import (
         ValidationEngine,
+        build_fix_plan,
         compute_health_score,
         load_rule_stack,
         summarize_results,
     )
     from shader_health.maya.scanner import scan_scene
+    from shader_health.maya.snapshot_enrichment import (
+        enrich_rule_results,
+        prepare_snapshot_for_validation,
+    )
 
-    snapshot = scan_scene()
+    raw_snapshot = scan_scene()
+    snapshot = prepare_snapshot_for_validation(raw_snapshot)
     renderer_ids = (snapshot.renderer,) if snapshot.renderer else ()
     rules = load_rule_stack(renderer_ids=renderer_ids)
-    results = tuple(ValidationEngine().validate(snapshot, rules))
+    results = list(ValidationEngine().validate(snapshot, rules))
+    results = enrich_rule_results(snapshot, results)
+    fix_plan = build_fix_plan(results, rules, snapshot)
+    failed_results = [item for item in results if item.status == "failed"]
     summary = summarize_results(results)
     health_score = compute_health_score(results)
-    failed_count = sum(1 for result in results if result.status == "failed")
+    failed_count = len(failed_results)
     message = (
         f"Scene validated. {failed_count} failed issue(s). "
         f"Health: {health_score.score}/100."
@@ -174,7 +183,9 @@ def _validate_scene() -> Any:
         action="validate_scene",
         succeeded=True,
         snapshot=snapshot,
-        results=results,
+        results=tuple(results),
+        rules=tuple(rules),
+        fix_plan=fix_plan,
         summary=summary,
         health_score=health_score,
         message=message,

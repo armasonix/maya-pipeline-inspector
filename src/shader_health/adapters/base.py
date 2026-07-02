@@ -81,10 +81,14 @@ _VRAY_NODE_TYPES = {
 _VRAY_TEXTURE_SLOTS = {
     "VRayMtl.diffuseColor": "base_color",
     "VRayMtl.reflectionGlossiness": "roughness",
+    "VRayMtl.rlg": "roughness",
     "VRayMtl.reflectionColor": "specular_color",
+    "VRayMtl.rlc": "specular_color",
     "VRayMtl.metalness": "metalness",
     "VRayMtl.bumpMap": "bump",
+    "VRayMtl.bmp": "bump",
     "VRayMtl.normalMap": "normal",
+    "VRayMtl.normal": "normal",
     "VRayMtl.opacityMap": "opacity",
     "VRayMtl.selfIllumination": "emission",
     "VRayBlendMtl.baseMtl": "material",
@@ -137,6 +141,7 @@ _ARNOLD_NODE_TYPES = {
 _ARNOLD_TEXTURE_SLOTS = {
     "aiStandardSurface.baseColor": "base_color",
     "aiStandardSurface.specularRoughness": "roughness",
+    "aiStandardSurface.diffuse_roughness": "roughness",
     "aiStandardSurface.metalness": "metalness",
     "aiStandardSurface.normalCamera": "normal",
     "aiStandardSurface.opacity": "opacity",
@@ -149,6 +154,7 @@ _ARNOLD_TEXTURE_SLOTS = {
     "aiLayerShader.mix": "mask",
     "aiMixShader.mix": "mask",
     "displacementShader.displacement": "displacement",
+    "displacementShader.d": "displacement",
 }
 
 _ARNOLD_COMPLEXITY_WEIGHTS = {

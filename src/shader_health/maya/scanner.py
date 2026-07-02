@@ -34,6 +34,8 @@ _ATTRS_BY_TYPE = {
     "aiStandardSurface": ("baseColor", "specularRoughness", "metalness"),
     "standardSurface": ("baseColor", "specularRoughness", "metalness"),
     "lambert": ("color", "transparency"),
+    "displacementShader": ("scale", "displacement", "displacementAmount"),
+    "VRayDisplacement": ("scale", "displacement", "displacementAmount"),
 }
 
 _TEXTURE_PATH_ATTRS = {
@@ -200,9 +202,14 @@ def _collect_shader_graph(
             )
 
         if displacement_shader:
-            displacement_nodes = _walk_upstream_graph(cmds, displacement_shader)[0]
+            displacement_nodes, displacement_connections = _walk_upstream_graph(
+                cmds,
+                displacement_shader,
+            )
             for node_name in displacement_nodes:
                 _add_node_snapshot(cmds, nodes, node_name)
+            if options.include_connections:
+                connections.extend(displacement_connections)
 
     file_dependencies = (
         _collect_file_dependencies(nodes)
