@@ -5,6 +5,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from shader_health.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
+
 PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
 PANEL_TITLE = "Maya Shader Health Inspector"
 PANEL_CONTENT_OBJECT_NAME = "shaderHealthInspectorPanelContent"
@@ -110,6 +112,7 @@ class ExportActionCallbacks:
 def build_main_widget(
     qt_widgets: Any,
     export_callbacks: Optional[ExportActionCallbacks] = None,
+    fix_queue_callbacks: Optional[FixQueueActionCallbacks] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
@@ -127,6 +130,7 @@ def build_main_widget(
     layout.addWidget(build_summary_header(qt_widgets))
     layout.addWidget(build_issues_table(qt_widgets))
     layout.addWidget(build_issue_details_panel(qt_widgets))
+    layout.addWidget(build_fix_queue(qt_widgets, callbacks=fix_queue_callbacks))
     layout.addWidget(build_export_actions(qt_widgets, callbacks=export_callbacks))
 
     description = qt_widgets.QLabel(
@@ -250,40 +254,41 @@ def build_issue_details_panel(
     title_label = qt_widgets.QLabel("Issue Details")
     layout.addWidget(title_label)
 
-    message_label = _details_label(
-        qt_widgets,
-        DETAILS_MESSAGE_LABEL_OBJECT_NAME,
-        _details_message_text(details_state),
+    layout.addWidget(
+        _details_label(
+            qt_widgets,
+            DETAILS_MESSAGE_LABEL_OBJECT_NAME,
+            _details_message_text(details_state),
+        )
     )
-    layout.addWidget(message_label)
-
-    why_label = _details_label(
-        qt_widgets,
-        DETAILS_WHY_LABEL_OBJECT_NAME,
-        _details_why_text(details_state),
+    layout.addWidget(
+        _details_label(
+            qt_widgets,
+            DETAILS_WHY_LABEL_OBJECT_NAME,
+            _details_why_text(details_state),
+        )
     )
-    layout.addWidget(why_label)
-
-    values_label = _details_label(
-        qt_widgets,
-        DETAILS_VALUES_LABEL_OBJECT_NAME,
-        _details_values_text(details_state),
+    layout.addWidget(
+        _details_label(
+            qt_widgets,
+            DETAILS_VALUES_LABEL_OBJECT_NAME,
+            _details_values_text(details_state),
+        )
     )
-    layout.addWidget(values_label)
-
-    graph_trace_label = _details_label(
-        qt_widgets,
-        DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME,
-        _details_graph_trace_text(details_state),
+    layout.addWidget(
+        _details_label(
+            qt_widgets,
+            DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME,
+            _details_graph_trace_text(details_state),
+        )
     )
-    layout.addWidget(graph_trace_label)
-
-    fix_label = _details_label(
-        qt_widgets,
-        DETAILS_FIX_LABEL_OBJECT_NAME,
-        _details_fix_text(details_state),
+    layout.addWidget(
+        _details_label(
+            qt_widgets,
+            DETAILS_FIX_LABEL_OBJECT_NAME,
+            _details_fix_text(details_state),
+        )
     )
-    layout.addWidget(fix_label)
 
     return widget
 
@@ -305,32 +310,33 @@ def build_export_actions(
     title_label = qt_widgets.QLabel("Report Exports")
     layout.addWidget(title_label)
 
-    json_button = _export_button(
-        qt_widgets,
-        "Export JSON Report",
-        EXPORT_JSON_BUTTON_OBJECT_NAME,
-        "Write the current shader health JSON report next to the scene.",
-        export_callbacks.on_export_json,
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Export JSON Report",
+            EXPORT_JSON_BUTTON_OBJECT_NAME,
+            "Write the current shader health JSON report next to the scene.",
+            export_callbacks.on_export_json,
+        )
     )
-    layout.addWidget(json_button)
-
-    html_button = _export_button(
-        qt_widgets,
-        "Export HTML Report",
-        EXPORT_HTML_BUTTON_OBJECT_NAME,
-        "Write the current shader health HTML report next to the scene.",
-        export_callbacks.on_export_html,
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Export HTML Report",
+            EXPORT_HTML_BUTTON_OBJECT_NAME,
+            "Write the current shader health HTML report next to the scene.",
+            export_callbacks.on_export_html,
+        )
     )
-    layout.addWidget(html_button)
-
-    manifest_button = _export_button(
-        qt_widgets,
-        "Export Shader Manifest",
-        EXPORT_MANIFEST_BUTTON_OBJECT_NAME,
-        "Write the current Material Passport / Shader Manifest next to the scene.",
-        export_callbacks.on_export_manifest,
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Export Shader Manifest",
+            EXPORT_MANIFEST_BUTTON_OBJECT_NAME,
+            "Write the current Material Passport / Shader Manifest next to the scene.",
+            export_callbacks.on_export_manifest,
+        )
     )
-    layout.addWidget(manifest_button)
 
     return widget
 
@@ -447,7 +453,7 @@ def _details_fix_text(state: IssueDetailsState) -> str:
     return f"Fix Available: {fix_status}   {state.fix_description}"
 
 
-def _export_button(
+def _button(
     qt_widgets: Any,
     label: str,
     object_name: str,
