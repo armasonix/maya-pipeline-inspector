@@ -78,7 +78,11 @@ class WaiverSidecar:
     waivers: tuple[WaiverRecord, ...] = ()
     schema_version: str = WAIVER_SCHEMA_VERSION
 
-    def active_for(self, result: RuleResult, now_utc: Optional[str] = None) -> Optional[WaiverRecord]:
+    def active_for(
+        self,
+        result: RuleResult,
+        now_utc: Optional[str] = None,
+    ) -> Optional[WaiverRecord]:
         for waiver in self.waivers:
             if waiver.matches(result) and not waiver.expired(now_utc):
                 return waiver
@@ -154,7 +158,10 @@ def load_waiver_sidecar(path: str | Path) -> WaiverSidecar:
 def write_waiver_sidecar(path: str | Path, sidecar: WaiverSidecar) -> Path:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(sidecar.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    out.write_text(
+        json.dumps(sidecar.to_dict(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return out
 
 
