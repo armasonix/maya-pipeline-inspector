@@ -353,7 +353,7 @@ def _export_fix_plan(path: Optional[str]) -> Any:
         snapshot=validation.snapshot,
         profile_id=validation.profile_id,
     )
-    return _runtime_result(result.action, result.path, result.message)
+    return _runtime_result(result.action, Path(result.path), result.message)
 
 
 def _runtime_output_path(
