@@ -88,6 +88,8 @@ show_ui()
 
 See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for the full workflow.
 
+**Next release planning:** [docs/V0_2_DEVELOPMENT_PLAN.md](docs/V0_2_DEVELOPMENT_PLAN.md) (Milestones 10–14, Issues #049–#070).
+
 ### Headless example
 
 ```bash

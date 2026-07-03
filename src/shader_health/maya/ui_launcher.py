@@ -7,8 +7,10 @@ from shader_health.ui import main_window
 from shader_health.ui.fix_queue import (
     FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
+    confirm_risky_fixes,
     fix_rows_from_table,
     populate_fix_queue,
+    risky_fix_rows,
     safe_fix_rows,
     selected_fix_rows,
 )
@@ -86,6 +88,7 @@ def _create_dockable_panel() -> Any:
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
         )
         panel_state["content"] = content
+        self._shader_health_content = content
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
@@ -104,10 +107,27 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_json=_export_json_from_ui,
         on_export_html=_export_html_from_ui,
         on_export_manifest=_export_manifest_from_ui,
+        on_export_fix_plan=_export_fix_plan_from_ui,
     )
 
 
 def _export_json_from_ui() -> None:
+    content = _active_panel_content()
+    snapshot = getattr(content, "_shader_health_snapshot", None) if content is not None else None
+    results = getattr(content, "_shader_health_results", None) if content is not None else None
+    if snapshot is not None and results is not None:
+        from shader_health.maya import export_actions
+
+        fix_audit = getattr(content, "_shader_health_last_fix_audit", None)
+        _print_export_result(
+            export_actions.export_json_report(
+                snapshot=snapshot,
+                results=results,
+                fix_audit=fix_audit,
+            )
+        )
+        return
+
     from shader_health.maya.commands import export_json_report_action
 
     _print_export_result(export_json_report_action())
@@ -125,11 +145,39 @@ def _export_manifest_from_ui() -> None:
     _print_export_result(export_shader_manifest_action())
 
 
+def _export_fix_plan_from_ui() -> None:
+    content = _active_panel_content()
+    fix_plan = getattr(content, "_shader_health_fix_plan", None) if content is not None else None
+    snapshot = getattr(content, "_shader_health_snapshot", None) if content is not None else None
+    profile_id = getattr(content, "_shader_health_profile_id", "") if content is not None else ""
+    if fix_plan is not None and snapshot is not None:
+        from shader_health.maya import export_actions
+
+        _print_export_result(
+            export_actions.export_fix_plan(
+                fix_plan=fix_plan,
+                snapshot=snapshot,
+                profile_id=profile_id,
+            )
+        )
+        return
+
+    from shader_health.maya.commands import export_fix_plan_action
+
+    _print_export_result(export_fix_plan_action())
+
+
 def _panel_content(panel_state: dict[str, Any]) -> Any:
     content = panel_state.get("content")
     if content is None:
         raise RuntimeError("Shader Health panel content is not initialized.")
     return content
+
+
+def _active_panel_content() -> Any | None:
+    if _PANEL is None:
+        return None
+    return getattr(_PANEL, "_shader_health_content", None)
 
 
 def _validation_action_callbacks(
@@ -413,6 +461,9 @@ def _store_validation_state(
     content._shader_health_failed_results = failed_results
     content._shader_health_issue_rows = rows
     content._shader_health_fix_plan = getattr(result, "fix_plan", None)
+    content._shader_health_snapshot = getattr(result, "snapshot", None)
+    content._shader_health_results = getattr(result, "results", ())
+    content._shader_health_profile_id = getattr(result, "profile_id", "")
     _populate_fix_queue(content, result)
 
 
@@ -589,7 +640,17 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         in selected_ids
     )
-    report = apply_fix_actions(actions)
+    if risky_fix_rows(selected) and not confirm_risky_fixes(qt_widgets, selected):
+        _set_label_text(
+            content,
+            qt_widgets,
+            "shaderHealthInspectorDescription",
+            "High-risk fixes were not applied.",
+        )
+        return
+    allow_high_risk = bool(risky_fix_rows(selected))
+    report = apply_fix_actions(actions, allow_high_risk=allow_high_risk)
+    _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,
         qt_widgets,
@@ -625,6 +686,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         in safe_ids
     )
     report = apply_fix_actions(actions)
+    _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,
         qt_widgets,
@@ -632,6 +694,20 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         f"Applied {report.applied_count} safe fix(es).",
     )
     _revalidate_with_current_scope(content, qt_widgets)
+
+
+def _persist_fix_apply_audit(content: Any, report: Any) -> None:
+    from shader_health.maya.validation_pipeline import persist_fix_apply_audit
+
+    snapshot = getattr(content, "_shader_health_snapshot", None)
+    scene_path = getattr(snapshot, "scene_path", "") if snapshot is not None else ""
+    profile_id = getattr(content, "_shader_health_profile_id", "")
+    _, session_dict = persist_fix_apply_audit(
+        report,
+        scene_path=scene_path,
+        profile_id=profile_id,
+    )
+    content._shader_health_last_fix_audit = session_dict
 
 
 def _on_issue_row_selected(content: Any, qt_widgets: Any) -> None:
@@ -884,6 +960,10 @@ def _reset_panel_state(
     content._shader_health_fix_rows = ()
     content._shader_health_selected_issue = None
     content._shader_health_scan_scope = "scene"
+    content._shader_health_snapshot = None
+    content._shader_health_results = ()
+    content._shader_health_profile_id = ""
+    content._shader_health_last_fix_audit = None
 
     _set_label_text(
         content,

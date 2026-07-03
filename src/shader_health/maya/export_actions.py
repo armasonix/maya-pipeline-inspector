@@ -4,11 +4,13 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from shader_health.core import GraphSnapshot, RuleResult
+from shader_health.core.fix_plan import FixPlan
 from shader_health.maya.scanner import scan_scene
 from shader_health.reports import write_json_report
+from shader_health.reports.fix_plan_export import write_fix_plan_export
 from shader_health.reports.html_report import write_html_report
 from shader_health.reports.manifest import write_shader_manifest
 
@@ -31,12 +33,18 @@ def export_json_report(
     snapshot: Optional[GraphSnapshot] = None,
     snapshot_provider: Optional[SnapshotProvider] = None,
     results: Iterable[RuleResult] = (),
+    fix_audit: Optional[dict[str, Any]] = None,
 ) -> ExportActionResult:
     """Export the current shader health JSON report."""
 
     export_snapshot = _snapshot(snapshot, snapshot_provider)
     output_path = _output_path(path, export_snapshot, suffix="report", extension="json")
-    written_path = write_json_report(output_path, export_snapshot, results)
+    written_path = write_json_report(
+        output_path,
+        export_snapshot,
+        results,
+        fix_audit=fix_audit,
+    )
     return _result("export_json_report", written_path, "JSON report exported.")
 
 
@@ -67,6 +75,27 @@ def export_shader_manifest(
     output_path = _output_path(path, export_snapshot, suffix="manifest", extension="json")
     written_path = write_shader_manifest(output_path, export_snapshot)
     return _result("export_shader_manifest", written_path, "Shader manifest exported.")
+
+
+def export_fix_plan(
+    path: Optional[str | Path] = None,
+    *,
+    fix_plan: FixPlan,
+    snapshot: Optional[GraphSnapshot] = None,
+    snapshot_provider: Optional[SnapshotProvider] = None,
+    profile_id: str = "",
+) -> ExportActionResult:
+    """Export the current planned fix actions without mutating the scene."""
+
+    export_snapshot = _snapshot(snapshot, snapshot_provider)
+    output_path = _output_path(path, export_snapshot, suffix="fix_plan", extension="json")
+    written_path = write_fix_plan_export(
+        output_path,
+        fix_plan,
+        snapshot=export_snapshot,
+        profile_id=profile_id,
+    )
+    return _result("export_fix_plan", written_path, "Fix plan exported.")
 
 
 def _snapshot(

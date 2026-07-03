@@ -13,7 +13,7 @@ JsonValue = Any
 
 _REFERENCE_BLOCK_REASON = "target_referenced"
 _LOCKED_BLOCK_REASON = "target_locked"
-_HIGH_RISK_BLOCK_REASON = "high_risk_requires_explicit_confirmation"
+HIGH_RISK_BLOCK_REASON = "high_risk_requires_explicit_confirmation"
 UNDO_SUPPORTED_FIX_TYPES = frozenset(
     {
         "set_attr",
@@ -138,7 +138,7 @@ def _build_action(
     node = node_index.find(result)
     target_node = _target_node_name(result, node)
     target_attr = _target_attr(result, rule.fix.params)
-    after_value = _after_value(result, rule.fix.params)
+    after_value = _after_value(result, rule.fix.params, rule.fix.type)
     block_reasons = _block_reasons(node, rule.fix.risk)
 
     return FixAction(
@@ -160,7 +160,7 @@ def _build_action(
         requires_reference_edit=bool(node.referenced) if node else False,
         requires_supervisor=rule.fix.risk == "high",
         undo_supported=rule.fix.type in UNDO_SUPPORTED_FIX_TYPES,
-        blocked=bool(block_reasons),
+        blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
         params=rule.fix.to_dict(),
     )
@@ -173,7 +173,16 @@ def _target_attr(result: RuleResult, fix_params: Mapping[str, Any]) -> Optional[
     return result.plug
 
 
-def _after_value(result: RuleResult, fix_params: Mapping[str, Any]) -> JsonValue:
+def _after_value(result: RuleResult, fix_params: Mapping[str, Any], fix_type: str) -> JsonValue:
+    if fix_type == "normalize_path":
+        before_path = str(result.current_value or "")
+        normalized = resolve_normalize_path_value(before_path, fix_params)
+        if normalized is not None:
+            return normalized
+    if fix_type == "disable_feature":
+        if "value" in fix_params:
+            return fix_params["value"]
+        return False
     if "value" in fix_params:
         return fix_params["value"]
     if "path" in fix_params:
@@ -188,8 +197,14 @@ def _block_reasons(node: Optional[NodeSnapshot], risk: str) -> list[str]:
     if node is not None and node.locked:
         reasons.append(_LOCKED_BLOCK_REASON)
     if risk == "high":
-        reasons.append(_HIGH_RISK_BLOCK_REASON)
+        reasons.append(HIGH_RISK_BLOCK_REASON)
     return reasons
+
+
+def hard_block_reasons(block_reasons: Iterable[str]) -> list[str]:
+    """Return block reasons that prevent application without override flags."""
+
+    return [reason for reason in block_reasons if reason != HIGH_RISK_BLOCK_REASON]
 
 
 def _target_node_name(result: RuleResult, node: Optional[NodeSnapshot]) -> str:
@@ -201,6 +216,47 @@ def _target_node_name(result: RuleResult, node: Optional[NodeSnapshot]) -> str:
 def _fix_id(result: RuleResult, fix_type: str) -> str:
     target = result.target_id or result.node or "scene"
     return f"{result.rule_id}:{target}:{fix_type}"
+
+
+def replace_path_prefix(path: str, old_prefix: str, new_prefix: str) -> Optional[str]:
+    """Replace a path prefix, preserving the remainder of the path."""
+
+    path_norm = path.replace("\\", "/")
+    old_norm = old_prefix.replace("\\", "/").rstrip("/")
+    new_norm = new_prefix.replace("\\", "/").rstrip("/")
+    if not path_norm or not old_norm or not new_norm:
+        return None
+
+    if path_norm.lower() == old_norm.lower():
+        return new_norm
+
+    old_with_sep = f"{old_norm}/"
+    if path_norm.lower().startswith(old_with_sep.lower()):
+        suffix = path_norm[len(old_norm) :]
+        return new_norm + suffix
+    return None
+
+
+def resolve_normalize_path_value(
+    before_path: str,
+    fix_params: Mapping[str, Any],
+    *,
+    planned_after: JsonValue = None,
+) -> Optional[str]:
+    """Resolve the target path for a normalize_path fix."""
+
+    explicit_path = fix_params.get("path")
+    if isinstance(explicit_path, str) and explicit_path.strip():
+        return explicit_path.strip()
+
+    replace_from = fix_params.get("replace_from")
+    replace_to = fix_params.get("replace_to")
+    if replace_from and replace_to:
+        return replace_path_prefix(before_path, str(replace_from), str(replace_to))
+
+    if isinstance(planned_after, str) and planned_after.strip():
+        return planned_after.strip()
+    return None
 
 
 class _NodeIndex:

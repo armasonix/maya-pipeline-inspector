@@ -1,0 +1,44 @@
+{
+  "fix_audit_schema_version": "1.0",
+  "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+  "sessions": [
+    {
+      "applied_at_utc": "2026-07-03T15:01:13Z",
+      "applied_count": 2,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 2,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    }
+  ]
+}

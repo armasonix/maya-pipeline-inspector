@@ -22,6 +22,7 @@ FIX_QUEUE_COLUMNS = (
     "Blocked",
 )
 HIGH_RISK = "high"
+MEDIUM_RISK = "medium"
 
 
 @dataclass(frozen=True)
@@ -170,7 +171,9 @@ def safe_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     return tuple(
         row
         for row in rows
-        if not row.blocked and not row.requires_confirmation and row.risk != HIGH_RISK
+        if not row.blocked
+        and not row.requires_confirmation
+        and row.risk not in (HIGH_RISK, MEDIUM_RISK)
     )
 
 
@@ -203,6 +206,48 @@ def _risky_confirmation_text(rows: Sequence[FixQueueRow]) -> str:
     if risky_count:
         return f"Risky fixes require confirmation: {risky_count} pending."
     return "Risky fixes require confirmation before they can be applied."
+
+
+def confirm_risky_fixes(qt_widgets: Any, rows: Sequence[FixQueueRow]) -> bool:
+    """Ask the user to confirm high-risk fixes before application."""
+
+    risky = risky_fix_rows(rows)
+    if not risky:
+        return True
+
+    message_box = qt_widgets.QMessageBox
+    lines = [
+        f"{row.target_node}.{row.target_attr}: {row.before_value} -> {row.after_value}"
+        for row in risky[:8]
+    ]
+    if len(risky) > 8:
+        lines.append(f"... and {len(risky) - 8} more")
+    message = (
+        f"Apply {len(risky)} high-risk fix(es)? "
+        "These changes can affect render look or farm safety.\n\n" + "\n".join(lines)
+    )
+    standard_button = getattr(message_box, "StandardButton", None)
+    if standard_button is not None:
+        yes_button = standard_button.Yes
+        no_button = standard_button.No
+        default_button = standard_button.No
+        reply = message_box.warning(
+            None,
+            "Confirm Risky Fixes",
+            message,
+            yes_button | no_button,
+            default_button,
+        )
+        return reply == yes_button
+
+    reply = message_box.warning(
+        None,
+        "Confirm Risky Fixes",
+        message,
+        message_box.Yes | message_box.No,
+        message_box.No,
+    )
+    return reply == message_box.Yes
 
 
 def _fix_queue_button(

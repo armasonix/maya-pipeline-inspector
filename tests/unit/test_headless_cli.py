@@ -75,6 +75,61 @@ def test_validate_snapshot_returns_ok_when_no_blocking_results(tmp_path: Path):
     assert payload["status"] == "passed"
 
 
+def test_validate_snapshot_writes_fix_plan_when_flag_and_fixes_exist(tmp_path: Path):
+    snapshot_path = _write_snapshot(tmp_path, "ACEScg")
+    report_path = tmp_path / "report.json"
+    fix_plan_path = tmp_path / "fix_plan.json"
+    rule_root = _rule_root(tmp_path, block_publish=True, include_fix=True)
+
+    code = cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--export-fix-plan",
+            str(fix_plan_path),
+            "--rule-root",
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    payload = json.loads(fix_plan_path.read_text(encoding="utf-8"))
+    assert code == cli.EXIT_PUBLISH_BLOCK
+    assert payload["fix_plan_schema_version"] == "1.0"
+    assert payload["total"] == 1
+    assert payload["actions"][0]["fix_type"] == "set_attr"
+    assert payload["actions"][0]["before_value"] == "ACEScg"
+    assert payload["actions"][0]["after_value"] == "Raw"
+
+
+def test_validate_snapshot_skips_fix_plan_export_without_fixes(tmp_path: Path):
+    snapshot_path = _write_snapshot(tmp_path, "Raw")
+    report_path = tmp_path / "report.json"
+    fix_plan_path = tmp_path / "fix_plan.json"
+    rule_root = _rule_root(tmp_path, block_publish=True, include_fix=True)
+
+    code = cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--export-fix-plan",
+            str(fix_plan_path),
+            "--rule-root",
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    assert not fix_plan_path.exists()
+
+
 def test_validate_invalid_rule_root_returns_config_error(tmp_path: Path):
     snapshot_path = _write_snapshot(tmp_path, "Raw")
 
@@ -143,8 +198,9 @@ def _rule_root(
     *,
     block_publish: bool = False,
     block_deadline: bool = False,
+    include_fix: bool = False,
 ) -> Path:
-    rule_root = tmp_path / f"rules_{block_publish}_{block_deadline}"
+    rule_root = tmp_path / f"rules_{block_publish}_{block_deadline}_{include_fix}"
     common = rule_root / "common"
     common.mkdir(parents=True)
     rule = {
@@ -174,6 +230,13 @@ def _rule_root(
             }
         ]
     }
+    if include_fix:
+        rule["rules"][0]["policy"]["auto_fix_allowed"] = True
+        rule["rules"][0]["fix"] = {
+            "type": "set_attr",
+            "risk": "low",
+            "params": {"attribute": "colorSpace", "value": "Raw"},
+        }
     (common / "colorspace.json").write_text(json.dumps(rule), encoding="utf-8")
     return rule_root
 

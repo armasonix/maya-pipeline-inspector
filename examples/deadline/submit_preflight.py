@@ -87,9 +87,13 @@ def run_deadline_preflight(
     )
     validator_exit_code = int(completed.returncode)
     if validator_exit_code == VALIDATOR_OK:
-        return _result(True, SUBMISSION_ALLOWED, validator_exit_code, command, report_path, completed)
+        return _result(
+            True, SUBMISSION_ALLOWED, validator_exit_code, command, report_path, completed
+        )
     if validator_exit_code == VALIDATOR_DEADLINE_BLOCK:
-        return _result(False, SUBMISSION_BLOCKED, validator_exit_code, command, report_path, completed)
+        return _result(
+            False, SUBMISSION_BLOCKED, validator_exit_code, command, report_path, completed
+        )
     return _result(False, PREFLIGHT_ERROR, validator_exit_code, command, report_path, completed)
 
 

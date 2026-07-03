@@ -31,10 +31,8 @@ config.local.yml
 *.local.yaml
 *.local.yml
 
-# Runtime output
-logs/
-reports/
-.cache/
+# Runtime output (root-level report artifacts only)
+/reports/
 .shader_health_cache/
 *.shader_health_waivers.json
 

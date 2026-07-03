@@ -61,6 +61,42 @@ def test_export_shader_manifest_writes_manifest_file(tmp_path: Path):
     assert payload["manifest_schema_version"] == "1.0"
 
 
+def test_export_fix_plan_writes_fix_plan_file(tmp_path: Path):
+    from shader_health.core.fix_plan import FixPlan
+
+    output_path = tmp_path / "fix_plan.json"
+    fix_plan = FixPlan()
+
+    result = export_actions.export_fix_plan(
+        output_path,
+        fix_plan=fix_plan,
+        snapshot=make_snapshot(str(tmp_path / "demo.ma")),
+        profile_id="artist_relaxed",
+    )
+
+    assert result.succeeded is True
+    assert result.action == "export_fix_plan"
+    assert Path(result.path) == output_path
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["fix_plan_schema_version"] == "1.0"
+    assert payload["profile_id"] == "artist_relaxed"
+    assert payload["actions"] == []
+
+
+def test_export_fix_plan_uses_scene_based_default_path(tmp_path: Path):
+    from shader_health.core.fix_plan import FixPlan
+
+    scene_path = tmp_path / "asset_shading.ma"
+
+    result = export_actions.export_fix_plan(
+        fix_plan=FixPlan(),
+        snapshot=make_snapshot(str(scene_path)),
+        profile_id="artist_relaxed",
+    )
+
+    assert Path(result.path) == tmp_path / "asset_shading_shader_health_fix_plan.json"
+
+
 def test_export_json_report_uses_scene_based_default_path(tmp_path: Path):
     scene_path = tmp_path / "asset_shading.ma"
 
@@ -88,14 +124,21 @@ def test_export_command_wrappers_delegate(monkeypatch: Any):
         "_export_shader_manifest",
         lambda path: calls.append(("manifest", path)) or result,
     )
+    monkeypatch.setattr(
+        commands,
+        "_export_fix_plan",
+        lambda path: calls.append(("fix_plan", path)) or result,
+    )
 
     assert commands.export_json_report_action("report.json") is result
     assert commands.export_html_report_action("report.html") is result
     assert commands.export_shader_manifest_action("manifest.json") is result
+    assert commands.export_fix_plan_action("fix_plan.json") is result
     assert calls == [
         ("json", "report.json"),
         ("html", "report.html"),
         ("manifest", "manifest.json"),
+        ("fix_plan", "fix_plan.json"),
     ]
 
 
@@ -163,6 +206,7 @@ def test_export_buttons_connect_to_callbacks():
         on_export_json=lambda: calls.append("json"),
         on_export_html=lambda: calls.append("html"),
         on_export_manifest=lambda: calls.append("manifest"),
+        on_export_fix_plan=lambda: calls.append("fix_plan"),
     )
 
     widget = main_window.build_export_actions(FakeQtWidgets, callbacks=callbacks)
@@ -170,7 +214,8 @@ def test_export_buttons_connect_to_callbacks():
     _find(widget, main_window.EXPORT_JSON_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_HTML_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_MANIFEST_BUTTON_OBJECT_NAME).clicked.emit()
-    assert calls == ["json", "html", "manifest"]
+    _find(widget, main_window.EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME).clicked.emit()
+    assert calls == ["json", "html", "manifest", "fix_plan"]
 
 
 def _find(widget: Any, object_name: str) -> Any:
