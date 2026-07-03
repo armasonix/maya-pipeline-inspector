@@ -103,6 +103,7 @@ def test_apply_fix_actions_returns_empty_report_without_undo_chunk_for_empty_inp
         "applied_count": 0,
         "blocked_count": 0,
         "failed_count": 0,
+        "undo_chunk_name": "Shader Health Apply Fixes",
         "records": [],
     }
     assert cmds.undo_calls == []

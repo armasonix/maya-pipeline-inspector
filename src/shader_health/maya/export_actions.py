@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from shader_health.core import GraphSnapshot, RuleResult
 from shader_health.maya.scanner import scan_scene
@@ -31,12 +31,18 @@ def export_json_report(
     snapshot: Optional[GraphSnapshot] = None,
     snapshot_provider: Optional[SnapshotProvider] = None,
     results: Iterable[RuleResult] = (),
+    fix_audit: Optional[dict[str, Any]] = None,
 ) -> ExportActionResult:
     """Export the current shader health JSON report."""
 
     export_snapshot = _snapshot(snapshot, snapshot_provider)
     output_path = _output_path(path, export_snapshot, suffix="report", extension="json")
-    written_path = write_json_report(output_path, export_snapshot, results)
+    written_path = write_json_report(
+        output_path,
+        export_snapshot,
+        results,
+        fix_audit=fix_audit,
+    )
     return _result("export_json_report", written_path, "JSON report exported.")
 
 

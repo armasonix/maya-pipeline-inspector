@@ -19,7 +19,12 @@ JsonDict = dict[str, Any]
 JsonValue = Any
 
 
-def build_json_report(snapshot: GraphSnapshot, results: Iterable[RuleResult]) -> JsonDict:
+def build_json_report(
+    snapshot: GraphSnapshot,
+    results: Iterable[RuleResult],
+    *,
+    fix_audit: Mapping[str, Any] | None = None,
+) -> JsonDict:
     """Build the deterministic report payload without writing it to disk."""
 
     result_list = list(results)
@@ -28,7 +33,7 @@ def build_json_report(snapshot: GraphSnapshot, results: Iterable[RuleResult]) ->
     block_publish = summary.block_publish
     block_deadline = summary.block_deadline
 
-    return {
+    payload: JsonDict = {
         "block_deadline": block_deadline,
         "block_publish": block_publish,
         "blocking": {
@@ -48,6 +53,9 @@ def build_json_report(snapshot: GraphSnapshot, results: Iterable[RuleResult]) ->
         "status": "failed" if summary.failed else "passed",
         "summary": summary.to_dict(),
     }
+    if fix_audit is not None:
+        payload["fix_audit"] = _json_safe(dict(fix_audit))
+    return payload
 
 
 def dumps_json_report(
@@ -55,10 +63,11 @@ def dumps_json_report(
     results: Iterable[RuleResult],
     *,
     indent: int | None = 2,
+    fix_audit: Mapping[str, Any] | None = None,
 ) -> str:
     """Serialize a validation report as deterministic UTF-8 JSON text."""
 
-    payload = build_json_report(snapshot, results)
+    payload = build_json_report(snapshot, results, fix_audit=fix_audit)
     return json.dumps(payload, indent=indent, sort_keys=True) + "\n"
 
 
@@ -68,13 +77,14 @@ def write_json_report(
     results: Iterable[RuleResult],
     *,
     indent: int | None = 2,
+    fix_audit: Mapping[str, Any] | None = None,
 ) -> Path:
     """Write a deterministic validation report and return the output path."""
 
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        dumps_json_report(snapshot, results, indent=indent),
+        dumps_json_report(snapshot, results, indent=indent, fix_audit=fix_audit),
         encoding="utf-8",
     )
     return output_path

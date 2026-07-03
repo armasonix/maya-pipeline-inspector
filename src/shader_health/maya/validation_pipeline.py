@@ -76,6 +76,46 @@ def waiver_sidecar_path_for_scene(scene_path: str) -> Optional[Path]:
     return scene.with_name(f"{scene.stem}.shader_health_waivers.json")
 
 
+def fix_audit_sidecar_path_for_scene(scene_path: str) -> Optional[Path]:
+    """Return the default fix audit sidecar path beside a Maya scene."""
+
+    if not scene_path:
+        return None
+    scene = Path(scene_path)
+    if not scene.name:
+        return None
+    return scene.with_name(f"{scene.stem}.shader_health_fix_audit.json")
+
+
+def persist_fix_apply_audit(
+    apply_report: Any,
+    *,
+    scene_path: str,
+    profile_id: str,
+    audit_sidecar_path: Optional[Path] = None,
+    applied_at_utc: Optional[str] = None,
+) -> tuple[Optional[Path], dict[str, Any]]:
+    """Append an apply session to the scene fix audit sidecar."""
+
+    from shader_health.core.fix_audit import (
+        append_fix_audit_session,
+        build_fix_audit_session,
+    )
+
+    session = build_fix_audit_session(
+        scene_path=scene_path,
+        profile_id=profile_id,
+        apply_report=apply_report,
+        applied_at_utc=applied_at_utc,
+    )
+    session_dict = session.to_dict()
+    sidecar_path = audit_sidecar_path or fix_audit_sidecar_path_for_scene(scene_path)
+    if sidecar_path is None:
+        return None, session_dict
+    written_path = append_fix_audit_session(sidecar_path, session)
+    return written_path, session_dict
+
+
 def run_validation(
     snapshot: GraphSnapshot,
     *,

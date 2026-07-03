@@ -134,3 +134,23 @@ def test_json_report_passed_status_without_failed_results():
     assert report["block_deadline"] is False
     assert report["summary"]["passed"] == 1
     assert report["score"]["score"] == 100
+    assert "fix_audit" not in report
+
+
+def test_json_report_includes_optional_fix_audit_section():
+    snapshot = make_snapshot()
+    fix_audit = {
+        "applied_at_utc": "2026-07-03T12:00:00Z",
+        "scene_path": snapshot.scene_path,
+        "profile_id": "artist_relaxed",
+        "undo_chunk_name": "Shader Health Apply Fixes",
+        "total": 1,
+        "applied_count": 1,
+        "blocked_count": 0,
+        "failed_count": 0,
+        "records": [],
+    }
+
+    report = build_json_report(snapshot, [], fix_audit=fix_audit)
+
+    assert report["fix_audit"] == fix_audit

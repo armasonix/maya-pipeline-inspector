@@ -57,6 +57,7 @@ class AppliedFixRecord:
 @dataclass(frozen=True)
 class ApplyFixReport:
     records: tuple[AppliedFixRecord, ...]
+    undo_chunk_name: str = DEFAULT_UNDO_CHUNK_NAME
 
     @property
     def total(self) -> int:
@@ -75,13 +76,15 @@ class ApplyFixReport:
         return sum(1 for record in self.records if not record.applied and not record.blocked)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "total": self.total,
             "applied_count": self.applied_count,
             "blocked_count": self.blocked_count,
             "failed_count": self.failed_count,
+            "undo_chunk_name": self.undo_chunk_name,
             "records": [record.to_dict() for record in self.records],
         }
+        return payload
 
 
 def apply_fix_actions(
@@ -96,7 +99,7 @@ def apply_fix_actions(
     maya_cmds = cmds or _maya_cmds()
     queued = tuple(actions)
     if not queued:
-        return ApplyFixReport(records=())
+        return ApplyFixReport(records=(), undo_chunk_name=undo_chunk_name)
 
     records: list[AppliedFixRecord] = []
     maya_cmds.undoInfo(openChunk=True, chunkName=undo_chunk_name)
@@ -113,7 +116,7 @@ def apply_fix_actions(
             )
     finally:
         maya_cmds.undoInfo(closeChunk=True)
-    return ApplyFixReport(records=tuple(records))
+    return ApplyFixReport(records=tuple(records), undo_chunk_name=undo_chunk_name)
 
 
 def _apply_one(
