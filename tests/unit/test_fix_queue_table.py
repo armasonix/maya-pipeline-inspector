@@ -3,6 +3,7 @@ from __future__ import annotations
 from shader_health.ui.fix_queue import (
     FixQueueRow,
     fix_rows_from_table,
+    safe_fix_rows,
     selected_fix_rows,
     selected_from_table_item,
     toggle_selected_table_item,
@@ -75,3 +76,39 @@ def test_selected_from_table_item():
     assert selected_from_table_item(FakeItem("YES")) is True
     assert selected_from_table_item(FakeItem("NO")) is False
     assert selected_from_table_item(None) is False
+
+
+def test_safe_fix_rows_excludes_medium_and_high_risk_fixes():
+    rows = (
+        FixQueueRow(
+            selected=False,
+            title="Low",
+            risk="low",
+            target_node="file1",
+            target_attr="colorSpace",
+            before_value="sRGB",
+            after_value="Raw",
+        ),
+        FixQueueRow(
+            selected=False,
+            title="Medium relink",
+            risk="medium",
+            target_node="file2",
+            target_attr="fileTextureName",
+            before_value="v001",
+            after_value="v003",
+        ),
+        FixQueueRow(
+            selected=False,
+            title="High",
+            risk="high",
+            target_node="file3",
+            target_attr="displacement",
+            before_value=True,
+            after_value=False,
+        ),
+    )
+
+    safe_rows = safe_fix_rows(rows)
+
+    assert [row.title for row in safe_rows] == ["Low"]

@@ -108,6 +108,80 @@ def test_apply_fix_actions_returns_empty_report_without_undo_chunk_for_empty_inp
     assert cmds.undo_calls == []
 
 
+def test_apply_relink_path_updates_file_texture_path_inside_undo_chunk():
+    cmds = FakeCmds(
+        {
+            "file1.fileTextureName": "D:/show/tex/albedo_v001.<UDIM>.exr",
+        }
+    )
+    action = _relink_action(
+        before_value="D:/show/tex/albedo_v001.<UDIM>.exr",
+        after_value="D:/show/tex/albedo_v003.<UDIM>.exr",
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.undo_calls == [
+        {"openChunk": True, "chunkName": "Shader Health Apply Fixes"},
+        {"closeChunk": True},
+    ]
+    assert cmds.set_calls == [
+        (
+            "file1.fileTextureName",
+            "D:/show/tex/albedo_v003.<UDIM>.exr",
+            {"type": "string"},
+        )
+    ]
+    assert report.applied_count == 1
+    record = report.records[0]
+    assert record.fix_type == "relink_path"
+    assert record.target_attr == "fileTextureName"
+    assert record.before_value == "D:/show/tex/albedo_v001.<UDIM>.exr"
+    assert record.after_value == "D:/show/tex/albedo_v003.<UDIM>.exr"
+
+
+def test_apply_relink_path_blocks_referenced_targets_by_default():
+    cmds = FakeCmds({"file1.fileTextureName": "D:/old/path.exr"})
+    action = _relink_action(referenced=True)
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.set_calls == []
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["target_referenced"]
+
+
+def test_apply_relink_path_blocks_missing_target_node():
+    cmds = FakeCmds()
+    action = _relink_action()
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.set_calls == []
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["target_node_missing"]
+
+
+def test_apply_relink_path_uses_attribute_from_fix_params_when_plug_is_metadata():
+    cmds = FakeCmds({"file1.fileTextureName": "D:/show/tex/albedo_v001.exr"})
+    action = _relink_action(target_attr="version")
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert report.applied_count == 1
+    assert cmds.set_calls[0][0] == "file1.fileTextureName"
+
+
+def test_apply_relink_path_blocks_invalid_empty_path():
+    cmds = FakeCmds({"file1.fileTextureName": "D:/show/tex/albedo_v001.exr"})
+    action = _relink_action(after_value="   ")
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["invalid_relink_path"]
+
+
 def _action(
     *,
     fix_type: str = "set_attr",
@@ -138,4 +212,43 @@ def _action(
         blocked=bool(block_reasons),
         block_reasons=block_reasons,
         params={"type": fix_type, "attribute": "colorSpace", "value": "Raw"},
+    )
+
+
+def _relink_action(
+    *,
+    referenced: bool = False,
+    locked: bool = False,
+    target_attr: str = "fileTextureName",
+    before_value: str = "D:/show/tex/albedo_v001.<UDIM>.exr",
+    after_value: str = "D:/show/tex/albedo_v003.<UDIM>.exr",
+) -> FixAction:
+    block_reasons: list[str] = []
+    if referenced:
+        block_reasons.append("target_referenced")
+    if locked:
+        block_reasons.append("target_locked")
+    return FixAction(
+        fix_id="common.texture.version.latest:node:file1:relink_path",
+        rule_id="common.texture.version.latest",
+        title="Texture version should be latest available: relink_path",
+        fix_type="relink_path",
+        risk="medium",
+        target_kind="file_dependency",
+        target_id="node:file1",
+        target_node="file1",
+        target_attr=target_attr,
+        before_value=before_value,
+        after_value=after_value,
+        explanation="Relink texture to latest approved version.",
+        referenced=referenced,
+        locked=locked,
+        requires_reference_edit=referenced,
+        blocked=bool(block_reasons),
+        block_reasons=block_reasons,
+        params={
+            "type": "relink_path",
+            "attribute": "fileTextureName",
+            "path": after_value,
+        },
     )

@@ -22,6 +22,7 @@ FIX_QUEUE_COLUMNS = (
     "Blocked",
 )
 HIGH_RISK = "high"
+MEDIUM_RISK = "medium"
 
 
 @dataclass(frozen=True)
@@ -170,7 +171,9 @@ def safe_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     return tuple(
         row
         for row in rows
-        if not row.blocked and not row.requires_confirmation and row.risk != HIGH_RISK
+        if not row.blocked
+        and not row.requires_confirmation
+        and row.risk not in (HIGH_RISK, MEDIUM_RISK)
     )
 
 
