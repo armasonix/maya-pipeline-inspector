@@ -4,18 +4,31 @@ from __future__ import annotations
 import importlib
 import json
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
 
+from shader_health.core.waivers import (
+    WaiverSidecar,
+    create_waiver_from_result,
+    load_waiver_sidecar,
+    write_waiver_sidecar,
+)
 from shader_health.maya.navigation import (
     NavigationActionResult,
     copy_path,
-    open_attribute_editor,
+    open_in_hypershade,
     reveal_file,
     select_node,
 )
 from shader_health.maya.ui_launcher import close_panel, show_panel
+from shader_health.maya.validation_pipeline import (
+    DEFAULT_PROFILE_ID,
+    ValidationRunResult,
+    run_validation,
+    waiver_sidecar_path_for_scene,
+)
 
 MENU_NAME = "shaderHealthInspectorMenu"
 MENU_LABEL = "Shader Health"
@@ -41,22 +54,88 @@ def close_ui(*, delete: bool = True) -> None:
     close_panel(delete=delete)
 
 
-def validate_scene_action() -> Any:
+def validate_scene_action(*, profile_id: str = DEFAULT_PROFILE_ID) -> Any:
     """Validate the current Maya scene and return a UI-friendly result object."""
 
-    return _validate_scene()
+    return _validate(scan_scope="scene", profile_id=profile_id)
+
+
+def validate_selection_action(*, profile_id: str = DEFAULT_PROFILE_ID) -> Any:
+    """Validate the current Maya selection and return a UI-friendly result object."""
+
+    return _validate(scan_scope="selection", profile_id=profile_id)
+
+
+def waive_issue_action(result: Any, *, reason: str, approved_by: str = "artist") -> Any:
+    """Persist a waiver for a failed validation result and return the sidecar path."""
+
+    if getattr(result, "status", "") != "failed":
+        raise ValueError("Only failed issues can be waived.")
+    snapshot_path = getattr(result, "_scene_path", None) or _current_scene_path()
+    sidecar_path = waiver_sidecar_path_for_scene(snapshot_path)
+    if sidecar_path is None:
+        raise ValueError("Save the scene before creating a waiver sidecar.")
+
+    sidecar = (
+        load_waiver_sidecar(sidecar_path)
+        if sidecar_path.is_file()
+        else WaiverSidecar()
+    )
+    now = datetime.now(timezone.utc)
+    waiver = create_waiver_from_result(
+        result,
+        reason=reason,
+        approved_by=approved_by,
+        created_at_utc=now.isoformat().replace("+00:00", "Z"),
+        expires_at_utc=(now + timedelta(days=30)).isoformat().replace("+00:00", "Z"),
+    )
+    updated = WaiverSidecar(waivers=(*sidecar.waivers, waiver))
+    write_waiver_sidecar(sidecar_path, updated)
+    return SimpleNamespace(
+        action="waive_issue",
+        succeeded=True,
+        path=str(sidecar_path),
+        message=f"Waiver saved to {sidecar_path.name}.",
+    )
 
 
 def select_node_action(node_name: str) -> NavigationActionResult:
     """Select a Maya node from a UI action."""
 
-    return select_node(node_name)
+    return select_node(_maya_node_name(node_name))
+
+
+def open_in_hypershade_action(
+    node_name: str,
+    *,
+    material_name: Optional[str] = None,
+) -> NavigationActionResult:
+    """Open Hypershade focused on the issue material from a UI action."""
+
+    maya_cmds = _maya_cmds()
+    candidates: list[str] = []
+    if material_name:
+        candidates.append(_maya_node_name(material_name))
+    if node_name:
+        node = _maya_node_name(node_name)
+        if node not in candidates:
+            candidates.append(node)
+    target = next((name for name in candidates if maya_cmds.objExists(name)), None)
+    if target is None:
+        label = material_name or node_name or "node"
+        return NavigationActionResult(
+            action="open_in_hypershade",
+            target=str(label),
+            succeeded=False,
+            message="Material or node does not exist.",
+        )
+    return open_in_hypershade(target)
 
 
 def open_attribute_editor_action(node_name: str) -> NavigationActionResult:
-    """Open Maya Attribute Editor for a node from a UI action."""
+    """Deprecated alias kept for older callers."""
 
-    return open_attribute_editor(node_name)
+    return open_in_hypershade_action(node_name)
 
 
 def copy_path_action(path: str) -> NavigationActionResult:
@@ -150,52 +229,82 @@ def install_ui() -> None:
     install_shelf()
 
 
-def _validate_scene() -> Any:
-    from shader_health.core import (
-        ValidationEngine,
-        build_fix_plan,
-        compute_health_score,
-        load_rule_stack,
-        summarize_results,
-    )
-    from shader_health.maya.scanner import scan_scene
-    from shader_health.maya.snapshot_enrichment import (
-        enrich_rule_results,
-        prepare_snapshot_for_validation,
+def _validate(*, scan_scope: str, profile_id: str) -> Any:
+    from shader_health.maya.scanner import scan_scene, scan_selection, selection_node_names
+
+    if scan_scope == "selection":
+        selected = selection_node_names()
+        if not selected:
+            return _validation_error(
+                "Nothing selected. Select geometry or shader nodes before validating.",
+                action="validate_selection",
+                scan_scope=scan_scope,
+                profile_id=profile_id,
+            )
+        raw_snapshot = scan_selection()
+        if not raw_snapshot.shading_engines:
+            return _validation_error(
+                "Selection has no assigned shader networks to validate.",
+                action="validate_selection",
+                scan_scope=scan_scope,
+                profile_id=profile_id,
+            )
+    else:
+        raw_snapshot = scan_scene()
+    run = run_validation(raw_snapshot, profile_id=profile_id, scan_scope=scan_scope)
+    return _validation_result(run, action=f"validate_{scan_scope}")
+
+
+def _validation_error(
+    message: str,
+    *,
+    action: str,
+    scan_scope: str,
+    profile_id: str = "",
+) -> Any:
+    return SimpleNamespace(
+        action=action,
+        succeeded=False,
+        snapshot=None,
+        results=(),
+        rules=(),
+        fix_plan=None,
+        summary=None,
+        health_score=SimpleNamespace(
+            score=100,
+            critical=0,
+            error=0,
+            warning=0,
+            info=0,
+            block_publish=False,
+            block_deadline=False,
+        ),
+        message=message,
+        profile_id=profile_id,
+        scan_scope=scan_scope,
     )
 
-    raw_snapshot = scan_scene()
-    snapshot = prepare_snapshot_for_validation(raw_snapshot)
-    renderer_ids = (snapshot.renderer,) if snapshot.renderer else ()
-    rules = load_rule_stack(renderer_ids=renderer_ids)
-    results = list(ValidationEngine().validate(snapshot, rules))
-    results = enrich_rule_results(snapshot, results)
-    fix_plan = build_fix_plan(results, rules, snapshot)
-    failed_results = [item for item in results if item.status == "failed"]
-    summary = summarize_results(results)
-    health_score = compute_health_score(results)
-    failed_count = len(failed_results)
-    message = (
-        f"Scene validated. {failed_count} failed issue(s). "
-        f"Health: {health_score.score}/100."
-    )
+
+def _validation_result(run: ValidationRunResult, *, action: str) -> Any:
     return SimpleNamespace(
-        action="validate_scene",
+        action=action,
         succeeded=True,
-        snapshot=snapshot,
-        results=tuple(results),
-        rules=tuple(rules),
-        fix_plan=fix_plan,
-        summary=summary,
-        health_score=health_score,
-        message=message,
+        snapshot=run.snapshot,
+        results=run.results,
+        rules=run.rules,
+        fix_plan=run.fix_plan,
+        summary=run.summary,
+        health_score=run.health_score,
+        message=run.message,
+        profile_id=run.profile_id,
+        scan_scope=run.scan_scope,
     )
 
 
 def _export_json_report(path: Optional[str]) -> Any:
     from shader_health.reports import write_json_report
 
-    validation = _validate_scene()
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
     output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "json")
     write_json_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_json_report", output_path, "JSON report exported.")
@@ -204,14 +313,14 @@ def _export_json_report(path: Optional[str]) -> Any:
 def _export_html_report(path: Optional[str]) -> Any:
     from shader_health.reports.html_report import write_html_report
 
-    validation = _validate_scene()
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
     output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "html")
     write_html_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_html_report", output_path, "HTML report exported.")
 
 
 def _export_shader_manifest(path: Optional[str]) -> Any:
-    validation = _validate_scene()
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
     output_path = _runtime_output_path(path, validation.snapshot.scene_path, "manifest", "json")
     payload = {
         "manifest_schema_version": "maya-runtime-1.0",
@@ -261,6 +370,20 @@ def _runtime_result(action: str, path: Path, message: str) -> Any:
         succeeded=True,
         message=message,
     )
+
+
+def _current_scene_path() -> str:
+    cmds = _maya_cmds()
+    return str(cmds.file(query=True, sceneName=True) or "")
+
+
+def _maya_node_name(node_id: Optional[str]) -> str:
+    if not node_id:
+        raise ValueError("node_name must not be empty.")
+    text = str(node_id)
+    if text.startswith("node:"):
+        return text.split(":", 1)[1]
+    return text
 
 
 def _maya_shelf_top_level() -> str:

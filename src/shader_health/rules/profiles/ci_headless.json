@@ -1,0 +1,12 @@
+{
+  "id": "ci_headless",
+  "display_name": "CI Headless",
+  "rule_overrides": {
+    "common.shader_network.shading_engine.empty": {
+      "enabled": false
+    },
+    "common.shader_network.default_material.assigned": {
+      "enabled": false
+    }
+  }
+}

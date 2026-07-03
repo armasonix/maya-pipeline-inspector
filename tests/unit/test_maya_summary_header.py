@@ -104,6 +104,10 @@ class FakeVBoxLayout:
         self.stretches.append(stretch)
 
 
+class FakeHBoxLayout(FakeVBoxLayout):
+    pass
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
@@ -112,6 +116,7 @@ class FakeQtWidgets:
     QTableWidget = FakeTableWidget
     QTableWidgetItem = FakeTableWidgetItem
     QVBoxLayout = FakeVBoxLayout
+    QHBoxLayout = FakeHBoxLayout
 
 
 def test_summary_header_defaults_show_score_counts_blocks_and_profile_dropdown():

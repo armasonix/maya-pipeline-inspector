@@ -26,7 +26,13 @@ def find_json_files(paths: Iterable[Path]) -> list[Path]:
     files: list[Path] = []
     for path in paths:
         if path.is_dir():
-            files.extend(sorted(item for item in path.rglob("*.json") if item.is_file()))
+            files.extend(
+                sorted(
+                    item
+                    for item in path.rglob("*.json")
+                    if item.is_file() and "profiles" not in item.parts
+                )
+            )
         elif path.is_file():
             files.append(path)
         else:

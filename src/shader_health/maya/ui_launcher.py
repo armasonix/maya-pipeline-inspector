@@ -5,7 +5,9 @@ from typing import Any, Optional
 
 from shader_health.ui import main_window
 from shader_health.ui.fix_queue import (
+    FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
+    fix_rows_from_table,
     populate_fix_queue,
     safe_fix_rows,
     selected_fix_rows,
@@ -16,6 +18,7 @@ WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
 
 _PANEL: Optional[Any] = None
+_SCRIPT_JOBS: list[int] = []
 
 
 def show_panel() -> Any:
@@ -56,14 +59,18 @@ def close_panel(*, delete: bool = True) -> None:
 
     if _PANEL is not None:
         _PANEL.close()
+    _kill_script_jobs()
     _PANEL = None
 
 
 def _create_dockable_panel() -> Any:
+    _kill_script_jobs()
     qt_widgets = load_qt_widgets()
     from maya.app.general.mayaMixin import (  # type: ignore[import-not-found]
         MayaQWidgetDockableMixin,
     )
+
+    panel_state: dict[str, Any] = {"content": None}
 
     def init_panel(self: Any) -> None:
         super(type(self), self).__init__()
@@ -75,10 +82,13 @@ def _create_dockable_panel() -> Any:
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
+            validation_callbacks=_validation_action_callbacks(panel_state, qt_widgets),
+            issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
         )
-        _wire_validate_scene(content, qt_widgets)
+        panel_state["content"] = content
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
+        _wire_scene_change_reset(content, qt_widgets)
         layout.addWidget(content)
 
     panel_class = type(
@@ -115,40 +125,168 @@ def _export_manifest_from_ui() -> None:
     _print_export_result(export_shader_manifest_action())
 
 
-def _wire_validate_scene(content: Any, qt_widgets: Any) -> None:
-    button = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        "shaderHealthInspectorValidateSceneButton",
+def _panel_content(panel_state: dict[str, Any]) -> Any:
+    content = panel_state.get("content")
+    if content is None:
+        raise RuntimeError("Shader Health panel content is not initialized.")
+    return content
+
+
+def _validation_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> main_window.ValidationActionCallbacks:
+    return main_window.ValidationActionCallbacks(
+        on_validate_scene=lambda: _validate_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            scan_scope="scene",
+        ),
+        on_validate_selection=lambda: _validate_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            scan_scope="selection",
+        ),
+        on_profile_changed=lambda: _revalidate_with_current_scope(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
-    if button is None:
-        return
-    button.setEnabled(True)
-    button.setToolTip("Scan and validate the current Maya scene.")
-    clicked = getattr(button, "clicked", None)
-    connect = getattr(clicked, "connect", None)
-    if connect is not None:
-        connect(lambda *_: _validate_scene_from_ui(content, qt_widgets))
 
 
-def _validate_scene_from_ui(content: Any, qt_widgets: Any) -> None:
+def _issue_details_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> main_window.IssueDetailsActionCallbacks:
+    return main_window.IssueDetailsActionCallbacks(
+        on_select_node=lambda: _run_navigation_action(
+            _panel_content(panel_state),
+            qt_widgets,
+            "select_node",
+        ),
+        on_open_in_hypershade=lambda: _run_navigation_action(
+            _panel_content(panel_state),
+            qt_widgets,
+            "open_in_hypershade",
+        ),
+        on_copy_path=lambda: _run_navigation_action(
+            _panel_content(panel_state),
+            qt_widgets,
+            "copy_path",
+        ),
+        on_reveal_file=lambda: _run_navigation_action(
+            _panel_content(panel_state),
+            qt_widgets,
+            "reveal_file",
+        ),
+        on_waive_issue=lambda: _waive_selected_issue_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
+
+
+def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None:
     try:
-        from shader_health.maya.commands import validate_scene_action
+        from shader_health.maya.commands import validate_scene_action, validate_selection_action
 
-        result = validate_scene_action()
+        profile_id = _selected_profile_id(content, qt_widgets)
+        if scan_scope == "selection":
+            result = validate_selection_action(profile_id=profile_id)
+        else:
+            result = validate_scene_action(profile_id=profile_id)
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
-        _set_label_text(
-            content,
-            qt_widgets,
-            "shaderHealthInspectorDescription",
-            message,
-        )
+        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", message)
         print(message)
         return
 
+    if not getattr(result, "succeeded", True):
+        _reset_panel_state(content, qt_widgets, status_message=result.message)
+        print(result.message)
+        return
+
+    content._shader_health_scan_scope = scan_scope
     _populate_validation_result(content, qt_widgets, result)
     print(result.message)
+
+
+def _revalidate_with_current_scope(content: Any, qt_widgets: Any) -> None:
+    scan_scope = getattr(content, "_shader_health_scan_scope", "scene")
+    if getattr(content, "_shader_health_failed_results", ()):
+        _validate_from_ui(content, qt_widgets, scan_scope=scan_scope)
+
+
+def _selected_profile_id(content: Any, qt_widgets: Any) -> str:
+    profile_dropdown = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.PROFILE_DROPDOWN_OBJECT_NAME,
+    )
+    if profile_dropdown is None:
+        return "artist_relaxed"
+    current_text = getattr(profile_dropdown, "currentText", lambda: "artist_relaxed")()
+    return str(current_text or "artist_relaxed")
+
+
+def _selected_issue(content: Any) -> Any:
+    return getattr(content, "_shader_health_selected_issue", None)
+
+
+def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
+    from shader_health.maya import commands
+
+    issue = _selected_issue(content)
+    if issue is None:
+        return
+    try:
+        if action == "select_node":
+            result = commands.select_node_action(str(issue.node or ""))
+        elif action == "open_in_hypershade":
+            result = commands.open_in_hypershade_action(
+                str(issue.node or ""),
+                material_name=str(getattr(issue, "material", "") or "") or None,
+            )
+        elif action == "copy_path":
+            result = commands.copy_path_action(_issue_path(issue))
+        elif action == "reveal_file":
+            result = commands.reveal_file_action(_issue_path(issue))
+        else:
+            return
+    except Exception as exc:  # noqa: BLE001
+        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", str(exc))
+        return
+    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+
+
+def _issue_path(issue: Any) -> str:
+    evidence = getattr(issue, "evidence", {}) or {}
+    for key in ("resolved_path", "raw_path", "path"):
+        value = evidence.get(key)
+        if value:
+            return str(value)
+    current_value = getattr(issue, "current_value", "")
+    if isinstance(current_value, str) and ("/" in current_value or "\\" in current_value):
+        return current_value
+    raise ValueError("Selected issue does not expose a filesystem path.")
+
+
+def _waive_selected_issue_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya import commands
+
+    issue = _selected_issue(content)
+    if issue is None:
+        return
+    try:
+        result = commands.waive_issue_action(
+            issue,
+            reason="Approved from Maya Shader Health Inspector UI.",
+        )
+    except Exception as exc:  # noqa: BLE001
+        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", str(exc))
+        return
+    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+    _revalidate_with_current_scope(content, qt_widgets)
 
 
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
@@ -191,6 +329,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         _store_validation_state(content, failed_results, rows, result)
 
     _update_severity_filter_options(content, qt_widgets, rows)
+    _update_owner_filter_options(content, qt_widgets, rows)
     _refresh_issues_table_view(content, qt_widgets)
 
     display_results = getattr(
@@ -233,6 +372,38 @@ def _update_severity_filter_options(
             block_signals(False)
 
 
+def _update_owner_filter_options(
+    content: Any,
+    qt_widgets: Any,
+    rows: tuple[main_window.IssueTableRow, ...],
+) -> None:
+    owner_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_OWNER_FILTER_OBJECT_NAME,
+    )
+    if owner_filter is None:
+        return
+
+    block_signals = getattr(owner_filter, "blockSignals", None)
+    if block_signals is not None:
+        block_signals(True)
+    try:
+        options = list(main_window.owner_filter_options(rows))
+        clear = getattr(owner_filter, "clear", None)
+        if clear is not None:
+            clear()
+        add_items = getattr(owner_filter, "addItems", None)
+        if add_items is not None:
+            add_items(options)
+        set_current = getattr(owner_filter, "setCurrentText", None)
+        if set_current is not None and options:
+            set_current(options[0])
+    finally:
+        if block_signals is not None:
+            block_signals(False)
+
+
 def _store_validation_state(
     content: Any,
     failed_results: tuple[Any, ...],
@@ -246,13 +417,11 @@ def _store_validation_state(
 
 
 def _populate_fix_queue(content: Any, result: Any) -> None:
-    from shader_health.ui.fix_queue import FIX_QUEUE_TABLE_OBJECT_NAME
-
     fix_plan = getattr(result, "fix_plan", None)
     actions = getattr(fix_plan, "actions", ())
     fix_rows = tuple(
         FixQueueRow(
-            selected=not action.blocked,
+            selected=False,
             title=action.title,
             risk=action.risk,
             target_node=action.target_node,
@@ -283,25 +452,46 @@ def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
         qt_widgets.QComboBox,
         main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME,
     )
+    owner_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_OWNER_FILTER_OBJECT_NAME,
+    )
+    view_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_VIEW_FILTER_OBJECT_NAME,
+    )
     if table is not None:
         selection_model = getattr(table, "selectionModel", lambda: None)()
         selection_changed = getattr(selection_model, "selectionChanged", None)
         connect = getattr(selection_changed, "connect", None)
         if connect is not None:
             connect(lambda *_: _on_issue_row_selected(content, qt_widgets))
+    if severity_filter is not None:
+        current_text_changed = getattr(severity_filter, "currentTextChanged", None)
+        connect = getattr(current_text_changed, "connect", None)
+        if connect is not None:
+            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
     if sort_dropdown is not None:
         current_text_changed = getattr(sort_dropdown, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
             connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
-    if severity_filter is not None:
-        current_text_changed = getattr(severity_filter, "currentTextChanged", None)
+    if owner_filter is not None:
+        current_text_changed = getattr(owner_filter, "currentTextChanged", None)
+        connect = getattr(current_text_changed, "connect", None)
+        if connect is not None:
+            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+    if view_filter is not None:
+        current_text_changed = getattr(view_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
             connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
 
 
 def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
+    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
     apply_selected = _find_child(
         content,
         qt_widgets.QPushButton,
@@ -312,6 +502,18 @@ def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
         qt_widgets.QPushButton,
         "shaderHealthInspectorApplySafeFixesButton",
     )
+    if table is not None:
+        cell_clicked = getattr(table, "cellClicked", None)
+        connect = getattr(cell_clicked, "connect", None)
+        if connect is not None:
+            connect(
+                lambda row, column: _on_fix_queue_cell_clicked(
+                    content,
+                    qt_widgets,
+                    int(row),
+                    int(column),
+                ),
+            )
     if apply_selected is not None:
         clicked = getattr(apply_selected, "clicked", None)
         connect = getattr(clicked, "connect", None)
@@ -324,16 +526,57 @@ def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
             connect(lambda *_: _apply_safe_fixes_from_ui(content, qt_widgets))
 
 
+def _on_fix_queue_cell_clicked(
+    content: Any,
+    qt_widgets: Any,
+    row: int,
+    column: int,
+) -> None:
+    if column != 0:
+        return
+    from shader_health.ui.fix_queue import toggle_selected_table_item
+
+    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    stored_rows = getattr(content, "_shader_health_fix_rows", ())
+    if table is None or not stored_rows or row < 0 or row >= len(stored_rows):
+        return
+    item = table.item(row, 0)
+    if item is None:
+        return
+    toggle_selected_table_item(item)
+    _sync_fix_queue_selection(content, qt_widgets)
+
+
+def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
+    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    stored_rows = getattr(content, "_shader_health_fix_rows", ())
+    if table is None or not stored_rows:
+        return
+    content._shader_health_fix_rows = fix_rows_from_table(table, stored_rows)
+
+
 def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya.fix_applier import apply_fix_actions
 
     fix_plan = getattr(content, "_shader_health_fix_plan", None)
-    fix_rows = getattr(content, "_shader_health_fix_rows", ())
-    if fix_plan is None or not fix_rows:
+    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    stored_rows = getattr(content, "_shader_health_fix_rows", ())
+    if fix_plan is None or not stored_rows or table is None:
+        return
+    fix_rows = fix_rows_from_table(table, stored_rows)
+    content._shader_health_fix_rows = fix_rows
+    selected = selected_fix_rows(fix_rows)
+    if not selected:
+        _set_label_text(
+            content,
+            qt_widgets,
+            "shaderHealthInspectorDescription",
+            "No fixes selected. Check rows in the Safe Auto-Fix Queue first.",
+        )
         return
     selected_ids = {
         (row.target_node, row.target_attr, row.before_value, row.after_value)
-        for row in selected_fix_rows(fix_rows)
+        for row in selected
     }
     actions = tuple(
         action
@@ -353,16 +596,19 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         "shaderHealthInspectorDescription",
         f"Applied {report.applied_count} selected fix(es).",
     )
-    _validate_scene_from_ui(content, qt_widgets)
+    _revalidate_with_current_scope(content, qt_widgets)
 
 
 def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya.fix_applier import apply_fix_actions
 
     fix_plan = getattr(content, "_shader_health_fix_plan", None)
-    fix_rows = getattr(content, "_shader_health_fix_rows", ())
-    if fix_plan is None or not fix_rows:
+    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    stored_rows = getattr(content, "_shader_health_fix_rows", ())
+    if fix_plan is None or not stored_rows or table is None:
         return
+    fix_rows = fix_rows_from_table(table, stored_rows)
+    content._shader_health_fix_rows = fix_rows
     safe_ids = {
         (row.target_node, row.target_attr, row.before_value, row.after_value)
         for row in safe_fix_rows(fix_rows)
@@ -385,7 +631,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         "shaderHealthInspectorDescription",
         f"Applied {report.applied_count} safe fix(es).",
     )
-    _validate_scene_from_ui(content, qt_widgets)
+    _revalidate_with_current_scope(content, qt_widgets)
 
 
 def _on_issue_row_selected(content: Any, qt_widgets: Any) -> None:
@@ -406,6 +652,7 @@ def _on_issue_row_selected(content: Any, qt_widgets: Any) -> None:
     if selected_index < 0 or selected_index >= len(display_results):
         return
     selected = display_results[selected_index]
+    content._shader_health_selected_issue = selected
     _populate_issue_details(content, qt_widgets, selected)
 
 
@@ -425,24 +672,60 @@ def _refresh_issues_table_view(content: Any, qt_widgets: Any) -> None:
         qt_widgets.QComboBox,
         main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME,
     )
+    owner_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_OWNER_FILTER_OBJECT_NAME,
+    )
+    view_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_VIEW_FILTER_OBJECT_NAME,
+    )
     default_filter = main_window.ALL_SEVERITIES_LABEL
     filter_label = getattr(
         severity_filter,
         "currentText",
         lambda: default_filter,
     )()
+    owner_label = getattr(
+        owner_filter,
+        "currentText",
+        lambda: main_window.ALL_OWNERS_LABEL,
+    )()
+    view_label = getattr(
+        view_filter,
+        "currentText",
+        lambda: main_window.ALL_ISSUES_LABEL,
+    )()
     sort_key = getattr(sort_dropdown, "currentText", lambda: "severity")()
 
     pairs = list(zip(rows, failed_results))
-    if (
-        filter_label
-        and filter_label != main_window.ALL_SEVERITIES_LABEL
-    ):
+    if filter_label and filter_label != main_window.ALL_SEVERITIES_LABEL:
         normalized = filter_label.casefold()
         pairs = [
             (row, result)
             for row, result in pairs
             if row.severity.casefold() == normalized
+        ]
+    if owner_label and owner_label != main_window.ALL_OWNERS_LABEL:
+        normalized_owner = owner_label.casefold()
+        pairs = [
+            (row, result)
+            for row, result in pairs
+            if row.owner.casefold() == normalized_owner
+        ]
+    if view_label == main_window.BLOCKING_ONLY_LABEL:
+        pairs = [
+            (row, result)
+            for row, result in pairs
+            if getattr(result, "block_publish", False) or getattr(result, "block_deadline", False)
+        ]
+    elif view_label == main_window.AUTO_FIXABLE_LABEL:
+        pairs = [
+            (row, result)
+            for row, result in pairs
+            if getattr(result, "auto_fix_available", False)
         ]
     pairs.sort(key=lambda pair: main_window._issue_sort_value(pair[0], str(sort_key)))
     display_rows = tuple(row for row, _ in pairs)
@@ -558,6 +841,85 @@ def _populate_first_issue_details(
         return
 
     _populate_issue_details(content, qt_widgets, failed_results[0])
+    content._shader_health_selected_issue = failed_results[0]
+
+
+def _wire_scene_change_reset(content: Any, qt_widgets: Any) -> None:
+    global _SCRIPT_JOBS
+    cmds = _maya_cmds()
+    for event in ("SceneOpened", "NewSceneOpened"):
+        job_id = cmds.scriptJob(
+            event=[event, lambda c=content, q=qt_widgets: _reset_panel_state(c, q)],
+        )
+        _SCRIPT_JOBS.append(int(job_id))
+
+
+def _kill_script_jobs() -> None:
+    global _SCRIPT_JOBS
+    if not _SCRIPT_JOBS:
+        return
+    try:
+        cmds = _maya_cmds()
+    except RuntimeError:
+        _SCRIPT_JOBS = []
+        return
+    for job_id in _SCRIPT_JOBS:
+        try:
+            cmds.scriptJob(kill=job_id, force=True)
+        except Exception:  # noqa: BLE001
+            continue
+    _SCRIPT_JOBS = []
+
+
+def _reset_panel_state(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    status_message: str = "Ready to validate the current scene or selection.",
+) -> None:
+    content._shader_health_failed_results = ()
+    content._shader_health_display_failed_results = ()
+    content._shader_health_issue_rows = ()
+    content._shader_health_fix_plan = None
+    content._shader_health_fix_rows = ()
+    content._shader_health_selected_issue = None
+    content._shader_health_scan_scope = "scene"
+
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.HEALTH_SCORE_LABEL_OBJECT_NAME,
+        "Health: 100 / 100",
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SEVERITY_COUNTS_LABEL_OBJECT_NAME,
+        "Critical: 0   Error: 0   Warning: 0   Info: 0",
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.BLOCK_STATUS_LABEL_OBJECT_NAME,
+        "Publish Block: NO   Deadline Block: NO",
+    )
+    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", status_message)
+
+    issues_table = _find_child(
+        content,
+        qt_widgets.QTableWidget,
+        main_window.ISSUES_TABLE_OBJECT_NAME,
+    )
+    if issues_table is not None:
+        issues_table.setSortingEnabled(False)
+        issues_table.setRowCount(0)
+        issues_table.setSortingEnabled(True)
+
+    fix_table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    if fix_table is not None:
+        populate_fix_queue(qt_widgets, fix_table, ())
+
+    _populate_first_issue_details(content, qt_widgets, ())
 
 
 def _find_child(content: Any, widget_type: Any, object_name: str) -> Any:

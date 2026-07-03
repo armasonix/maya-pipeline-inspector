@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
 
-Status: early development. This document defines the intended architecture and will evolve as implementation progresses.
+Status: v0.1 MVP. Core engine, Maya integration, dockable UI, headless CLI, and packaged rule/profile assets are implemented.
 
 ## Goals
 
@@ -17,10 +17,13 @@ Status: early development. This document defines the intended architecture and w
 ```text
 Maya scene
   -> Maya scanner
+  -> Snapshot enrichment
   -> GraphSnapshot
   -> Renderer adapter resolution
   -> Rule pack resolution
   -> Core validation engine
+  -> Waiver application
+  -> Result enrichment
   -> RuleResult list
   -> Health score
   -> Fix plan
@@ -32,7 +35,8 @@ Maya scene
 ```mermaid
 flowchart TD
     SCENE[Maya Scene] --> SCANNER[Maya Scanner]
-    SCANNER --> SNAPSHOT[GraphSnapshot]
+    SCANNER --> ENRICH[Snapshot Enrichment]
+    ENRICH --> SNAPSHOT[GraphSnapshot]
     SNAPSHOT --> ADAPTERS[Renderer Adapters]
     SNAPSHOT --> RULES[Rule Loader]
     ADAPTERS --> RULES
@@ -79,6 +83,8 @@ src/shader_health/
 │   └── diff.py
 ├── maya/
 │   ├── scanner.py
+│   ├── snapshot_enrichment.py
+│   ├── validation_pipeline.py
 │   ├── graph_trace.py
 │   ├── selection.py
 │   ├── fix_applier.py
@@ -120,10 +126,11 @@ sequenceDiagram
     User->>UI: Validate Scene
     UI->>Scanner: scan_scene()
     Scanner-->>UI: GraphSnapshot
-    UI->>Core: validate(snapshot, profile)
+    UI->>Core: run_validation(snapshot, profile)
+    Core->>Core: enrich snapshot + apply waivers
     Core->>Rules: resolve common + renderer + profile rules
     Rules-->>Core: resolved RuleDefinition list
-    Core-->>UI: RuleResult list + summary
+    Core-->>UI: RuleResult list + summary + fix plan
     UI->>Reports: export JSON/HTML if requested
 ```
 
@@ -231,28 +238,25 @@ Safe-fix rules:
 
 ## Headless Parity
 
-Anything important in the UI should also be available in headless mode through snapshot validation and deterministic reports.
-
-Target command shape:
+UI and CLI both call `shader_health.maya.validation_pipeline.run_validation`, which runs snapshot enrichment, profile resolution, waiver loading, result enrichment, and fix planning in one shared path.
 
 ```bash
-mayapy -m shader_health validate scene.ma --profile publish_strict --report report.json
+python -m shader_health validate scene.ma --profile-id publish_strict --report report.json
 ```
 
 ## Testing Strategy
 
-Default public CI should run pure Python tests only:
+Default public CI runs pure Python tests only:
 
 - model serialization tests;
-- rule schema tests;
-- rule loader tests;
-- validator tests;
-- scoring tests;
-- path/UDIM/version parsing tests;
-- report and manifest tests.
+- rule schema and loader tests;
+- validator and scoring tests;
+- snapshot enrichment and validation pipeline parity tests;
+- report and manifest tests;
+- Maya UI launcher tests with Qt/Maya mocked.
 
-Maya integration tests should be optional/local unless Maya is available.
+Maya integration tests are optional/local unless Maya is available.
 
 ## Development Rule
 
-Do not build UI logic around unstable models. Implement and test the core snapshot/rule/result contracts before expanding scanner, adapters, UI, and fixes.
+Extend the shared validation pipeline and snapshot contracts before adding UI-only behavior. Keep headless and UI entrypoints on the same enrichment path.

@@ -84,7 +84,34 @@ def test_validate_scene_action_runs_scanner_and_validator(monkeypatch: Any):
     assert result.succeeded is True
     assert result.snapshot.scene_path == "demo.ma"
     assert result.health_score.score == 100
-    assert "Scene validated" in result.message
+    assert "Scene validated" in result.message or "validated with profile" in result.message
+
+
+def test_validate_selection_action_reports_empty_selection(monkeypatch: Any):
+    from shader_health.maya import scanner
+
+    monkeypatch.setattr(scanner, "selection_node_names", lambda: [])
+
+    result = commands.validate_selection_action()
+
+    assert result.succeeded is False
+    assert "Nothing selected" in result.message
+
+
+def test_validate_selection_action_reports_missing_shader_networks(monkeypatch: Any):
+    from shader_health.maya import scanner
+
+    monkeypatch.setattr(scanner, "selection_node_names", lambda: ["pCube1"])
+    monkeypatch.setattr(
+        scanner,
+        "scan_selection",
+        lambda: GraphSnapshot(scene_path="demo.ma", renderer="common"),
+    )
+
+    result = commands.validate_selection_action()
+
+    assert result.succeeded is False
+    assert "no assigned shader networks" in result.message.casefold()
 
 
 def test_install_menu_replaces_existing_menu(monkeypatch: Any):

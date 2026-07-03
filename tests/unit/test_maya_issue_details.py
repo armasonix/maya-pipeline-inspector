@@ -106,6 +106,10 @@ class FakeVBoxLayout:
         self.stretches.append(stretch)
 
 
+class FakeHBoxLayout(FakeVBoxLayout):
+    pass
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
@@ -114,6 +118,7 @@ class FakeQtWidgets:
     QTableWidget = FakeTableWidget
     QTableWidgetItem = FakeTableWidgetItem
     QVBoxLayout = FakeVBoxLayout
+    QHBoxLayout = FakeHBoxLayout
 
 
 def test_issue_details_defaults_show_empty_selection_state():

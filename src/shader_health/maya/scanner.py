@@ -87,6 +87,12 @@ def scan_selection(
     )
 
 
+def selection_node_names(cmds_module: Optional[Any] = None) -> list[str]:
+    """Return the current Maya selection as long node names."""
+
+    return _selection_names(_get_cmds(cmds_module))
+
+
 def _get_cmds(cmds_module: Optional[Any]) -> Any:
     if cmds_module is not None:
         return cmds_module
@@ -235,11 +241,79 @@ def _shading_engine_names(cmds: Any, selected_nodes: Optional[list[str]]) -> lis
 
     selected_engines: list[str] = []
     for node_name in selected_nodes:
-        if _node_type(cmds, node_name) == "shadingEngine":
-            selected_engines.append(node_name)
-        connected = _call_cmds(cmds, "listConnections", [], node_name, type="shadingEngine")
-        selected_engines.extend(str(item) for item in connected or [])
+        selected_engines.extend(_shading_engines_for_node(cmds, node_name))
     return _dedupe_strings(selected_engines)
+
+
+def _shading_engines_for_node(cmds: Any, node_name: str) -> list[str]:
+    engines: list[str] = []
+    node_type = _node_type(cmds, node_name)
+
+    if node_type == "shadingEngine":
+        engines.append(node_name)
+
+    connected = _call_cmds(cmds, "listConnections", [], node_name, type="shadingEngine") or []
+    engines.extend(str(item) for item in connected)
+
+    if node_type == "transform":
+        shapes = _call_cmds(
+            cmds,
+            "listRelatives",
+            [],
+            node_name,
+            shapes=True,
+            fullPath=True,
+            noIntermediate=True,
+        ) or []
+        for shape in shapes:
+            shape_engines = _call_cmds(
+                cmds,
+                "listConnections",
+                [],
+                str(shape),
+                type="shadingEngine",
+            ) or []
+            engines.extend(str(item) for item in shape_engines)
+
+    if _is_shader_node_type(node_type):
+        shader_engines = _call_cmds(
+            cmds,
+            "listConnections",
+            [],
+            node_name,
+            type="shadingEngine",
+            destination=True,
+        ) or []
+        engines.extend(str(item) for item in shader_engines)
+
+    if node_type in {"file", "VRayBitmap", "aiImage"}:
+        downstream = _call_cmds(
+            cmds,
+            "listConnections",
+            [],
+            node_name,
+            destination=True,
+            connections=False,
+        ) or []
+        for downstream_node in downstream:
+            downstream_type = _node_type(cmds, str(downstream_node))
+            if _is_shader_node_type(downstream_type):
+                engines.extend(_shading_engines_for_node(cmds, str(downstream_node)))
+
+    return _dedupe_strings(engines)
+
+
+def _is_shader_node_type(type_name: str) -> bool:
+    if type_name in {
+        "lambert",
+        "blinn",
+        "phong",
+        "aiStandardSurface",
+        "standardSurface",
+    }:
+        return True
+    lowered = type_name.lower()
+    return type_name.startswith("VRay") or "material" in lowered or type_name.endswith("Mtl")
 
 
 def _walk_upstream_graph(cmds: Any, root_node: str) -> tuple[list[str], list[ConnectionSnapshot]]:

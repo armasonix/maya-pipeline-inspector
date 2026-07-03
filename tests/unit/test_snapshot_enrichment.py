@@ -118,6 +118,64 @@ def test_prepare_snapshot_propagates_semantics_and_udim_metadata(tmp_path: Path)
     assert displacement_node.attrs["amount"] == 18
 
 
+def test_enrich_rule_results_sets_material_for_displacement_texture(tmp_path: Path):
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "demo.ma"),
+        renderer="vray",
+        nodes=[
+            NodeSnapshot(
+                id="node:demo_displacement_v001_1",
+                name="demo_displacement_v001_1",
+                type_name="file",
+                attrs={"colorSpace": "Raw"},
+            ),
+            NodeSnapshot(
+                id="node:displacementShader1",
+                name="displacementShader1",
+                type_name="displacementShader",
+                attrs={"scale": 18},
+            ),
+            NodeSnapshot(
+                id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+            ),
+        ],
+        connections=[
+            ConnectionSnapshot(
+                src_node="node:demo_displacement_v001_1",
+                src_attr="outAlpha",
+                dst_node="node:displacementShader1",
+                dst_attr="displacement",
+            ),
+        ],
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+                displacement_nodes=["node:displacementShader1"],
+            )
+        ],
+    )
+    result = RuleResult(
+        rule_id="common.displacement.amount.max",
+        severity="warning",
+        status="failed",
+        title="High displacement",
+        message="High displacement",
+        why="Why",
+        owner="shader_td",
+        target_kind="node",
+        target_id="node:displacementShader1",
+        node="node:displacementShader1",
+    )
+
+    enriched = enrich_rule_results(snapshot, [result])[0]
+
+    assert enriched.material == "hero_mtl"
+
+
 def test_enrich_rule_results_sets_material_for_texture_dependency(tmp_path: Path):
     snapshot = _broken_scene_like_snapshot(tmp_path)
     result = RuleResult(

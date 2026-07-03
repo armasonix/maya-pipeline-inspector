@@ -66,6 +66,13 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
     """Map node ids and short names to owning material names."""
 
     index: dict[str, str] = {}
+    incoming: dict[str, list[str]] = {}
+    for connection in snapshot.connections:
+        incoming.setdefault(connection.dst_node, []).append(connection.src_node)
+
+    texture_types = {"file", "VRayBitmap", "aiImage"}
+    nodes_by_id = {node.id: node for node in snapshot.nodes}
+
     for material in snapshot.materials:
         index[material.node_id] = material.name
         index[material.name] = material.name
@@ -75,7 +82,37 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
         for node_id in material.displacement_nodes:
             index[node_id] = material.name
             index[_short_node_id(node_id)] = material.name
+            for texture_id in _upstream_texture_nodes(
+                node_id,
+                incoming,
+                nodes_by_id,
+                texture_types,
+            ):
+                index[texture_id] = material.name
+                index[_short_node_id(texture_id)] = material.name
     return index
+
+
+def _upstream_texture_nodes(
+    start_node_id: str,
+    incoming: dict[str, list[str]],
+    nodes_by_id: dict[str, NodeSnapshot],
+    texture_types: set[str],
+) -> set[str]:
+    found: set[str] = set()
+    stack = list(incoming.get(start_node_id, ()))
+    visited: set[str] = set()
+    while stack:
+        node_id = stack.pop()
+        if node_id in visited:
+            continue
+        visited.add(node_id)
+        node = nodes_by_id.get(node_id)
+        if node is not None and node.type_name in texture_types:
+            found.add(node_id)
+            continue
+        stack.extend(incoming.get(node_id, ()))
+    return found
 
 
 def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
