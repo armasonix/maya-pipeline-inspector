@@ -32,6 +32,7 @@ EXPORT_ACTIONS_OBJECT_NAME = "shaderHealthInspectorExportActions"
 EXPORT_JSON_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportJsonButton"
 EXPORT_HTML_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportHtmlButton"
 EXPORT_MANIFEST_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportManifestButton"
+EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportFixPlanButton"
 VALIDATE_SCENE_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSceneButton"
 VALIDATE_SELECTION_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSelectionButton"
 ISSUES_OWNER_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesOwnerFilter"
@@ -124,6 +125,7 @@ class ExportActionCallbacks:
     on_export_json: Optional[Callable[[], None]] = None
     on_export_html: Optional[Callable[[], None]] = None
     on_export_manifest: Optional[Callable[[], None]] = None
+    on_export_fix_plan: Optional[Callable[[], None]] = None
 
 
 @dataclass(frozen=True)
@@ -487,6 +489,15 @@ def build_export_actions(
             EXPORT_MANIFEST_BUTTON_OBJECT_NAME,
             "Write the current Material Passport / Shader Manifest next to the scene.",
             export_callbacks.on_export_manifest,
+        )
+    )
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Export Fix Plan",
+            EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
+            "Write the current planned fix actions next to the scene without applying them.",
+            export_callbacks.on_export_fix_plan,
         )
     )
 

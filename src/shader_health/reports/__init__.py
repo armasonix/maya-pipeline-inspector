@@ -1,5 +1,11 @@
 """Report artifact helpers."""
 
+from shader_health.reports.fix_plan_export import (
+    FIX_PLAN_SCHEMA_VERSION,
+    build_fix_plan_export,
+    dumps_fix_plan_export,
+    write_fix_plan_export,
+)
 from shader_health.reports.json_report import (
     REPORT_SCHEMA_VERSION,
     build_json_report,
@@ -8,8 +14,12 @@ from shader_health.reports.json_report import (
 )
 
 __all__ = [
+    "FIX_PLAN_SCHEMA_VERSION",
     "REPORT_SCHEMA_VERSION",
+    "build_fix_plan_export",
     "build_json_report",
+    "dumps_fix_plan_export",
     "dumps_json_report",
+    "write_fix_plan_export",
     "write_json_report",
 ]

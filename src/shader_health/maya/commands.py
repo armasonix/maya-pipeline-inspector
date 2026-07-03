@@ -168,6 +168,12 @@ def export_shader_manifest_action(path: Optional[str] = None) -> Any:
     return _export_shader_manifest(path)
 
 
+def export_fix_plan_action(path: Optional[str] = None) -> Any:
+    """Export a fix plan artifact from the current Maya scene."""
+
+    return _export_fix_plan(path)
+
+
 def install_menu(parent: Optional[str] = None) -> str:
     """Install Maya menu entries that open and close the dockable panel."""
 
@@ -334,6 +340,20 @@ def _export_shader_manifest(path: Optional[str]) -> Any:
     }
     _write_json(output_path, payload)
     return _runtime_result("export_shader_manifest", output_path, "Shader manifest exported.")
+
+
+def _export_fix_plan(path: Optional[str]) -> Any:
+    from shader_health.maya import export_actions
+
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "fix_plan", "json")
+    result = export_actions.export_fix_plan(
+        output_path,
+        fix_plan=validation.fix_plan,
+        snapshot=validation.snapshot,
+        profile_id=validation.profile_id,
+    )
+    return _runtime_result(result.action, result.path, result.message)
 
 
 def _runtime_output_path(

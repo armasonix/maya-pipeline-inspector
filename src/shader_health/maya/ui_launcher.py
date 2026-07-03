@@ -107,6 +107,7 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_json=_export_json_from_ui,
         on_export_html=_export_html_from_ui,
         on_export_manifest=_export_manifest_from_ui,
+        on_export_fix_plan=_export_fix_plan_from_ui,
     )
 
 
@@ -142,6 +143,28 @@ def _export_manifest_from_ui() -> None:
     from shader_health.maya.commands import export_shader_manifest_action
 
     _print_export_result(export_shader_manifest_action())
+
+
+def _export_fix_plan_from_ui() -> None:
+    content = _active_panel_content()
+    fix_plan = getattr(content, "_shader_health_fix_plan", None) if content is not None else None
+    snapshot = getattr(content, "_shader_health_snapshot", None) if content is not None else None
+    profile_id = getattr(content, "_shader_health_profile_id", "") if content is not None else ""
+    if fix_plan is not None and snapshot is not None:
+        from shader_health.maya import export_actions
+
+        _print_export_result(
+            export_actions.export_fix_plan(
+                fix_plan=fix_plan,
+                snapshot=snapshot,
+                profile_id=profile_id,
+            )
+        )
+        return
+
+    from shader_health.maya.commands import export_fix_plan_action
+
+    _print_export_result(export_fix_plan_action())
 
 
 def _panel_content(panel_state: dict[str, Any]) -> Any:

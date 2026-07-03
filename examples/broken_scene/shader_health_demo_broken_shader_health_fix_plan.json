@@ -1,0 +1,10 @@
+{
+  "actions": [],
+  "blocked_count": 0,
+  "fix_plan_schema_version": "1.0",
+  "profile_id": "supervisor_full",
+  "safe_count": 0,
+  "scan_scope": "scene",
+  "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+  "total": 0
+}

@@ -14,6 +14,7 @@ from shader_health.maya.validation_pipeline import (
     run_validation,
 )
 from shader_health.reports import write_json_report
+from shader_health.reports.fix_plan_export import write_fix_plan_export
 
 EXIT_OK = 0
 EXIT_PUBLISH_BLOCK = 1
@@ -72,6 +73,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--waiver-sidecar",
         help="Optional waiver sidecar JSON path.",
     )
+    validate.add_argument(
+        "--export-fix-plan",
+        help="Optional output path for a deterministic fix plan JSON export.",
+    )
     return parser
 
 
@@ -90,6 +95,13 @@ def validate_command(args: argparse.Namespace) -> int:
             scan_scope="scene",
         )
         write_json_report(args.report, run.snapshot, run.results)
+        if args.export_fix_plan and run.fix_plan.total:
+            write_fix_plan_export(
+                args.export_fix_plan,
+                run.fix_plan,
+                snapshot=run.snapshot,
+                profile_id=run.profile_id,
+            )
         return _exit_code(run.results)
     except RuleLoadError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
