@@ -13,7 +13,7 @@ JsonValue = Any
 
 _REFERENCE_BLOCK_REASON = "target_referenced"
 _LOCKED_BLOCK_REASON = "target_locked"
-_HIGH_RISK_BLOCK_REASON = "high_risk_requires_explicit_confirmation"
+HIGH_RISK_BLOCK_REASON = "high_risk_requires_explicit_confirmation"
 UNDO_SUPPORTED_FIX_TYPES = frozenset(
     {
         "set_attr",
@@ -160,7 +160,7 @@ def _build_action(
         requires_reference_edit=bool(node.referenced) if node else False,
         requires_supervisor=rule.fix.risk == "high",
         undo_supported=rule.fix.type in UNDO_SUPPORTED_FIX_TYPES,
-        blocked=bool(block_reasons),
+        blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
         params=rule.fix.to_dict(),
     )
@@ -179,6 +179,10 @@ def _after_value(result: RuleResult, fix_params: Mapping[str, Any], fix_type: st
         normalized = resolve_normalize_path_value(before_path, fix_params)
         if normalized is not None:
             return normalized
+    if fix_type == "disable_feature":
+        if "value" in fix_params:
+            return fix_params["value"]
+        return False
     if "value" in fix_params:
         return fix_params["value"]
     if "path" in fix_params:
@@ -193,8 +197,14 @@ def _block_reasons(node: Optional[NodeSnapshot], risk: str) -> list[str]:
     if node is not None and node.locked:
         reasons.append(_LOCKED_BLOCK_REASON)
     if risk == "high":
-        reasons.append(_HIGH_RISK_BLOCK_REASON)
+        reasons.append(HIGH_RISK_BLOCK_REASON)
     return reasons
+
+
+def hard_block_reasons(block_reasons: Iterable[str]) -> list[str]:
+    """Return block reasons that prevent application without override flags."""
+
+    return [reason for reason in block_reasons if reason != HIGH_RISK_BLOCK_REASON]
 
 
 def _target_node_name(result: RuleResult, node: Optional[NodeSnapshot]) -> str:

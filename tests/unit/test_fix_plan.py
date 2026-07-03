@@ -108,7 +108,7 @@ def test_fix_planner_marks_high_risk_actions_as_supervisor_required_and_blocked(
     assert action.risk == "high"
     assert action.requires_supervisor is True
     assert action.undo_supported is False
-    assert action.blocked is True
+    assert action.blocked is False
     assert action.block_reasons == ["high_risk_requires_explicit_confirmation"]
 
 
@@ -189,6 +189,30 @@ def test_fix_planner_builds_normalize_path_action_from_rule_fix():
     assert action.risk == "medium"
     assert action.target_attr == "fileTextureName"
     assert action.after_value == "$ASSET_ROOT/tex/albedo.exr"
+
+
+def test_fix_planner_builds_disable_feature_action_with_default_false_value():
+    rule = _rule(
+        fix=RuleFix(
+            type="disable_feature",
+            risk="high",
+            params={"attribute": "aiDispersion"},
+        ),
+    )
+    result = _failed_result(
+        plug="aiDispersion",
+        current_value=True,
+    )
+    snapshot = _snapshot(NodeSnapshot(id="node:disp1", name="disp1", type_name="displacementShader"))
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    action = plan.actions[0]
+    assert action.fix_type == "disable_feature"
+    assert action.target_attr == "aiDispersion"
+    assert action.after_value is False
+    assert action.blocked is False
+    assert action.block_reasons == ["high_risk_requires_explicit_confirmation"]
 
 
 def _rule_with_fix(fix: Optional[RuleFix] = None) -> RuleDefinition:

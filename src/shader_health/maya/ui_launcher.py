@@ -7,8 +7,10 @@ from shader_health.ui import main_window
 from shader_health.ui.fix_queue import (
     FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
+    confirm_risky_fixes,
     fix_rows_from_table,
     populate_fix_queue,
+    risky_fix_rows,
     safe_fix_rows,
     selected_fix_rows,
 )
@@ -589,7 +591,16 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         in selected_ids
     )
-    report = apply_fix_actions(actions)
+    if risky_fix_rows(selected) and not confirm_risky_fixes(qt_widgets, selected):
+        _set_label_text(
+            content,
+            qt_widgets,
+            "shaderHealthInspectorDescription",
+            "High-risk fixes were not applied.",
+        )
+        return
+    allow_high_risk = bool(risky_fix_rows(selected))
+    report = apply_fix_actions(actions, allow_high_risk=allow_high_risk)
     _set_label_text(
         content,
         qt_widgets,

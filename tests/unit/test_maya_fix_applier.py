@@ -220,6 +220,42 @@ def test_apply_normalize_path_blocks_when_prefix_does_not_match():
     assert report.records[0].block_reasons == ["invalid_normalize_path"]
 
 
+def test_apply_disable_feature_sets_bool_attribute_with_confirmation():
+    cmds = FakeCmds({"displacementShader1.aiDispersion": True})
+    action = _disable_feature_action()
+
+    report = apply_fix_actions([action], cmds=cmds, allow_high_risk=True)
+
+    assert report.applied_count == 1
+    assert cmds.set_calls == [("displacementShader1.aiDispersion", False, {})]
+    record = report.records[0]
+    assert record.fix_type == "disable_feature"
+    assert record.before_value is True
+    assert record.after_value is False
+
+
+def test_apply_disable_feature_blocks_without_high_risk_confirmation():
+    cmds = FakeCmds({"displacementShader1.aiDispersion": True})
+    action = _disable_feature_action()
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.set_calls == []
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["high_risk_requires_explicit_confirmation"]
+
+
+def test_apply_disable_feature_blocks_referenced_targets_by_default():
+    cmds = FakeCmds({"displacementShader1.aiDispersion": True})
+    action = _disable_feature_action(referenced=True)
+
+    report = apply_fix_actions([action], cmds=cmds, allow_high_risk=True)
+
+    assert cmds.set_calls == []
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["target_referenced"]
+
+
 def _action(
     *,
     fix_type: str = "set_attr",
@@ -327,5 +363,45 @@ def _normalize_action(
             "attribute": "fileTextureName",
             "replace_from": "D:/show/assets",
             "replace_to": "$ASSET_ROOT",
+        },
+    )
+
+
+def _disable_feature_action(
+    *,
+    referenced: bool = False,
+    locked: bool = False,
+    target_attr: str = "aiDispersion",
+    before_value: bool = True,
+    after_value: bool = False,
+) -> FixAction:
+    block_reasons: list[str] = ["high_risk_requires_explicit_confirmation"]
+    if referenced:
+        block_reasons.insert(0, "target_referenced")
+    if locked:
+        block_reasons.insert(0, "target_locked")
+    return FixAction(
+        fix_id="common.displacement.amount.max:node:displacementShader1:disable_feature",
+        rule_id="common.displacement.amount.max",
+        title="Displacement amount must stay within the risk budget: disable_feature",
+        fix_type="disable_feature",
+        risk="high",
+        target_kind="node",
+        target_id="node:displacementShader1",
+        target_node="displacementShader1",
+        target_attr=target_attr,
+        before_value=before_value,
+        after_value=after_value,
+        explanation="Disable risky displacement feature.",
+        referenced=referenced,
+        locked=locked,
+        requires_reference_edit=referenced,
+        requires_supervisor=True,
+        blocked=referenced or locked,
+        block_reasons=block_reasons,
+        params={
+            "type": "disable_feature",
+            "attribute": target_attr,
+            "value": after_value,
         },
     )

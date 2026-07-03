@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from shader_health.core.fix_plan import FixAction
 
-from shader_health.core.fix_plan import resolve_normalize_path_value
+from shader_health.core.fix_plan import HIGH_RISK_BLOCK_REASON, resolve_normalize_path_value
 
-SUPPORTED_FIX_TYPES = frozenset({"set_attr", "relink_path", "normalize_path"})
+SUPPORTED_FIX_TYPES = frozenset({"set_attr", "relink_path", "normalize_path", "disable_feature"})
 DEFAULT_UNDO_CHUNK_NAME = "Shader Health Apply Fixes"
 DEFAULT_TEXTURE_PATH_ATTR = "fileTextureName"
 REFERENCED_BLOCK_REASON = "target_referenced"
@@ -90,6 +90,7 @@ def apply_fix_actions(
     cmds: Optional[Any] = None,
     allow_referenced: bool = False,
     allow_locked: bool = False,
+    allow_high_risk: bool = False,
     undo_chunk_name: str = DEFAULT_UNDO_CHUNK_NAME,
 ) -> ApplyFixReport:
     maya_cmds = cmds or _maya_cmds()
@@ -101,7 +102,15 @@ def apply_fix_actions(
     maya_cmds.undoInfo(openChunk=True, chunkName=undo_chunk_name)
     try:
         for action in queued:
-            records.append(_apply_one(action, maya_cmds, allow_referenced, allow_locked))
+            records.append(
+                _apply_one(
+                    action,
+                    maya_cmds,
+                    allow_referenced,
+                    allow_locked,
+                    allow_high_risk,
+                )
+            )
     finally:
         maya_cmds.undoInfo(closeChunk=True)
     return ApplyFixReport(records=tuple(records))
@@ -112,8 +121,9 @@ def _apply_one(
     cmds: Any,
     allow_referenced: bool,
     allow_locked: bool,
+    allow_high_risk: bool,
 ) -> AppliedFixRecord:
-    reasons = _reasons(action, allow_referenced, allow_locked)
+    reasons = _reasons(action, allow_referenced, allow_locked, allow_high_risk)
     if reasons:
         return _blocked(action, reasons)
     if action.fix_type not in SUPPORTED_FIX_TYPES:
@@ -126,7 +136,15 @@ def _apply_one(
         return _apply_relink_path(action, cmds)
     if action.fix_type == "normalize_path":
         return _apply_normalize_path(action, cmds)
+    if action.fix_type == "disable_feature":
+        return _apply_disable_feature(action, cmds)
     return _blocked(action, [UNSUPPORTED_FIX_REASON])
+
+
+def _apply_disable_feature(action: FixAction, cmds: Any) -> AppliedFixRecord:
+    if action.after_value is None:
+        return _blocked(action, [MISSING_ATTR_REASON])
+    return _apply_set_attr(action, cmds)
 
 
 def _apply_set_attr(action: FixAction, cmds: Any) -> AppliedFixRecord:
@@ -236,12 +254,19 @@ def _applied(
     )
 
 
-def _reasons(action: FixAction, allow_referenced: bool, allow_locked: bool) -> list[str]:
+def _reasons(
+    action: FixAction,
+    allow_referenced: bool,
+    allow_locked: bool,
+    allow_high_risk: bool,
+) -> list[str]:
     reasons: list[str] = []
     for reason in action.block_reasons:
         if reason == REFERENCED_BLOCK_REASON and allow_referenced:
             continue
         if reason == LOCKED_BLOCK_REASON and allow_locked:
+            continue
+        if reason == HIGH_RISK_BLOCK_REASON and allow_high_risk:
             continue
         _append_unique(reasons, reason)
     if action.referenced and not allow_referenced:
