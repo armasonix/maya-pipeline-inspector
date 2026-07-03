@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from shader_health.core.fix_plan import build_fix_plan
+from shader_health.core.fix_plan import (
+    build_fix_plan,
+    replace_path_prefix,
+    resolve_normalize_path_value,
+)
 from shader_health.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
 from shader_health.core.rule_schema import (
     RuleCheck,
@@ -142,6 +146,51 @@ def test_fix_planner_resolves_material_target_to_underlying_node():
     assert action.block_reasons == ["target_referenced"]
 
 
+def test_replace_path_prefix_rewrites_matching_root():
+    assert replace_path_prefix(
+        "D:/show/assets/tex/albedo.exr",
+        "D:/show/assets",
+        "$ASSET_ROOT",
+    ) == "$ASSET_ROOT/tex/albedo.exr"
+
+
+def test_resolve_normalize_path_value_uses_replace_from_and_replace_to():
+    assert resolve_normalize_path_value(
+        "D:/show/assets/tex/albedo.exr",
+        {
+            "replace_from": "D:/show/assets",
+            "replace_to": "$ASSET_ROOT",
+        },
+    ) == "$ASSET_ROOT/tex/albedo.exr"
+
+
+def test_fix_planner_builds_normalize_path_action_from_rule_fix():
+    rule = _rule(
+        fix=RuleFix(
+            type="normalize_path",
+            risk="medium",
+            params={
+                "attribute": "fileTextureName",
+                "replace_from": "D:/show/assets",
+                "replace_to": "$ASSET_ROOT",
+            },
+        )
+    )
+    result = _failed_result(
+        plug="fileTextureName",
+        current_value="D:/show/assets/tex/albedo.exr",
+    )
+    snapshot = _snapshot(NodeSnapshot(id="node:file1", name="file1", type_name="file"))
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    action = plan.actions[0]
+    assert action.fix_type == "normalize_path"
+    assert action.risk == "medium"
+    assert action.target_attr == "fileTextureName"
+    assert action.after_value == "$ASSET_ROOT/tex/albedo.exr"
+
+
 def _rule_with_fix(fix: Optional[RuleFix] = None) -> RuleDefinition:
     return _rule(fix=_default_fix() if fix is None else fix)
 
@@ -186,6 +235,8 @@ def _failed_result(
     target_kind: str = "node",
     target_id: str = "node:file1",
     node: str = "file1",
+    plug: str = "colorSpace",
+    current_value: str = "ACEScg",
 ) -> RuleResult:
     return RuleResult(
         rule_id="common.texture.colorspace.data_raw",
@@ -198,8 +249,8 @@ def _failed_result(
         target_kind=target_kind,
         target_id=target_id,
         node=node,
-        plug="colorSpace",
-        current_value="ACEScg",
+        plug=plug,
+        current_value=current_value,
         expected_value="Raw",
         auto_fix_available=True,
         fix_id="set_attr",

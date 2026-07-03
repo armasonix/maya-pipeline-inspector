@@ -182,6 +182,44 @@ def test_apply_relink_path_blocks_invalid_empty_path():
     assert report.records[0].block_reasons == ["invalid_relink_path"]
 
 
+def test_apply_normalize_path_rewrites_local_prefix_to_project_variable():
+    cmds = FakeCmds({"file1.fileTextureName": "D:/show/assets/tex/albedo.exr"})
+    action = _normalize_action()
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert report.applied_count == 1
+    assert cmds.set_calls == [
+        ("file1.fileTextureName", "$ASSET_ROOT/tex/albedo.exr", {"type": "string"}),
+    ]
+    record = report.records[0]
+    assert record.fix_type == "normalize_path"
+    assert record.before_value == "D:/show/assets/tex/albedo.exr"
+    assert record.after_value == "$ASSET_ROOT/tex/albedo.exr"
+
+
+def test_apply_normalize_path_blocks_referenced_targets_by_default():
+    cmds = FakeCmds({"file1.fileTextureName": "D:/show/assets/tex/albedo.exr"})
+    action = _normalize_action(referenced=True)
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.set_calls == []
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["target_referenced"]
+
+
+def test_apply_normalize_path_blocks_when_prefix_does_not_match():
+    cmds = FakeCmds({"file1.fileTextureName": "//legacy_server/random/albedo.exr"})
+    action = _normalize_action()
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.set_calls == []
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["invalid_normalize_path"]
+
+
 def _action(
     *,
     fix_type: str = "set_attr",
@@ -250,5 +288,44 @@ def _relink_action(
             "type": "relink_path",
             "attribute": "fileTextureName",
             "path": after_value,
+        },
+    )
+
+
+def _normalize_action(
+    *,
+    referenced: bool = False,
+    locked: bool = False,
+    before_value: str = "D:/show/assets/tex/albedo.exr",
+    after_value: str = "$ASSET_ROOT/tex/albedo.exr",
+) -> FixAction:
+    block_reasons: list[str] = []
+    if referenced:
+        block_reasons.append("target_referenced")
+    if locked:
+        block_reasons.append("target_locked")
+    return FixAction(
+        fix_id="common.texture.path.local_drive:node:file1:normalize_path",
+        rule_id="common.texture.path.local_drive",
+        title="Texture path must not use a local drive root: normalize_path",
+        fix_type="normalize_path",
+        risk="medium",
+        target_kind="file_dependency",
+        target_id="node:file1",
+        target_node="file1",
+        target_attr="fileTextureName",
+        before_value=before_value,
+        after_value=after_value,
+        explanation="Convert local path to approved project variable.",
+        referenced=referenced,
+        locked=locked,
+        requires_reference_edit=referenced,
+        blocked=bool(block_reasons),
+        block_reasons=block_reasons,
+        params={
+            "type": "normalize_path",
+            "attribute": "fileTextureName",
+            "replace_from": "D:/show/assets",
+            "replace_to": "$ASSET_ROOT",
         },
     )

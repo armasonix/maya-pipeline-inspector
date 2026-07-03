@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from shader_health.core.fix_plan import FixAction
 
-SUPPORTED_FIX_TYPES = frozenset({"set_attr", "relink_path"})
+from shader_health.core.fix_plan import resolve_normalize_path_value
+
+SUPPORTED_FIX_TYPES = frozenset({"set_attr", "relink_path", "normalize_path"})
 DEFAULT_UNDO_CHUNK_NAME = "Shader Health Apply Fixes"
 DEFAULT_TEXTURE_PATH_ATTR = "fileTextureName"
 REFERENCED_BLOCK_REASON = "target_referenced"
@@ -18,6 +20,7 @@ UNSUPPORTED_FIX_REASON = "unsupported_fix_type"
 MISSING_TARGET_REASON = "target_node_missing"
 MISSING_ATTR_REASON = "target_attr_missing"
 INVALID_RELINK_PATH_REASON = "invalid_relink_path"
+INVALID_NORMALIZE_PATH_REASON = "invalid_normalize_path"
 METADATA_PLUG_NAMES = frozenset({"version"})
 
 
@@ -121,6 +124,8 @@ def _apply_one(
         return _apply_set_attr(action, cmds)
     if action.fix_type == "relink_path":
         return _apply_relink_path(action, cmds)
+    if action.fix_type == "normalize_path":
+        return _apply_normalize_path(action, cmds)
     return _blocked(action, [UNSUPPORTED_FIX_REASON])
 
 
@@ -139,23 +144,57 @@ def _apply_set_attr(action: FixAction, cmds: Any) -> AppliedFixRecord:
 
 
 def _apply_relink_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
-    target_attr = _relink_target_attr(action)
+    target_attr = _path_target_attr(action)
     if not target_attr:
         return _blocked(action, [MISSING_ATTR_REASON])
-    if not _is_relink_path_value(action.after_value):
+    if not _is_path_string_value(action.after_value):
         return _blocked(action, [INVALID_RELINK_PATH_REASON])
+
+    return _apply_path_value(action, cmds, target_attr, str(action.after_value).strip())
+
+
+def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
+    target_attr = _path_target_attr(action)
+    if not target_attr:
+        return _blocked(action, [MISSING_ATTR_REASON])
 
     plug = f"{action.target_node}.{target_attr}"
     if not _plug_exists(cmds, plug):
         return _blocked(action, [MISSING_ATTR_REASON])
 
     before_value = cmds.getAttr(plug)
-    _set_attr(cmds, plug, action.after_value)
+    if not isinstance(before_value, str):
+        return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
+
+    normalized_path = resolve_normalize_path_value(
+        before_value,
+        action.params,
+        planned_after=action.after_value,
+    )
+    if not _is_path_string_value(normalized_path) or normalized_path == before_value:
+        return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
+
+    return _apply_path_value(action, cmds, target_attr, str(normalized_path).strip(), before_value)
+
+
+def _apply_path_value(
+    action: FixAction,
+    cmds: Any,
+    target_attr: str,
+    path_value: str,
+    before_value: Any = None,
+) -> AppliedFixRecord:
+    plug = f"{action.target_node}.{target_attr}"
+    if not _plug_exists(cmds, plug):
+        return _blocked(action, [MISSING_ATTR_REASON])
+
+    current_value = before_value if before_value is not None else cmds.getAttr(plug)
+    _set_attr(cmds, plug, path_value)
     after_value = cmds.getAttr(plug)
-    return _applied(action, target_attr, before_value, after_value)
+    return _applied(action, target_attr, current_value, after_value)
 
 
-def _relink_target_attr(action: FixAction) -> Optional[str]:
+def _path_target_attr(action: FixAction) -> Optional[str]:
     if action.target_attr and action.target_attr not in METADATA_PLUG_NAMES:
         return action.target_attr
     param_attr = action.params.get("attribute")
@@ -164,7 +203,7 @@ def _relink_target_attr(action: FixAction) -> Optional[str]:
     return DEFAULT_TEXTURE_PATH_ATTR
 
 
-def _is_relink_path_value(value: Any) -> bool:
+def _is_path_string_value(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
