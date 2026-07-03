@@ -203,7 +203,9 @@ def test_fix_planner_builds_disable_feature_action_with_default_false_value():
         plug="aiDispersion",
         current_value=True,
     )
-    snapshot = _snapshot(NodeSnapshot(id="node:disp1", name="disp1", type_name="displacementShader"))
+    snapshot = _snapshot(
+        NodeSnapshot(id="node:disp1", name="disp1", type_name="displacementShader")
+    )
 
     plan = build_fix_plan([result], [rule], snapshot)
 
