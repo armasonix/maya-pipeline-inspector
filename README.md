@@ -1,17 +1,71 @@
 # Maya Shader Health Inspector
 
-Production-oriented material QA framework for Autodesk Maya pipelines.
+Production material QA framework for Maya pipelines.
 
-**Status:** early development / architecture phase  
+Built to prevent render-time material failures by detecting missing textures, outdated maps, wrong color space, broken UDIMs, unsafe paths, displacement risk, and renderer-specific shader issues before assets reach publish or the render farm.
+
+**Status:** v0.1 MVP (demo scene, dockable UI, reports, safe-fix queue)  
 **Primary DCC:** Autodesk Maya  
 **Initial renderer targets:** Common Maya, V-Ray, Arnold  
 **Future renderer targets:** RenderMan, Redshift, USD / MaterialX
 
-Maya Shader Health Inspector is designed to detect material and texture problems before assets reach publish, lighting, or Deadline render submission. It focuses on repeatable, data-driven QA for shader graphs, texture dependencies, color management, UDIM sets, displacement risk, path policy, renderer compatibility, and farm-preflight safety.
-
 The tool answers one practical production question:
 
 > Can this asset or shot be safely published or submitted to the render farm, and if not, what is broken, who owns the fix, how dangerous is it, and can it be fixed safely?
+
+## Visual demo
+
+Captured from [`examples/broken_scene/shader_health_demo_broken.ma`](examples/broken_scene/shader_health_demo_broken.ma). Full capture notes: [`docs/assets/README.md`](docs/assets/README.md).
+
+### Dockable panel
+
+![Shader Health Inspector UI — validate scene, issue table, details, health summary, and safe auto-fix queue](docs/assets/ui-panel.png)
+
+The dockable Maya panel after **Validate Scene**: health score, severity filters, issue details, and the Safe Auto-Fix Queue on the broken demo scene.
+
+### HTML report
+
+![HTML validation report — health score, blocking status, and collapsible severity groups](docs/assets/html-report.png)
+
+Self-contained HTML export from the same demo validation. Severity groups collapse so reviewers can jump straight to the issue list they care about.
+
+Sample artifacts:
+
+- [Open HTML report](examples/broken_scene/shader_health_demo_broken_shader_health_report.html)
+- [JSON report](examples/broken_scene/shader_health_demo_broken_shader_health_report.json)
+- [Shader manifest](examples/broken_scene/shader_health_demo_broken_shader_health_manifest.json)
+
+### Safe auto-fix (before / after)
+
+![Before and after safe auto-fix — colorspace issue cleared after apply and revalidate](docs/assets/before-after-safe-fix.gif)
+
+A low-risk colorspace fix selected in the queue, applied with undo support, then re-validated until the issue clears.
+
+## Architecture
+
+Validation is snapshot-first: Maya scanning stays at the edge; rules, scoring, reports, and fix planning run on plain Python data so behavior is testable without Maya.
+
+```mermaid
+flowchart TD
+    SCENE[Maya Scene] --> SCANNER[Maya Scanner]
+    SCANNER --> ENRICH[Snapshot Enrichment]
+    ENRICH --> SNAPSHOT[GraphSnapshot]
+    SNAPSHOT --> ADAPTERS[Renderer Adapters]
+    SNAPSHOT --> RULES[Rule Loader]
+    ADAPTERS --> RULES
+    RULES --> ENGINE[Validation Engine]
+    SNAPSHOT --> ENGINE
+    ENGINE --> RESULTS[Rule Results]
+    RESULTS --> SCORE[Health Score]
+    RESULTS --> FIXPLAN[Fix Planner]
+    RESULTS --> REPORTS[JSON / HTML Reports]
+    RESULTS --> UI[Maya Dockable UI]
+    RESULTS --> CLI[Headless CLI]
+    RESULTS --> DEADLINE[Deadline Preflight]
+    FIXPLAN --> UI
+```
+
+More detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
 ## Why this exists
 
@@ -40,36 +94,40 @@ These problems are often discovered too late: during farm submission, overnight 
 - Headless validation for publish systems, CI, and Deadline preflight.
 - Dockable Maya UI for artists, Shader TDs, and supervisors.
 
-## Planned MVP scope
+## Demo scene
 
-The first MVP focuses on texture and shader preflight:
-
-- GraphSnapshot model for Maya material networks.
-- JSON rule schema and rule loader.
-- Common Maya, V-Ray, and Arnold adapter foundation.
-- Missing texture and path policy validation.
-- UDIM integrity checks.
-- Semantic texture slot detection.
-- Color space validation for color vs data maps.
-- Displacement risk checks.
-- Basic shader complexity scoring.
-- Material Health Score.
-- JSON / HTML reports.
-- Headless validation command.
-- Dockable Maya panel.
-- Deadline submit preflight example.
-
-## Repository status
-
-Development is currently driven from `docs/DEVELOPMENT_PLAN.md` and GitHub issues/milestones.
-
-The project is intentionally being built in this order:
+The v0.1 demo is a deliberately broken Maya scene with readable geometry and material names:
 
 ```text
-Snapshot model -> rule engine -> rule packs -> Maya scanner -> adapters -> reports -> UI -> safe fixes -> headless -> Deadline -> demo -> release
+examples/broken_scene/
+├── shader_health_demo_broken.ma
+├── textures/
+└── README.md
 ```
 
-This keeps the validation core testable before the Maya UI and renderer integrations are added.
+Intentional issue categories:
+
+- missing texture;
+- wrong colorSpace;
+- missing UDIM tile;
+- local path;
+- displacement risk;
+- orphan material.
+
+Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_scene/README.md)
+
+## Current capabilities
+
+- `GraphSnapshot` model and Maya scanner.
+- JSON rule schema, rule loader, and validation engine.
+- Common Maya, V-Ray, and Arnold adapter foundation.
+- Missing texture, path policy, UDIM, color space, and displacement checks.
+- Material health score and severity summary.
+- JSON / HTML reports and shader manifest export.
+- Dockable Maya panel with issue table, filters, details, and safe fix queue.
+- Headless validation command and Deadline preflight example.
+
+Roadmap and issue tracking: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md)
 
 ## Development
 
@@ -101,18 +159,32 @@ python -m pytest tests -v
 ### Optional local checks
 
 ```bash
-python -m ruff check src tests
+python -m ruff check src tests tools
 python -m mypy src
+python tools/validate_rules.py
 ```
 
 ### Source layout
 
 ```text
 src/shader_health/
+├── core/          # models, rules, validator, scoring, fix plan, reports
+├── maya/          # scanner, commands, UI launcher, fix applier
+├── ui/            # dockable panel widgets
+├── adapters/      # renderer adapters and semantic slot resolver
+├── rules/         # common / vray / arnold rule packs and profiles
+└── deadline/      # submit preflight helpers
 ```
 
 The package uses a `src` layout so imports during tests match installed-package behavior.
 
+## Documentation
+
+- [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — intended artist/TD workflow
+- [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) — rule pack authoring
+- [`docs/SNAPSHOT_SCHEMA.md`](docs/SNAPSHOT_SCHEMA.md) — snapshot contract
+- [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — farm preflight hook
+
 ## License
 
-MIT License. See `LICENSE`.
+MIT License. See [`LICENSE`](LICENSE).

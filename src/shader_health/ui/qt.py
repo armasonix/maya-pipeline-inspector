@@ -9,6 +9,11 @@ QT_WIDGETS_CANDIDATES = (
     "PySide2.QtWidgets",
 )
 
+QT_CORE_CANDIDATES = (
+    "PySide6.QtCore",
+    "PySide2.QtCore",
+)
+
 
 def load_qt_widgets() -> Any:
     """Return Maya's available QtWidgets module.
@@ -25,3 +30,16 @@ def load_qt_widgets() -> Any:
             errors.append(f"{module_name}: {exc}")
     joined_errors = "; ".join(errors)
     raise RuntimeError(f"No supported Qt binding found for Maya UI: {joined_errors}")
+
+
+def load_qt_core() -> Any:
+    """Return Maya's available QtCore module."""
+
+    errors: list[str] = []
+    for module_name in QT_CORE_CANDIDATES:
+        try:
+            return importlib.import_module(module_name)
+        except ImportError as exc:
+            errors.append(f"{module_name}: {exc}")
+    joined_errors = "; ".join(errors)
+    raise RuntimeError(f"No supported QtCore binding found for Maya UI: {joined_errors}")

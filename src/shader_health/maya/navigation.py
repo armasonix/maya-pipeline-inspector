@@ -33,6 +33,58 @@ def select_node(node_name: str, *, cmds: Optional[Any] = None) -> NavigationActi
     return _result("select_node", target, True, "Node selected.")
 
 
+def open_in_hypershade(
+    node_name: str,
+    *,
+    cmds: Optional[Any] = None,
+    mel: Optional[Any] = None,
+) -> NavigationActionResult:
+    """Open Hypershade and show the shader network for a material node."""
+
+    target = _require_text(node_name, field_name="node_name")
+    maya_cmds = cmds or _maya_cmds()
+    if not maya_cmds.objExists(target):
+        return _result("open_in_hypershade", target, False, "Node does not exist.")
+    maya_mel = mel or _maya_mel()
+
+    hypershade_was_open = bool(_hypershade_panel_name(maya_cmds))
+    if not hypershade_was_open:
+        hypershade_window = getattr(maya_cmds, "HypershadeWindow", None)
+        if hypershade_window is not None:
+            hypershade_window()
+        else:
+            maya_mel.eval("HypershadeWindow")
+
+    panel_name = _hypershade_panel_name(maya_cmds) or "hyperShadePanel1"
+    maya_cmds.select(target, replace=True)
+    hyper_shade = getattr(maya_cmds, "hyperShade", None)
+    if hyper_shade is not None:
+        hyper_shade(shaderNetwork=target)
+    else:
+        maya_mel.eval(f'hyperShade -shaderNetwork "{target}"')
+
+    graph_command = f'hyperShadePanelGraphCommand("{panel_name}", "showUpAndDownstream")'
+
+    def _apply_io_connections_view() -> None:
+        maya_mel.eval(graph_command)
+
+    if hypershade_was_open:
+        _apply_io_connections_view()
+    else:
+        eval_deferred = getattr(maya_cmds, "evalDeferred", None)
+        if eval_deferred is not None:
+            eval_deferred(_apply_io_connections_view)
+        else:
+            _apply_io_connections_view()
+
+    return _result(
+        "open_in_hypershade",
+        target,
+        True,
+        f"Hypershade focused on {target} (input and output connections).",
+    )
+
+
 def open_attribute_editor(
     node_name: str,
     *,
@@ -128,6 +180,35 @@ def _require_text(value: str, *, field_name: str) -> str:
     if not stripped:
         raise ValueError(f"{field_name} must not be empty.")
     return stripped
+
+
+def _hypershade_panel_name(maya_cmds: Any) -> str:
+    """Return the active Hypershade model panel name, if Hypershade is open."""
+
+    model_panel = getattr(maya_cmds, "modelPanel", None)
+    if model_panel is not None:
+        for candidate in ("hyperShadePanel1", "hypershadePrimaryPane"):
+            try:
+                if model_panel(candidate, exists=True):
+                    return candidate
+            except TypeError:
+                continue
+
+    get_panel = getattr(maya_cmds, "getPanel", None)
+    model_editor = getattr(maya_cmds, "modelEditor", None)
+    if get_panel is not None and model_editor is not None:
+        try:
+            panels = get_panel(type="modelPanel") or []
+        except TypeError:
+            panels = []
+        for panel in panels:
+            try:
+                editor_name = model_editor(panel, query=True, editorName=True)
+            except Exception:  # noqa: BLE001 - Maya query failures vary by panel state
+                continue
+            if editor_name == "hyperShadePanel":
+                return str(panel)
+    return ""
 
 
 def _result(

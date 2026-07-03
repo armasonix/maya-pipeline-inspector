@@ -8,14 +8,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 
-from shader_health.core import (
-    GraphSnapshot,
-    RuleDefinition,
-    RuleLoadError,
-    RuleResult,
-    ValidationEngine,
-    load_rule_stack,
-    summarize_results,
+from shader_health.core import GraphSnapshot, RuleLoadError
+from shader_health.maya.validation_pipeline import (
+    DEFAULT_PROFILE_ID,
+    run_validation,
 )
 from shader_health.reports import write_json_report
 
@@ -56,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--rule-root", help="Rule root folder. Defaults to packaged rules.")
     validate.add_argument("--profile", help="Profile JSON path.")
     validate.add_argument(
+        "--profile-id",
+        default=DEFAULT_PROFILE_ID,
+        help="Packaged profile id when --profile is omitted.",
+    )
+    validate.add_argument(
         "--renderer",
         action="append",
         default=[],
@@ -67,49 +68,35 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Extra rule file or folder.",
     )
+    validate.add_argument(
+        "--waiver-sidecar",
+        help="Optional waiver sidecar JSON path.",
+    )
     return parser
 
 
 def validate_command(args: argparse.Namespace) -> int:
     try:
         snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
-        renderer_ids = tuple(args.renderer or _snapshot_renderer_ids(snapshot))
-        rules = _load_rules(
-            rule_root=_rule_root_path(args.rule_root),
+        if args.renderer:
+            snapshot = _snapshot_with_renderer(snapshot, tuple(args.renderer))
+        run = run_validation(
+            snapshot,
+            profile_id=str(args.profile_id),
             profile_path=_optional_path(args.profile),
-            renderer_ids=renderer_ids,
+            rule_root=_rule_root_path(args.rule_root),
             extra_rule_paths=tuple(Path(path) for path in args.extra_rules),
+            waiver_sidecar_path=_optional_path(args.waiver_sidecar),
+            scan_scope="scene",
         )
-        results = ValidationEngine().validate(snapshot, rules)
-        write_json_report(args.report, snapshot, results)
-        return _exit_code(results)
+        write_json_report(args.report, run.snapshot, run.results)
+        return _exit_code(run.results)
     except RuleLoadError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
     except Exception as exc:  # noqa: BLE001
         print(f"Runtime error: {exc}", file=sys.stderr)
         return EXIT_RUNTIME_ERROR
-
-
-def _load_rules(
-    *,
-    rule_root: Optional[Path],
-    profile_path: Optional[Path],
-    renderer_ids: tuple[str, ...],
-    extra_rule_paths: tuple[Path, ...],
-) -> list[RuleDefinition]:
-    if rule_root is None:
-        return load_rule_stack(
-            renderer_ids=renderer_ids,
-            profile_path=profile_path,
-            extra_rule_paths=extra_rule_paths,
-        )
-    return load_rule_stack(
-        rule_root=rule_root,
-        renderer_ids=renderer_ids,
-        profile_path=profile_path,
-        extra_rule_paths=extra_rule_paths,
-    )
 
 
 def _rule_root_path(value: Optional[str]) -> Optional[Path]:
@@ -123,10 +110,6 @@ def _rule_root_path(value: Optional[str]) -> Optional[Path]:
 
 def _optional_path(value: Optional[str]) -> Optional[Path]:
     return Path(value) if value else None
-
-
-def _snapshot_renderer_ids(snapshot: GraphSnapshot) -> tuple[str, ...]:
-    return (snapshot.renderer,) if snapshot.renderer else ()
 
 
 def _load_snapshot(path: Path, input_kind: str) -> GraphSnapshot:
@@ -156,7 +139,20 @@ def _snapshot_from_scene(path: Path) -> GraphSnapshot:
     return snapshot
 
 
-def _exit_code(results: Sequence[RuleResult]) -> int:
+def _snapshot_with_renderer(
+    snapshot: GraphSnapshot,
+    renderer_ids: tuple[str, ...],
+) -> GraphSnapshot:
+    if not renderer_ids:
+        return snapshot
+    from dataclasses import replace
+
+    return replace(snapshot, renderer=renderer_ids[0])
+
+
+def _exit_code(results: Sequence) -> int:
+    from shader_health.core import summarize_results
+
     summary = summarize_results(results)
     if summary.block_deadline:
         return EXIT_DEADLINE_BLOCK

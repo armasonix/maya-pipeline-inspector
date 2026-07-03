@@ -1,0 +1,33 @@
+{
+  "id": "deadline_critical",
+  "display_name": "Deadline Critical",
+  "rule_overrides": {
+    "common.shader_complexity.graph_nodes.max": {
+      "enabled": false
+    },
+    "common.shader_complexity.texture_count.max": {
+      "enabled": false
+    },
+    "common.shader_complexity.graph_depth.max": {
+      "enabled": false
+    },
+    "common.texture.duplicates.same_path": {
+      "enabled": false
+    },
+    "common.texture.optimized.exists": {
+      "enabled": false
+    },
+    "common.texture.optimized.fresh": {
+      "enabled": false
+    },
+    "common.texture.version.latest": {
+      "enabled": false
+    },
+    "common.shader_network.shading_engine.empty": {
+      "enabled": false
+    },
+    "common.shader_network.default_material.assigned": {
+      "enabled": false
+    }
+  }
+}

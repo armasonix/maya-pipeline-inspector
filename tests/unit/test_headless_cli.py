@@ -10,6 +10,7 @@ from shader_health.core import GraphSnapshot, NodeSnapshot
 def test_validate_snapshot_writes_report_and_returns_publish_block(tmp_path: Path):
     snapshot_path = _write_snapshot(tmp_path, "ACEScg")
     report_path = tmp_path / "report.json"
+    rule_root = _rule_root(tmp_path, block_publish=True)
 
     code = cli.main(
         [
@@ -18,7 +19,9 @@ def test_validate_snapshot_writes_report_and_returns_publish_block(tmp_path: Pat
             "--report",
             str(report_path),
             "--rule-root",
-            str(_rule_root(tmp_path, block_publish=True)),
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
         ]
     )
 
@@ -31,6 +34,7 @@ def test_validate_snapshot_writes_report_and_returns_publish_block(tmp_path: Pat
 def test_validate_snapshot_returns_deadline_block(tmp_path: Path):
     snapshot_path = _write_snapshot(tmp_path, "ACEScg")
     report_path = tmp_path / "report.json"
+    rule_root = _rule_root(tmp_path, block_deadline=True)
 
     code = cli.main(
         [
@@ -39,7 +43,9 @@ def test_validate_snapshot_returns_deadline_block(tmp_path: Path):
             "--report",
             str(report_path),
             "--rule-root",
-            str(_rule_root(tmp_path, block_deadline=True)),
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
         ]
     )
 
@@ -49,6 +55,7 @@ def test_validate_snapshot_returns_deadline_block(tmp_path: Path):
 def test_validate_snapshot_returns_ok_when_no_blocking_results(tmp_path: Path):
     snapshot_path = _write_snapshot(tmp_path, "Raw")
     report_path = tmp_path / "report.json"
+    rule_root = _rule_root(tmp_path, block_publish=True)
 
     code = cli.main(
         [
@@ -57,7 +64,9 @@ def test_validate_snapshot_returns_ok_when_no_blocking_results(tmp_path: Path):
             "--report",
             str(report_path),
             "--rule-root",
-            str(_rule_root(tmp_path, block_publish=True)),
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
         ]
     )
 
@@ -88,6 +97,7 @@ def test_validate_scene_path_uses_scene_loader(monkeypatch, tmp_path: Path):
     scene_path.write_text("// scene", encoding="utf-8")
     report_path = tmp_path / "scene_report.json"
     monkeypatch.setattr(cli, "_snapshot_from_scene", lambda path: _snapshot("Raw"))
+    rule_root = _rule_root(tmp_path, block_publish=True)
 
     code = cli.main(
         [
@@ -98,7 +108,9 @@ def test_validate_scene_path_uses_scene_loader(monkeypatch, tmp_path: Path):
             "--report",
             str(report_path),
             "--rule-root",
-            str(_rule_root(tmp_path, block_publish=True)),
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
         ]
     )
 
@@ -164,3 +176,18 @@ def _rule_root(
     }
     (common / "colorspace.json").write_text(json.dumps(rule), encoding="utf-8")
     return rule_root
+
+
+def _minimal_profile(tmp_path: Path) -> Path:
+    path = tmp_path / "minimal_profile.json"
+    path.write_text(
+        json.dumps(
+            {
+                "id": "minimal",
+                "display_name": "Minimal",
+                "rule_overrides": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path

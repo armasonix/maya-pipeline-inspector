@@ -1,0 +1,56 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "arnold.material.untextured.info",
+      "name": "Arnold material has no connected textures",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "material",
+      "severity": "info",
+      "owner": "shader_td",
+      "message": "Arnold material has no connected texture nodes.",
+      "why": "Untextured Arnold materials are valid for debug or flat-color lookdev, but production assets usually need explicit texture coverage before publish.",
+      "match": {
+        "node_type": ["aiStandardSurface", "aiToon", "aiCarPaint"]
+      },
+      "check": {
+        "type": "list_length_min",
+        "attribute": "texture_nodes",
+        "min": 1
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "arnold.material.displacement_linked.info",
+      "name": "Arnold material uses displacement",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "material",
+      "severity": "info",
+      "owner": "shader_td",
+      "message": "Arnold material has displacement nodes in its network.",
+      "why": "Displacement-linked Arnold materials should be reviewed for farm-safe scale and subdivision settings before publish.",
+      "match": {
+        "node_type": ["aiStandardSurface", "aiToon", "aiCarPaint"]
+      },
+      "check": {
+        "type": "list_length_max",
+        "attribute": "displacement_nodes",
+        "max": 0
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

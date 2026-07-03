@@ -2,4 +2,4 @@
 
 APP_NAME = "Maya Shader Health Inspector"
 PACKAGE_NAME = "maya-shader-health-inspector"
-__version__ = "0.0.0"
+__version__ = "0.1.0"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "maya-shader-health-inspector"
-version = "0.0.0"
+version = "0.1.0"
 description = "Production-oriented material QA framework for Autodesk Maya pipelines."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -22,7 +22,7 @@ keywords = [
     "arnold",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",

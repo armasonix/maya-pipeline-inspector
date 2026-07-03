@@ -2,11 +2,11 @@
 
 Maya Shader Health Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
 
-Status: early development. This guide describes the intended user workflow for the MVP and will be updated as implementation progresses.
+Status: v0.1 MVP. The dockable Maya UI, headless CLI, packaged profiles, waiver sidecars, and report export are implemented. See the demo scene under `examples/broken_scene/`.
 
 ## What the Tool Checks
 
-The MVP is planned to validate:
+The v0.1 MVP validates:
 
 - missing texture files;
 - local or unsafe texture paths;
@@ -66,30 +66,31 @@ Main needs:
 ```text
 1. Open Maya scene.
 2. Open Maya Shader Health Inspector panel.
-3. Select profile: artist_relaxed, publish_strict, deadline_critical, or supervisor_full.
+3. Select profile: `artist_relaxed`, `publish_strict`, `deadline_critical`, `supervisor_full`, or `ci_headless`.
 4. Click Validate Scene or Validate Selection.
 5. Review health score and blocking status.
-6. Filter issues by severity, owner, renderer, or auto-fix availability.
+6. Filter issues by severity, owner, blocking status, or auto-fix availability.
 7. Select an issue.
 8. Read what failed and why it matters.
-9. Use Select Node, Open Attribute Editor, Copy Path, or Reveal File.
+9. Use Select Node, Open in Hypershade, Copy Path, or Reveal File.
 10. Apply safe fixes if available.
 11. Revalidate.
 12. Export JSON/HTML report if needed.
 ```
 
-## Planned UI Layout
+## Maya UI Layout
 
 ```text
 +--------------------------------------------------------------------------------+
 | Maya Shader Health Inspector                                                    |
-| Scene: current_scene.ma   Renderer: V-Ray   Profile: Publish Strict             |
 | Health: 78/100   Critical: 2   Error: 5   Warning: 17   Deadline Block: YES     |
-| [Validate Scene] [Validate Selection] [Apply Safe Fixes] [Export Report]        |
+| Profile: publish_strict                                                         |
+| [Validate Scene] [Validate Selection]                                           |
 +--------------------------------------------------------------------------------+
-| Filters: [All severities] [Blocking only] [Auto-fixable] [Owner] [Renderer]     |
+| Sort: [severity]  Severity: [All severities]  Owner: [All owners]               |
+| View: [All issues | Blocking only | Auto-fixable]                               |
 +--------------------------------------------------------------------------------+
-| Sev | Material | Node | Issue | Auto-Fix | Owner | Rule ID                     |
+| Sev | Material | Node | Issue | Owner | Rule                                    |
 +--------------------------------------------------------------------------------+
 | Details                                                                        |
 | What: Roughness texture is color-managed as ACEScg.                             |
@@ -97,7 +98,10 @@ Main needs:
 | Current: ACEScg                                                                 |
 | Expected: Raw                                                                   |
 | Trace: file_roughness.outAlpha -> material.roughness                           |
-| [Select Node] [Open Attr Editor] [Copy Path] [Apply Fix] [Waive]                |
+| [Select Node] [Open in Hypershade] [Copy Path] [Reveal File] [Waive]          |
++--------------------------------------------------------------------------------+
+| Fix Queue: preview safe fixes, apply selected or all safe fixes                 |
+| Export: JSON / HTML / Shader Manifest                                           |
 +--------------------------------------------------------------------------------+
 ```
 
@@ -145,7 +149,7 @@ Important block flags:
 
 Profiles control strictness and runtime behavior.
 
-Planned MVP profiles:
+Packaged MVP profiles (under `src/shader_health/rules/profiles/`):
 
 | Profile | Purpose |
 |---|---|
@@ -153,7 +157,20 @@ Planned MVP profiles:
 | `publish_strict` | Asset publish checks. Blocks serious issues. |
 | `deadline_critical` | Fast farm submission preflight. Critical-only where possible. |
 | `supervisor_full` | Full audit mode with all rules visible. |
-| `ci_headless` | Deterministic validation for automated checks. |
+| `ci_headless` | Deterministic validation for automated checks. Same rule profile in UI and CLI; selecting it in Maya does not spawn a separate headless process. |
+
+The Maya UI and headless CLI both call the same validation pipeline (`run_validation`). Choosing `ci_headless` in the panel only changes which rules/overrides are applied to the current scene scan.
+
+## Renderer Rule Packs
+
+Packaged renderer-specific rules live under `src/shader_health/rules/vray/` and `src/shader_health/rules/arnold/`.
+
+Current v0.1 renderer checks are info-level audits such as:
+
+- untextured V-Ray / Arnold materials;
+- displacement-linked materials that should be reviewed before publish.
+
+These rules load when the snapshot renderer is `vray` or `arnold`.
 
 ## Issue Details
 
@@ -221,7 +238,7 @@ If an issue is inside a referenced asset, the tool should:
 
 Waivers are controlled exceptions for known issues.
 
-Expected behavior:
+Expected behavior (implemented via waiver sidecar beside the scene file):
 
 - waiver must include reason;
 - waiver must include approver;
@@ -240,27 +257,24 @@ Expires: 2026-07-30
 
 ## Reports
 
-Planned report outputs:
+Implemented report outputs:
 
 - JSON report for automation;
-- HTML report for review;
-- Material Passport / Shader Manifest for asset state tracking;
+- HTML report for human review;
+- Shader Manifest for asset state tracking;
 - manifest diff report for change review.
 
-JSON reports are intended for pipeline systems. HTML reports are intended for human review.
+JSON reports are intended for pipeline systems. HTML reports are self-contained, modern summary pages for supervisors and TD review (health score, blocking status, severity groups, and issue tables with horizontal scroll for long rule IDs).
 
 ## Headless Usage
 
-Target command shape:
-
 ```bash
-mayapy -m shader_health validate scene.ma --profile publish_strict --report report.json
-mayapy -m shader_health validate scene.ma --profile deadline_critical --critical-only
-mayapy -m shader_health manifest scene.ma --out shader_manifest.json
-mayapy -m shader_health diff old_manifest.json new_manifest.json --html diff.html
+python -m shader_health validate scene.ma --profile-id publish_strict --report report.json
+python -m shader_health validate snapshot.json --input-kind snapshot --profile-id ci_headless --report report.json
+python -m shader_health validate scene.ma --waiver-sidecar scene.shader_health_waivers.json --report report.json
 ```
 
-MVP implementation will add these commands gradually.
+The headless CLI uses the same validation pipeline as the Maya UI (`prepare_snapshot_for_validation`, profile loading, waivers, enrichment, fix planning).
 
 ## Deadline Submit Preflight
 
@@ -287,7 +301,7 @@ Expected behavior:
 
 ## Current Development Status
 
-The repository is currently in bootstrap and core architecture phase. The user-facing Maya UI is planned after the pure Python core, rule engine, and scanner contracts are stable.
+v0.1 MVP is implemented: core rule engine, Maya scanner, snapshot enrichment, dockable UI, headless CLI, packaged profiles, waiver sidecars, JSON/HTML reports, shader manifest export, and safe-fix queue. Optional Maya integration tests remain local-only; public CI runs pure Python unit tests.
 
 See also:
 

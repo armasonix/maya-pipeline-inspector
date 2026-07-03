@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   pure-python-tests:
-    name: Python ${{ matrix.python-version }}
+    name: Unit + integration tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -34,7 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
-      - name: Run unit tests
+      - name: Run unit and integration tests
         run: python -m pytest tests -v
 
       - name: Run Ruff

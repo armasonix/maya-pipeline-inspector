@@ -5,7 +5,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from shader_health.maya.validation_pipeline import list_packaged_profile_ids
 from shader_health.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
+from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
 
 PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
 PANEL_TITLE = "Maya Shader Health Inspector"
@@ -30,12 +32,27 @@ EXPORT_ACTIONS_OBJECT_NAME = "shaderHealthInspectorExportActions"
 EXPORT_JSON_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportJsonButton"
 EXPORT_HTML_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportHtmlButton"
 EXPORT_MANIFEST_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportManifestButton"
-DEFAULT_PROFILE_OPTIONS = (
+VALIDATE_SCENE_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSceneButton"
+VALIDATE_SELECTION_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSelectionButton"
+ISSUES_OWNER_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesOwnerFilter"
+ISSUES_VIEW_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesViewFilter"
+DETAILS_ACTIONS_OBJECT_NAME = "shaderHealthInspectorIssueDetailsActions"
+SELECT_NODE_BUTTON_OBJECT_NAME = "shaderHealthInspectorSelectNodeButton"
+OPEN_ATTR_EDITOR_BUTTON_OBJECT_NAME = "shaderHealthInspectorOpenAttrEditorButton"
+COPY_PATH_BUTTON_OBJECT_NAME = "shaderHealthInspectorCopyPathButton"
+REVEAL_FILE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRevealFileButton"
+WAIVE_ISSUE_BUTTON_OBJECT_NAME = "shaderHealthInspectorWaiveIssueButton"
+DEFAULT_PROFILE_OPTIONS = list_packaged_profile_ids() or (
     "artist_relaxed",
     "publish_strict",
     "deadline_critical",
     "supervisor_full",
+    "ci_headless",
 )
+ALL_ISSUES_LABEL = "All issues"
+BLOCKING_ONLY_LABEL = "Blocking only"
+AUTO_FIXABLE_LABEL = "Auto-fixable"
+ALL_OWNERS_LABEL = "All owners"
 ISSUES_TABLE_COLUMNS = (
     "Severity",
     "Material",
@@ -109,12 +126,38 @@ class ExportActionCallbacks:
     on_export_manifest: Optional[Callable[[], None]] = None
 
 
+@dataclass(frozen=True)
+class ValidationActionCallbacks:
+    """Optional callbacks for validation UI buttons."""
+
+    on_validate_scene: Optional[Callable[[], None]] = None
+    on_validate_selection: Optional[Callable[[], None]] = None
+    on_profile_changed: Optional[Callable[[], None]] = None
+
+
+@dataclass(frozen=True)
+class IssueDetailsActionCallbacks:
+    """Optional callbacks for issue detail navigation and waiver actions."""
+
+    on_select_node: Optional[Callable[[], None]] = None
+    on_open_in_hypershade: Optional[Callable[[], None]] = None
+    on_copy_path: Optional[Callable[[], None]] = None
+    on_reveal_file: Optional[Callable[[], None]] = None
+    on_waive_issue: Optional[Callable[[], None]] = None
+
+
 def build_main_widget(
     qt_widgets: Any,
     export_callbacks: Optional[ExportActionCallbacks] = None,
     fix_queue_callbacks: Optional[FixQueueActionCallbacks] = None,
+    validation_callbacks: Optional[ValidationActionCallbacks] = None,
+    issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
+
+    export_callbacks = export_callbacks or ExportActionCallbacks()
+    validation_callbacks = validation_callbacks or ValidationActionCallbacks()
+    issue_details_callbacks = issue_details_callbacks or IssueDetailsActionCallbacks()
 
     widget = qt_widgets.QWidget()
     widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
@@ -127,27 +170,55 @@ def build_main_widget(
     title.setObjectName("shaderHealthInspectorTitle")
     layout.addWidget(title)
 
-    layout.addWidget(build_summary_header(qt_widgets))
+    layout.addWidget(build_summary_header(
+        qt_widgets,
+        profile_changed=validation_callbacks.on_profile_changed,
+    ))
+    layout.addWidget(build_validation_actions(qt_widgets, callbacks=validation_callbacks))
     layout.addWidget(build_issues_table(qt_widgets))
-    layout.addWidget(build_issue_details_panel(qt_widgets))
+    layout.addWidget(build_issue_details_panel(qt_widgets, callbacks=issue_details_callbacks))
     layout.addWidget(build_fix_queue(qt_widgets, callbacks=fix_queue_callbacks))
     layout.addWidget(build_export_actions(qt_widgets, callbacks=export_callbacks))
 
-    description = qt_widgets.QLabel(
-        "Export actions are available for the current scene snapshot. Live "
-        "validation result wiring is added in a later production milestone."
-    )
+    description = qt_widgets.QLabel("Ready to validate the current scene or selection.")
     description.setObjectName("shaderHealthInspectorDescription")
     description.setWordWrap(True)
     layout.addWidget(description)
 
-    validate_button = qt_widgets.QPushButton("Validate Scene")
-    validate_button.setObjectName("shaderHealthInspectorValidateSceneButton")
-    validate_button.setEnabled(False)
-    validate_button.setToolTip("Validation is added in a later Maya UI issue.")
-    layout.addWidget(validate_button)
-
     layout.addStretch(1)
+    return widget
+
+
+def build_validation_actions(
+    qt_widgets: Any,
+    callbacks: Optional[ValidationActionCallbacks] = None,
+) -> Any:
+    """Build validate scene/selection controls."""
+
+    validation_callbacks = callbacks or ValidationActionCallbacks()
+    widget = qt_widgets.QWidget()
+    widget.setObjectName("shaderHealthInspectorValidationActions")
+
+    layout = qt_widgets.QHBoxLayout(widget)
+    layout.setContentsMargins(8, 0, 8, 0)
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Validate Scene",
+            VALIDATE_SCENE_BUTTON_OBJECT_NAME,
+            "Scan and validate the current Maya scene.",
+            validation_callbacks.on_validate_scene,
+        )
+    )
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Validate Selection",
+            VALIDATE_SELECTION_BUTTON_OBJECT_NAME,
+            "Scan and validate the current Maya selection.",
+            validation_callbacks.on_validate_selection,
+        )
+    )
     return widget
 
 
@@ -155,6 +226,7 @@ def build_summary_header(
     qt_widgets: Any,
     state: Optional[SummaryHeaderState] = None,
     profile_options: Sequence[str] = DEFAULT_PROFILE_OPTIONS,
+    profile_changed: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build the summary/header widget shown at the top of the Maya panel."""
 
@@ -187,7 +259,12 @@ def build_summary_header(
     profile_dropdown.addItems(list(profile_options))
     if summary_state.profile_id in profile_options:
         profile_dropdown.setCurrentText(summary_state.profile_id)
-    profile_dropdown.setToolTip("Validation profile selection is wired in a later issue.")
+    profile_dropdown.setToolTip("Choose the validation profile for scene and selection checks.")
+    if profile_changed is not None:
+        current_text_changed = getattr(profile_dropdown, "currentTextChanged", None)
+        connect = getattr(current_text_changed, "connect", None)
+        if connect is not None:
+            connect(lambda *_: profile_changed())
     layout.addWidget(profile_dropdown)
 
     return widget
@@ -213,8 +290,26 @@ def build_issues_table(
     severity_filter = qt_widgets.QComboBox()
     severity_filter.setObjectName(ISSUES_SEVERITY_FILTER_OBJECT_NAME)
     severity_filter.addItems(list(severity_filter_options(issue_rows)))
-    severity_filter.setToolTip("Severity filtering is wired to validation results later.")
+    severity_filter.setToolTip("Filter issues by severity.")
     layout.addWidget(severity_filter)
+
+    owner_filter_label = qt_widgets.QLabel("Owner Filter")
+    layout.addWidget(owner_filter_label)
+
+    owner_filter = qt_widgets.QComboBox()
+    owner_filter.setObjectName(ISSUES_OWNER_FILTER_OBJECT_NAME)
+    owner_filter.addItems([ALL_OWNERS_LABEL])
+    owner_filter.setToolTip("Filter issues by owner.")
+    layout.addWidget(owner_filter)
+
+    view_filter_label = qt_widgets.QLabel("View Filter")
+    layout.addWidget(view_filter_label)
+
+    view_filter = qt_widgets.QComboBox()
+    view_filter.setObjectName(ISSUES_VIEW_FILTER_OBJECT_NAME)
+    view_filter.addItems([ALL_ISSUES_LABEL, BLOCKING_ONLY_LABEL, AUTO_FIXABLE_LABEL])
+    view_filter.setToolTip("Filter blocking or auto-fixable issues.")
+    layout.addWidget(view_filter)
 
     sort_label = qt_widgets.QLabel("Sort By")
     layout.addWidget(sort_label)
@@ -231,6 +326,7 @@ def build_issues_table(
     table.setColumnCount(len(ISSUES_TABLE_COLUMNS))
     table.setHorizontalHeaderLabels(list(ISSUES_TABLE_COLUMNS))
     table.setSortingEnabled(True)
+    configure_read_only_table(table, qt_widgets)
     populate_issues_table(qt_widgets, table, issue_rows)
     layout.addWidget(table)
 
@@ -240,10 +336,12 @@ def build_issues_table(
 def build_issue_details_panel(
     qt_widgets: Any,
     state: Optional[IssueDetailsState] = None,
+    callbacks: Optional[IssueDetailsActionCallbacks] = None,
 ) -> Any:
     """Build the selected issue details panel."""
 
     details_state = state or IssueDetailsState()
+    issue_callbacks = callbacks or IssueDetailsActionCallbacks()
     widget = qt_widgets.QWidget()
     widget.setObjectName(DETAILS_PANEL_OBJECT_NAME)
 
@@ -289,6 +387,60 @@ def build_issue_details_panel(
             _details_fix_text(details_state),
         )
     )
+
+    actions = qt_widgets.QWidget()
+    actions.setObjectName(DETAILS_ACTIONS_OBJECT_NAME)
+    actions_layout = qt_widgets.QHBoxLayout(actions)
+    actions_layout.setContentsMargins(0, 0, 0, 0)
+    actions_layout.addWidget(
+        _button(
+            qt_widgets,
+            "Select Node",
+            SELECT_NODE_BUTTON_OBJECT_NAME,
+            "Select the issue node in Maya.",
+            issue_callbacks.on_select_node,
+        )
+    )
+    actions_layout.addWidget(
+        _button(
+            qt_widgets,
+            "Open in HyperShade",
+            OPEN_ATTR_EDITOR_BUTTON_OBJECT_NAME,
+            "Open Hypershade shader network for the issue material.",
+            issue_callbacks.on_open_in_hypershade,
+        )
+    )
+    actions_layout.addWidget(
+        _button(
+            qt_widgets,
+            "Copy Path",
+            COPY_PATH_BUTTON_OBJECT_NAME,
+            "Copy the issue path to the clipboard.",
+            issue_callbacks.on_copy_path,
+        )
+    )
+    actions_layout.addWidget(
+        _button(
+            qt_widgets,
+            "Reveal File",
+            REVEAL_FILE_BUTTON_OBJECT_NAME,
+            "Reveal the issue file in the host file browser.",
+            issue_callbacks.on_reveal_file,
+        )
+    )
+    actions_layout.addWidget(
+        _button(
+            qt_widgets,
+            "Waive",
+            WAIVE_ISSUE_BUTTON_OBJECT_NAME,
+            (
+                "Approve a known exception: writes a waiver sidecar next to the saved scene "
+                "so this rule failure is ignored on revalidation."
+            ),
+            issue_callbacks.on_waive_issue,
+        )
+    )
+    layout.addWidget(actions)
 
     return widget
 
@@ -351,7 +503,7 @@ def populate_issues_table(
     table.setRowCount(len(rows))
     for row_index, row in enumerate(rows):
         for column_index, value in enumerate(issue_row_cells(row)):
-            table.setItem(row_index, column_index, qt_widgets.QTableWidgetItem(value))
+            table.setItem(row_index, column_index, make_read_only_item(qt_widgets, value))
 
 
 def filter_issue_rows(
@@ -381,6 +533,13 @@ def sort_issue_rows(
             reverse=descending,
         )
     )
+
+
+def owner_filter_options(rows: Sequence[IssueTableRow]) -> tuple[str, ...]:
+    """Return deterministic owner filter options for the supplied rows."""
+
+    owners = sorted({_normalized_text(row.owner) for row in rows if row.owner})
+    return (ALL_OWNERS_LABEL, *owners)
 
 
 def severity_filter_options(rows: Sequence[IssueTableRow]) -> tuple[str, ...]:

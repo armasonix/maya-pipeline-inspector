@@ -3,19 +3,32 @@ from __future__ import annotations
 
 import importlib
 import json
-from html import escape
+from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
 
+from shader_health.core.waivers import (
+    WaiverSidecar,
+    create_waiver_from_result,
+    load_waiver_sidecar,
+    write_waiver_sidecar,
+)
 from shader_health.maya.navigation import (
     NavigationActionResult,
     copy_path,
-    open_attribute_editor,
+    open_in_hypershade,
     reveal_file,
     select_node,
 )
 from shader_health.maya.ui_launcher import close_panel, show_panel
+from shader_health.maya.validation_pipeline import (
+    DEFAULT_PROFILE_ID,
+    ValidationRunResult,
+    run_validation,
+    waiver_sidecar_path_for_scene,
+)
 
 MENU_NAME = "shaderHealthInspectorMenu"
 MENU_LABEL = "Shader Health"
@@ -41,16 +54,88 @@ def close_ui(*, delete: bool = True) -> None:
     close_panel(delete=delete)
 
 
+def validate_scene_action(*, profile_id: str = DEFAULT_PROFILE_ID) -> Any:
+    """Validate the current Maya scene and return a UI-friendly result object."""
+
+    return _validate(scan_scope="scene", profile_id=profile_id)
+
+
+def validate_selection_action(*, profile_id: str = DEFAULT_PROFILE_ID) -> Any:
+    """Validate the current Maya selection and return a UI-friendly result object."""
+
+    return _validate(scan_scope="selection", profile_id=profile_id)
+
+
+def waive_issue_action(result: Any, *, reason: str, approved_by: str = "artist") -> Any:
+    """Persist a waiver for a failed validation result and return the sidecar path."""
+
+    if getattr(result, "status", "") != "failed":
+        raise ValueError("Only failed issues can be waived.")
+    snapshot_path = getattr(result, "_scene_path", None) or _current_scene_path()
+    sidecar_path = waiver_sidecar_path_for_scene(snapshot_path)
+    if sidecar_path is None:
+        raise ValueError("Save the scene before creating a waiver sidecar.")
+
+    sidecar = (
+        load_waiver_sidecar(sidecar_path)
+        if sidecar_path.is_file()
+        else WaiverSidecar()
+    )
+    now = datetime.now(timezone.utc)
+    waiver = create_waiver_from_result(
+        result,
+        reason=reason,
+        approved_by=approved_by,
+        created_at_utc=now.isoformat().replace("+00:00", "Z"),
+        expires_at_utc=(now + timedelta(days=30)).isoformat().replace("+00:00", "Z"),
+    )
+    updated = WaiverSidecar(waivers=(*sidecar.waivers, waiver))
+    write_waiver_sidecar(sidecar_path, updated)
+    return SimpleNamespace(
+        action="waive_issue",
+        succeeded=True,
+        path=str(sidecar_path),
+        message=f"Waiver saved to {sidecar_path.name}.",
+    )
+
+
 def select_node_action(node_name: str) -> NavigationActionResult:
     """Select a Maya node from a UI action."""
 
-    return select_node(node_name)
+    return select_node(_maya_node_name(node_name))
+
+
+def open_in_hypershade_action(
+    node_name: str,
+    *,
+    material_name: Optional[str] = None,
+) -> NavigationActionResult:
+    """Open Hypershade focused on the issue material from a UI action."""
+
+    maya_cmds = _maya_cmds()
+    candidates: list[str] = []
+    if material_name:
+        candidates.append(_maya_node_name(material_name))
+    if node_name:
+        node = _maya_node_name(node_name)
+        if node not in candidates:
+            candidates.append(node)
+    target = next((name for name in candidates if maya_cmds.objExists(name)), None)
+    if target is None:
+        label = material_name or node_name or "node"
+        return NavigationActionResult(
+            action="open_in_hypershade",
+            target=str(label),
+            succeeded=False,
+            message="Material or node does not exist.",
+        )
+    return open_in_hypershade(target)
 
 
 def open_attribute_editor_action(node_name: str) -> NavigationActionResult:
-    """Open Maya Attribute Editor for a node from a UI action."""
+    """Deprecated alias kept for older callers."""
 
-    return open_attribute_editor(node_name)
+    return open_in_hypershade_action(node_name)
 
 
 def copy_path_action(path: str) -> NavigationActionResult:
@@ -144,79 +229,111 @@ def install_ui() -> None:
     install_shelf()
 
 
+def _validate(*, scan_scope: str, profile_id: str) -> Any:
+    from shader_health.maya.scanner import scan_scene, scan_selection, selection_node_names
+
+    if scan_scope == "selection":
+        selected = selection_node_names()
+        if not selected:
+            return _validation_error(
+                "Nothing selected. Select geometry or shader nodes before validating.",
+                action="validate_selection",
+                scan_scope=scan_scope,
+                profile_id=profile_id,
+            )
+        raw_snapshot = scan_selection()
+        if not raw_snapshot.shading_engines:
+            return _validation_error(
+                "Selection has no assigned shader networks to validate.",
+                action="validate_selection",
+                scan_scope=scan_scope,
+                profile_id=profile_id,
+            )
+    else:
+        raw_snapshot = scan_scene()
+    run = run_validation(raw_snapshot, profile_id=profile_id, scan_scope=scan_scope)
+    return _validation_result(run, action=f"validate_{scan_scope}")
+
+
+def _validation_error(
+    message: str,
+    *,
+    action: str,
+    scan_scope: str,
+    profile_id: str = "",
+) -> Any:
+    return SimpleNamespace(
+        action=action,
+        succeeded=False,
+        snapshot=None,
+        results=(),
+        rules=(),
+        fix_plan=None,
+        summary=None,
+        health_score=SimpleNamespace(
+            score=100,
+            critical=0,
+            error=0,
+            warning=0,
+            info=0,
+            block_publish=False,
+            block_deadline=False,
+        ),
+        message=message,
+        profile_id=profile_id,
+        scan_scope=scan_scope,
+    )
+
+
+def _validation_result(run: ValidationRunResult, *, action: str) -> Any:
+    return SimpleNamespace(
+        action=action,
+        succeeded=True,
+        snapshot=run.snapshot,
+        results=run.results,
+        rules=run.rules,
+        fix_plan=run.fix_plan,
+        summary=run.summary,
+        health_score=run.health_score,
+        message=run.message,
+        profile_id=run.profile_id,
+        scan_scope=run.scan_scope,
+    )
+
+
 def _export_json_report(path: Optional[str]) -> Any:
-    scene = _runtime_scene_metadata()
-    output_path = _runtime_output_path(path, scene["scene_path"], "report", "json")
-    payload = {
-        "report_schema_version": "maya-runtime-1.0",
-        "status": "not_validated",
-        "summary": {},
-        "results": [],
-        "snapshot": scene,
-    }
-    _write_json(output_path, payload)
+    from shader_health.reports import write_json_report
+
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "json")
+    write_json_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_json_report", output_path, "JSON report exported.")
 
 
 def _export_html_report(path: Optional[str]) -> Any:
-    scene = _runtime_scene_metadata()
-    output_path = _runtime_output_path(path, scene["scene_path"], "report", "html")
-    lines = [
-        "<!doctype html>",
-        '<html lang="en">',
-        "<head>",
-        '<meta charset="utf-8">',
-        "<title>Maya Shader Health Report</title>",
-        "</head>",
-        "<body>",
-        "<main>",
-        "<h1>Maya Shader Health Report</h1>",
-        "<h2>Runtime Export</h2>",
-        f"<p><strong>Scene:</strong> {_html(scene['scene_path'])}</p>",
-        f"<p><strong>Maya:</strong> {_html(scene['maya_version'])}</p>",
-        f"<p><strong>Renderer:</strong> {_html(scene['renderer'])}</p>",
-        "<p>Status: not_validated</p>",
-        "</main>",
-        "</body>",
-        "</html>",
-    ]
-    _write_text(output_path, "\n".join(lines) + "\n")
+    from shader_health.reports.html_report import write_html_report
+
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "html")
+    write_html_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_html_report", output_path, "HTML report exported.")
 
 
 def _export_shader_manifest(path: Optional[str]) -> Any:
-    scene = _runtime_scene_metadata()
-    output_path = _runtime_output_path(path, scene["scene_path"], "manifest", "json")
+    validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
+    output_path = _runtime_output_path(path, validation.snapshot.scene_path, "manifest", "json")
     payload = {
         "manifest_schema_version": "maya-runtime-1.0",
-        "scene_path": scene["scene_path"],
-        "maya_version": scene["maya_version"],
-        "renderer": scene["renderer"],
-        "scan_scope": "scene",
-        "materials": [],
+        "scene_path": validation.snapshot.scene_path,
+        "maya_version": validation.snapshot.maya_version,
+        "renderer": validation.snapshot.renderer,
+        "scan_scope": validation.snapshot.scan_scope,
+        "materials": [asdict(material) for material in validation.snapshot.materials],
+        "file_dependencies": [asdict(item) for item in validation.snapshot.file_dependencies],
+        "results": [result.to_dict() for result in validation.results],
     }
     _write_json(output_path, payload)
     return _runtime_result("export_shader_manifest", output_path, "Shader manifest exported.")
-
-
-def _runtime_scene_metadata() -> dict[str, str]:
-    cmds = _maya_cmds()
-    scene_path = str(cmds.file(query=True, sceneName=True) or "")
-    maya_version = str(cmds.about(version=True) or "")
-    renderer = _runtime_renderer(cmds)
-    return {
-        "scene_path": scene_path,
-        "maya_version": maya_version,
-        "renderer": renderer,
-        "scan_scope": "scene",
-    }
-
-
-def _runtime_renderer(cmds: Any) -> str:
-    try:
-        return str(cmds.getAttr("defaultRenderGlobals.currentRenderer") or "")
-    except Exception:  # noqa: BLE001
-        return ""
 
 
 def _runtime_output_path(
@@ -246,10 +363,6 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _html(value: Any) -> str:
-    return escape(str(value), quote=False)
-
-
 def _runtime_result(action: str, path: Path, message: str) -> Any:
     return SimpleNamespace(
         action=action,
@@ -259,17 +372,35 @@ def _runtime_result(action: str, path: Path, message: str) -> Any:
     )
 
 
+def _current_scene_path() -> str:
+    cmds = _maya_cmds()
+    return str(cmds.file(query=True, sceneName=True) or "")
+
+
+def _maya_node_name(node_id: Optional[str]) -> str:
+    if not node_id:
+        raise ValueError("node_name must not be empty.")
+    text = str(node_id)
+    if text.startswith("node:"):
+        return text.split(":", 1)[1]
+    return text
+
+
 def _maya_shelf_top_level() -> str:
-    mel: Any = _maya_module("maya.mel")
-    return str(mel.eval("$tmp = $gShelfTopLevel"))
+    mel = _maya_mel()
+    shelf_top_level = mel.eval("$tmp=$gShelfTopLevel")
+    return str(shelf_top_level)
 
 
 def _maya_cmds() -> Any:
-    return _maya_module("maya.cmds")
-
-
-def _maya_module(module_name: str) -> Any:
     try:
-        return importlib.import_module(module_name)
+        return importlib.import_module("maya.cmds")
     except ImportError as exc:
-        raise RuntimeError("Maya commands can only run inside Autodesk Maya.") from exc
+        raise RuntimeError("Maya commands are available only inside Autodesk Maya.") from exc
+
+
+def _maya_mel() -> Any:
+    try:
+        return importlib.import_module("maya.mel")
+    except ImportError as exc:
+        raise RuntimeError("Maya MEL is available only inside Autodesk Maya.") from exc

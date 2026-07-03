@@ -1,0 +1,21 @@
+{
+  "id": "artist_relaxed",
+  "display_name": "Artist Relaxed",
+  "rule_overrides": {
+    "common.shader_complexity.graph_nodes.max": {
+      "enabled": false
+    },
+    "common.shader_complexity.texture_count.max": {
+      "enabled": false
+    },
+    "common.shader_complexity.graph_depth.max": {
+      "enabled": false
+    },
+    "common.texture.duplicates.same_path": {
+      "block_deadline": false
+    },
+    "common.texture.path.project_root": {
+      "block_deadline": false
+    }
+  }
+}

@@ -59,6 +59,8 @@ def test_html_report_is_self_contained_and_shows_blocking_status():
 
     assert html.startswith("<!doctype html>")
     assert "<style>" in html
+    assert "table-wrap" in html
+    assert "score-ring" in html
     assert "href=" not in html
     assert "http://" not in html
     assert "https://" not in html
@@ -83,9 +85,28 @@ def test_html_report_shows_severity_groups_and_results():
     assert "Error (0)" in html
     assert "Warning (1)" in html
     assert "Info (0)" in html
+    assert '<details class="severity severity-critical" open>' in html
+    assert '<details class="severity severity-warning">' in html
+    assert '<details class="severity severity-warning" open>' not in html
+    assert '<summary class="severity-summary">' in html
     assert "a.rule" in html
     assert "z.rule" in html
     assert html.index("a.rule") < html.index("z.rule")
+
+
+def test_html_report_severity_groups_are_collapsible_without_javascript():
+    html = build_html_report(
+        make_snapshot(),
+        [make_result("common.texture.path.local_drive", "info")],
+    )
+
+    assert "<details" in html
+    assert "<summary" in html
+    assert "Expand or collapse each severity group" in html
+    assert "<script" not in html.casefold()
+    assert "Toggle" not in html
+    assert "table-layout: fixed" in html
+    assert "max-width: none" in html
 
 
 def test_html_report_escapes_user_controlled_text():
