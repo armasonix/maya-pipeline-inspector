@@ -1,5 +1,7 @@
 # Maya Shader Health Inspector — Production Development Plan
 
+> **v0.2 planning:** Milestones 10–14 and Issues #049–#070 are defined in [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md).
+
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
 **Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
 **Primary DCC:** Autodesk Maya  
