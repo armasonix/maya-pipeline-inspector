@@ -168,5 +168,9 @@ def _rule_with_fix() -> RuleDefinition:
         match=RuleMatch(criteria={"node_type": ["file"]}),
         check=RuleCheck(type="attribute_equals", params={"attribute": "colorSpace"}),
         policy=RulePolicy(auto_fix_allowed=True),
-        fix=RuleFix(type="set_attr", risk="low", params={"attribute": "colorSpace", "value": "Raw"}),
+        fix=RuleFix(
+            type="set_attr",
+            risk="low",
+            params={"attribute": "colorSpace", "value": "Raw"},
+        ),
     )
