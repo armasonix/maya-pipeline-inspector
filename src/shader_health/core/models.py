@@ -39,6 +39,12 @@ def _as_optional_bool(value: Any) -> Optional[bool]:
     return bool(value)
 
 
+def _as_optional_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    return int(value)
+
+
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{label} must be a mapping, got {type(value).__name__}")
@@ -234,6 +240,68 @@ class FileDependencySnapshot:
 
 
 @dataclass(frozen=True)
+class VrayMaterialMetadata:
+    """V-Ray-specific metadata attached to a material during enrichment."""
+
+    texture_count: int = 0
+    displacement_linked: bool = False
+    subdivision_enabled: bool = False
+    reflection_max_depth: Optional[int] = None
+    refraction_max_depth: Optional[int] = None
+    limit_attrs: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "texture_count": self.texture_count,
+            "displacement_linked": self.displacement_linked,
+            "subdivision_enabled": self.subdivision_enabled,
+            "reflection_max_depth": self.reflection_max_depth,
+            "refraction_max_depth": self.refraction_max_depth,
+            "limit_attrs": dict(self.limit_attrs),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> VrayMaterialMetadata:
+        raw_limit_attrs = data.get("limit_attrs", {})
+        limit_attrs = dict(raw_limit_attrs) if isinstance(raw_limit_attrs, Mapping) else {}
+        return cls(
+            texture_count=int(data.get("texture_count", 0)),
+            displacement_linked=bool(data.get("displacement_linked", False)),
+            subdivision_enabled=bool(data.get("subdivision_enabled", False)),
+            reflection_max_depth=_as_optional_int(data.get("reflection_max_depth")),
+            refraction_max_depth=_as_optional_int(data.get("refraction_max_depth")),
+            limit_attrs=limit_attrs,
+        )
+
+
+@dataclass(frozen=True)
+class VraySceneMetadata:
+    """V-Ray scene-level metadata derived from the scanned graph."""
+
+    has_vray_plugin: bool = False
+    vray_plugin_node_ids: list[str] = field(default_factory=list)
+    vray_material_count: int = 0
+    has_vray_materials: bool = False
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "has_vray_plugin": self.has_vray_plugin,
+            "vray_plugin_node_ids": list(self.vray_plugin_node_ids),
+            "vray_material_count": self.vray_material_count,
+            "has_vray_materials": self.has_vray_materials,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> VraySceneMetadata:
+        return cls(
+            has_vray_plugin=bool(data.get("has_vray_plugin", False)),
+            vray_plugin_node_ids=_as_str_list(data.get("vray_plugin_node_ids")),
+            vray_material_count=int(data.get("vray_material_count", 0)),
+            has_vray_materials=bool(data.get("has_vray_materials", False)),
+        )
+
+
+@dataclass(frozen=True)
 class MaterialSnapshot:
     """Material-level summary extracted from the shader graph."""
 
@@ -248,9 +316,10 @@ class MaterialSnapshot:
     graph_node_count: int = 0
     graph_depth: int = 0
     graph_fingerprint: str = ""
+    vray_metadata: Optional[VrayMaterialMetadata] = None
 
     def to_dict(self) -> JsonDict:
-        return {
+        payload: JsonDict = {
             "node_id": self.node_id,
             "name": self.name,
             "type_name": self.type_name,
@@ -263,9 +332,16 @@ class MaterialSnapshot:
             "graph_depth": self.graph_depth,
             "graph_fingerprint": self.graph_fingerprint,
         }
+        if self.vray_metadata is not None:
+            payload["vray_metadata"] = self.vray_metadata.to_dict()
+        return payload
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> MaterialSnapshot:
+        raw_vray_metadata = data.get("vray_metadata")
+        vray_metadata = None
+        if isinstance(raw_vray_metadata, Mapping):
+            vray_metadata = VrayMaterialMetadata.from_dict(raw_vray_metadata)
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -278,6 +354,7 @@ class MaterialSnapshot:
             graph_node_count=int(data.get("graph_node_count", 0)),
             graph_depth=int(data.get("graph_depth", 0)),
             graph_fingerprint=str(data.get("graph_fingerprint", "")),
+            vray_metadata=vray_metadata,
         )
 
 
@@ -360,9 +437,10 @@ class GraphSnapshot:
     shading_engines: list[ShadingEngineSnapshot] = field(default_factory=list)
     file_dependencies: list[FileDependencySnapshot] = field(default_factory=list)
     references: list[ReferenceSnapshot] = field(default_factory=list)
+    vray_scene_metadata: Optional[VraySceneMetadata] = None
 
     def to_dict(self) -> JsonDict:
-        return {
+        payload: JsonDict = {
             "schema_version": self.schema_version,
             "scene_path": self.scene_path,
             "maya_version": self.maya_version,
@@ -376,9 +454,16 @@ class GraphSnapshot:
             "file_dependencies": [dependency.to_dict() for dependency in self.file_dependencies],
             "references": [reference.to_dict() for reference in self.references],
         }
+        if self.vray_scene_metadata is not None:
+            payload["vray_scene_metadata"] = self.vray_scene_metadata.to_dict()
+        return payload
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GraphSnapshot:
+        raw_vray_scene_metadata = data.get("vray_scene_metadata")
+        vray_scene_metadata = None
+        if isinstance(raw_vray_scene_metadata, Mapping):
+            vray_scene_metadata = VraySceneMetadata.from_dict(raw_vray_scene_metadata)
         return cls(
             schema_version=str(data.get("schema_version", SNAPSHOT_SCHEMA_VERSION)),
             scene_path=str(data.get("scene_path", "")),
@@ -410,6 +495,7 @@ class GraphSnapshot:
                 ReferenceSnapshot.from_dict(_require_mapping(item, "references item"))
                 for item in data.get("references", [])
             ],
+            vray_scene_metadata=vray_scene_metadata,
         )
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:

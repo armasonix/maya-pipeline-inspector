@@ -27,6 +27,7 @@ from shader_health.core import (
     NodeSnapshot,
     RuleResult,
 )
+from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
@@ -39,7 +40,8 @@ def prepare_snapshot_for_validation(snapshot: GraphSnapshot) -> GraphSnapshot:
     enriched = enrich_snapshot(snapshot)
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
     resolved = resolver.apply_to_snapshot(enriched)
-    return _with_propagated_semantic_slots(resolved)
+    propagated = _with_propagated_semantic_slots(resolved)
+    return enrich_vray_metadata(propagated)
 
 
 def enrich_rule_results(

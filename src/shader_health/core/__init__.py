@@ -15,6 +15,8 @@ from shader_health.core.models import (
     NodeSnapshot,
     ReferenceSnapshot,
     ShadingEngineSnapshot,
+    VrayMaterialMetadata,
+    VraySceneMetadata,
 )
 from shader_health.core.rule_loader import (
     ProfileDefinition,
@@ -85,6 +87,8 @@ __all__ = [
     "ShadingEngineSnapshot",
     "ValidationEngine",
     "ValidationSummary",
+    "VrayMaterialMetadata",
+    "VraySceneMetadata",
     "WaiverRecord",
     "WaiverSidecar",
     "apply_profile_overrides",

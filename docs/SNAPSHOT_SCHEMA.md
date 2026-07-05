@@ -56,8 +56,29 @@ This keeps the following systems aligned:
 | `shading_engines` | array | Yes | Shading engine assignments and shader links. |
 | `file_dependencies` | array | Yes | Texture/file dependencies collected from file nodes. |
 | `references` | array | Yes | Referenced scene metadata for reference-safe validation. |
+| `vray_scene_metadata` | object or null | No | V-Ray scene enrichment payload when enrichment runs. |
 
 All arrays may be empty.
+
+### V-Ray scene metadata (`vray_scene_metadata`)
+
+Attached during validation enrichment when the snapshot is prepared for rules.
+
+```json
+{
+  "has_vray_plugin": true,
+  "vray_plugin_node_ids": ["node:vraySettings"],
+  "vray_material_count": 3,
+  "has_vray_materials": true
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `has_vray_plugin` | boolean | Scene contains a V-Ray settings/plugin node such as `VRaySettingsNode`. |
+| `vray_plugin_node_ids` | array[string] | Node IDs for detected V-Ray plugin/settings nodes. |
+| `vray_material_count` | integer | Count of V-Ray material nodes in the snapshot. |
+| `has_vray_materials` | boolean | True when one or more V-Ray materials are present. |
 
 ## NodeSnapshot
 
@@ -153,6 +174,36 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
 | `graph_node_count` | integer | Yes | Number of nodes in material graph. |
 | `graph_depth` | integer | Yes | Approximate upstream graph depth. |
 | `graph_fingerprint` | string | Yes | Stable graph fingerprint if computed, otherwise empty string. |
+| `vray_metadata` | object or null | No | V-Ray enrichment payload when the material is a V-Ray shader type. |
+
+### V-Ray material metadata (`vray_metadata`)
+
+Attached during validation enrichment for V-Ray material types such as `VRayMtl`.
+
+```json
+{
+  "texture_count": 2,
+  "displacement_linked": true,
+  "subdivision_enabled": false,
+  "reflection_max_depth": 8,
+  "refraction_max_depth": 8,
+  "limit_attrs": {
+    "reflection_max_depth": 8,
+    "refraction_max_depth": 8,
+    "brdf": 3,
+    "force_displacement": true
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `texture_count` | integer | Number of texture nodes linked to the material. |
+| `displacement_linked` | boolean | Material has displacement nodes or a shading engine displacement shader. |
+| `subdivision_enabled` | boolean | V-Ray subdivision/displacement flags detected on the material node. |
+| `reflection_max_depth` | integer or null | Reflection trace depth limit when available. |
+| `refraction_max_depth` | integer or null | Refraction trace depth limit when available. |
+| `limit_attrs` | object | Additional normalized V-Ray limit attrs from the material node. |
 
 ## ShadingEngineSnapshot
 
