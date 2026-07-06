@@ -210,15 +210,16 @@ def test_apply_normalize_path_blocks_referenced_targets_by_default():
     assert report.records[0].block_reasons == ["target_referenced"]
 
 
-def test_apply_normalize_path_blocks_when_prefix_does_not_match():
+def test_apply_normalize_path_uses_asset_root_basename_when_prefix_does_not_match():
     cmds = FakeCmds({"file1.fileTextureName": "//legacy_server/random/albedo.exr"})
     action = _normalize_action()
 
     report = apply_fix_actions([action], cmds=cmds)
 
-    assert cmds.set_calls == []
-    assert report.blocked_count == 1
-    assert report.records[0].block_reasons == ["invalid_normalize_path"]
+    assert cmds.set_calls == [
+        ("file1.fileTextureName", "$ASSET_ROOT/textures/albedo.exr", {"type": "string"}),
+    ]
+    assert report.applied_count == 1
 
 
 def test_apply_disable_feature_sets_bool_attribute_with_confirmation():

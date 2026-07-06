@@ -12,7 +12,13 @@ from shader_health.ui.fix_queue import (
 )
 
 
-def _high_risk_row(*, selected: bool = True, target_node: str = "file1") -> FixQueueRow:
+def _high_risk_row(
+    *,
+    selected: bool = True,
+    target_node: str = "file1",
+    fix_id: str = "",
+) -> FixQueueRow:
+    resolved_fix_id = fix_id or f"common.displacement.amount.max:{target_node}:disable_feature"
     return FixQueueRow(
         selected=selected,
         title="Disable displacement",
@@ -21,6 +27,7 @@ def _high_risk_row(*, selected: bool = True, target_node: str = "file1") -> FixQ
         target_attr="displacement",
         before_value="True",
         after_value="False",
+        fix_id=resolved_fix_id,
         requires_confirmation=True,
     )
 
@@ -223,6 +230,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
         _shader_health_fix_plan=SimpleNamespace(
             actions=(
                 SimpleNamespace(
+                    fix_id="common.displacement.amount.max:file1:disable_feature",
                     target_node="file1",
                     target_attr="displacement",
                     before_value=True,

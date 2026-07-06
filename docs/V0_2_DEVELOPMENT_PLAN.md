@@ -71,7 +71,7 @@ The original [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) roadmap assumed a s
 
 **Re-scoped v0.2 theme:** **Production Hardening & Studio Readiness** — extend MVP implementations to production-grade depth rather than re-implementing already-shipped features.
 
-Issue **#069** tracks synchronizing [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) with this realignment.
+Issue **#069** synchronized [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) with this realignment (see master plan banner and Milestones 10–14 index).
 
 ---
 

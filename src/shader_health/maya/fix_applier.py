@@ -190,7 +190,7 @@ def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
     normalized_path = resolve_normalize_path_value(
         before_value,
         action.params,
-        planned_after=action.after_value,
+        scene_path=str(action.params.get("scene_path") or ""),
     )
     if not _is_path_string_value(normalized_path) or normalized_path == before_value:
         return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])

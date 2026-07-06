@@ -5,7 +5,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
+from shader_health.ui.table_widgets import (
+    configure_read_only_table,
+    is_checkbox_checked,
+    is_fix_queue_select_checked,
+    make_fix_queue_select_cell,
+    make_read_only_item,
+)
 
 FIX_QUEUE_OBJECT_NAME = "shaderHealthInspectorFixQueue"
 FIX_QUEUE_TABLE_OBJECT_NAME = "shaderHealthInspectorFixQueueTable"
@@ -37,6 +43,7 @@ class FixQueueRow:
     target_attr: str
     before_value: str
     after_value: str
+    fix_id: str = ""
     blocked: bool = False
     requires_confirmation: bool = False
 
@@ -68,7 +75,10 @@ def build_fix_queue(
     title_label = qt_widgets.QLabel("Safe Auto-Fix Queue")
     set_tooltip = getattr(title_label, "setToolTip", None)
     if set_tooltip is not None:
-        set_tooltip("Click Selected (YES/NO) to choose fixes for Apply Selected Fixes.")
+        set_tooltip(
+            "Click the Select button on each row to choose fixes "
+            "for Apply Selected Fixes."
+        )
     layout.addWidget(title_label)
 
     table = qt_widgets.QTableWidget()
@@ -88,7 +98,7 @@ def build_fix_queue(
         qt_widgets,
         "Apply Selected Fixes",
         FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME,
-        "Apply checked YES rows in the Selected column.",
+        "Click Select on each row, then apply checked fixes.",
         fix_callbacks.on_apply_selected,
     )
     layout.addWidget(apply_selected_button)
@@ -109,27 +119,70 @@ def populate_fix_queue(
     qt_widgets: Any,
     table: Any,
     rows: Sequence[FixQueueRow],
+    *,
+    on_selection_changed: Optional[Callable[[], None]] = None,
 ) -> None:
     """Populate a Qt table widget with fix queue rows."""
 
     table.setRowCount(len(rows))
     for row_index, row in enumerate(rows):
-        for column_index, value in enumerate(fix_queue_row_cells(row)):
+        table.setCellWidget(
+            row_index,
+            0,
+            make_fix_queue_select_cell(
+                qt_widgets,
+                checked=row.selected,
+                on_toggled=lambda _checked, index=row_index: _on_select_toggled(
+                    table,
+                    index,
+                    on_selection_changed,
+                ),
+            ),
+        )
+        for column_index, value in enumerate(fix_queue_row_cells(row)[1:], start=1):
             table.setItem(row_index, column_index, make_read_only_item(qt_widgets, value))
 
 
+def _on_select_toggled(
+    table: Any,
+    row_index: int,
+    on_selection_changed: Optional[Callable[[], None]],
+) -> None:
+    if on_selection_changed is not None:
+        on_selection_changed()
+
+
 def selected_from_table_item(item: Any) -> bool:
-    """Return whether a fix queue Selected cell is marked YES."""
+    """Return whether a fix queue Selected cell is checked."""
 
     if item is None:
         return False
+    if is_checkbox_checked(item):
+        return True
     text = getattr(item, "text", lambda: "")()
     return str(text).strip().upper() == "YES"
 
 
 def toggle_selected_table_item(item: Any) -> bool:
-    """Toggle a fix queue Selected cell between YES and NO."""
+    """Toggle a fix queue Selected checkbox cell."""
 
+    if item is None:
+        return False
+    set_check_state = getattr(item, "setCheckState", None)
+    check_state = getattr(item, "checkState", None)
+    if set_check_state is not None and check_state is not None:
+        try:
+            from shader_health.ui.qt import load_qt_core
+
+            qt = load_qt_core().Qt
+            checked_state = getattr(qt, "Checked", None)
+            unchecked_state = getattr(qt, "Unchecked", None)
+            if checked_state is not None and unchecked_state is not None:
+                selected = check_state() != checked_state
+                set_check_state(checked_state if selected else unchecked_state)
+                return selected
+        except RuntimeError:
+            pass
     selected = not selected_from_table_item(item)
     set_text = getattr(item, "setText", None)
     if set_text is not None:
@@ -138,12 +191,15 @@ def toggle_selected_table_item(item: Any) -> bool:
 
 
 def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
-    """Return fix queue rows with Selected state read from YES/NO cells."""
+    """Return fix queue rows with Selected state read from Select buttons."""
 
     synced: list[FixQueueRow] = []
     for row_index, row in enumerate(rows):
-        item = table.item(row_index, 0) if hasattr(table, "item") else None
-        selected = selected_from_table_item(item) if item is not None else row.selected
+        if hasattr(table, "cellWidget") and table.cellWidget(row_index, 0) is not None:
+            selected = is_fix_queue_select_checked(table, row_index)
+        else:
+            item = table.item(row_index, 0) if hasattr(table, "item") else None
+            selected = selected_from_table_item(item) if item is not None else row.selected
         synced.append(
             FixQueueRow(
                 selected=selected,
@@ -153,6 +209,7 @@ def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQue
                 target_attr=row.target_attr,
                 before_value=row.before_value,
                 after_value=row.after_value,
+                fix_id=row.fix_id,
                 blocked=row.blocked,
                 requires_confirmation=row.requires_confirmation,
             )
@@ -160,10 +217,35 @@ def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQue
     return tuple(synced)
 
 
+def checked_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
+    """Return queue rows the user marked with Select, including blocked rows."""
+
+    return tuple(row for row in rows if row.selected)
+
+
 def selected_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     """Return selected queue rows that are not blocked."""
 
     return tuple(row for row in rows if row.selected and not row.blocked)
+
+
+def blocked_selection_message(rows: Sequence[FixQueueRow]) -> str:
+    """Build a user-facing message when selected fixes are blocked."""
+
+    blocked = tuple(row for row in rows if row.selected and row.blocked)
+    if not blocked:
+        return ""
+    samples = [
+        f"{row.target_node}.{row.target_attr or 'node'}"
+        for row in blocked[:3]
+    ]
+    suffix = f" (+{len(blocked) - 3} more)" if len(blocked) > 3 else ""
+    return (
+        "Selected fixes are blocked and were not applied: "
+        + ", ".join(samples)
+        + suffix
+        + ". Locked nodes and unplannable path fixes cannot run."
+    )
 
 
 def safe_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:

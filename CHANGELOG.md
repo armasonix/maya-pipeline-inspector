@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Reconciled long-term roadmap in [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md): v0.1 marked shipped, v0.2 aligned with [V0_2_DEVELOPMENT_PLAN.md](docs/V0_2_DEVELOPMENT_PLAN.md), v0.3+ rescoped; Milestones 10–14 indexed in §26.
+
 - Texture version freshness (`common.texture.version.latest`): clearer edge-case handling for multiple folder siblings, single-version folders, and missing `v###` tokens; added pass/fail snapshot fixtures and documented filesystem-only detection in [USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ### Added
@@ -19,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional Maya integration GitHub Actions workflow ([`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml), `workflow_dispatch` only).
 - Waiver manager UI in the Maya panel with sidecar revoke support.
 - High-risk fix confirmation dialog in the Safe Auto-Fix Queue: per-fix confirm for strict profiles, batch confirm for `supervisor_full`, with pending/selected risky counts on the helper label.
+- Issue filters on one horizontal row; issue details show reference-safety status.
+- Rule packs now expose `relink_path`, `normalize_path`, and `disable_feature` fixes (not only `set_attr`).
 
 ## [0.1.0] - 2026-07-03
 

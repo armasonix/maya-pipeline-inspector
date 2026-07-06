@@ -48,7 +48,13 @@
         "block_publish": true,
         "block_deadline": true,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "disable_feature",
+        "attribute": "scale",
+        "value": 0.0,
+        "risk": "high"
       }
     }
   ]

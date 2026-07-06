@@ -39,6 +39,1186 @@
       "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
       "total": 2,
       "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T09:24:14Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T09:24:26Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:47:25Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:47:41Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:48:24Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:48:49Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:49:03Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:49:09Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.<UDIM>.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_2"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:53:57Z",
+      "applied_count": 2,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 2,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:55:06Z",
+      "applied_count": 0,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 0,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:55:24Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:55:53Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/Users/ledorub3d/Documents/local_only_texture.exr",
+          "applied": true,
+          "before_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:local_only_texture_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "local_only_texture_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:56:08Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.<UDIM>.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_2"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T10:56:28Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": 0.0,
+          "applied": true,
+          "before_value": 18.0,
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.displacement.amount.max:node:displacementShader1:disable_feature",
+          "fix_type": "disable_feature",
+          "message": "Fix applied.",
+          "rule_id": "common.displacement.amount.max",
+          "target_attr": "scale",
+          "target_node": "displacementShader1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:01:23Z",
+      "applied_count": 0,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "path policy compliant",
+          "applied": false,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:16:36Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:16:40Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:17:26Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_roughness_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_2"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:17:47Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_roughness_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:17:51Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_displacement_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_displacement_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:17:54Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_normal_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_normal_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:17:58Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:18:13Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": 0.0,
+          "applied": true,
+          "before_value": 18.0,
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.displacement.amount.max:node:displacementShader1:disable_feature",
+          "fix_type": "disable_feature",
+          "message": "Fix applied.",
+          "rule_id": "common.displacement.amount.max",
+          "target_attr": "scale",
+          "target_node": "displacementShader1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T11:22:30Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:06:12Z",
+      "applied_count": 3,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "artist_relaxed",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        },
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_3:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_3"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 3,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:07:45Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:07:48Z",
+      "applied_count": 1,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_3:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_3"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 1,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:07:59Z",
+      "applied_count": 5,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_2"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_displacement_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_normal_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_normal_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_2"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 5,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:08:08Z",
+      "applied_count": 1,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/textures/local_only_texture.exr",
+          "applied": true,
+          "before_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:local_only_texture_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "local_only_texture_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/local_only_texture.exr",
+          "applied": false,
+          "before_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.project_root:node:local_only_texture_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "local_only_texture_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 2,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:09:05Z",
+      "applied_count": 2,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 2,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:17:11Z",
+      "applied_count": 3,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_displacement_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "sRGB",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_1:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_1"
+        },
+        {
+          "after_value": "Raw",
+          "applied": true,
+          "before_value": "ACEScg",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.colorspace.data_raw:node:demo_roughness_v001_3:set_attr",
+          "fix_type": "set_attr",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.colorspace.data_raw",
+          "target_attr": "colorSpace",
+          "target_node": "demo_roughness_v001_3"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 3,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:21:00Z",
+      "applied_count": 15,
+      "blocked_count": 1,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_2"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_displacement_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_normal_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_normal_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_2"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_roughness_v001_3:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_3"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/local_only_texture.exr",
+          "applied": true,
+          "before_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:local_only_texture_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "local_only_texture_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_albedo_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_2"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_displacement_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_displacement_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_displacement_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_displacement_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_normal_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_normal_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_normal_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_roughness_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_roughness_v001_2:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_2"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_roughness_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_roughness_v001_3:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_roughness_v001_3"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/local_only_texture.exr",
+          "applied": false,
+          "before_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "block_reasons": [
+            "invalid_normalize_path"
+          ],
+          "blocked": true,
+          "fix_id": "common.texture.path.project_root:node:local_only_texture_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix blocked.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "local_only_texture_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 16,
+      "undo_chunk_name": "Shader Health Apply Fixes"
+    },
+    {
+      "applied_at_utc": "2026-07-06T12:23:01Z",
+      "applied_count": 2,
+      "blocked_count": 0,
+      "failed_count": 0,
+      "profile_id": "supervisor_full",
+      "records": [
+        {
+          "after_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.local_drive:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.local_drive",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        },
+        {
+          "after_value": "${ASSET_ROOT}/textures/demo_albedo_v001.1001.exr",
+          "applied": true,
+          "before_value": "${ASSET_ROOT}/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "block_reasons": [],
+          "blocked": false,
+          "fix_id": "common.texture.path.project_root:node:demo_albedo_v001_1:normalize_path",
+          "fix_type": "normalize_path",
+          "message": "Fix applied.",
+          "rule_id": "common.texture.path.project_root",
+          "target_attr": "fileTextureName",
+          "target_node": "demo_albedo_v001_1"
+        }
+      ],
+      "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+      "total": 2,
+      "undo_chunk_name": "Shader Health Apply Fixes"
     }
   ]
 }

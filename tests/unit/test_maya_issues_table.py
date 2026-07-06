@@ -98,9 +98,10 @@ class FakeVBoxLayout:
     def setSpacing(self, spacing: int) -> None:
         _ = spacing
 
-    def addWidget(self, widget: Any) -> None:
+    def addWidget(self, widget: Any, stretch: Optional[int] = None) -> None:
         self.widgets.append(widget)
         self.parent.children.append(widget)
+        _ = stretch
 
     def addStretch(self, stretch: int) -> None:
         self.stretches.append(stretch)
@@ -141,10 +142,13 @@ def test_issues_table_displays_required_columns_and_cells():
 def test_issues_table_builds_filter_and_sort_controls():
     widget = main_window.build_issues_table(FakeQtWidgets, rows=_sample_rows())
 
+    filters_row = _find(widget, main_window.ISSUES_FILTERS_ROW_OBJECT_NAME)
     severity_filter = _find(widget, main_window.ISSUES_SEVERITY_FILTER_OBJECT_NAME)
     sort_dropdown = _find(widget, main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME)
     table = _find(widget, main_window.ISSUES_TABLE_OBJECT_NAME)
 
+    assert filters_row.layout is not None
+    assert widget.layout.widgets[0] is filters_row
     assert severity_filter.items == [
         main_window.ALL_SEVERITIES_LABEL,
         "critical",
