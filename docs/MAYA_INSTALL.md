@@ -211,3 +211,29 @@ Bootstrap behavior is covered by unit tests:
 ```bash
 python -m pytest tests/unit/test_maya_module_bootstrap.py -v
 ```
+
+Integration tests can run under system Python (default public CI) or through `mayapy` when Maya is available:
+
+```bash
+mayapy -m pip install -e ".[dev]"
+mayapy -m pytest tests/integration -v
+```
+
+### Optional GitHub Actions workflow (maintainers)
+
+The repository ships a manual workflow at [`.github/workflows/maya-integration.yml`](../.github/workflows/maya-integration.yml). It is triggered by **workflow_dispatch only** and does not run on every pull request.
+
+1. Configure a self-hosted runner with Autodesk Maya installed.
+2. Add repository secret `MAYA_PY` with the absolute path to `mayapy`.
+3. In GitHub: **Actions → Maya integration → Run workflow**.
+4. Optionally pass workflow input `mayapy_path` to override the secret for one run.
+
+When `MAYA_PY` is unset or the path is missing, the workflow exits successfully and prints a skip notice. Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Maya-free.
+
+Local Windows example:
+
+```powershell
+$env:MAYA_PY = "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
+& $env:MAYA_PY -m pip install -e ".[dev]"
+& $env:MAYA_PY -m pytest tests/integration -v
+```

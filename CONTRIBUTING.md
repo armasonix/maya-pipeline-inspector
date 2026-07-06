@@ -234,6 +234,8 @@ Maya integration tests should be optional/local unless a Maya runner is explicit
 mayapy -m pytest tests/integration -v
 ```
 
+Maintainers can also trigger the optional GitHub Actions workflow [`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml) (`workflow_dispatch` with `MAYA_PY` secret). See [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md).
+
 ## Documentation Contributions
 
 Documentation should be practical and production-oriented.

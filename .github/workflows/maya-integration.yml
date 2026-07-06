@@ -1,0 +1,83 @@
+# Optional Maya integration tests for maintainers.
+#
+# This workflow is NOT part of the default public CI gate (see ci.yml).
+# Trigger manually from GitHub Actions when a self-hosted runner with Maya is
+# available, or rely on the graceful skip when MAYA_PY is unset.
+#
+# Setup:
+#   1. Configure a self-hosted runner with Autodesk Maya installed.
+#   2. Add repository secret MAYA_PY with the absolute path to mayapy, e.g.
+#      /usr/autodesk/maya2025/bin/mayapy
+#      or C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe
+#   3. Actions -> Maya integration -> Run workflow
+#      Optional workflow input `mayapy_path` overrides the secret for one run.
+#
+# Local equivalent:
+#   mayapy -m pip install -e ".[dev]"
+#   mayapy -m pytest tests/integration -v
+#
+# See docs/MAYA_INSTALL.md for full install and CI notes.
+
+name: Maya integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      mayapy_path:
+        description: Optional absolute path to mayapy (overrides MAYA_PY secret)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  maya-integration:
+    name: Integration tests via mayapy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve mayapy path
+        id: mayapy
+        env:
+          MAYA_PY_SECRET: ${{ secrets.MAYA_PY }}
+        run: |
+          candidate="${{ inputs.mayapy_path }}"
+          if [ -z "$candidate" ]; then
+            candidate="$MAYA_PY_SECRET"
+          fi
+
+          if [ -z "$candidate" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Maya integration skipped: set MAYA_PY repository secret or workflow input mayapy_path."
+            exit 0
+          fi
+
+          if [ ! -x "$candidate" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Maya integration skipped: mayapy not found or not executable at: $candidate"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "path=$candidate" >> "$GITHUB_OUTPUT"
+          echo "Using mayapy: $candidate"
+
+      - name: Install package into Maya Python
+        if: steps.mayapy.outputs.skip != 'true'
+        run: |
+          "${{ steps.mayapy.outputs.path }}" -m pip install --upgrade pip
+          "${{ steps.mayapy.outputs.path }}" -m pip install -e ".[dev]"
+
+      - name: Run integration tests with mayapy
+        if: steps.mayapy.outputs.skip != 'true'
+        run: |
+          "${{ steps.mayapy.outputs.path }}" -m pytest tests/integration -v
+
+      - name: Report graceful skip
+        if: steps.mayapy.outputs.skip == 'true'
+        run: |
+          echo "::notice title=Maya integration skipped::No usable mayapy path. Default public CI in ci.yml remains Maya-free. Configure MAYA_PY on a self-hosted runner with Maya, then re-run this workflow."

@@ -325,7 +325,7 @@ Expected behavior:
 
 ## Current Development Status
 
-v0.1 MVP is implemented: core rule engine, Maya scanner, snapshot enrichment, dockable UI, headless CLI, packaged profiles, waiver sidecars, JSON/HTML reports, shader manifest export, and safe-fix queue. Optional Maya integration tests remain local-only; public CI runs pure Python unit tests.
+v0.1 MVP is implemented: core rule engine, Maya scanner, snapshot enrichment, dockable UI, headless CLI, packaged profiles, waiver sidecars, JSON/HTML reports, shader manifest export, and safe-fix queue. Public CI runs pure Python tests; optional `mayapy` integration is documented in [`MAYA_INSTALL.md`](MAYA_INSTALL.md).
 
 See also:
 
