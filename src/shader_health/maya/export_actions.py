@@ -12,7 +12,12 @@ from shader_health.maya.scanner import scan_scene
 from shader_health.reports import write_json_report
 from shader_health.reports.fix_plan_export import write_fix_plan_export
 from shader_health.reports.html_report import write_html_report
-from shader_health.reports.manifest import write_shader_manifest
+from shader_health.reports.manifest import build_shader_manifest, write_shader_manifest
+from shader_health.reports.manifest_diff_cli import (
+    ManifestDiffInputError,
+    load_manifest_json,
+    write_manifest_diff_outputs,
+)
 
 SnapshotProvider = Callable[[], GraphSnapshot]
 
@@ -96,6 +101,56 @@ def export_fix_plan(
         profile_id=profile_id,
     )
     return _result("export_fix_plan", written_path, "Fix plan exported.")
+
+
+def export_manifest_diff(
+    baseline_manifest_path: str | Path,
+    *,
+    json_path: Optional[str | Path] = None,
+    html_path: Optional[str | Path] = None,
+    snapshot: Optional[GraphSnapshot] = None,
+    snapshot_provider: Optional[SnapshotProvider] = None,
+) -> ExportActionResult:
+    """Export JSON and HTML diffs between a baseline manifest and the current scene."""
+
+    export_snapshot = _snapshot(snapshot, snapshot_provider)
+    try:
+        old_manifest = load_manifest_json(Path(baseline_manifest_path))
+    except ManifestDiffInputError as exc:
+        return ExportActionResult(
+            action="export_manifest_diff",
+            path=str(baseline_manifest_path),
+            succeeded=False,
+            message=str(exc),
+        )
+
+    new_manifest = build_shader_manifest(export_snapshot)
+    output_json_path = _output_path(
+        json_path,
+        export_snapshot,
+        suffix="manifest_diff",
+        extension="json",
+    )
+    output_html_path = (
+        Path(html_path)
+        if html_path is not None
+        else output_json_path.with_suffix(".html")
+    )
+    write_manifest_diff_outputs(
+        old_manifest,
+        new_manifest,
+        json_path=output_json_path,
+        html_path=output_html_path,
+    )
+    return ExportActionResult(
+        action="export_manifest_diff",
+        path=str(output_json_path),
+        succeeded=True,
+        message=(
+            "Manifest diff exported. "
+            f"JSON: {output_json_path.name} HTML: {output_html_path.name}"
+        ),
+    )
 
 
 def _snapshot(

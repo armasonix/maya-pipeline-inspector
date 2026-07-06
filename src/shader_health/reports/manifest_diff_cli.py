@@ -85,6 +85,25 @@ def execute_manifest_diff(
     return EXIT_OK
 
 
+def write_manifest_diff_outputs(
+    old_manifest: Mapping[str, Any],
+    new_manifest: Mapping[str, Any],
+    *,
+    json_path: Path,
+    html_path: Path,
+) -> JsonDict:
+    """Write JSON and HTML manifest diff artifacts and return the diff payload."""
+
+    diff_payload = build_manifest_diff(old_manifest, new_manifest)
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(
+        dumps_manifest_diff(old_manifest, new_manifest),
+        encoding="utf-8",
+    )
+    write_html_manifest_diff(html_path, diff_payload)
+    return diff_payload
+
+
 def load_manifest_json(path: Path) -> JsonDict:
     if not path.is_file():
         raise ManifestDiffInputError(f"Manifest file does not exist: {path}")

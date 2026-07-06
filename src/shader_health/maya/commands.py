@@ -174,6 +174,22 @@ def export_fix_plan_action(path: Optional[str] = None) -> Any:
     return _export_fix_plan(path)
 
 
+def export_manifest_diff_action(
+    baseline_manifest_path: Optional[str] = None,
+    *,
+    json_path: Optional[str] = None,
+    html_path: Optional[str] = None,
+) -> Any:
+    """Export manifest diff artifacts against a user-selected baseline manifest."""
+
+    return _export_manifest_diff_with_snapshot(
+        None,
+        baseline_manifest_path=baseline_manifest_path,
+        json_path=json_path,
+        html_path=html_path,
+    )
+
+
 def install_menu(parent: Optional[str] = None) -> str:
     """Install Maya menu entries that open and close the dockable panel."""
 
@@ -356,6 +372,60 @@ def _export_fix_plan(path: Optional[str]) -> Any:
     return _runtime_result(result.action, Path(result.path), result.message)
 
 
+def _export_manifest_diff_with_snapshot(
+    snapshot: Any,
+    *,
+    baseline_manifest_path: Optional[str] = None,
+    json_path: Optional[str] = None,
+    html_path: Optional[str] = None,
+) -> Any:
+    from shader_health.maya import export_actions
+
+    baseline_path = baseline_manifest_path or _pick_baseline_manifest_json()
+    if not baseline_path:
+        return SimpleNamespace(
+            action="export_manifest_diff",
+            path="",
+            succeeded=False,
+            message="Manifest diff export cancelled.",
+        )
+
+    if snapshot is not None:
+        result = export_actions.export_manifest_diff(
+            baseline_path,
+            json_path=json_path,
+            html_path=html_path,
+            snapshot=snapshot,
+        )
+    else:
+        validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
+        result = export_actions.export_manifest_diff(
+            baseline_path,
+            json_path=json_path,
+            html_path=html_path,
+            snapshot=validation.snapshot,
+        )
+    return _runtime_result(
+        result.action,
+        Path(result.path) if result.path else Path("."),
+        result.message,
+        succeeded=result.succeeded,
+    )
+
+
+def _pick_baseline_manifest_json() -> Optional[str]:
+    cmds = _maya_cmds()
+    selected = cmds.fileDialog2(
+        fileMode=1,
+        caption="Select Baseline Shader Manifest",
+        fileFilter="JSON Manifest (*.json)",
+        okCaption="Select",
+    )
+    if not selected:
+        return None
+    return str(selected[0])
+
+
 def _runtime_output_path(
     path: Optional[str],
     scene_path: str,
@@ -383,11 +453,11 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _runtime_result(action: str, path: Path, message: str) -> Any:
+def _runtime_result(action: str, path: Path, message: str, *, succeeded: bool = True) -> Any:
     return SimpleNamespace(
         action=action,
         path=str(path),
-        succeeded=True,
+        succeeded=succeeded,
         message=message,
     )
 
