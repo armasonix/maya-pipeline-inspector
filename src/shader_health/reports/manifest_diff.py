@@ -58,6 +58,7 @@ def build_manifest_diff(
         for key in sorted(old_keys.intersection(new_keys))
         if _item_changes(old_items[key], new_items[key])
     ]
+    fingerprint_changes = _fingerprint_change_count(changed_entries)
 
     return {
         "manifest_diff_schema_version": MANIFEST_DIFF_SCHEMA_VERSION,
@@ -69,11 +70,16 @@ def build_manifest_diff(
             "new": len(new_entries),
             "resolved": len(resolved_entries),
             "changed": len(changed_entries),
+            "fingerprint_changes": fingerprint_changes,
         },
         "issues": {
             "new": new_entries,
             "resolved": resolved_entries,
             "changed": changed_entries,
+        },
+        "regression": {
+            "fingerprint_drift_detected": fingerprint_changes > 0,
+            "manifest_regression_blocked": False,
         },
     }
 
@@ -210,3 +216,12 @@ def _json_safe(value: JsonValue) -> JsonValue:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return str(value)
+
+
+def _fingerprint_change_count(changed_entries: list[JsonDict]) -> int:
+    count = 0
+    for entry in changed_entries:
+        for change in entry.get("changes", ()):
+            if isinstance(change, Mapping) and change.get("field") == "graph_fingerprint":
+                count += 1
+    return count
