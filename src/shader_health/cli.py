@@ -15,6 +15,12 @@ from shader_health.maya.validation_pipeline import (
 )
 from shader_health.reports import write_json_report
 from shader_health.reports.fix_plan_export import write_fix_plan_export
+from shader_health.reports.manifest_diff_cli import (
+    EXIT_INPUT_ERROR as DIFF_EXIT_INPUT_ERROR,
+)
+from shader_health.reports.manifest_diff_cli import (
+    execute_manifest_diff,
+)
 
 EXIT_OK = 0
 EXIT_PUBLISH_BLOCK = 1
@@ -32,6 +38,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "validate":
         return validate_command(args)
+    if args.command == "diff":
+        return diff_command(args)
     parser.print_help()
     return EXIT_CONFIG_ERROR
 
@@ -77,6 +85,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--export-fix-plan",
         help="Optional output path for a deterministic fix plan JSON export.",
     )
+    diff = subparsers.add_parser(
+        "diff",
+        help="Compare two shader manifest JSON files.",
+    )
+    diff.add_argument("old_manifest", help="Baseline manifest JSON path.")
+    diff.add_argument("new_manifest", help="Current manifest JSON path.")
+    diff.add_argument(
+        "--out",
+        help="Optional output JSON diff path. Defaults to stdout when omitted.",
+    )
+    diff.add_argument(
+        "--html",
+        help="Optional output HTML diff report path.",
+    )
     return parser
 
 
@@ -109,6 +131,18 @@ def validate_command(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"Runtime error: {exc}", file=sys.stderr)
         return EXIT_RUNTIME_ERROR
+
+
+def diff_command(args: argparse.Namespace) -> int:
+    exit_code = execute_manifest_diff(
+        Path(args.old_manifest),
+        Path(args.new_manifest),
+        out_path=_optional_path(args.out),
+        html_path=_optional_path(args.html),
+    )
+    if exit_code == DIFF_EXIT_INPUT_ERROR:
+        return EXIT_CONFIG_ERROR
+    return exit_code
 
 
 def _rule_root_path(value: Optional[str]) -> Optional[Path]:
