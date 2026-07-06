@@ -1,6 +1,11 @@
 {
   "id": "publish_strict",
   "display_name": "Publish Strict",
+  "manifest_diff_policy": {
+    "max_new_changes": 0,
+    "max_fingerprint_changes": 0,
+    "block_on_new_textures": true
+  },
   "rule_overrides": {
     "vray.scene.plugin_missing.error": {
       "block_publish": true
