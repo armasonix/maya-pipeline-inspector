@@ -3,12 +3,15 @@ import pytest
 from shader_health.core import (
     FileDependencySnapshot,
     GraphSnapshot,
+    MaterialSnapshot,
     NodeSnapshot,
     RuleDefinition,
     RuleFix,
     RulePolicy,
     RuleSchemaError,
     ValidationEngine,
+    VrayMaterialMetadata,
+    VraySceneMetadata,
     summarize_results,
 )
 
@@ -327,3 +330,84 @@ def test_passed_result_never_blocks_even_when_rule_policy_blocks():
     assert summary.block_publish is False
     assert summary.block_deadline is False
 
+
+def test_validation_engine_reads_nested_enrichment_attributes():
+    rule = RuleDefinition.from_dict(
+        {
+            **make_rule_data(
+                rule_id="vray.material.displacement_review.warning",
+                severity="warning",
+                scope="material",
+                auto_fix=False,
+            ),
+            "renderer": ["vray"],
+            "match": {"node_type": ["VRayMtl"]},
+            "check": {
+                "type": "attribute_equals",
+                "attribute": "vray_metadata.displacement_linked",
+                "expected": False,
+            },
+            "policy": {
+                "block_publish": False,
+                "block_deadline": False,
+                "waiver_allowed": True,
+                "auto_fix_allowed": False,
+            },
+        }
+    )
+    snapshot = GraphSnapshot(
+        scene_path="demo.ma",
+        renderer="vray",
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+                vray_metadata=VrayMaterialMetadata(displacement_linked=True),
+            )
+        ],
+    )
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "failed"
+    assert result.plug == "vray_metadata.displacement_linked"
+
+
+def test_validation_engine_reads_nested_scene_enrichment_attributes():
+    rule = RuleDefinition.from_dict(
+        {
+            **make_rule_data(
+                rule_id="vray.scene.plugin_missing.error",
+                severity="error",
+                scope="scene",
+                auto_fix=False,
+            ),
+            "renderer": ["vray"],
+            "match": {"vray_scene_metadata.has_vray_materials": True},
+            "check": {
+                "type": "attribute_equals",
+                "attribute": "vray_scene_metadata.has_vray_plugin",
+                "expected": True,
+            },
+            "policy": {
+                "block_publish": False,
+                "block_deadline": False,
+                "waiver_allowed": True,
+                "auto_fix_allowed": False,
+            },
+        }
+    )
+    snapshot = GraphSnapshot(
+        scene_path="demo.ma",
+        renderer="vray",
+        vray_scene_metadata=VraySceneMetadata(
+            has_vray_materials=True,
+            vray_material_count=1,
+        ),
+    )
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "failed"
+    assert result.current_value is False

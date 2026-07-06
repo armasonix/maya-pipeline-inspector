@@ -758,10 +758,12 @@ class ValidationEngine:
 
     def _read_value(self, target: _TargetContext, key: str) -> Any:
         obj = target.obj
-        if isinstance(obj, NodeSnapshot) and key in obj.attrs:
+        if isinstance(obj, NodeSnapshot) and "." not in key and key in obj.attrs:
             return obj.attrs[key]
         if isinstance(obj, GraphSnapshot) and key == "renderer_family":
             return obj.renderer
+        if "." in key:
+            return _read_nested_value(obj, key)
         if hasattr(obj, key):
             return getattr(obj, key)
         return None
@@ -927,6 +929,20 @@ def _identifier_candidates(value: Optional[str]) -> set[str]:
     if not normalized:
         return set()
     return {normalized, normalized.rsplit(":", 1)[-1]}
+
+
+def _read_nested_value(obj: object, key: str) -> Any:
+    current: Any = obj
+    for part in key.split("."):
+        if current is None:
+            return None
+        if isinstance(current, NodeSnapshot) and part in current.attrs:
+            return current.attrs[part]
+        if hasattr(current, part):
+            current = getattr(current, part)
+        else:
+            return None
+    return current
 
 
 def _as_string_list(value: Any) -> list[str]:

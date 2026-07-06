@@ -9,6 +9,43 @@ from tests.integration.fixtures import arnold_scene_snapshot, broken_scene_snaps
 from shader_health.maya.validation_pipeline import run_validation
 
 
+def test_vray_renderer_pack_flags_missing_plugin_node(tmp_path: Path):
+    snapshot = broken_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
+
+    failed = next(
+        item
+        for item in run.results
+        if item.rule_id == "vray.scene.plugin_missing.error" and item.status == "failed"
+    )
+    assert failed.current_value is False
+
+
+def test_vray_renderer_pack_flags_displacement_review_material(tmp_path: Path):
+    snapshot = broken_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
+
+    failed = [
+        item
+        for item in run.results
+        if item.rule_id == "vray.material.displacement_review.warning" and item.status == "failed"
+    ]
+    assert failed
+    assert failed[0].material == "demo_displacement_MTL"
+
+
+def test_publish_strict_profile_blocks_on_vray_plugin_rule(tmp_path: Path):
+    snapshot = broken_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="publish_strict", scan_scope="scene")
+
+    failed = next(
+        item
+        for item in run.results
+        if item.rule_id == "vray.scene.plugin_missing.error" and item.status == "failed"
+    )
+    assert failed.block_publish is True
+
+
 def test_vray_renderer_pack_flags_untextured_material(tmp_path: Path):
     snapshot = broken_scene_snapshot(tmp_path)
     run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
@@ -59,3 +96,7 @@ def test_renderer_rules_are_loaded_for_matching_renderer(tmp_path: Path):
     rule_ids = {rule.id for rule in run.rules}
     assert "vray.material.untextured.info" in rule_ids
     assert "vray.material.displacement_linked.info" in rule_ids
+    assert "vray.scene.plugin_missing.error" in rule_ids
+    assert "vray.material.displacement_review.warning" in rule_ids
+    assert "vray.material.texture_budget.warning" in rule_ids
+    assert "vray.material.trace_depth.warning" in rule_ids
