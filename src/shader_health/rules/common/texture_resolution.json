@@ -1,0 +1,85 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.resolution.hero.max",
+      "name": "Hero texture resolution budget",
+      "enabled": false,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Hero texture exceeds the configured resolution budget.",
+      "why": "Oversized hero textures increase memory pressure and farm render times without proportional quality gains.",
+      "match": {
+        "dependency_kind": "texture",
+        "exists": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "max_dimension",
+        "max": 8192
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.resolution.prop.max",
+      "name": "Prop texture resolution budget",
+      "enabled": false,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Prop texture exceeds the configured resolution budget.",
+      "why": "Prop assets should stay within tiered texture budgets so publish gates remain predictable across asset classes.",
+      "match": {
+        "dependency_kind": "texture",
+        "exists": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "max_dimension",
+        "max": 4096
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.resolution.background.max",
+      "name": "Background texture resolution budget",
+      "enabled": false,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Background texture exceeds the configured resolution budget.",
+      "why": "Background assets can use lower resolution tiers to keep scene memory and IO costs manageable.",
+      "match": {
+        "dependency_kind": "texture",
+        "exists": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "max_dimension",
+        "max": 2048
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

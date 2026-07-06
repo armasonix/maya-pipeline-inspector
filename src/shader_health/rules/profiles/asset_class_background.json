@@ -1,0 +1,20 @@
+{
+  "id": "asset_class_background",
+  "display_name": "Asset Class Background",
+  "manifest_diff_policy": {
+    "max_new_changes": 1,
+    "max_fingerprint_changes": 2,
+    "block_on_new_textures": false
+  },
+  "rule_overrides": {
+    "common.texture.resolution.hero.max": {
+      "enabled": false
+    },
+    "common.texture.resolution.prop.max": {
+      "enabled": false
+    },
+    "common.texture.resolution.background.max": {
+      "enabled": true
+    }
+  }
+}
