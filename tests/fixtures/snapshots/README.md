@@ -10,6 +10,8 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `arnold_policy_scene.json` | `arnold_policy_scene.expectations.json` | Arnold | Production policy failures (plugin, displacement, transmission depth, stand-in) |
 | `vray_material_policy.json` | — | V-Ray | Enrichment round-trip unit test |
 | `arnold_material_policy.json` | — | Arnold | Enrichment round-trip unit test |
+| `texture_freshness_outdated.json` | — | Common | Texture version freshness fail (`v001` vs latest `v003`) |
+| `texture_freshness_latest.json` | — | Common | Texture version freshness pass (`v003` is latest) |
 
 ## Adding a renderer fixture case
 

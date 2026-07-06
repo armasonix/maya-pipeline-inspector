@@ -4,10 +4,11 @@ import copy
 import json
 from pathlib import Path
 
+from shader_health import cli
 from shader_health.reports.manifest_diff import (
+    MANIFEST_DIFF_SCHEMA_VERSION,
     build_manifest_diff,
     dumps_manifest_diff,
-    MANIFEST_DIFF_SCHEMA_VERSION,
 )
 from tools.diff_manifests import main as diff_manifests_main
 
@@ -161,3 +162,79 @@ def test_manifest_diff_command_writes_json_output(tmp_path: Path):
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert payload["manifest_diff_schema_version"] == MANIFEST_DIFF_SCHEMA_VERSION
     assert payload["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+
+
+def test_shader_health_diff_cli_writes_json_to_stdout(tmp_path: Path, capsys):
+    old_path = tmp_path / "old_manifest.json"
+    new_path = tmp_path / "new_manifest.json"
+    old_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
+    new_path.write_text(json.dumps(new_manifest()), encoding="utf-8")
+
+    exit_code = cli.main(["diff", str(old_path), str(new_path)])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert exit_code == cli.EXIT_OK
+    assert payload["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+    assert captured.err == ""
+
+
+def test_shader_health_diff_cli_writes_json_and_html_outputs(tmp_path: Path):
+    old_path = tmp_path / "old_manifest.json"
+    new_path = tmp_path / "new_manifest.json"
+    out_path = tmp_path / "diff" / "manifest_diff.json"
+    html_path = tmp_path / "diff" / "manifest_diff.html"
+    old_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
+    new_path.write_text(json.dumps(new_manifest()), encoding="utf-8")
+
+    exit_code = cli.main(
+        [
+            "diff",
+            str(old_path),
+            str(new_path),
+            "--out",
+            str(out_path),
+            "--html",
+            str(html_path),
+        ]
+    )
+
+    assert exit_code == cli.EXIT_OK
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    html = html_path.read_text(encoding="utf-8")
+    assert payload["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+    assert html.startswith("<!doctype html>")
+    assert "Maya Shader Health Manifest Diff" in html
+    assert "file_roughness" in html
+
+
+def test_shader_health_diff_cli_returns_config_error_for_missing_manifest(
+    tmp_path: Path,
+    capsys,
+):
+    old_path = tmp_path / "old_manifest.json"
+    new_path = tmp_path / "missing_manifest.json"
+    old_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
+
+    exit_code = cli.main(["diff", str(old_path), str(new_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == cli.EXIT_CONFIG_ERROR
+    assert "Input error:" in captured.err
+    assert "does not exist" in captured.err
+
+
+def test_shader_health_diff_cli_returns_config_error_for_invalid_json(
+    tmp_path: Path,
+    capsys,
+):
+    old_path = tmp_path / "old_manifest.json"
+    new_path = tmp_path / "new_manifest.json"
+    old_path.write_text("{not-json", encoding="utf-8")
+    new_path.write_text(json.dumps(new_manifest()), encoding="utf-8")
+
+    exit_code = cli.main(["diff", str(old_path), str(new_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == cli.EXIT_CONFIG_ERROR
+    assert "Invalid JSON" in captured.err

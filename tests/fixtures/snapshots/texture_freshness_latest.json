@@ -1,0 +1,55 @@
+{
+  "connections": [],
+  "file_dependencies": [
+    {
+      "attr": "fileTextureName",
+      "exists": true,
+      "extension": ".exr",
+      "is_udim": true,
+      "latest_version": "003",
+      "missing_udim_tiles": [],
+      "node_id": "node:file_albedo",
+      "raw_path": "$ASSET_ROOT/tex/albedo_v003.<UDIM>.exr",
+      "resolved_path": "D:/show/assets/tex/albedo_v003.<UDIM>.exr",
+      "udim_tiles": [1001, 1002, 1003],
+      "version": "003"
+    }
+  ],
+  "materials": [
+    {
+      "graph_depth": 1,
+      "graph_fingerprint": "",
+      "graph_node_count": 2,
+      "name": "hero_mtl",
+      "node_id": "node:hero_mtl",
+      "renderer_family": "vray",
+      "shading_engines": ["node:hero_sg"],
+      "texture_nodes": ["node:file_albedo"],
+      "type_name": "VRayMtl"
+    }
+  ],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {
+        "fileTextureName": "$ASSET_ROOT/tex/albedo_v003.<UDIM>.exr"
+      },
+      "classification": ["texture", "file"],
+      "full_name": "file_albedo",
+      "id": "node:file_albedo",
+      "locked": false,
+      "name": "file_albedo",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "file"
+    }
+  ],
+  "references": [],
+  "renderer": "vray",
+  "scan_scope": "scene",
+  "scene_path": "D:/show/assets/hero/shading/hero.ma",
+  "scanned_at_utc": "2026-07-06T08:00:00Z",
+  "shading_engines": []
+}

@@ -672,6 +672,8 @@ def _latest_texture_version(path: str) -> Optional[str]:
         return current_version
 
     for child in children:
+        if not child.is_file():
+            continue
         child_match = version_pattern.match(child.name)
         if child_match:
             versions.append(child_match.group("version"))

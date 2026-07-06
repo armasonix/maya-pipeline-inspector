@@ -1,4 +1,6 @@
 import logging
+from pathlib import Path
+from typing import Any
 
 from shader_health.core import GraphSnapshot
 from shader_health.maya import ScanOptions, scan_scene, scan_selection
@@ -279,6 +281,30 @@ def test_scan_scene_collects_file_texture_dependencies(tmp_path, monkeypatch):
     assert roughness.missing_udim_tiles == []
     assert roughness.version == "001"
     assert roughness.latest_version == "001"
+
+
+def test_scan_scene_skips_texture_version_when_filename_has_no_version_token(
+    tmp_path: Path,
+    monkeypatch: Any,
+):
+    asset_root = tmp_path / "assets"
+    tex_root = asset_root / "tex"
+    tex_root.mkdir(parents=True)
+    (tex_root / "albedo.1001.exr").write_bytes(b"albedo-1001")
+    (tex_root / "albedo.1002.exr").write_bytes(b"albedo-1002")
+
+    monkeypatch.setenv("ASSET_ROOT", str(asset_root).replace("\\", "/"))
+
+    cmds = FakeCmds()
+    cmds.attrs["char_demo:file_albedo.fileTextureName"] = "$ASSET_ROOT/tex/albedo.<UDIM>.exr"
+
+    snapshot = scan_scene(cmds_module=cmds)
+    albedo = {item.node_id: item for item in snapshot.file_dependencies}[
+        "node:char_demo:file_albedo"
+    ]
+
+    assert albedo.version is None
+    assert albedo.latest_version is None
 
 
 def test_scan_options_can_skip_file_dependency_collection():

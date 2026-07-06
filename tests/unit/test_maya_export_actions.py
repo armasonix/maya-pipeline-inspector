@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+from tests.unit.test_manifest_diff_command import old_manifest
+
 from shader_health.core import GraphSnapshot
 from shader_health.maya import commands, export_actions
+from shader_health.reports.manifest import build_shader_manifest
 from shader_health.ui import main_window
 
 
@@ -105,6 +108,67 @@ def test_export_json_report_uses_scene_based_default_path(tmp_path: Path):
     assert Path(result.path) == tmp_path / "asset_shading_shader_health_report.json"
 
 
+def test_export_manifest_diff_writes_json_and_html_outputs(tmp_path: Path):
+    baseline_path = tmp_path / "baseline_manifest.json"
+    baseline_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
+    snapshot = make_snapshot(str(tmp_path / "asset_shading.ma"))
+    json_path = tmp_path / "manifest_diff.json"
+    html_path = tmp_path / "manifest_diff.html"
+
+    result = export_actions.export_manifest_diff(
+        baseline_path,
+        json_path=json_path,
+        html_path=html_path,
+        snapshot=snapshot,
+    )
+
+    assert result.succeeded is True
+    assert result.action == "export_manifest_diff"
+    assert Path(result.path) == json_path
+    assert json.loads(json_path.read_text(encoding="utf-8"))["summary"]["changed"] >= 0
+    html = html_path.read_text(encoding="utf-8")
+    assert "Maya Shader Health Manifest Diff" in html
+
+
+def test_export_manifest_diff_uses_scene_based_default_paths(tmp_path: Path):
+    baseline_path = tmp_path / "baseline_manifest.json"
+    baseline_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
+    scene_path = tmp_path / "asset_shading.ma"
+
+    result = export_actions.export_manifest_diff(
+        baseline_path,
+        snapshot=make_snapshot(str(scene_path)),
+    )
+
+    assert result.succeeded is True
+    assert Path(result.path) == tmp_path / "asset_shading_shader_health_manifest_diff.json"
+    assert (tmp_path / "asset_shading_shader_health_manifest_diff.html").is_file()
+
+
+def test_export_manifest_diff_reports_invalid_baseline(tmp_path: Path):
+    missing_baseline = tmp_path / "missing_baseline.json"
+
+    result = export_actions.export_manifest_diff(
+        missing_baseline,
+        snapshot=make_snapshot(str(tmp_path / "asset_shading.ma")),
+    )
+
+    assert result.succeeded is False
+    assert result.action == "export_manifest_diff"
+    assert "does not exist" in result.message
+
+
+def test_export_manifest_diff_does_not_mutate_scene_snapshot(tmp_path: Path):
+    baseline_path = tmp_path / "baseline_manifest.json"
+    baseline_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
+    snapshot = make_snapshot(str(tmp_path / "asset_shading.ma"))
+    before = build_shader_manifest(snapshot)
+
+    export_actions.export_manifest_diff(baseline_path, snapshot=snapshot)
+
+    assert build_shader_manifest(snapshot) == before
+
+
 def test_export_command_wrappers_delegate(monkeypatch: Any):
     calls: list[tuple[str, Optional[str]]] = []
     result = export_actions.ExportActionResult("action", "path", True, "ok")
@@ -129,16 +193,23 @@ def test_export_command_wrappers_delegate(monkeypatch: Any):
         "_export_fix_plan",
         lambda path: calls.append(("fix_plan", path)) or result,
     )
+    monkeypatch.setattr(
+        commands,
+        "_export_manifest_diff_with_snapshot",
+        lambda snapshot, **kwargs: calls.append(("manifest_diff", snapshot)) or result,
+    )
 
     assert commands.export_json_report_action("report.json") is result
     assert commands.export_html_report_action("report.html") is result
     assert commands.export_shader_manifest_action("manifest.json") is result
     assert commands.export_fix_plan_action("fix_plan.json") is result
+    assert commands.export_manifest_diff_action("baseline.json") is result
     assert calls == [
         ("json", "report.json"),
         ("html", "report.html"),
         ("manifest", "manifest.json"),
         ("fix_plan", "fix_plan.json"),
+        ("manifest_diff", None),
     ]
 
 
@@ -206,6 +277,7 @@ def test_export_buttons_connect_to_callbacks():
         on_export_json=lambda: calls.append("json"),
         on_export_html=lambda: calls.append("html"),
         on_export_manifest=lambda: calls.append("manifest"),
+        on_export_manifest_diff=lambda: calls.append("manifest_diff"),
         on_export_fix_plan=lambda: calls.append("fix_plan"),
     )
 
@@ -214,8 +286,9 @@ def test_export_buttons_connect_to_callbacks():
     _find(widget, main_window.EXPORT_JSON_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_HTML_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_MANIFEST_BUTTON_OBJECT_NAME).clicked.emit()
+    _find(widget, main_window.EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME).clicked.emit()
-    assert calls == ["json", "html", "manifest", "fix_plan"]
+    assert calls == ["json", "html", "manifest", "manifest_diff", "fix_plan"]
 
 
 def _find(widget: Any, object_name: str) -> Any:

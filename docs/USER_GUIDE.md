@@ -10,7 +10,7 @@ The v0.1 MVP validates:
 
 - missing texture files;
 - local or unsafe texture paths;
-- stale texture versions;
+- stale texture versions (filesystem sibling scan only; see [Texture version freshness](#texture-version-freshness));
 - broken UDIM tile sets;
 - wrong color space on data maps;
 - risky displacement setups;
@@ -18,6 +18,14 @@ The v0.1 MVP validates:
 - duplicate or orphan material networks;
 - basic renderer compatibility;
 - Deadline preflight safety.
+
+## Texture version freshness
+
+Rule `common.texture.version.latest` compares the `v###` token in a texture filename against the highest numeric sibling found in the same folder on disk (for example `albedo_v001.<UDIM>.exr` vs `albedo_v003.<UDIM>.exr` in the same directory).
+
+**v0.2 limitation:** version detection is filesystem-based only. Shader Health Inspector does not query a publish database, asset management system, or shot-level version registry. If the latest approved texture lives on another path, branch, or storage tier, the rule may report a false pass or false fail.
+
+The check is skipped when the filename has no `v###` version token or when the scanner cannot resolve version metadata from the path.
 
 ## Main User Roles
 
