@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from shader_health import cli
+from shader_health.core.fix_audit import load_fix_audit_sidecar
 from shader_health.core.fix_plan import FixAction, FixPlan, fix_plan_from_export
 from shader_health.maya.fix_applier import AppliedFixRecord, ApplyFixReport
 
@@ -328,3 +329,150 @@ def test_apply_fixes_cli_forwards_policy_flags_to_applier(tmp_path: Path, monkey
     assert exit_code == cli.EXIT_OK
     assert captured["allow_referenced"] is True
     assert captured["allow_high_risk"] is True
+
+
+def test_apply_fixes_cli_appends_fix_audit_sidecar_on_real_apply(tmp_path: Path, monkeypatch):
+    scene_path = tmp_path / "hero.ma"
+    scene_path.write_text("// scene", encoding="utf-8")
+    plan = FixPlan(
+        actions=(
+            FixAction(
+                fix_id="rule:node:set_attr",
+                rule_id="rule",
+                title="title",
+                fix_type="set_attr",
+                risk="low",
+                target_kind="node",
+                target_id="node:file1",
+                target_node="file1",
+            ),
+        )
+    )
+    fake_report = ApplyFixReport(
+        records=(
+            AppliedFixRecord(
+                fix_id="rule:node:set_attr",
+                rule_id="rule",
+                fix_type="set_attr",
+                target_node="file1",
+                target_attr="colorSpace",
+                applied=True,
+            ),
+        )
+    )
+    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_apply_fixes_in_scene", lambda *_args, **_kwargs: fake_report)
+
+    exit_code = cli.main(["apply-fixes", str(scene_path)])
+
+    audit_path = scene_path.with_name("hero.shader_health_fix_audit.json")
+    loaded = load_fix_audit_sidecar(audit_path)
+    assert exit_code == cli.EXIT_OK
+    assert len(loaded.sessions) == 1
+    assert loaded.sessions[0].applied_count == 1
+
+
+def test_apply_fixes_cli_dry_run_skips_fix_audit_sidecar(tmp_path: Path, monkeypatch):
+    scene_path = tmp_path / "hero.ma"
+    scene_path.write_text("// scene", encoding="utf-8")
+    plan = FixPlan(
+        actions=(
+            FixAction(
+                fix_id="rule:node:set_attr",
+                rule_id="rule",
+                title="title",
+                fix_type="set_attr",
+                risk="low",
+                target_kind="node",
+                target_id="node:file1",
+                target_node="file1",
+            ),
+        )
+    )
+    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+
+    exit_code = cli.main(["apply-fixes", str(scene_path), "--dry-run"])
+
+    audit_path = scene_path.with_name("hero.shader_health_fix_audit.json")
+    assert exit_code == cli.EXIT_OK
+    assert not audit_path.exists()
+
+
+def test_apply_fixes_cli_returns_publish_block_when_all_actions_blocked(
+    tmp_path: Path,
+    monkeypatch,
+):
+    scene_path = tmp_path / "scene.ma"
+    scene_path.write_text("// scene", encoding="utf-8")
+    plan = FixPlan(
+        actions=(
+            FixAction(
+                fix_id="blocked:node:set_attr",
+                rule_id="rule",
+                title="blocked",
+                fix_type="set_attr",
+                risk="high",
+                target_kind="node",
+                target_id="node:file1",
+                target_node="file1",
+                blocked=True,
+                block_reasons=["high_risk_requires_explicit_confirmation"],
+            ),
+        )
+    )
+    fake_report = ApplyFixReport(
+        records=(
+            AppliedFixRecord(
+                fix_id="blocked:node:set_attr",
+                rule_id="rule",
+                fix_type="set_attr",
+                target_node="file1",
+                target_attr="colorSpace",
+                blocked=True,
+                block_reasons=["high_risk_requires_explicit_confirmation"],
+            ),
+        )
+    )
+    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_apply_fixes_in_scene", lambda *_args, **_kwargs: fake_report)
+
+    exit_code = cli.main(["apply-fixes", str(scene_path)])
+
+    assert exit_code == cli.EXIT_PUBLISH_BLOCK
+
+
+def test_apply_fixes_cli_returns_runtime_error_when_apply_fails(tmp_path: Path, monkeypatch):
+    scene_path = tmp_path / "scene.ma"
+    scene_path.write_text("// scene", encoding="utf-8")
+    plan = FixPlan(
+        actions=(
+            FixAction(
+                fix_id="rule:node:set_attr",
+                rule_id="rule",
+                title="title",
+                fix_type="set_attr",
+                risk="low",
+                target_kind="node",
+                target_id="node:file1",
+                target_node="file1",
+            ),
+        )
+    )
+    fake_report = ApplyFixReport(
+        records=(
+            AppliedFixRecord(
+                fix_id="rule:node:set_attr",
+                rule_id="rule",
+                fix_type="set_attr",
+                target_node="file1",
+                target_attr="colorSpace",
+                message="Maya API error",
+            ),
+        )
+    )
+    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_apply_fixes_in_scene", lambda *_args, **_kwargs: fake_report)
+
+    exit_code = cli.main(["apply-fixes", str(scene_path)])
+
+    assert exit_code == cli.EXIT_RUNTIME_ERROR

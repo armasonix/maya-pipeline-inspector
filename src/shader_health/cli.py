@@ -15,6 +15,8 @@ from shader_health.core.manifest_gate import evaluate_manifest_gate
 from shader_health.core.rule_loader import load_profile
 from shader_health.maya.validation_pipeline import (
     DEFAULT_PROFILE_ID,
+    fix_audit_sidecar_path_for_scene,
+    persist_fix_apply_audit,
     run_validation,
 )
 from shader_health.reports import write_json_report
@@ -252,6 +254,14 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
             allow_high_risk=bool(args.allow_high_risk),
         )
         _write_apply_report(args.report, apply_report.to_dict())
+        audit_path, _ = persist_fix_apply_audit(
+            apply_report,
+            scene_path=str(scene_path),
+            profile_id=str(args.profile_id),
+            audit_sidecar_path=fix_audit_sidecar_path_for_scene(str(scene_path)),
+        )
+        if audit_path is not None:
+            print(f"Fix audit appended: {audit_path}")
         if apply_report.failed_count:
             return EXIT_RUNTIME_ERROR
         if apply_report.blocked_count and not apply_report.applied_count:
