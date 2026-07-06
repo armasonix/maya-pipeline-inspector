@@ -23,6 +23,7 @@ ADRs help keep these decisions visible as the codebase grows.
 | 0001 | Snapshot-first core architecture | Accepted |
 | 0002 | Renderer adapter boundary | Accepted |
 | 0003 | Safe-fix and reference-safety policy | Accepted |
+| 0004 | Headless apply-fixes policy | Accepted |
 
 ## Status Values
 
