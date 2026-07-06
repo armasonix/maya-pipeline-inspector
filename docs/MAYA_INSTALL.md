@@ -246,16 +246,32 @@ mayapy -m pip install -e ".[dev]"
 mayapy -m pytest tests/integration -v
 ```
 
+When validating v0.3 manifest automation locally, also run:
+
+```bash
+DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
+OUT_MANIFEST="/tmp/shader_health_manifest_smoke.json"
+GATE_REPORT="/tmp/shader_health_gate_smoke.json"
+
+mayapy -m shader_health manifest "$DEMO_SCENE" \
+  --out "$OUT_MANIFEST" \
+  --profile-id publish_strict
+
+mayapy -m shader_health gate "$DEMO_SCENE" "$OUT_MANIFEST" \
+  --profile-id publish_strict \
+  --out "$GATE_REPORT"
+```
+
 ### Optional GitHub Actions workflow (maintainers)
 
-The repository ships a manual workflow at [`.github/workflows/maya-integration.yml`](../.github/workflows/maya-integration.yml). It is triggered by **workflow_dispatch only** and does not run on every pull request.
+The repository ships a manual workflow at [`.github/workflows/maya-integration.yml`](../.github/workflows/maya-integration.yml). It is triggered by **workflow_dispatch only** and does not run on every pull request. When `mayapy` is available it runs the same manifest export and gate smoke steps after `tests/integration`.
 
 1. Configure a self-hosted runner with Autodesk Maya installed.
 2. Add repository secret `MAYA_PY` with the absolute path to `mayapy`.
 3. In GitHub: **Actions → Maya integration → Run workflow**.
 4. Optionally pass workflow input `mayapy_path` to override the secret for one run.
 
-When `MAYA_PY` is unset or the path is missing, the workflow exits successfully and prints a skip notice. Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Maya-free.
+When `MAYA_PY` is unset or the path is missing, the workflow exits successfully and prints a skip notice. When Maya is available, it also runs v0.3 smoke checks: `shader_health manifest` export and `shader_health gate` against the freshly exported manifest (schema 1.1, `publish_strict` profile). Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Maya-free.
 
 Local Windows example:
 
