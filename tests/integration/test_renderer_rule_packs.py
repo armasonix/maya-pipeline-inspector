@@ -1,4 +1,8 @@
-"""Integration tests for packaged renderer rule packs."""
+"""Integration tests for packaged renderer rule packs.
+
+Fixture-driven policy scenarios live in `test_renderer_policy_fixtures.py`.
+See `tests/fixtures/snapshots/README.md` for adding JSON renderer policy cases.
+"""
 
 from __future__ import annotations
 
