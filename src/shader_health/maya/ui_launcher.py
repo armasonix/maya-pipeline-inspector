@@ -141,6 +141,7 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_html=_export_html_from_ui,
         on_export_manifest=_export_manifest_from_ui,
         on_export_manifest_diff=_export_manifest_diff_from_ui,
+        on_compare_approved_manifest=_compare_approved_manifest_from_ui,
         on_export_fix_plan=_export_fix_plan_from_ui,
     )
 
@@ -185,6 +186,19 @@ def _export_manifest_diff_from_ui() -> None:
     from shader_health.maya.commands import _export_manifest_diff_with_snapshot
 
     _print_export_result(_export_manifest_diff_with_snapshot(snapshot))
+
+
+def _compare_approved_manifest_from_ui() -> None:
+    content = _active_panel_content()
+    snapshot = getattr(content, "_shader_health_snapshot", None) if content is not None else None
+    from shader_health.maya.commands import _export_manifest_diff_with_snapshot
+
+    _print_export_result(
+        _export_manifest_diff_with_snapshot(
+            snapshot,
+            prefer_approved_sidecar=True,
+        )
+    )
 
 
 def _export_fix_plan_from_ui() -> None:

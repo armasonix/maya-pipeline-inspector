@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Optional
 
 from tests.unit.test_manifest_diff_command import old_manifest
@@ -229,33 +230,33 @@ def test_export_manifest_diff_does_not_mutate_scene_snapshot(tmp_path: Path):
 
 
 def test_export_command_wrappers_delegate(monkeypatch: Any):
-    calls: list[tuple[str, Optional[str]]] = []
+    calls: list[tuple[str, Optional[str], dict[str, Any]]] = []
     result = export_actions.ExportActionResult("action", "path", True, "ok")
 
     monkeypatch.setattr(
         commands,
         "_export_json_report",
-        lambda path: calls.append(("json", path)) or result,
+        lambda path: calls.append(("json", path, {})) or result,
     )
     monkeypatch.setattr(
         commands,
         "_export_html_report",
-        lambda path: calls.append(("html", path)) or result,
+        lambda path: calls.append(("html", path, {})) or result,
     )
     monkeypatch.setattr(
         commands,
         "_export_shader_manifest",
-        lambda path: calls.append(("manifest", path)) or result,
+        lambda path: calls.append(("manifest", path, {})) or result,
     )
     monkeypatch.setattr(
         commands,
         "_export_fix_plan",
-        lambda path: calls.append(("fix_plan", path)) or result,
+        lambda path: calls.append(("fix_plan", path, {})) or result,
     )
     monkeypatch.setattr(
         commands,
         "_export_manifest_diff_with_snapshot",
-        lambda snapshot, **kwargs: calls.append(("manifest_diff", snapshot)) or result,
+        lambda snapshot, **kwargs: calls.append(("manifest_diff", snapshot, kwargs)) or result,
     )
 
     assert commands.export_json_report_action("report.json") is result
@@ -263,12 +264,32 @@ def test_export_command_wrappers_delegate(monkeypatch: Any):
     assert commands.export_shader_manifest_action("manifest.json") is result
     assert commands.export_fix_plan_action("fix_plan.json") is result
     assert commands.export_manifest_diff_action("baseline.json") is result
+    assert commands.export_manifest_diff_action(prefer_approved_sidecar=True) is result
     assert calls == [
-        ("json", "report.json"),
-        ("html", "report.html"),
-        ("manifest", "manifest.json"),
-        ("fix_plan", "fix_plan.json"),
-        ("manifest_diff", None),
+        ("json", "report.json", {}),
+        ("html", "report.html", {}),
+        ("manifest", "manifest.json", {}),
+        ("fix_plan", "fix_plan.json", {}),
+        (
+            "manifest_diff",
+            None,
+            {
+                "baseline_manifest_path": "baseline.json",
+                "json_path": None,
+                "html_path": None,
+                "prefer_approved_sidecar": False,
+            },
+        ),
+        (
+            "manifest_diff",
+            None,
+            {
+                "baseline_manifest_path": None,
+                "json_path": None,
+                "html_path": None,
+                "prefer_approved_sidecar": True,
+            },
+        ),
     ]
 
 
@@ -331,6 +352,61 @@ class FakeQtWidgets:
     QVBoxLayout = FakeVBoxLayout
 
 
+def test_approved_manifest_sidecar_path_uses_scene_sidecar(tmp_path: Path):
+    scene_path = tmp_path / "hero_shading.ma"
+    sidecar = tmp_path / "hero_shading_shader_health_manifest.json"
+    sidecar.write_text("{}", encoding="utf-8")
+    snapshot = SimpleNamespace(scene_path=str(scene_path))
+
+    resolved = commands._approved_manifest_sidecar_path(snapshot)
+
+    assert resolved == str(sidecar)
+
+
+def test_approved_manifest_sidecar_path_returns_none_when_sidecar_missing(tmp_path: Path):
+    snapshot = SimpleNamespace(scene_path=str(tmp_path / "hero_shading.ma"))
+
+    assert commands._approved_manifest_sidecar_path(snapshot) is None
+
+
+def test_export_manifest_diff_prefers_approved_sidecar_without_dialog(
+    monkeypatch: Any,
+    tmp_path: Path,
+):
+    scene_path = tmp_path / "hero_shading.ma"
+    sidecar = tmp_path / "hero_shading_shader_health_manifest.json"
+    sidecar.write_text(json.dumps(old_manifest()), encoding="utf-8")
+    snapshot = make_snapshot(str(scene_path))
+    snapshot = GraphSnapshot(
+        scene_path=str(scene_path),
+        maya_version="2025",
+        renderer="vray",
+        scan_scope="scene",
+        scanned_at_utc="2026-07-01T12:00:00Z",
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+                renderer_family="vray",
+            )
+        ],
+    )
+    def fail_dialog() -> str:
+        raise AssertionError("file picker should not open when approved sidecar exists")
+
+    monkeypatch.setattr(commands, "_pick_baseline_manifest_json", fail_dialog)
+
+    result = commands._export_manifest_diff_with_snapshot(
+        snapshot,
+        prefer_approved_sidecar=True,
+    )
+
+    assert result.succeeded is True
+    assert Path(result.path).name == "hero_shading_shader_health_manifest_diff.json"
+    assert (tmp_path / "hero_shading_shader_health_manifest_diff.html").is_file()
+
+
 def test_export_buttons_connect_to_callbacks():
     calls: list[str] = []
     callbacks = main_window.ExportActionCallbacks(
@@ -338,6 +414,7 @@ def test_export_buttons_connect_to_callbacks():
         on_export_html=lambda: calls.append("html"),
         on_export_manifest=lambda: calls.append("manifest"),
         on_export_manifest_diff=lambda: calls.append("manifest_diff"),
+        on_compare_approved_manifest=lambda: calls.append("compare_approved_manifest"),
         on_export_fix_plan=lambda: calls.append("fix_plan"),
     )
 
@@ -347,8 +424,19 @@ def test_export_buttons_connect_to_callbacks():
     _find(widget, main_window.EXPORT_HTML_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_MANIFEST_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, main_window.EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME).clicked.emit()
+    _find(
+        widget,
+        main_window.EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
+    ).clicked.emit()
     _find(widget, main_window.EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME).clicked.emit()
-    assert calls == ["json", "html", "manifest", "manifest_diff", "fix_plan"]
+    assert calls == [
+        "json",
+        "html",
+        "manifest",
+        "manifest_diff",
+        "compare_approved_manifest",
+        "fix_plan",
+    ]
 
 
 def _find(widget: Any, object_name: str) -> Any:

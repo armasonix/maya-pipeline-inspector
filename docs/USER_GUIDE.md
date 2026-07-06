@@ -326,6 +326,10 @@ Implemented report outputs:
 
 JSON reports are intended for pipeline systems. HTML reports are self-contained, modern summary pages for supervisors and TD review (health score, blocking status, severity groups, and issue tables with horizontal scroll for long rule IDs).
 
+### Compare to Approved Manifest (v0.3)
+
+Export a shader manifest beside the scene (`{scene}_shader_health_manifest.json`), then use **Compare to Approved Manifest** in the panel to diff against that sidecar without a file picker. If the sidecar is missing, the action falls back to the baseline manifest file picker (same as **Export Manifest Diff**).
+
 ## Headless Usage
 
 ```bash

@@ -36,6 +36,9 @@ EXPORT_JSON_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportJsonButton"
 EXPORT_HTML_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportHtmlButton"
 EXPORT_MANIFEST_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportManifestButton"
 EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportManifestDiffButton"
+EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME = (
+    "shaderHealthInspectorCompareApprovedManifestButton"
+)
 EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportFixPlanButton"
 VALIDATE_SCENE_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSceneButton"
 VALIDATE_SELECTION_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSelectionButton"
@@ -131,6 +134,7 @@ class ExportActionCallbacks:
     on_export_html: Optional[Callable[[], None]] = None
     on_export_manifest: Optional[Callable[[], None]] = None
     on_export_manifest_diff: Optional[Callable[[], None]] = None
+    on_compare_approved_manifest: Optional[Callable[[], None]] = None
     on_export_fix_plan: Optional[Callable[[], None]] = None
 
 
@@ -525,6 +529,15 @@ def build_export_actions(
             EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME,
             "Pick a baseline manifest JSON and export JSON/HTML diff against the current scene.",
             export_callbacks.on_export_manifest_diff,
+        )
+    )
+    layout.addWidget(
+        _button(
+            qt_widgets,
+            "Compare to Approved Manifest",
+            EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
+            "Use the approved manifest sidecar next to the scene when available.",
+            export_callbacks.on_compare_approved_manifest,
         )
     )
     layout.addWidget(

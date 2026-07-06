@@ -224,6 +224,7 @@ def export_manifest_diff_action(
     *,
     json_path: Optional[str] = None,
     html_path: Optional[str] = None,
+    prefer_approved_sidecar: bool = False,
 ) -> Any:
     """Export manifest diff artifacts against a user-selected baseline manifest."""
 
@@ -232,6 +233,7 @@ def export_manifest_diff_action(
         baseline_manifest_path=baseline_manifest_path,
         json_path=json_path,
         html_path=html_path,
+        prefer_approved_sidecar=prefer_approved_sidecar,
     )
 
 
@@ -445,10 +447,15 @@ def _export_manifest_diff_with_snapshot(
     baseline_manifest_path: Optional[str] = None,
     json_path: Optional[str] = None,
     html_path: Optional[str] = None,
+    prefer_approved_sidecar: bool = False,
 ) -> Any:
     from shader_health.maya import export_actions
 
-    baseline_path = baseline_manifest_path or _pick_baseline_manifest_json()
+    baseline_path = baseline_manifest_path
+    if baseline_path is None and prefer_approved_sidecar:
+        baseline_path = _approved_manifest_sidecar_path(snapshot)
+    if baseline_path is None:
+        baseline_path = _pick_baseline_manifest_json()
     if not baseline_path:
         return SimpleNamespace(
             action="export_manifest_diff",
@@ -491,6 +498,22 @@ def _pick_baseline_manifest_json() -> Optional[str]:
     if not selected:
         return None
     return str(selected[0])
+
+
+def _approved_manifest_sidecar_path(snapshot: Any = None) -> Optional[str]:
+    scene_path = ""
+    if snapshot is not None:
+        scene_path_value = getattr(snapshot, "scene_path", None)
+        if scene_path_value:
+            scene_path = str(scene_path_value)
+    if not scene_path:
+        scene_path = _current_scene_path()
+    if not scene_path:
+        return None
+    sidecar = _runtime_output_path(None, scene_path, "manifest", "json")
+    if sidecar.is_file():
+        return str(sidecar)
+    return None
 
 
 def _runtime_output_path(
