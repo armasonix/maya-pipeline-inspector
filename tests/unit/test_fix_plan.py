@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 from shader_health.core.fix_plan import (
+    FixAction,
     build_fix_plan,
+    fix_plan_from_export,
     project_root_from_scene,
     replace_path_prefix,
     resolve_normalize_path_value,
@@ -65,6 +67,24 @@ def test_fix_planner_skips_non_failed_results_and_rules_without_fix():
         "blocked_count": 0,
         "actions": [],
     }
+
+
+def test_fix_plan_from_export_preserves_blocked_actions():
+    action = FixAction(
+        fix_id="rule:node:set_attr",
+        rule_id="rule",
+        title="title",
+        fix_type="set_attr",
+        risk="high",
+        target_kind="node",
+        target_id="node:file1",
+        target_node="file1",
+        blocked=True,
+        block_reasons=["high_risk_requires_explicit_confirmation"],
+    )
+    plan = fix_plan_from_export({"actions": [action.to_dict()]})
+    assert plan.blocked_count == 1
+    assert plan.actions[0].blocked is True
 
 
 def test_fix_planner_includes_referenced_and_locked_status():

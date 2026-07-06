@@ -87,6 +87,34 @@ class FixAction:
             "params": dict(self.params),
         }
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> FixAction:
+        block_reasons = data.get("block_reasons", [])
+        params = data.get("params", {})
+        return cls(
+            fix_id=str(data.get("fix_id", "")),
+            rule_id=str(data.get("rule_id", "")),
+            title=str(data.get("title", "")),
+            fix_type=str(data.get("fix_type", "")),
+            risk=str(data.get("risk", "")),
+            target_kind=str(data.get("target_kind", "")),
+            target_id=str(data.get("target_id", "")),
+            target_node=str(data.get("target_node", "")),
+            target_attr=data.get("target_attr"),
+            before_value=data.get("before_value"),
+            after_value=data.get("after_value"),
+            explanation=str(data.get("explanation", "")),
+            referenced=bool(data.get("referenced", False)),
+            locked=bool(data.get("locked", False)),
+            reference_path=data.get("reference_path"),
+            requires_reference_edit=bool(data.get("requires_reference_edit", False)),
+            requires_supervisor=bool(data.get("requires_supervisor", False)),
+            undo_supported=bool(data.get("undo_supported", True)),
+            blocked=bool(data.get("blocked", False)),
+            block_reasons=list(block_reasons) if isinstance(block_reasons, list) else [],
+            params=dict(params) if isinstance(params, Mapping) else {},
+        )
+
 
 @dataclass(frozen=True)
 class FixPlan:
@@ -115,6 +143,18 @@ class FixPlan:
             "blocked_count": self.blocked_count,
             "actions": [action.to_dict() for action in self.actions],
         }
+
+
+def fix_plan_from_export(data: Mapping[str, Any]) -> FixPlan:
+    """Load a fix plan from a deterministic export JSON payload."""
+
+    raw_actions = data.get("actions", [])
+    if not isinstance(raw_actions, list):
+        raise ValueError("fix plan export actions must be a list")
+    actions = tuple(
+        FixAction.from_dict(item) for item in raw_actions if isinstance(item, Mapping)
+    )
+    return FixPlan(actions=actions)
 
 
 def build_fix_plan(
