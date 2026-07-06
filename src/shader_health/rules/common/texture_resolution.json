@@ -18,7 +18,7 @@
       "check": {
         "type": "numeric_max",
         "attribute": "max_dimension",
-        "max": 8192
+        "max": 4096
       },
       "policy": {
         "block_publish": true,
@@ -45,7 +45,7 @@
       "check": {
         "type": "numeric_max",
         "attribute": "max_dimension",
-        "max": 4096
+        "max": 2048
       },
       "policy": {
         "block_publish": true,
@@ -72,7 +72,7 @@
       "check": {
         "type": "numeric_max",
         "attribute": "max_dimension",
-        "max": 2048
+        "max": 1024
       },
       "policy": {
         "block_publish": false,
