@@ -14,7 +14,7 @@ Regardless of install method, the UI entrypoints are the same:
 | Shelf tab | `ShaderHealth` | Button: **Shader Health** — opens the dockable panel |
 | Python API | `shader_health.maya.commands` | `install_ui()`, `show_ui()`, `close_ui()`, validation and export commands |
 
-On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers a call to [`shader_health_inspector_bootstrap.install_ui()`](../maya_module/scripts/shader_health_inspector_bootstrap.py), which installs the menu and shelf for the current Maya session.
+On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers UI installation: it tries `cmds.loadPlugin("shader_health_inspector.py")` first (v0.3+), then falls back to [`shader_health_inspector_bootstrap.install_ui()`](../maya_module/scripts/shader_health_inspector_bootstrap.py) when the plugin is unavailable.
 
 ## Supported Maya versions (best-effort)
 
@@ -65,26 +65,52 @@ For a persistent studio setup, set `MAYA_MODULE_PATH` in the facility launcher, 
 [`maya_module/shader_health_inspector.mod`](../maya_module/shader_health_inspector.mod):
 
 ```text
-+ shader_health_inspector 0.1 .
++ shader_health_inspector 0.3 .
 PYTHONPATH +:= ../src
 scripts: scripts
 shelves: shelves
+plug-ins: plug-ins
 ```
 
 - `PYTHONPATH +:= ../src` adds the repository `src/` folder so `import shader_health` resolves without a separate `pip` install.
 - `scripts: scripts` puts `maya_module/scripts/` on Maya's script path so `userSetup.py` runs at startup.
 - `shelves: shelves` publishes the optional MEL shelf helper in `maya_module/shelves/`.
+- `plug-ins: plug-ins` registers the Python plugin for **Settings → Plug-in Manager** (v0.3+).
 
 ### 4. Startup behavior
 
 At Maya launch:
 
 1. Maya executes `maya_module/scripts/userSetup.py`.
-2. `userSetup.py` registers `shader_health_inspector_bootstrap.install_ui()` with `cmds.evalDeferred(...)`.
-3. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
-4. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
+2. `userSetup.py` defers `_install_shader_health_ui()`.
+3. The deferred hook tries `cmds.loadPlugin("shader_health_inspector.py", quiet=True)` first.
+4. When the plugin loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
+5. If plugin load fails (for example, module-only deployments), `userSetup.py` falls back to calling `install_ui()` directly.
+6. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
+7. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
 
 The bootstrap module also ensures the repository `src/` directory is on `sys.path` before importing `shader_health`, even if the `.mod` path is customized.
+
+## Plug-in Manager vs module-only (v0.3 dual install)
+
+| Path | Plug-in Manager | Module `userSetup` |
+| --- | --- | --- |
+| Dual install (recommended v0.3+) | Load/unload `shader_health_inspector` | Tries `loadPlugin` on startup |
+| Module-only (backward compatible) | Plugin not loaded | Direct `install_ui()` fallback |
+
+### Plug-in Manager workflow
+
+1. Ensure `MAYA_MODULE_PATH` points at `maya_module/` (see Option A above).
+2. Open **Settings → Plug-in Manager**.
+3. Enable **Loaded** for `shader_health_inspector.py` (vendor: Shader Health Inspector).
+4. Confirm the **Shader Health** menu and **ShaderHealth** shelf appear.
+5. Unload the plugin to remove menu, shelf, and panel without restarting Maya.
+
+### `autoLoad` studio policy
+
+- **Manual load (default):** leave `autoLoad` off so TDs control when Shader Health UI appears.
+- **Auto load:** enable `autoLoad` in Plug-in Manager or rely on `userSetup.py`, which calls `cmds.loadPlugin(..., quiet=True)` when your facility wants the panel available in every interactive session.
+- **Farm / `mayapy`:** headless validation does **not** require plugin load; use `mayapy -m shader_health ...` instead.
 
 ### 5. Verify in Maya
 
@@ -189,14 +215,15 @@ For a `pip` install:
 mayapy -m pip uninstall maya-shader-health-inspector
 ```
 
-To remove only the current session menu/shelf:
+To remove only the current session menu/shelf/panel:
 
 ```python
-from shader_health.maya.commands import uninstall_menu, uninstall_shelf
+from shader_health.maya.commands import uninstall_ui
 
-uninstall_menu()
-uninstall_shelf()
+uninstall_ui()
 ```
+
+When using Plug-in Manager, unloading `shader_health_inspector` runs the same cleanup via `uninitializePlugin`.
 
 ## Related docs
 

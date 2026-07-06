@@ -8,6 +8,7 @@ from types import ModuleType
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_PATH = ROOT / "maya_module" / "scripts" / "shader_health_inspector_bootstrap.py"
 USER_SETUP_PATH = ROOT / "maya_module" / "scripts" / "userSetup.py"
+PLUGIN_PATH = ROOT / "maya_module" / "plug-ins" / "shader_health_inspector.py"
 
 
 def load_module(path: Path, module_name: str) -> ModuleType:
@@ -61,11 +62,36 @@ def test_bootstrap_install_ui_delegates_to_shader_health_commands(monkeypatch):
     assert calls == ["install_ui"]
 
 
+def test_bootstrap_uninstall_ui_delegates_to_shader_health_commands(monkeypatch):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_uninstall")
+    calls: list[str] = []
+
+    class FakeCommands:
+        @staticmethod
+        def uninstall_ui() -> None:
+            calls.append("uninstall_ui")
+
+        @staticmethod
+        def reset_ui_install_state() -> None:
+            calls.append("reset_ui_install_state")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "shader_health.maya.commands",
+        FakeCommands(),
+    )
+    monkeypatch.setattr(bootstrap, "_ensure_source_path", lambda: None)
+
+    bootstrap.uninstall_ui()
+
+    assert calls == ["uninstall_ui", "reset_ui_install_state"]
+
+
 def test_user_setup_import_is_harmless_outside_maya():
     load_module(USER_SETUP_PATH, "shader_health_user_setup_outside_maya")
 
 
-def test_user_setup_defers_bootstrap_install(monkeypatch):
+def test_user_setup_prefers_plugin_load(monkeypatch):
     deferred: list[str] = []
 
     class FakeCmds:
@@ -74,6 +100,51 @@ def test_user_setup_defers_bootstrap_install(monkeypatch):
             deferred.append("deferred")
             callback()
             return None
+
+        @staticmethod
+        def pluginInfo(plugin_name, query=True, loaded=True):
+            _ = plugin_name, query, loaded
+            return False
+
+        @staticmethod
+        def loadPlugin(plugin_name, quiet=True):
+            deferred.append(f"load:{plugin_name}:{quiet}")
+            return "shader_health_inspector"
+
+        @staticmethod
+        def warning(message: str):
+            _ = message
+
+    fake_maya = ModuleType("maya")
+    fake_maya.cmds = FakeCmds
+
+    monkeypatch.setitem(sys.modules, "maya", fake_maya)
+    monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
+
+    load_module(USER_SETUP_PATH, "shader_health_user_setup_plugin")
+
+    assert deferred == ["deferred", "load:shader_health_inspector.py:True"]
+
+
+def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
+    deferred: list[str] = []
+
+    class FakeCmds:
+        @staticmethod
+        def evalDeferred(callback):
+            deferred.append("deferred")
+            callback()
+            return None
+
+        @staticmethod
+        def pluginInfo(plugin_name, query=True, loaded=True):
+            _ = plugin_name, query, loaded
+            return False
+
+        @staticmethod
+        def loadPlugin(plugin_name, quiet=True):
+            _ = plugin_name, quiet
+            raise RuntimeError("plugin missing")
 
         @staticmethod
         def warning(message: str):
@@ -93,6 +164,65 @@ def test_user_setup_defers_bootstrap_install(monkeypatch):
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
     monkeypatch.setitem(sys.modules, "shader_health_inspector_bootstrap", fake_bootstrap)
 
-    load_module(USER_SETUP_PATH, "shader_health_user_setup_deferred")
+    load_module(USER_SETUP_PATH, "shader_health_user_setup_fallback")
 
     assert deferred == ["deferred", "install_ui"]
+
+
+def test_plugin_initialize_deferred_install(monkeypatch):
+    calls: list[str] = []
+
+    class FakeBootstrap:
+        @staticmethod
+        def install_ui() -> None:
+            calls.append("install_ui")
+
+    class FakeCmds:
+        @staticmethod
+        def evalDeferred(callback):
+            callback()
+
+    class FakePlugin:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+    fake_mpx = ModuleType("OpenMayaMPx")
+    fake_mpx.MFnPlugin = FakePlugin
+    fake_maya = ModuleType("maya")
+    fake_maya.cmds = FakeCmds
+
+    monkeypatch.setitem(sys.modules, "shader_health_inspector_bootstrap", FakeBootstrap())
+    monkeypatch.setitem(sys.modules, "maya", fake_maya)
+    monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
+    monkeypatch.setitem(sys.modules, "maya.OpenMayaMPx", fake_mpx)
+
+    plugin = load_module(PLUGIN_PATH, "shader_health_inspector_plugin_fresh")
+    plugin.initializePlugin(object())
+
+    assert calls == ["install_ui"]
+
+
+def test_plugin_uninitialize_calls_uninstall(monkeypatch):
+    calls: list[str] = []
+
+    class FakeBootstrap:
+        @staticmethod
+        def uninstall_ui() -> None:
+            calls.append("uninstall_ui")
+
+    class FakePlugin:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+    fake_mpx = ModuleType("OpenMayaMPx")
+    fake_mpx.MFnPlugin = FakePlugin
+    fake_maya = ModuleType("maya")
+
+    monkeypatch.setitem(sys.modules, "shader_health_inspector_bootstrap", FakeBootstrap())
+    monkeypatch.setitem(sys.modules, "maya", fake_maya)
+    monkeypatch.setitem(sys.modules, "maya.OpenMayaMPx", fake_mpx)
+
+    plugin = load_module(PLUGIN_PATH, "shader_health_inspector_plugin_uninit_fresh")
+    plugin.uninitializePlugin(object())
+
+    assert calls == ["uninstall_ui"]

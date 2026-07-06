@@ -289,11 +289,33 @@ def uninstall_shelf() -> None:
         cmds.deleteUI(SHELF_BUTTON_NAME, control=True)
 
 
+def uninstall_ui() -> None:
+    """Remove Shader Health UI entrypoints for the current session."""
+
+    close_ui(delete=True)
+    uninstall_shelf()
+    uninstall_menu()
+
+
+_UI_INSTALLED = False
+
+
 def install_ui() -> None:
     """Install all Maya UI entrypoints for the current session."""
 
+    global _UI_INSTALLED
+    if _UI_INSTALLED:
+        return
     install_menu()
     install_shelf()
+    _UI_INSTALLED = True
+
+
+def reset_ui_install_state() -> None:
+    """Reset the install guard. Intended for tests and plugin unload."""
+
+    global _UI_INSTALLED
+    _UI_INSTALLED = False
 
 
 def _validate(*, scan_scope: str, profile_id: str) -> Any:

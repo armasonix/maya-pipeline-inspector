@@ -42,6 +42,16 @@ def install_shelf() -> str:
     return _install_shelf()
 
 
+def uninstall_ui() -> None:
+    """Remove menu, shelf, and panel for plugin unload."""
+
+    _ensure_source_path()
+    from shader_health.maya.commands import reset_ui_install_state, uninstall_ui as _uninstall_ui
+
+    _uninstall_ui()
+    reset_ui_install_state()
+
+
 def install_ui() -> None:
     """Install all Maya UI entrypoints for this session."""
 
