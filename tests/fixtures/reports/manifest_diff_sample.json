@@ -1,0 +1,19 @@
+{
+  "required_sections": [
+    "Maya Shader Health Manifest Diff",
+    "Summary",
+    "Issue Groups",
+    "New (1)",
+    "Resolved (1)",
+    "Changed (2)",
+    "file_roughness",
+    "file_mask",
+    "graph_fingerprint",
+    "sha256:old_graph",
+    "sha256:new_graph",
+    "old_scene.ma",
+    "new_scene.ma",
+    "table-layout: fixed",
+    "max-width: none"
+  ]
+}
