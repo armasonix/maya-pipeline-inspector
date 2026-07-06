@@ -45,6 +45,16 @@ def _as_optional_int(value: Any) -> Optional[int]:
     return int(value)
 
 
+def _as_optional_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{label} must be a mapping, got {type(value).__name__}")
@@ -302,6 +312,80 @@ class VraySceneMetadata:
 
 
 @dataclass(frozen=True)
+class ArnoldMaterialMetadata:
+    """Arnold-specific metadata attached to a material during enrichment."""
+
+    texture_count: int = 0
+    displacement_linked: bool = False
+    specular_roughness: Optional[float] = None
+    metalness: Optional[float] = None
+    transmission_weight: Optional[float] = None
+    transmission_depth: Optional[int] = None
+    key_attrs: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "texture_count": self.texture_count,
+            "displacement_linked": self.displacement_linked,
+            "specular_roughness": self.specular_roughness,
+            "metalness": self.metalness,
+            "transmission_weight": self.transmission_weight,
+            "transmission_depth": self.transmission_depth,
+            "key_attrs": dict(self.key_attrs),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ArnoldMaterialMetadata:
+        raw_key_attrs = data.get("key_attrs", {})
+        key_attrs = dict(raw_key_attrs) if isinstance(raw_key_attrs, Mapping) else {}
+        return cls(
+            texture_count=int(data.get("texture_count", 0)),
+            displacement_linked=bool(data.get("displacement_linked", False)),
+            specular_roughness=_as_optional_float(data.get("specular_roughness")),
+            metalness=_as_optional_float(data.get("metalness")),
+            transmission_weight=_as_optional_float(data.get("transmission_weight")),
+            transmission_depth=_as_optional_int(data.get("transmission_depth")),
+            key_attrs=key_attrs,
+        )
+
+
+@dataclass(frozen=True)
+class ArnoldSceneMetadata:
+    """Arnold scene-level metadata derived from the scanned graph."""
+
+    has_arnold_plugin: bool = False
+    arnold_plugin_node_ids: list[str] = field(default_factory=list)
+    arnold_material_count: int = 0
+    has_arnold_materials: bool = False
+    stand_in_node_ids: list[str] = field(default_factory=list)
+    stand_in_count: int = 0
+    has_stand_ins: bool = False
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "has_arnold_plugin": self.has_arnold_plugin,
+            "arnold_plugin_node_ids": list(self.arnold_plugin_node_ids),
+            "arnold_material_count": self.arnold_material_count,
+            "has_arnold_materials": self.has_arnold_materials,
+            "stand_in_node_ids": list(self.stand_in_node_ids),
+            "stand_in_count": self.stand_in_count,
+            "has_stand_ins": self.has_stand_ins,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ArnoldSceneMetadata:
+        return cls(
+            has_arnold_plugin=bool(data.get("has_arnold_plugin", False)),
+            arnold_plugin_node_ids=_as_str_list(data.get("arnold_plugin_node_ids")),
+            arnold_material_count=int(data.get("arnold_material_count", 0)),
+            has_arnold_materials=bool(data.get("has_arnold_materials", False)),
+            stand_in_node_ids=_as_str_list(data.get("stand_in_node_ids")),
+            stand_in_count=int(data.get("stand_in_count", 0)),
+            has_stand_ins=bool(data.get("has_stand_ins", False)),
+        )
+
+
+@dataclass(frozen=True)
 class MaterialSnapshot:
     """Material-level summary extracted from the shader graph."""
 
@@ -317,6 +401,7 @@ class MaterialSnapshot:
     graph_depth: int = 0
     graph_fingerprint: str = ""
     vray_metadata: Optional[VrayMaterialMetadata] = None
+    arnold_metadata: Optional[ArnoldMaterialMetadata] = None
 
     def to_dict(self) -> JsonDict:
         payload: JsonDict = {
@@ -334,6 +419,8 @@ class MaterialSnapshot:
         }
         if self.vray_metadata is not None:
             payload["vray_metadata"] = self.vray_metadata.to_dict()
+        if self.arnold_metadata is not None:
+            payload["arnold_metadata"] = self.arnold_metadata.to_dict()
         return payload
 
     @classmethod
@@ -342,6 +429,10 @@ class MaterialSnapshot:
         vray_metadata = None
         if isinstance(raw_vray_metadata, Mapping):
             vray_metadata = VrayMaterialMetadata.from_dict(raw_vray_metadata)
+        raw_arnold_metadata = data.get("arnold_metadata")
+        arnold_metadata = None
+        if isinstance(raw_arnold_metadata, Mapping):
+            arnold_metadata = ArnoldMaterialMetadata.from_dict(raw_arnold_metadata)
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -355,6 +446,7 @@ class MaterialSnapshot:
             graph_depth=int(data.get("graph_depth", 0)),
             graph_fingerprint=str(data.get("graph_fingerprint", "")),
             vray_metadata=vray_metadata,
+            arnold_metadata=arnold_metadata,
         )
 
 
@@ -438,6 +530,7 @@ class GraphSnapshot:
     file_dependencies: list[FileDependencySnapshot] = field(default_factory=list)
     references: list[ReferenceSnapshot] = field(default_factory=list)
     vray_scene_metadata: Optional[VraySceneMetadata] = None
+    arnold_scene_metadata: Optional[ArnoldSceneMetadata] = None
 
     def to_dict(self) -> JsonDict:
         payload: JsonDict = {
@@ -456,6 +549,8 @@ class GraphSnapshot:
         }
         if self.vray_scene_metadata is not None:
             payload["vray_scene_metadata"] = self.vray_scene_metadata.to_dict()
+        if self.arnold_scene_metadata is not None:
+            payload["arnold_scene_metadata"] = self.arnold_scene_metadata.to_dict()
         return payload
 
     @classmethod
@@ -464,6 +559,10 @@ class GraphSnapshot:
         vray_scene_metadata = None
         if isinstance(raw_vray_scene_metadata, Mapping):
             vray_scene_metadata = VraySceneMetadata.from_dict(raw_vray_scene_metadata)
+        raw_arnold_scene_metadata = data.get("arnold_scene_metadata")
+        arnold_scene_metadata = None
+        if isinstance(raw_arnold_scene_metadata, Mapping):
+            arnold_scene_metadata = ArnoldSceneMetadata.from_dict(raw_arnold_scene_metadata)
         return cls(
             schema_version=str(data.get("schema_version", SNAPSHOT_SCHEMA_VERSION)),
             scene_path=str(data.get("scene_path", "")),
@@ -496,6 +595,7 @@ class GraphSnapshot:
                 for item in data.get("references", [])
             ],
             vray_scene_metadata=vray_scene_metadata,
+            arnold_scene_metadata=arnold_scene_metadata,
         )
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
