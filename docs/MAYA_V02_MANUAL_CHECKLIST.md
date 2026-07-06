@@ -14,17 +14,17 @@ Scene: [`shader_health_demo_broken.ma`](../examples/broken_scene/shader_health_d
    - `set_attr` / low — wrong colorSpace
    - `normalize_path` / medium — local drive path
    - `disable_feature` / high — displacement amount (if rule fires on scene setup)
-6. Apply Safe Fixes for low risk only; undo in Maya.
+6. Use **Select** buttons on rows (not YES/NO cells); apply low-risk fixes; undo in Maya.
 7. Select medium/high rows → **Apply Selected** → confirm dialogs (strict profile = per-fix).
 
-## Session 2 — Reference safety
+## Session 2 — Reference safety (reference edits)
 
 1. Save a small source scene with one fixable colorSpace issue as `ref_source.ma`.
 2. New scene → **File → Reference** `ref_source.ma`.
 3. Validate → select the colorSpace issue.
-4. Issue Details should show **Reference safety: referenced node (...)**.
-5. Fix queue row for that fix should show **Blocked = YES**.
-6. Apply Selected must not change the referenced node.
+4. Issue Details should show **Reference safety: referenced node (...). Fixes apply here as reference edits.**
+5. Fix queue row should show **Blocked = NO** (unless the node is locked).
+6. **Select** + **Apply Selected** should apply the fix in the current scene as a reference edit.
 
 ## Session 3 — Renderer policy packs
 
@@ -33,7 +33,7 @@ Requires V-Ray or Arnold loaded in Maya.
 1. Set **Render Settings → Current Renderer** to `vray` or `arnold`.
 2. Use a scene with `VRayMtl` / `aiStandardSurface` materials (not only lambert).
 3. Validate → issues table should include `vray.*` or `arnold.*` rule ids.
-4. No separate renderer panel is expected; rules appear in the main issues table.
+4. For V-Ray: create `VRaySettingsNode` if `vray.scene.plugin_missing.error` fires; revalidate.
 
 ## Session 4 — Headless parity
 
@@ -45,11 +45,14 @@ mayapy examples/publish/submit_preflight.py examples/broken_scene/shader_health_
   --mayapy "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
 ```
 
-## Debug log (optional)
+## Session 5 — Export workflow (post-revalidate)
 
-After **Validate Scene**, check [`debug-ee1eca.log`](../debug-ee1eca.log) at repo root for:
+After fixes and final **Revalidate**:
 
-- `fix_action_types` containing `set_attr`, `normalize_path`, `disable_feature` (and `relink_path` when version siblings exist on disk)
-- `requires_confirmation_count` > 0 when high-risk fixes are queued
+1. **Export JSON Report** → automation / CI artifact.
+2. **Export HTML Report** → supervisor review.
+3. **Export Shader Manifest** → new approved baseline.
+4. **Export Manifest Diff** → only when comparing against a previous manifest.
+5. **Export Fix Plan** → optional audit before apply.
 
-Record tested Maya version(s) in release notes.
+Record tested Maya version(s) in the GitHub Release notes.

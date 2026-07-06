@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
 
-Status: **v0.1.0 shipped**; **v0.2** production hardening in progress ([V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md)). The dockable Maya UI, headless CLI, packaged profiles, waiver sidecars, and report export are implemented. See the demo scene under `examples/broken_scene/`.
+Status: **v0.2.0 shipped** (2026-07-06). See [CHANGELOG.md](../CHANGELOG.md) and [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md).
 
 Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
 
@@ -10,7 +10,7 @@ Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVE
 
 ## What the Tool Checks
 
-The v0.1 MVP validates:
+v0.2 adds expanded safe fixes, renderer policy packs, manifest diff, waiver manager, and pipeline integration docs. v0.1 MVP validates:
 
 - missing texture files;
 - local or unsafe texture paths;
@@ -350,7 +350,7 @@ Expected behavior:
 
 ## Current Development Status
 
-v0.1 MVP is implemented: core rule engine, Maya scanner, snapshot enrichment, dockable UI, headless CLI, packaged profiles, waiver sidecars, JSON/HTML reports, shader manifest export, and safe-fix queue. Public CI runs pure Python tests; optional `mayapy` integration is documented in [`MAYA_INSTALL.md`](MAYA_INSTALL.md).
+v0.2 is implemented: expanded safe fixes, renderer policy packs, waiver manager, manifest diff, headless CLI parity, and optional Maya CI workflow. Public CI runs pure Python tests; optional `mayapy` integration is documented in [`MAYA_INSTALL.md`](MAYA_INSTALL.md).
 
 See also:
 

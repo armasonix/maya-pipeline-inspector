@@ -577,8 +577,6 @@ def _store_validation_state(
     rows: tuple[main_window.IssueTableRow, ...],
     result: Any,
 ) -> None:
-    from shader_health.debug_session_log import write_debug_log
-
     content._shader_health_failed_results = failed_results
     content._shader_health_issue_rows = rows
     content._shader_health_fix_plan = getattr(result, "fix_plan", None)
@@ -587,23 +585,6 @@ def _store_validation_state(
     content._shader_health_profile_id = getattr(result, "profile_id", "")
     snapshot = getattr(result, "snapshot", None)
     content._shader_health_scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
-    fix_plan = getattr(result, "fix_plan", None)
-    actions = getattr(fix_plan, "actions", ())
-    # region agent log
-    write_debug_log(
-        location="ui_launcher.py:_store_validation_state",
-        message="validation stored for UI",
-        hypothesis_id="A",
-        data={
-            "profile_id": getattr(result, "profile_id", ""),
-            "renderer": getattr(snapshot, "renderer", None) if snapshot else None,
-            "failed_count": len(failed_results),
-            "fix_action_types": [getattr(action, "fix_type", "") for action in actions],
-            "fix_risks": [getattr(action, "risk", "") for action in actions],
-            "blocked_fix_count": sum(1 for action in actions if getattr(action, "blocked", False)),
-        },
-    )
-    # endregion
     _populate_fix_queue(content, result)
 
 
@@ -636,23 +617,6 @@ def _populate_fix_queue(content: Any, result: Any) -> None:
             on_selection_changed=lambda: _sync_fix_queue_selection(content, qt_widgets),
         )
     _refresh_fix_queue_confirmation_label(content, qt_widgets, fix_rows)
-    # region agent log
-    from shader_health.debug_session_log import write_debug_log
-
-    write_debug_log(
-        location="ui_launcher.py:_populate_fix_queue",
-        message="fix queue populated",
-        hypothesis_id="A",
-        data={
-            "queue_count": len(fix_rows),
-            "queue_risks": [row.risk for row in fix_rows],
-            "queue_blocked": [row.blocked for row in fix_rows],
-            "requires_confirmation_count": sum(
-                1 for row in fix_rows if row.requires_confirmation
-            ),
-        },
-    )
-    # endregion
 
 
 def _refresh_fix_queue_confirmation_label(
@@ -794,20 +758,6 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     content._shader_health_fix_rows = fix_rows
     checked = checked_fix_rows(fix_rows)
     selected = selected_fix_rows(fix_rows)
-    # region agent log
-    from shader_health.debug_session_log import write_debug_log
-
-    write_debug_log(
-        location="ui_launcher.py:_apply_selected_fixes_from_ui",
-        message="apply selected entry",
-        hypothesis_id="C",
-        data={
-            "checked_count": len(checked),
-            "selected_count": len(selected),
-            "blocked_checked": [row.fix_id for row in checked if row.blocked],
-        },
-    )
-    # endregion
     if not checked:
         _set_label_text(
             content,
@@ -832,20 +782,6 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         for action in fix_plan.actions
         if action.fix_id in selected_ids
     )
-    # region agent log
-    from shader_health.debug_session_log import write_debug_log
-
-    write_debug_log(
-        location="ui_launcher.py:_apply_selected_fixes_from_ui",
-        message="apply selected requested",
-        hypothesis_id="B",
-        data={
-            "selected_count": len(selected),
-            "matched_action_count": len(actions),
-            "selected_fix_ids": sorted(selected_ids),
-        },
-    )
-    # endregion
     if not actions:
         _set_label_text(
             content,
@@ -870,14 +806,6 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         allow_high_risk=allow_high_risk,
         allow_referenced=True,
     )
-    # region agent log
-    write_debug_log(
-        location="ui_launcher.py:_apply_selected_fixes_from_ui",
-        message="apply selected finished",
-        hypothesis_id="B",
-        data=report.to_dict(),
-    )
-    # endregion
     _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,

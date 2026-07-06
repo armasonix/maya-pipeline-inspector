@@ -7,22 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Improved
+## [0.2.0] - 2026-07-06
 
-- Reconciled long-term roadmap in [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md): v0.1 marked shipped, v0.2 aligned with [V0_2_DEVELOPMENT_PLAN.md](docs/V0_2_DEVELOPMENT_PLAN.md), v0.3+ rescoped; Milestones 10–14 indexed in §26.
+**Maya Shader Health Inspector v0.2 — Production Hardening & Studio Readiness**
 
-- Texture version freshness (`common.texture.version.latest`): clearer edge-case handling for multiple folder siblings, single-version folders, and missing `v###` tokens; added pass/fail snapshot fixtures and documented filesystem-only detection in [USER_GUIDE.md](docs/USER_GUIDE.md).
+Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, supervisor change review, pipeline integration docs, and waiver/fix UX polish.
 
 ### Added
 
-- Publish preflight hook example ([`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py)) and integration guide ([`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md)).
-- Maya install guide ([`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md)) for `MAYA_MODULE_PATH`, editable `pip`, and menu/shelf bootstrap.
-- Studio overrides guide ([`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md)) with worked `examples/studio/` rule pack and profile sample.
-- Optional Maya integration GitHub Actions workflow ([`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml), `workflow_dispatch` only).
-- Waiver manager UI in the Maya panel with sidecar revoke support.
-- High-risk fix confirmation dialog in the Safe Auto-Fix Queue: per-fix confirm for strict profiles, batch confirm for `supervisor_full`, with pending/selected risky counts on the helper label.
-- Issue filters on one horizontal row; issue details show reference-safety status.
-- Rule packs now expose `relink_path`, `normalize_path`, and `disable_feature` fixes (not only `set_attr`).
+#### Safe fixes and audit
+
+- `relink_path`, `normalize_path`, and `disable_feature` fix appliers with undo-chunk apply.
+- Fix apply audit log (`*.shader_health_fix_audit.json`) with JSON round-trip tests.
+- **Export Fix Plan** from Maya UI and headless CLI.
+- Rule packs expose `normalize_path` / `relink_path` / `disable_feature` fixes (not only `set_attr`).
+
+#### Renderer policy packs
+
+- V-Ray and Arnold snapshot enrichment (`vray_metadata`, `arnold_metadata`, scene plugin detection).
+- Production policy rules: plugin missing, displacement review, texture budget, trace depth (V-Ray and Arnold packs).
+- Renderer policy fixture tests in `tests/fixtures/snapshots/`.
+
+#### Change review and manifests
+
+- HTML manifest diff report template.
+- `shader_health diff` CLI subcommand.
+- **Export Manifest Diff** from Maya UI (baseline picker + JSON/HTML output).
+
+#### Pipeline integration and studio docs
+
+- Publish preflight hook example ([`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py)) and [integration guide](docs/integrations/publish_submit_preflight.md).
+- Maya install guide ([`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md)).
+- Studio overrides guide ([`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md)) with `examples/studio/` sample pack.
+- Optional Maya integration GitHub Actions workflow (`.github/workflows/maya-integration.yml`, `workflow_dispatch` only).
+- Manual Maya verification checklist ([`docs/MAYA_V02_MANUAL_CHECKLIST.md`](docs/MAYA_V02_MANUAL_CHECKLIST.md)).
+
+#### Maya UI (v0.2)
+
+- Waiver manager UI with sidecar revoke and expiry display.
+- High-risk fix confirmation: per-fix dialog for strict profiles, batch confirm for `supervisor_full`.
+- Safe Auto-Fix Queue **Select** toggle buttons (replacing YES/NO cells).
+- Issue filters on one horizontal row; Issue Details show reference-safety status.
+- Referenced-node fixes apply in the current scene as Maya reference edits (when not locked).
+
+### Changed
+
+- `normalize_path` resolves local checkout paths via detected project root (`src/shader_health/`) and maps standalone user paths to `${ASSET_ROOT}/textures/<filename>`.
+- Fix queue apply matches actions by `fix_id`; blocked selections show explicit description messages.
+- Reconciled long-term roadmap in [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md); Milestones 10–14 indexed in §26.
+
+### Improved
+
+- Texture version freshness (`common.texture.version.latest`): edge cases for sibling folders, single-version folders, and missing `v###` tokens; pass/fail fixtures and USER_GUIDE documentation.
+
+### Known limitations (v0.2)
+
+- Texture version detection remains filesystem-based (no publish DB / AMS integration).
+- Public CI runs without Maya; optional `workflow_dispatch` Maya job only.
+- Missing texture files cannot be auto-relinked without a known target path.
+- Rule authoring remains JSON-only (no rule editor UI).
+
+### Install
+
+Same as v0.1 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
+**Planning for v0.3+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md), [V0_2_DEVELOPMENT_PLAN.md](docs/V0_2_DEVELOPMENT_PLAN.md) (completed).
 
 ## [0.1.0] - 2026-07-03
 
@@ -129,4 +178,5 @@ python -m shader_health validate examples/broken_scene/shader_health_demo_broken
 - Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Deadline preflight: [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md)
 
+[0.2.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.2.0
 [0.1.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.1.0

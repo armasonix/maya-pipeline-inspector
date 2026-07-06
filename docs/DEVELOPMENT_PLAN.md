@@ -1,6 +1,6 @@
 # Maya Shader Health Inspector — Production Development Plan
 
-> **v0.1.0 shipped** (2026-07-03). **v0.2** — Production Hardening & Studio Readiness — is defined in [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md) (Milestones 10–14, Issues #049–#070). [§27](#27-roadmap) summarizes the reconciled long-term roadmap.
+> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3+** — see [§27](#27-roadmap). v0.2 detail: [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md) (Milestones 10–14, Issues #049–#070).
 
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
 **Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
@@ -2132,19 +2132,17 @@ Delivered:
 - JSON/HTML reports, shader manifest export, JSON manifest diff tool.
 - Headless CLI, Deadline submit preflight example, demo scene, ADRs, CI.
 
-### v0.2 — Production Hardening & Studio Readiness (in progress → v0.2.0)
+### v0.2 — Production Hardening & Studio Readiness (shipped)
 
-**Theme:** Extend v0.1 implementations to production-grade depth — not re-build already-shipped features.
+**Tag:** `v0.2.0` (2026-07-06)
 
-**Plan:** Milestones 10–14, Issues #049–#070 — detail in [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md).
-
-Scope highlights:
+Delivered (Milestones 10–14, Issues #049–#070):
 
 - Safe fix expansion (`relink_path`, `normalize_path`, `disable_feature`) and fix apply audit trail.
 - V-Ray and Arnold production policy rule packs with enriched snapshot metadata.
 - HTML manifest diff, CLI `diff` subcommand, UI export workflow, texture freshness hardening.
 - Publish preflight example, Maya module install guide, studio overrides documentation, optional Maya CI workflow.
-- Waiver manager UI, high-risk fix confirmation dialog, reconciled roadmap (#069), v0.2.0 release (#070).
+- Waiver manager UI, high-risk fix confirmation, reference-edit apply, reconciled roadmap (#069).
 
 ### v0.3 — Pipeline Automation & Manifest Depth
 

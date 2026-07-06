@@ -4,7 +4,7 @@ Production material QA framework for Maya pipelines.
 
 Built to prevent render-time material failures by detecting missing textures, outdated maps, wrong color space, broken UDIMs, unsafe paths, displacement risk, and renderer-specific shader issues before assets reach publish or the render farm.
 
-**Status:** v0.1.0 shipped; v0.2 production hardening in progress (demo scene, dockable UI, reports, safe-fix queue)  
+**Status:** **v0.2.0 shipped** (2026-07-06) — production hardening: expanded safe fixes, V-Ray/Arnold policy packs, manifest diff, pipeline docs  
 **Primary DCC:** Autodesk Maya  
 **Initial renderer targets:** Common Maya, V-Ray, Arnold  
 **Future renderer targets:** RenderMan, Redshift, USD / MaterialX
@@ -116,7 +116,18 @@ Intentional issue categories:
 
 Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_scene/README.md)
 
-## Current capabilities
+## Current capabilities (v0.2)
+
+- Everything in v0.1, plus:
+- Safe fixes: `set_attr`, `relink_path`, `normalize_path`, `disable_feature` with audit log and fix-plan export.
+- V-Ray and Arnold production policy rule packs with enriched snapshot metadata.
+- Manifest diff (CLI + UI, JSON + HTML).
+- Waiver manager UI, high-risk fix confirmation, reference-edit apply for referenced nodes.
+- Publish preflight example, Maya install guide, studio overrides documentation.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.2.0 release notes.
+
+## Current capabilities (v0.1 baseline)
 
 - `GraphSnapshot` model and Maya scanner.
 - JSON rule schema, rule loader, and validation engine.
@@ -127,7 +138,7 @@ Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_
 - Dockable Maya panel with issue table, filters, details, and safe fix queue.
 - Headless validation command and Deadline preflight example.
 
-Roadmap and issue tracking: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (master plan, reconciled §27) · [`docs/V0_2_DEVELOPMENT_PLAN.md`](docs/V0_2_DEVELOPMENT_PLAN.md) (v0.2 milestones 10–14)
+Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.2 plan completed in [`docs/V0_2_DEVELOPMENT_PLAN.md`](docs/V0_2_DEVELOPMENT_PLAN.md)
 
 ## Install in Maya
 
