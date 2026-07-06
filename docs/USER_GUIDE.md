@@ -334,6 +334,7 @@ Export a shader manifest beside the scene (`{scene}_shader_health_manifest.json`
 
 ```bash
 python -m shader_health validate scene.ma --profile-id publish_strict --report report.json
+python -m shader_health manifest scene.ma --out shader_manifest.json
 python -m shader_health validate snapshot.json --input-kind snapshot --profile-id ci_headless --report report.json
 python -m shader_health validate scene.ma --waiver-sidecar scene.shader_health_waivers.json --report report.json
 ```

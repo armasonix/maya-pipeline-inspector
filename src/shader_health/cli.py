@@ -21,7 +21,7 @@ from shader_health.maya.validation_pipeline import (
 )
 from shader_health.reports import write_json_report
 from shader_health.reports.fix_plan_export import write_fix_plan_export
-from shader_health.reports.manifest import build_shader_manifest
+from shader_health.reports.manifest import build_shader_manifest, write_shader_manifest
 from shader_health.reports.manifest_diff_cli import (
     EXIT_INPUT_ERROR as DIFF_EXIT_INPUT_ERROR,
 )
@@ -50,6 +50,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return diff_command(args)
     if args.command == "gate":
         return gate_command(args)
+    if args.command == "manifest":
+        return manifest_command(args)
     if args.command == "apply-fixes":
         return apply_fixes_command(args)
     parser.print_help()
@@ -133,6 +135,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Packaged profile id when --profile is omitted.",
     )
     gate.add_argument("--out", help="Optional gate result JSON output path.")
+    manifest = subparsers.add_parser(
+        "manifest",
+        help="Export a shader manifest from a Maya scene or snapshot.",
+    )
+    manifest.add_argument("input_path", help="Maya scene path or GraphSnapshot JSON path.")
+    manifest.add_argument("--out", required=True, help="Output manifest JSON path.")
+    manifest.add_argument(
+        "--input-kind",
+        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT),
+        default=INPUT_AUTO,
+    )
+    manifest.add_argument("--profile", help="Profile JSON path for validation context.")
+    manifest.add_argument(
+        "--profile-id",
+        default=DEFAULT_PROFILE_ID,
+        help="Packaged profile id when --profile is omitted.",
+    )
     apply_fixes = subparsers.add_parser(
         "apply-fixes",
         help="Apply planned fixes to a Maya scene (requires mayapy).",
@@ -224,6 +243,30 @@ def gate_command(args: argparse.Namespace) -> int:
             profile_id=str(args.profile_id),
             out_path=_optional_path(args.out),
         )
+    except RuleLoadError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+    except Exception as exc:  # noqa: BLE001
+        print(f"Runtime error: {exc}", file=sys.stderr)
+        return EXIT_RUNTIME_ERROR
+
+
+def manifest_command(args: argparse.Namespace) -> int:
+    try:
+        snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
+        run = run_validation(
+            snapshot,
+            profile_id=str(args.profile_id),
+            profile_path=_optional_path(args.profile),
+            scan_scope="scene",
+        )
+        write_shader_manifest(
+            args.out,
+            run.snapshot,
+            results=run.results,
+            health_score=run.health_score.score,
+        )
+        return EXIT_OK
     except RuleLoadError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR

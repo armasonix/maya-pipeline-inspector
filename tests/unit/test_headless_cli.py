@@ -254,6 +254,77 @@ def test_validate_snapshot_runs_manifest_gate_after_passing_validation(tmp_path:
     assert report_path.exists()
 
 
+def test_manifest_snapshot_writes_shader_manifest_with_health_score(tmp_path: Path):
+    snapshot_path = _write_snapshot(tmp_path, "ACEScg")
+    manifest_path = tmp_path / "manifest.json"
+
+    code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--out",
+            str(manifest_path),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert code == cli.EXIT_OK
+    assert payload["manifest_schema_version"] == "1.1"
+    assert payload["health_score"] == 100
+
+
+def test_manifest_snapshot_from_material_graph(tmp_path: Path):
+    snapshot_path = _write_material_snapshot(tmp_path, "sha256:hero")
+    manifest_path = tmp_path / "material_manifest.json"
+
+    code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--input-kind",
+            "snapshot",
+            "--out",
+            str(manifest_path),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert code == cli.EXIT_OK
+    assert payload["materials"][0]["graph_fingerprint"] == "sha256:hero"
+
+
+def test_manifest_scene_path_uses_scene_loader(monkeypatch, tmp_path: Path):
+    scene_path = tmp_path / "scene.ma"
+    scene_path.write_text("// scene", encoding="utf-8")
+    manifest_path = tmp_path / "scene_manifest.json"
+    monkeypatch.setattr(
+        cli,
+        "_snapshot_from_scene",
+        lambda path: _material_snapshot("sha256:scene"),
+    )
+
+    code = cli.main(
+        [
+            "manifest",
+            str(scene_path),
+            "--input-kind",
+            "scene",
+            "--out",
+            str(manifest_path),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["materials"][0]["graph_fingerprint"] == "sha256:scene"
+
+
 def _write_snapshot(tmp_path: Path, color_space: str) -> Path:
     path = tmp_path / f"snapshot_{color_space}.json"
     path.write_text(_snapshot(color_space).to_json(), encoding="utf-8")
