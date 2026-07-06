@@ -666,8 +666,9 @@ v0.2.0 is ready when:
 | [adr/0002-renderer-adapter-boundary.md](adr/0002-renderer-adapter-boundary.md) | Renderer adapter boundary |
 | [adr/0003-safe-fix-reference-safety-policy.md](adr/0003-safe-fix-reference-safety-policy.md) | Safe fix and reference safety policy |
 | [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) | Deadline preflight integration |
-| [integrations/publish_submit_preflight.md](integrations/publish_submit_preflight.md) | *Planned in #063* |
-| [MAYA_INSTALL.md](MAYA_INSTALL.md) | *Planned in #064* |
+| [integrations/publish_submit_preflight.md](integrations/publish_submit_preflight.md) | Publish preflight integration |
+| [MAYA_INSTALL.md](MAYA_INSTALL.md) | Maya module and pip install |
+| [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) | Studio custom rules and profile overrides |
 
 ### Documents to update during v0.2 implementation
 
