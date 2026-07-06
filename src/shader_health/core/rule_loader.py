@@ -214,18 +214,22 @@ def apply_profile_overrides(
     rules: Iterable[RuleDefinition],
     profile: ProfileDefinition,
 ) -> list[RuleDefinition]:
-    rules_by_id = {rule.id: rule for rule in rules}
-    unknown = sorted(set(profile.rule_overrides) - set(rules_by_id))
-    if unknown:
-        raise RuleLoadError(
-            f"profile {profile.id!r} references unknown rule(s): {', '.join(unknown)}"
-        )
-
     resolved: list[RuleDefinition] = []
     for rule in rules:
         override = profile.rule_overrides.get(rule.id)
         resolved.append(rule if override is None else override.apply(rule))
     return resolved
+
+
+def validate_profile_overrides(
+    profile: ProfileDefinition,
+    rules_by_id: Mapping[str, RuleDefinition],
+) -> None:
+    unknown = sorted(set(profile.rule_overrides) - set(rules_by_id))
+    if unknown:
+        raise RuleLoadError(
+            f"profile {profile.id!r} references unknown rule(s): {', '.join(unknown)}"
+        )
 
 
 def _load_json(path: Path) -> Any:

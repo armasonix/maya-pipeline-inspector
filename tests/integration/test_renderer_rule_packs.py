@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.integration.fixtures import arnold_scene_snapshot, broken_scene_snapshot
+from tests.integration.fixtures import (
+    arnold_policy_scene_snapshot,
+    arnold_scene_snapshot,
+    broken_scene_snapshot,
+)
 
 from shader_health.maya.validation_pipeline import run_validation
 
@@ -76,6 +80,63 @@ def test_vray_renderer_pack_flags_displacement_linked_material(tmp_path: Path):
     assert info_results[0].material == "demo_displacement_MTL"
 
 
+def test_arnold_renderer_pack_flags_missing_plugin_node(tmp_path: Path):
+    snapshot = arnold_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
+
+    failed = next(
+        item
+        for item in run.results
+        if item.rule_id == "arnold.scene.plugin_missing.error" and item.status == "failed"
+    )
+    assert failed.current_value is False
+
+
+def test_arnold_renderer_pack_flags_displacement_review_material(tmp_path: Path):
+    snapshot = arnold_policy_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
+
+    failed = [
+        item
+        for item in run.results
+        if item.rule_id == "arnold.material.displacement_review.warning" and item.status == "failed"
+    ]
+    assert failed
+    assert failed[0].material == "demo_displacement_MTL"
+
+
+def test_publish_strict_profile_blocks_on_arnold_plugin_rule(tmp_path: Path):
+    snapshot = arnold_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="publish_strict", scan_scope="scene")
+
+    failed = next(
+        item
+        for item in run.results
+        if item.rule_id == "arnold.scene.plugin_missing.error" and item.status == "failed"
+    )
+    assert failed.block_publish is True
+
+
+def test_arnold_policy_pack_reports_expected_production_failures(tmp_path: Path):
+    snapshot = arnold_policy_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
+
+    policy_rule_ids = {
+        "arnold.scene.plugin_missing.error",
+        "arnold.material.displacement_review.warning",
+        "arnold.material.transmission_depth.warning",
+        "arnold.scene.stand_in_review.warning",
+    }
+    failed_policy = [
+        item
+        for item in run.results
+        if item.rule_id in policy_rule_ids and item.status == "failed"
+    ]
+
+    assert {item.rule_id for item in failed_policy} == policy_rule_ids
+    assert len(failed_policy) == 4
+
+
 def test_arnold_renderer_pack_flags_untextured_material(tmp_path: Path):
     snapshot = arnold_scene_snapshot(tmp_path)
     run = run_validation(snapshot, profile_id="supervisor_full", scan_scope="scene")
@@ -100,3 +161,17 @@ def test_renderer_rules_are_loaded_for_matching_renderer(tmp_path: Path):
     assert "vray.material.displacement_review.warning" in rule_ids
     assert "vray.material.texture_budget.warning" in rule_ids
     assert "vray.material.trace_depth.warning" in rule_ids
+
+
+def test_arnold_renderer_rules_are_loaded_for_matching_renderer(tmp_path: Path):
+    snapshot = arnold_scene_snapshot(tmp_path)
+    run = run_validation(snapshot, profile_id="artist_relaxed", scan_scope="scene")
+
+    rule_ids = {rule.id for rule in run.rules}
+    assert "arnold.material.untextured.info" in rule_ids
+    assert "arnold.material.displacement_linked.info" in rule_ids
+    assert "arnold.scene.plugin_missing.error" in rule_ids
+    assert "arnold.material.displacement_review.warning" in rule_ids
+    assert "arnold.material.texture_budget.warning" in rule_ids
+    assert "arnold.material.transmission_depth.warning" in rule_ids
+    assert "arnold.scene.stand_in_review.warning" in rule_ids

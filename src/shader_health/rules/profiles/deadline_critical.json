@@ -37,6 +37,15 @@
     },
     "vray.material.trace_depth.warning": {
       "block_deadline": true
+    },
+    "arnold.scene.plugin_missing.error": {
+      "block_deadline": true
+    },
+    "arnold.material.displacement_review.warning": {
+      "block_deadline": true
+    },
+    "arnold.material.transmission_depth.warning": {
+      "block_deadline": true
     }
   }
 }

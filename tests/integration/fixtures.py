@@ -110,6 +110,56 @@ def broken_scene_snapshot(tmp_path: Path) -> GraphSnapshot:
     )
 
 
+def arnold_policy_scene_snapshot(tmp_path: Path) -> GraphSnapshot:
+    """Build an Arnold snapshot that triggers production policy rule failures."""
+
+    return GraphSnapshot(
+        scene_path=str(tmp_path / "arnold_policy_demo.ma"),
+        renderer="arnold",
+        scan_scope="scene",
+        scanned_at_utc="2026-07-01T12:00:00Z",
+        nodes=[
+            NodeSnapshot(
+                id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="aiStandardSurface",
+                attrs={"transmissionDepth": 16},
+            ),
+            NodeSnapshot(
+                id="node:demo_displacement_MTL",
+                name="demo_displacement_MTL",
+                type_name="aiStandardSurface",
+            ),
+            NodeSnapshot(
+                id="node:displacementShader1",
+                name="displacementShader1",
+                type_name="displacementShader",
+                attrs={"scale": 12},
+            ),
+            NodeSnapshot(
+                id="node:hero_proxyStandIn",
+                name="hero_proxyStandIn",
+                type_name="aiStandIn",
+            ),
+        ],
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="aiStandardSurface",
+                texture_nodes=["node:file_basecolor"],
+            ),
+            MaterialSnapshot(
+                node_id="node:demo_displacement_MTL",
+                name="demo_displacement_MTL",
+                type_name="aiStandardSurface",
+                texture_nodes=["node:file_disp"],
+                displacement_nodes=["node:displacementShader1"],
+            ),
+        ],
+    )
+
+
 def arnold_scene_snapshot(tmp_path: Path) -> GraphSnapshot:
     """Build a minimal Arnold snapshot for renderer-pack integration checks."""
 

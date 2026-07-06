@@ -10,6 +10,15 @@
     },
     "vray.material.texture_budget.warning": {
       "block_publish": true
+    },
+    "arnold.scene.plugin_missing.error": {
+      "block_publish": true
+    },
+    "arnold.material.displacement_review.warning": {
+      "block_publish": true
+    },
+    "arnold.material.texture_budget.warning": {
+      "block_publish": true
     }
   }
 }

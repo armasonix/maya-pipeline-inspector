@@ -13,6 +13,11 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from shader_health.core.rule_loader import (  # noqa: E402
+    RuleLoadError,
+    load_profile,
+    validate_profile_overrides,
+)
 from shader_health.core.rule_schema import RuleDefinition, RuleSchemaError  # noqa: E402
 
 DEFAULT_RULE_ROOT = REPO_ROOT / "src" / "shader_health" / "rules"
@@ -91,14 +96,32 @@ def validate_rule_file(path: Path) -> list[RuleDefinition]:
 
 
 def validate_paths(paths: Iterable[Path]) -> tuple[int, int]:
-    files = find_json_files(paths)
+    paths_list = list(paths)
+    files = find_json_files(paths_list)
     file_count = 0
     rule_count = 0
+    rules_by_id: dict[str, RuleDefinition] = {}
 
     for path in files:
         rules = validate_rule_file(path)
         file_count += 1
         rule_count += len(rules)
+        for rule in rules:
+            rules_by_id[rule.id] = rule
+
+    profiles_root = DEFAULT_RULE_ROOT / "profiles"
+    validating_packaged_rules = any(
+        path.resolve() == DEFAULT_RULE_ROOT.resolve()
+        or DEFAULT_RULE_ROOT.resolve() in path.resolve().parents
+        for path in paths_list
+    )
+    if validating_packaged_rules and profiles_root.is_dir():
+        for profile_path in sorted(profiles_root.glob("*.json")):
+            profile = load_profile(profile_path)
+            try:
+                validate_profile_overrides(profile, rules_by_id)
+            except RuleLoadError as exc:
+                raise RuleValidationFailure(str(exc)) from exc
 
     return file_count, rule_count
 
