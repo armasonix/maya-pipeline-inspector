@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from shader_health.core import GraphSnapshot, RuleResult
 from shader_health.core.waivers import (
     WaiverSidecar,
     apply_waivers,
     create_waiver_from_result,
     load_waiver_sidecar,
+    revoke_waiver,
     write_waiver_sidecar,
 )
 from shader_health.reports import build_json_report
@@ -83,6 +86,36 @@ def test_json_report_includes_waived_issue():
     assert report["status"] == "passed"
     assert report["results"][0]["status"] == "waived"
     assert report["results"][0]["evidence"]["waiver"]["approved_by"] == "lead"
+
+
+def test_revoke_waiver_removes_record_and_round_trips(tmp_path: Path):
+    sidecar = WaiverSidecar((_waiver(),))
+    path = tmp_path / "scene.shader_health_waivers.json"
+    write_waiver_sidecar(path, sidecar)
+
+    updated = revoke_waiver(sidecar, sidecar.waivers[0].id)
+    write_waiver_sidecar(path, updated)
+    loaded = load_waiver_sidecar(path)
+
+    assert loaded.waivers == ()
+    assert updated.to_dict() == loaded.to_dict()
+
+
+def test_revoke_waiver_unknown_id_raises():
+    sidecar = WaiverSidecar((_waiver(),))
+
+    with pytest.raises(ValueError, match="Unknown waiver id"):
+        revoke_waiver(sidecar, "missing-waiver-id")
+
+
+def test_waiver_status_label_marks_expired_records():
+    active = _waiver(expires_at_utc="2026-08-02T08:00:00Z")
+    expired = _waiver(expires_at_utc="2026-07-01T08:00:00Z")
+
+    from shader_health.core.waivers import waiver_status_label
+
+    assert waiver_status_label(active, now_utc="2026-07-03T08:00:00Z") == "active"
+    assert waiver_status_label(expired, now_utc="2026-07-03T08:00:00Z") == "expired"
 
 
 def _waiver(*, expires_at_utc: str = "2026-08-02T08:00:00Z"):

@@ -1,6 +1,6 @@
 # Maya Shader Health Inspector — v0.2 Development Plan
 
-**Status:** Planning document for work after **v0.1.0**  
+**Status:** **v0.2.0 shipped** (2026-07-06)  
 **Target release:** v0.2.0 — Production Hardening & Studio Readiness  
 **Previous plan:** [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) (Milestones 0–9, Issues #1–#48)  
 **Baseline release:** [CHANGELOG.md](../CHANGELOG.md) — `[0.1.0]`
@@ -71,7 +71,7 @@ The original [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) roadmap assumed a s
 
 **Re-scoped v0.2 theme:** **Production Hardening & Studio Readiness** — extend MVP implementations to production-grade depth rather than re-implementing already-shipped features.
 
-Issue **#069** tracks synchronizing [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) with this realignment.
+Issue **#069** synchronized [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) with this realignment (see master plan banner and Milestones 10–14 index).
 
 ---
 
@@ -643,8 +643,8 @@ v0.2 follows the test pyramid in [DEVELOPMENT_PLAN.md §28](DEVELOPMENT_PLAN.md)
 
 v0.2.0 is ready when:
 
-- [ ] Issues **#049–#069** are closed, or deferrals are explicit in CHANGELOG with rationale.
-- [ ] Issue **#070** release checklist is complete.
+- [x] Issues **#049–#069** are closed, or deferrals are explicit in CHANGELOG with rationale.
+- [x] Issue **#070** release checklist is complete.
 - [ ] No regression in headless exit codes (`0`, `1`, `2`, `3`, `4`).
 - [ ] Demo scene [`examples/broken_scene/`](../examples/broken_scene/) still produces expected issue categories.
 - [ ] [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) reflects realigned roadmap (#069).

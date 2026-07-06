@@ -5,13 +5,20 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
+from shader_health.ui.table_widgets import (
+    configure_read_only_table,
+    is_checkbox_checked,
+    is_fix_queue_select_checked,
+    make_fix_queue_select_cell,
+    make_read_only_item,
+)
 
 FIX_QUEUE_OBJECT_NAME = "shaderHealthInspectorFixQueue"
 FIX_QUEUE_TABLE_OBJECT_NAME = "shaderHealthInspectorFixQueueTable"
 FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME = "shaderHealthInspectorApplySelectedFixesButton"
 FIX_QUEUE_APPLY_SAFE_BUTTON_OBJECT_NAME = "shaderHealthInspectorApplySafeFixesButton"
 FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME = "shaderHealthInspectorRiskyFixConfirmationLabel"
+SUPERVISOR_FULL_PROFILE_ID = "supervisor_full"
 FIX_QUEUE_COLUMNS = (
     "Selected",
     "Risk",
@@ -36,6 +43,7 @@ class FixQueueRow:
     target_attr: str
     before_value: str
     after_value: str
+    fix_id: str = ""
     blocked: bool = False
     requires_confirmation: bool = False
 
@@ -67,7 +75,10 @@ def build_fix_queue(
     title_label = qt_widgets.QLabel("Safe Auto-Fix Queue")
     set_tooltip = getattr(title_label, "setToolTip", None)
     if set_tooltip is not None:
-        set_tooltip("Click Selected (YES/NO) to choose fixes for Apply Selected Fixes.")
+        set_tooltip(
+            "Click the Select button on each row to choose fixes "
+            "for Apply Selected Fixes."
+        )
     layout.addWidget(title_label)
 
     table = qt_widgets.QTableWidget()
@@ -78,7 +89,7 @@ def build_fix_queue(
     configure_read_only_table(table, qt_widgets)
     layout.addWidget(table)
 
-    confirmation_label = qt_widgets.QLabel(_risky_confirmation_text(fix_rows))
+    confirmation_label = qt_widgets.QLabel(risky_confirmation_text(fix_rows))
     confirmation_label.setObjectName(FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME)
     confirmation_label.setWordWrap(True)
     layout.addWidget(confirmation_label)
@@ -87,7 +98,7 @@ def build_fix_queue(
         qt_widgets,
         "Apply Selected Fixes",
         FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME,
-        "Apply checked YES rows in the Selected column.",
+        "Click Select on each row, then apply checked fixes.",
         fix_callbacks.on_apply_selected,
     )
     layout.addWidget(apply_selected_button)
@@ -108,27 +119,70 @@ def populate_fix_queue(
     qt_widgets: Any,
     table: Any,
     rows: Sequence[FixQueueRow],
+    *,
+    on_selection_changed: Optional[Callable[[], None]] = None,
 ) -> None:
     """Populate a Qt table widget with fix queue rows."""
 
     table.setRowCount(len(rows))
     for row_index, row in enumerate(rows):
-        for column_index, value in enumerate(fix_queue_row_cells(row)):
+        table.setCellWidget(
+            row_index,
+            0,
+            make_fix_queue_select_cell(
+                qt_widgets,
+                checked=row.selected,
+                on_toggled=lambda _checked, index=row_index: _on_select_toggled(
+                    table,
+                    index,
+                    on_selection_changed,
+                ),
+            ),
+        )
+        for column_index, value in enumerate(fix_queue_row_cells(row)[1:], start=1):
             table.setItem(row_index, column_index, make_read_only_item(qt_widgets, value))
 
 
+def _on_select_toggled(
+    table: Any,
+    row_index: int,
+    on_selection_changed: Optional[Callable[[], None]],
+) -> None:
+    if on_selection_changed is not None:
+        on_selection_changed()
+
+
 def selected_from_table_item(item: Any) -> bool:
-    """Return whether a fix queue Selected cell is marked YES."""
+    """Return whether a fix queue Selected cell is checked."""
 
     if item is None:
         return False
+    if is_checkbox_checked(item):
+        return True
     text = getattr(item, "text", lambda: "")()
     return str(text).strip().upper() == "YES"
 
 
 def toggle_selected_table_item(item: Any) -> bool:
-    """Toggle a fix queue Selected cell between YES and NO."""
+    """Toggle a fix queue Selected checkbox cell."""
 
+    if item is None:
+        return False
+    set_check_state = getattr(item, "setCheckState", None)
+    check_state = getattr(item, "checkState", None)
+    if set_check_state is not None and check_state is not None:
+        try:
+            from shader_health.ui.qt import load_qt_core
+
+            qt = load_qt_core().Qt
+            checked_state = getattr(qt, "Checked", None)
+            unchecked_state = getattr(qt, "Unchecked", None)
+            if checked_state is not None and unchecked_state is not None:
+                selected = check_state() != checked_state
+                set_check_state(checked_state if selected else unchecked_state)
+                return selected
+        except RuntimeError:
+            pass
     selected = not selected_from_table_item(item)
     set_text = getattr(item, "setText", None)
     if set_text is not None:
@@ -137,12 +191,15 @@ def toggle_selected_table_item(item: Any) -> bool:
 
 
 def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
-    """Return fix queue rows with Selected state read from YES/NO cells."""
+    """Return fix queue rows with Selected state read from Select buttons."""
 
     synced: list[FixQueueRow] = []
     for row_index, row in enumerate(rows):
-        item = table.item(row_index, 0) if hasattr(table, "item") else None
-        selected = selected_from_table_item(item) if item is not None else row.selected
+        if hasattr(table, "cellWidget") and table.cellWidget(row_index, 0) is not None:
+            selected = is_fix_queue_select_checked(table, row_index)
+        else:
+            item = table.item(row_index, 0) if hasattr(table, "item") else None
+            selected = selected_from_table_item(item) if item is not None else row.selected
         synced.append(
             FixQueueRow(
                 selected=selected,
@@ -152,6 +209,7 @@ def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQue
                 target_attr=row.target_attr,
                 before_value=row.before_value,
                 after_value=row.after_value,
+                fix_id=row.fix_id,
                 blocked=row.blocked,
                 requires_confirmation=row.requires_confirmation,
             )
@@ -159,10 +217,35 @@ def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQue
     return tuple(synced)
 
 
+def checked_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
+    """Return queue rows the user marked with Select, including blocked rows."""
+
+    return tuple(row for row in rows if row.selected)
+
+
 def selected_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     """Return selected queue rows that are not blocked."""
 
     return tuple(row for row in rows if row.selected and not row.blocked)
+
+
+def blocked_selection_message(rows: Sequence[FixQueueRow]) -> str:
+    """Build a user-facing message when selected fixes are blocked."""
+
+    blocked = tuple(row for row in rows if row.selected and row.blocked)
+    if not blocked:
+        return ""
+    samples = [
+        f"{row.target_node}.{row.target_attr or 'node'}"
+        for row in blocked[:3]
+    ]
+    suffix = f" (+{len(blocked) - 3} more)" if len(blocked) > 3 else ""
+    return (
+        "Selected fixes are blocked and were not applied: "
+        + ", ".join(samples)
+        + suffix
+        + ". Locked nodes and unplannable path fixes cannot run."
+    )
 
 
 def safe_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
@@ -201,53 +284,129 @@ def fix_queue_row_cells(row: FixQueueRow) -> tuple[str, str, str, str, str, str,
     )
 
 
-def _risky_confirmation_text(rows: Sequence[FixQueueRow]) -> str:
-    risky_count = len(risky_fix_rows(rows))
-    if risky_count:
-        return f"Risky fixes require confirmation: {risky_count} pending."
-    return "Risky fixes require confirmation before they can be applied."
+def allows_batch_risky_confirmation(profile_id: str) -> bool:
+    """Return whether the active profile may confirm risky fixes in one batch dialog."""
+
+    return profile_id.strip() == SUPERVISOR_FULL_PROFILE_ID
 
 
-def confirm_risky_fixes(qt_widgets: Any, rows: Sequence[FixQueueRow]) -> bool:
+def risky_confirmation_text(
+    rows: Sequence[FixQueueRow],
+    *,
+    selected_rows: Optional[Sequence[FixQueueRow]] = None,
+) -> str:
+    """Build the fix queue confirmation helper label."""
+
+    pending = risky_fix_rows(rows)
+    pending_count = len(pending)
+    if pending_count == 0:
+        return "Risky fixes require confirmation before they can be applied."
+
+    selected_risky = risky_fix_rows(selected_rows or ())
+    selected_count = len(selected_risky)
+    if selected_count:
+        return (
+            f"Risky fixes require confirmation: {pending_count} pending, "
+            f"{selected_count} selected."
+        )
+    return f"Risky fixes require confirmation: {pending_count} pending."
+
+
+def update_risky_confirmation_label(
+    label: Any,
+    rows: Sequence[FixQueueRow],
+    *,
+    selected_rows: Optional[Sequence[FixQueueRow]] = None,
+) -> None:
+    """Refresh the risky-fix confirmation helper label."""
+
+    set_text = getattr(label, "setText", None)
+    if set_text is not None:
+        set_text(risky_confirmation_text(rows, selected_rows=selected_rows))
+
+
+def confirm_risky_fixes(
+    qt_widgets: Any,
+    rows: Sequence[FixQueueRow],
+    *,
+    profile_id: str = "",
+) -> bool:
     """Ask the user to confirm high-risk fixes before application."""
 
     risky = risky_fix_rows(rows)
     if not risky:
         return True
 
+    if allows_batch_risky_confirmation(profile_id):
+        return _confirm_risky_fix_batch(qt_widgets, risky)
+
+    return all(_confirm_single_risky_fix(qt_widgets, row) for row in risky)
+
+
+def _confirm_risky_fix_batch(qt_widgets: Any, risky: Sequence[FixQueueRow]) -> bool:
     message_box = qt_widgets.QMessageBox
-    lines = [
-        f"{row.target_node}.{row.target_attr}: {row.before_value} -> {row.after_value}"
-        for row in risky[:8]
-    ]
+    lines = [_risky_fix_summary_line(row) for row in risky[:8]]
     if len(risky) > 8:
         lines.append(f"... and {len(risky) - 8} more")
     message = (
         f"Apply {len(risky)} high-risk fix(es)? "
         "These changes can affect render look or farm safety.\n\n" + "\n".join(lines)
     )
+    return _message_box_confirmed(message_box, "Confirm Risky Fixes", message)
+
+
+def _confirm_single_risky_fix(qt_widgets: Any, row: FixQueueRow) -> bool:
+    message_box = qt_widgets.QMessageBox
+    message = (
+        "Apply this high-risk fix?\n\n"
+        f"{_risky_fix_summary_line(row)}\n\n"
+        "Cancel leaves the scene unchanged."
+    )
+    return _message_box_confirmed(
+        message_box,
+        "Confirm Risky Fix",
+        message,
+        default_no=True,
+    )
+
+
+def _risky_fix_summary_line(row: FixQueueRow) -> str:
+    risk_bits = [f"risk={row.risk}"]
+    if row.requires_confirmation and row.risk != HIGH_RISK:
+        risk_bits.append("supervisor")
+    risk_label = ", ".join(risk_bits)
+    return (
+        f"[{risk_label}] {row.target_node}.{row.target_attr}: "
+        f"{row.before_value} -> {row.after_value}"
+    )
+
+
+def _message_box_confirmed(
+    message_box: Any,
+    title: str,
+    message: str,
+    *,
+    default_no: bool = True,
+) -> bool:
     standard_button = getattr(message_box, "StandardButton", None)
     if standard_button is not None:
         yes_button = standard_button.Yes
         no_button = standard_button.No
-        default_button = standard_button.No
+        default_button = standard_button.No if default_no else standard_button.Yes
         reply = message_box.warning(
             None,
-            "Confirm Risky Fixes",
+            title,
             message,
             yes_button | no_button,
             default_button,
         )
         return reply == yes_button
 
-    reply = message_box.warning(
-        None,
-        "Confirm Risky Fixes",
-        message,
-        message_box.Yes | message_box.No,
-        message_box.No,
-    )
-    return reply == message_box.Yes
+    yes = message_box.Yes
+    no = message_box.No
+    default = no if default_no else yes
+    reply = message_box.warning(None, title, message, yes | no, default)
+    return reply == yes
 
 
 def _fix_queue_button(

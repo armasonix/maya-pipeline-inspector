@@ -148,6 +148,35 @@ def apply_waivers(
     return tuple(resolved)
 
 
+def revoke_waiver(sidecar: WaiverSidecar, waiver_id: str) -> WaiverSidecar:
+    """Return a sidecar copy with one waiver removed by id."""
+
+    remaining = tuple(waiver for waiver in sidecar.waivers if waiver.id != waiver_id)
+    if len(remaining) == len(sidecar.waivers):
+        raise ValueError(f"Unknown waiver id: {waiver_id}")
+    return WaiverSidecar(
+        waivers=remaining,
+        schema_version=sidecar.schema_version,
+    )
+
+
+def waiver_status_label(waiver: WaiverRecord, *, now_utc: Optional[str] = None) -> str:
+    """Return a display status for waiver manager UI."""
+
+    return "expired" if waiver.expired(now_utc) else "active"
+
+
+def load_waiver_sidecar_optional(path: Optional[str | Path]) -> WaiverSidecar:
+    """Load a waiver sidecar when present, otherwise return an empty sidecar."""
+
+    if path is None:
+        return WaiverSidecar()
+    sidecar_path = Path(path)
+    if not sidecar_path.is_file():
+        return WaiverSidecar()
+    return load_waiver_sidecar(sidecar_path)
+
+
 def load_waiver_sidecar(path: str | Path) -> WaiverSidecar:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, Mapping):

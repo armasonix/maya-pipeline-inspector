@@ -8,6 +8,7 @@ from typing import Any, Optional
 from shader_health.maya.validation_pipeline import list_packaged_profile_ids
 from shader_health.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
 from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
+from shader_health.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager
 
 PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
 PANEL_TITLE = "Maya Shader Health Inspector"
@@ -27,7 +28,9 @@ DETAILS_MESSAGE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsMessage"
 DETAILS_WHY_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsWhy"
 DETAILS_VALUES_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsValues"
 DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsGraphTrace"
+DETAILS_REFERENCE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsReference"
 DETAILS_FIX_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsFix"
+ISSUES_FILTERS_ROW_OBJECT_NAME = "shaderHealthInspectorIssuesFiltersRow"
 EXPORT_ACTIONS_OBJECT_NAME = "shaderHealthInspectorExportActions"
 EXPORT_JSON_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportJsonButton"
 EXPORT_HTML_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportHtmlButton"
@@ -115,6 +118,7 @@ class IssueDetailsState:
     current_value: str = "N/A"
     expected_value: str = "N/A"
     graph_trace: str = "N/A"
+    reference_safety: str = "Reference safety: N/A"
     fix_available: bool = False
     fix_description: str = "No safe fix selected."
 
@@ -156,12 +160,14 @@ def build_main_widget(
     fix_queue_callbacks: Optional[FixQueueActionCallbacks] = None,
     validation_callbacks: Optional[ValidationActionCallbacks] = None,
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
+    waiver_callbacks: Optional[WaiverManagerCallbacks] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
     export_callbacks = export_callbacks or ExportActionCallbacks()
     validation_callbacks = validation_callbacks or ValidationActionCallbacks()
     issue_details_callbacks = issue_details_callbacks or IssueDetailsActionCallbacks()
+    waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
 
     widget = qt_widgets.QWidget()
     widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
@@ -181,6 +187,7 @@ def build_main_widget(
     layout.addWidget(build_validation_actions(qt_widgets, callbacks=validation_callbacks))
     layout.addWidget(build_issues_table(qt_widgets))
     layout.addWidget(build_issue_details_panel(qt_widgets, callbacks=issue_details_callbacks))
+    layout.addWidget(build_waiver_manager(qt_widgets, callbacks=waiver_callbacks))
     layout.addWidget(build_fix_queue(qt_widgets, callbacks=fix_queue_callbacks))
     layout.addWidget(build_export_actions(qt_widgets, callbacks=export_callbacks))
 
@@ -288,42 +295,53 @@ def build_issues_table(
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(4)
 
-    severity_filter_label = qt_widgets.QLabel("Severity Filter")
-    layout.addWidget(severity_filter_label)
+    filters_row = qt_widgets.QWidget()
+    filters_row.setObjectName(ISSUES_FILTERS_ROW_OBJECT_NAME)
+    filters_layout = qt_widgets.QHBoxLayout(filters_row)
+    filters_layout.setContentsMargins(0, 0, 0, 0)
+    filters_layout.setSpacing(8)
 
-    severity_filter = qt_widgets.QComboBox()
-    severity_filter.setObjectName(ISSUES_SEVERITY_FILTER_OBJECT_NAME)
-    severity_filter.addItems(list(severity_filter_options(issue_rows)))
-    severity_filter.setToolTip("Filter issues by severity.")
-    layout.addWidget(severity_filter)
+    severity_filter = _issues_filter_combo(
+        qt_widgets,
+        label="Severity",
+        object_name=ISSUES_SEVERITY_FILTER_OBJECT_NAME,
+        items=list(severity_filter_options(issue_rows)),
+        tooltip="Filter issues by severity.",
+    )
+    owner_filter = _issues_filter_combo(
+        qt_widgets,
+        label="Owner",
+        object_name=ISSUES_OWNER_FILTER_OBJECT_NAME,
+        items=[ALL_OWNERS_LABEL],
+        tooltip="Filter issues by owner.",
+    )
+    view_filter = _issues_filter_combo(
+        qt_widgets,
+        label="View",
+        object_name=ISSUES_VIEW_FILTER_OBJECT_NAME,
+        items=[ALL_ISSUES_LABEL, BLOCKING_ONLY_LABEL, AUTO_FIXABLE_LABEL],
+        tooltip="Filter blocking or auto-fixable issues.",
+    )
+    sort_dropdown = _issues_filter_combo(
+        qt_widgets,
+        label="Sort",
+        object_name=ISSUES_SORT_DROPDOWN_OBJECT_NAME,
+        items=list(ISSUES_SORT_KEYS),
+        tooltip="Column sorting is enabled on the issues table.",
+        current_text="severity",
+    )
 
-    owner_filter_label = qt_widgets.QLabel("Owner Filter")
-    layout.addWidget(owner_filter_label)
+    for label, combo in (
+        severity_filter,
+        owner_filter,
+        view_filter,
+        sort_dropdown,
+    ):
+        filters_layout.addWidget(label)
+        filters_layout.addWidget(combo, 0)
 
-    owner_filter = qt_widgets.QComboBox()
-    owner_filter.setObjectName(ISSUES_OWNER_FILTER_OBJECT_NAME)
-    owner_filter.addItems([ALL_OWNERS_LABEL])
-    owner_filter.setToolTip("Filter issues by owner.")
-    layout.addWidget(owner_filter)
-
-    view_filter_label = qt_widgets.QLabel("View Filter")
-    layout.addWidget(view_filter_label)
-
-    view_filter = qt_widgets.QComboBox()
-    view_filter.setObjectName(ISSUES_VIEW_FILTER_OBJECT_NAME)
-    view_filter.addItems([ALL_ISSUES_LABEL, BLOCKING_ONLY_LABEL, AUTO_FIXABLE_LABEL])
-    view_filter.setToolTip("Filter blocking or auto-fixable issues.")
-    layout.addWidget(view_filter)
-
-    sort_label = qt_widgets.QLabel("Sort By")
-    layout.addWidget(sort_label)
-
-    sort_dropdown = qt_widgets.QComboBox()
-    sort_dropdown.setObjectName(ISSUES_SORT_DROPDOWN_OBJECT_NAME)
-    sort_dropdown.addItems(list(ISSUES_SORT_KEYS))
-    sort_dropdown.setCurrentText("severity")
-    sort_dropdown.setToolTip("Column sorting is enabled on the issues table.")
-    layout.addWidget(sort_dropdown)
+    filters_layout.addStretch(1)
+    layout.addWidget(filters_row)
 
     table = qt_widgets.QTableWidget()
     table.setObjectName(ISSUES_TABLE_OBJECT_NAME)
@@ -382,6 +400,13 @@ def build_issue_details_panel(
             qt_widgets,
             DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME,
             _details_graph_trace_text(details_state),
+        )
+    )
+    layout.addWidget(
+        _details_label(
+            qt_widgets,
+            DETAILS_REFERENCE_LABEL_OBJECT_NAME,
+            _details_reference_text(details_state),
         )
     )
     layout.addWidget(
@@ -629,9 +654,44 @@ def _details_graph_trace_text(state: IssueDetailsState) -> str:
     return f"Graph Trace: {state.graph_trace}"
 
 
+def _details_reference_text(state: IssueDetailsState) -> str:
+    return state.reference_safety
+
+
 def _details_fix_text(state: IssueDetailsState) -> str:
     fix_status = _yes_no(state.fix_available)
     return f"Fix Available: {fix_status}   {state.fix_description}"
+
+
+def _issues_filter_combo(
+    qt_widgets: Any,
+    *,
+    label: str,
+    object_name: str,
+    items: Sequence[str],
+    tooltip: str,
+    current_text: Optional[str] = None,
+) -> tuple[Any, Any]:
+    label_widget = qt_widgets.QLabel(label)
+    combo = qt_widgets.QComboBox()
+    combo.setObjectName(object_name)
+    combo.addItems(list(items))
+    combo.setToolTip(tooltip)
+    if current_text is not None:
+        combo.setCurrentText(current_text)
+    minimum_contents = getattr(combo, "setMinimumContentsLength", None)
+    if minimum_contents is not None:
+        minimum_contents(max(len(item) for item in items) if items else 8)
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    policy = getattr(combo, "setSizePolicy", None)
+    if size_policy is not None and policy is not None:
+        policy(size_policy.Preferred, size_policy.Fixed)
+    adjust_policy = getattr(combo, "setSizeAdjustPolicy", None)
+    combo_class = getattr(qt_widgets, "QComboBox", None)
+    adjust_to_contents = getattr(combo_class, "AdjustToContents", None)
+    if adjust_policy is not None and adjust_to_contents is not None:
+        adjust_policy(adjust_to_contents)
+    return label_widget, combo
 
 
 def _button(

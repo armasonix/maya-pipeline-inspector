@@ -1,6 +1,6 @@
 # Maya Shader Health Inspector — Production Development Plan
 
-> **v0.2 planning:** Milestones 10–14 and Issues #049–#070 are defined in [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md).
+> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3+** — see [§27](#27-roadmap). v0.2 detail: [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md) (Milestones 10–14, Issues #049–#070).
 
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
 **Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
@@ -2095,82 +2095,101 @@ Acceptance criteria:
 
 ---
 
+### Milestones 10–14 — v0.2 Production Hardening (post–v0.1.0)
+
+**Target release:** v0.2.0  
+**Authoritative detail:** [V0_2_DEVELOPMENT_PLAN.md §7–§8](V0_2_DEVELOPMENT_PLAN.md)  
+**GitHub milestones:** [#12–#16](https://github.com/armasonix/maya-shader-health-inspector/milestones) (plan id ↔ GitHub issue mapping in v0.2 plan Appendix B)
+
+| Milestone | Theme | Plan issues |
+|---:|---|---|
+| 10 | Safe Fix Expansion & Audit Trail | #049–#053 |
+| 11 | Renderer Policy Packs | #054–#058 |
+| 12 | Change Review and Manifest Diff UX | #059–#062 |
+| 13 | Studio Integration and Install | #063–#066 |
+| 14 | Waiver Workflow Polish and v0.2 Release | #067–#070 |
+
+Acceptance criteria, dependencies, and module notes for these issues are maintained only in the v0.2 plan document to avoid drift.
+
+---
+
 ## 27. Roadmap
 
-### v0.1 — Core MVP / Public Proof of Concept
+This section reflects delivery **after the v0.1.0 release** (2026-07-03). The original schedule assumed v0.2–v0.4 would ship sequentially; v0.1 absorbed much of that scope early. See [V0_2_DEVELOPMENT_PLAN.md §3](V0_2_DEVELOPMENT_PLAN.md) for the realignment rationale.
 
-Theme: **Texture & Shader Preflight**
+### v0.1 — Core MVP / Public Proof of Concept (shipped)
 
-- Core snapshot model.
-- Rule engine.
-- Common Maya rules.
-- Basic V-Ray/Arnold adapters.
-- Missing texture/path/colorSpace/UDIM checks.
-- Basic dockable panel.
-- JSON/HTML report.
-- Demo scene.
+**Tag:** `v0.1.0`  
+**Theme:** Texture & Shader Preflight  
+**Plan:** Milestones 0–8, Issues #1–#48 ([§26](#26-github-milestones-and-issues))
 
-### v0.2 — Production Safety Layer
+Delivered:
 
-Theme: **Safe Fixes and Deadline Preflight**
+- Core snapshot model and JSON rule engine.
+- Common Maya rules; basic V-Ray/Arnold adapter stubs.
+- Missing texture, path policy, colorSpace, UDIM, displacement risk, complexity, duplicate/orphan checks.
+- Dockable panel, issue table, navigation, Safe Auto-Fix Queue (`set_attr` only), waiver sidecar.
+- JSON/HTML reports, shader manifest export, JSON manifest diff tool.
+- Headless CLI, Deadline submit preflight example, demo scene, ADRs, CI.
 
-- Safe Auto-Fix Queue.
-- Reference-safe fix blocking.
-- Waiver sidecar system.
-- Deadline submit hook example.
-- Headless mayapy command.
-- Publish/Deadline profiles.
+### v0.2 — Production Hardening & Studio Readiness (shipped)
 
-### v0.3 — Material Passport and Diff
+**Tag:** `v0.2.0` (2026-07-06)
 
-Theme: **Asset Health Visibility**
+Delivered (Milestones 10–14, Issues #049–#070):
 
-- Material Passport / Shader Manifest.
-- Manifest diff validation.
-- Texture freshness improvements.
-- HTML diff report.
-- More robust graph fingerprinting.
+- Safe fix expansion (`relink_path`, `normalize_path`, `disable_feature`) and fix apply audit trail.
+- V-Ray and Arnold production policy rule packs with enriched snapshot metadata.
+- HTML manifest diff, CLI `diff` subcommand, UI export workflow, texture freshness hardening.
+- Publish preflight example, Maya module install guide, studio overrides documentation, optional Maya CI workflow.
+- Waiver manager UI, high-risk fix confirmation, reference-edit apply, reconciled roadmap (#069).
 
-### v0.4 — Optimization and Render Risk
+### v0.3 — Pipeline Automation & Manifest Depth
 
-Theme: **Cost and Complexity Control**
+**Theme:** Headless and passport workflows beyond the v0.2 change-review UX.
 
-- Shader Complexity Budget Profiler.
-- Displacement Risk Analyzer expansion.
-- Optimized texture freshness checks.
-- Texture resolution budget by asset class.
-- Duplicate material detector.
+Deferred from earlier roadmap cycles (partial coverage already in v0.1/v0.2):
+
+- Headless `--apply-fixes` mode (requires new ADR and strict supervisor policy).
+- Stronger graph fingerprinting and manifest regression gates.
+- Texture resolution budgets by asset class.
+- Remaining passport/diff automation not covered in Milestone 12.
+
+### v0.4 — Optimization and Render Risk (remaining)
+
+**Theme:** Cost and farm-risk controls beyond basic v0.1 checks.
+
+- Shader complexity budget profiler expansion.
+- Displacement risk analyzer depth.
+- Optimized texture / TX / tiled-texture policy enforcement.
+- Duplicate material detector at scale.
+
+v0.1 shipped baseline complexity, displacement, and optimized-texture **rules**; v0.4 focuses on expanded policy depth and budgets.
 
 ### v0.5 — Rule Authoring and Incident Workflow
 
-Theme: **Studio Customization**
+**Theme:** Studio customization without hand-editing JSON for every change.
 
 - Rule Authoring UI.
 - Incident-to-Rule workflow.
-- Rule pack validation tool.
-- Better documentation for studio overrides.
+- Rule pack validation tooling.
+- Studio override documentation improvements beyond v0.2 guides.
 
 ### v1.0 — Production Ready Public Release
 
-Theme: **Stable Open-Source QA Framework**
+**Theme:** Stable open-source QA framework.
 
-- Stable schema.
-- Stable adapter API.
-- Complete docs.
-- Demo package.
-- CI coverage.
-- Maya install guide.
-- Deadline integration guide.
-- Release notes and public portfolio page.
+- Stable schema and adapter API.
+- Complete documentation set (including install and integration guides started in v0.2).
+- Demo package, CI coverage, release discipline.
+- Public portfolio-quality README and release notes.
 
 ### Future
 
-- RenderMan adapter.
-- Redshift adapter.
-- USD / MaterialX inspection.
+- RenderMan, Redshift, USD / MaterialX adapters.
 - Lookdev regression thumbnails.
 - Optional texture generation via maketx.
-- ShotGrid/FTrack issue publishing.
+- ShotGrid / FTrack issue publishing.
 - Background incremental scan cache.
 
 ---

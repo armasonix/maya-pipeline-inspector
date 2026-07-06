@@ -5,16 +5,27 @@ from typing import Any, Optional
 
 from shader_health.ui import main_window
 from shader_health.ui.fix_queue import (
+    FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
     FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
+    blocked_selection_message,
+    checked_fix_rows,
     confirm_risky_fixes,
     fix_rows_from_table,
     populate_fix_queue,
     risky_fix_rows,
     safe_fix_rows,
     selected_fix_rows,
+    update_risky_confirmation_label,
 )
 from shader_health.ui.qt import load_qt_widgets
+from shader_health.ui.waiver_manager import (
+    WAIVER_STATUS_LABEL_OBJECT_NAME,
+    WAIVER_TABLE_OBJECT_NAME,
+    populate_waiver_table,
+    waiver_rows_from_records,
+    waiver_summary_text,
+)
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
@@ -86,13 +97,16 @@ def _create_dockable_panel() -> Any:
             export_callbacks=_export_action_callbacks(),
             validation_callbacks=_validation_action_callbacks(panel_state, qt_widgets),
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
+            waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
         )
         panel_state["content"] = content
         self._shader_health_content = content
         _wire_issues_table_interactions(content, qt_widgets)
+        _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
         layout.addWidget(content)
+        _refresh_waiver_manager(content, qt_widgets)
 
     panel_class = type(
         "ShaderHealthInspectorDock",
@@ -100,6 +114,25 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _waiver_manager_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> Any:
+    from shader_health.ui.waiver_manager import WaiverManagerCallbacks
+
+    return WaiverManagerCallbacks(
+        on_refresh=lambda: _refresh_waiver_manager(_panel_content(panel_state), qt_widgets),
+        on_revoke_selected=lambda: _revoke_selected_waiver_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_waiver_selected=lambda: _on_waiver_row_selected(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
 
 
 def _export_action_callbacks() -> main_window.ExportActionCallbacks:
@@ -346,6 +379,82 @@ def _waive_selected_issue_from_ui(content: Any, qt_widgets: Any) -> None:
     _revalidate_with_current_scope(content, qt_widgets)
 
 
+def _refresh_waiver_manager(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya import commands
+
+    try:
+        listing = commands.list_waivers_action(
+            getattr(content, "_shader_health_scene_path", None),
+        )
+    except Exception as exc:  # noqa: BLE001
+        _set_label_text(
+            content,
+            qt_widgets,
+            WAIVER_STATUS_LABEL_OBJECT_NAME,
+            f"Could not load waivers: {exc}",
+        )
+        return
+
+    waivers = getattr(listing, "waivers", ())
+    rows = waiver_rows_from_records(waivers)
+    table = _find_child(content, qt_widgets.QTableWidget, WAIVER_TABLE_OBJECT_NAME)
+    if table is not None:
+        table.setSortingEnabled(False)
+        populate_waiver_table(qt_widgets, table, rows)
+        table.setSortingEnabled(True)
+
+    content._shader_health_waiver_rows = rows
+    content._shader_health_waivers = tuple(waivers)
+    content._shader_health_waiver_sidecar_path = getattr(listing, "path", "")
+    _set_label_text(
+        content,
+        qt_widgets,
+        WAIVER_STATUS_LABEL_OBJECT_NAME,
+        waiver_summary_text(rows, sidecar_path=getattr(listing, "path", "")),
+    )
+    _on_waiver_row_selected(content, qt_widgets)
+
+
+def _revoke_selected_waiver_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya import commands
+
+    waiver_id = getattr(content, "_shader_health_selected_waiver_id", "")
+    if not waiver_id:
+        _set_label_text(
+            content,
+            qt_widgets,
+            WAIVER_STATUS_LABEL_OBJECT_NAME,
+            "Select a waiver row before revoking.",
+        )
+        return
+    try:
+        result = commands.revoke_waiver_action(
+            waiver_id,
+            getattr(content, "_shader_health_scene_path", None),
+        )
+    except Exception as exc:  # noqa: BLE001
+        _set_label_text(content, qt_widgets, WAIVER_STATUS_LABEL_OBJECT_NAME, str(exc))
+        return
+    _set_label_text(content, qt_widgets, WAIVER_STATUS_LABEL_OBJECT_NAME, result.message)
+    _refresh_waiver_manager(content, qt_widgets)
+    _revalidate_with_current_scope(content, qt_widgets)
+
+
+def _on_waiver_row_selected(content: Any, qt_widgets: Any) -> None:
+    table = _find_child(content, qt_widgets.QTableWidget, WAIVER_TABLE_OBJECT_NAME)
+    rows = getattr(content, "_shader_health_waiver_rows", ())
+    if table is None or not rows:
+        content._shader_health_selected_waiver_id = ""
+        return
+
+    current_row = getattr(table, "currentRow", lambda: -1)()
+    if current_row is None or int(current_row) < 0 or int(current_row) >= len(rows):
+        content._shader_health_selected_waiver_id = ""
+        return
+
+    content._shader_health_selected_waiver_id = rows[int(current_row)].waiver_id
+
+
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
     health = result.health_score
     _set_label_text(
@@ -395,6 +504,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         failed_results,
     )
     _populate_first_issue_details(content, qt_widgets, display_results)
+    _refresh_waiver_manager(content, qt_widgets)
 
 
 def _update_severity_filter_options(
@@ -473,6 +583,8 @@ def _store_validation_state(
     content._shader_health_snapshot = getattr(result, "snapshot", None)
     content._shader_health_results = getattr(result, "results", ())
     content._shader_health_profile_id = getattr(result, "profile_id", "")
+    snapshot = getattr(result, "snapshot", None)
+    content._shader_health_scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
     _populate_fix_queue(content, result)
 
 
@@ -488,6 +600,7 @@ def _populate_fix_queue(content: Any, result: Any) -> None:
             target_attr=str(action.target_attr or ""),
             before_value=str(action.before_value),
             after_value=str(action.after_value),
+            fix_id=action.fix_id,
             blocked=action.blocked,
             requires_confirmation=action.risk == "high" or action.requires_supervisor,
         )
@@ -497,7 +610,29 @@ def _populate_fix_queue(content: Any, result: Any) -> None:
     qt_widgets = load_qt_widgets()
     table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
     if table is not None:
-        populate_fix_queue(qt_widgets, table, fix_rows)
+        populate_fix_queue(
+            qt_widgets,
+            table,
+            fix_rows,
+            on_selection_changed=lambda: _sync_fix_queue_selection(content, qt_widgets),
+        )
+    _refresh_fix_queue_confirmation_label(content, qt_widgets, fix_rows)
+
+
+def _refresh_fix_queue_confirmation_label(
+    content: Any,
+    qt_widgets: Any,
+    rows: tuple[FixQueueRow, ...],
+    *,
+    selected_rows: Optional[tuple[FixQueueRow, ...]] = None,
+) -> None:
+    label = _find_child(
+        content,
+        qt_widgets.QLabel,
+        FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
+    )
+    if label is not None:
+        update_risky_confirmation_label(label, rows, selected_rows=selected_rows)
 
 
 def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
@@ -550,6 +685,16 @@ def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
             connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
 
 
+def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
+    table = _find_child(content, qt_widgets.QTableWidget, WAIVER_TABLE_OBJECT_NAME)
+    if table is not None:
+        selection_model = getattr(table, "selectionModel", lambda: None)()
+        selection_changed = getattr(selection_model, "selectionChanged", None)
+        connect = getattr(selection_changed, "connect", None)
+        if connect is not None:
+            connect(lambda *_: _on_waiver_row_selected(content, qt_widgets))
+
+
 def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
     table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
     apply_selected = _find_child(
@@ -563,16 +708,11 @@ def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
         "shaderHealthInspectorApplySafeFixesButton",
     )
     if table is not None:
-        cell_clicked = getattr(table, "cellClicked", None)
-        connect = getattr(cell_clicked, "connect", None)
-        if connect is not None:
-            connect(
-                lambda row, column: _on_fix_queue_cell_clicked(
-                    content,
-                    qt_widgets,
-                    int(row),
-                    int(column),
-                ),
+        item_changed = getattr(table, "itemChanged", None)
+        connect_changed = getattr(item_changed, "connect", None)
+        if connect_changed is not None:
+            connect_changed(
+                lambda item: _on_fix_queue_item_changed(content, qt_widgets, item),
             )
     if apply_selected is not None:
         clicked = getattr(apply_selected, "clicked", None)
@@ -586,24 +726,7 @@ def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
             connect(lambda *_: _apply_safe_fixes_from_ui(content, qt_widgets))
 
 
-def _on_fix_queue_cell_clicked(
-    content: Any,
-    qt_widgets: Any,
-    row: int,
-    column: int,
-) -> None:
-    if column != 0:
-        return
-    from shader_health.ui.fix_queue import toggle_selected_table_item
-
-    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
-    stored_rows = getattr(content, "_shader_health_fix_rows", ())
-    if table is None or not stored_rows or row < 0 or row >= len(stored_rows):
-        return
-    item = table.item(row, 0)
-    if item is None:
-        return
-    toggle_selected_table_item(item)
+def _on_fix_queue_item_changed(content: Any, qt_widgets: Any, item: Any) -> None:
     _sync_fix_queue_selection(content, qt_widgets)
 
 
@@ -612,7 +735,15 @@ def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
     stored_rows = getattr(content, "_shader_health_fix_rows", ())
     if table is None or not stored_rows:
         return
-    content._shader_health_fix_rows = fix_rows_from_table(table, stored_rows)
+    fix_rows = fix_rows_from_table(table, stored_rows)
+    content._shader_health_fix_rows = fix_rows
+    selected = selected_fix_rows(fix_rows)
+    _refresh_fix_queue_confirmation_label(
+        content,
+        qt_widgets,
+        fix_rows,
+        selected_rows=selected,
+    )
 
 
 def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -625,46 +756,62 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         return
     fix_rows = fix_rows_from_table(table, stored_rows)
     content._shader_health_fix_rows = fix_rows
+    checked = checked_fix_rows(fix_rows)
     selected = selected_fix_rows(fix_rows)
+    if not checked:
+        _set_label_text(
+            content,
+            qt_widgets,
+            "shaderHealthInspectorDescription",
+            "No fixes selected. Click Select on rows in the Safe Auto-Fix Queue first.",
+        )
+        return
+    blocked_message = blocked_selection_message(fix_rows)
     if not selected:
         _set_label_text(
             content,
             qt_widgets,
             "shaderHealthInspectorDescription",
-            "No fixes selected. Check rows in the Safe Auto-Fix Queue first.",
+            blocked_message
+            or "Selected fixes are blocked and were not applied.",
         )
         return
-    selected_ids = {
-        (row.target_node, row.target_attr, row.before_value, row.after_value)
-        for row in selected
-    }
+    selected_ids = {row.fix_id for row in selected if row.fix_id}
     actions = tuple(
         action
         for action in fix_plan.actions
-        if (
-            action.target_node,
-            str(action.target_attr or ""),
-            str(action.before_value),
-            str(action.after_value),
-        )
-        in selected_ids
+        if action.fix_id in selected_ids
     )
-    if risky_fix_rows(selected) and not confirm_risky_fixes(qt_widgets, selected):
+    if not actions:
         _set_label_text(
             content,
             qt_widgets,
             "shaderHealthInspectorDescription",
-            "High-risk fixes were not applied.",
+            "No matching fix actions found for the selected queue rows.",
         )
         return
+    if risky_fix_rows(selected):
+        profile_id = getattr(content, "_shader_health_profile_id", "") or ""
+        if not confirm_risky_fixes(qt_widgets, selected, profile_id=profile_id):
+            _set_label_text(
+                content,
+                qt_widgets,
+                "shaderHealthInspectorDescription",
+                "High-risk fixes were not applied.",
+            )
+            return
     allow_high_risk = bool(risky_fix_rows(selected))
-    report = apply_fix_actions(actions, allow_high_risk=allow_high_risk)
+    report = apply_fix_actions(
+        actions,
+        allow_high_risk=allow_high_risk,
+        allow_referenced=True,
+    )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,
         qt_widgets,
         "shaderHealthInspectorDescription",
-        f"Applied {report.applied_count} selected fix(es).",
+        _format_fix_apply_message(report, selected_count=len(selected)),
     )
     _revalidate_with_current_scope(content, qt_widgets)
 
@@ -679,28 +826,24 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         return
     fix_rows = fix_rows_from_table(table, stored_rows)
     content._shader_health_fix_rows = fix_rows
-    safe_ids = {
-        (row.target_node, row.target_attr, row.before_value, row.after_value)
-        for row in safe_fix_rows(fix_rows)
-    }
-    actions = tuple(
-        action
-        for action in fix_plan.actions
-        if (
-            action.target_node,
-            str(action.target_attr or ""),
-            str(action.before_value),
-            str(action.after_value),
+    safe_ids = {row.fix_id for row in safe_fix_rows(fix_rows) if row.fix_id}
+    actions = tuple(action for action in fix_plan.actions if action.fix_id in safe_ids)
+    if not actions:
+        _set_label_text(
+            content,
+            qt_widgets,
+            "shaderHealthInspectorDescription",
+            "No safe fixes available. Referenced, locked, medium/high-risk, "
+            "or unplannable fixes are skipped.",
         )
-        in safe_ids
-    )
-    report = apply_fix_actions(actions)
+        return
+    report = apply_fix_actions(actions, allow_referenced=True)
     _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,
         qt_widgets,
         "shaderHealthInspectorDescription",
-        f"Applied {report.applied_count} safe fix(es).",
+        _format_fix_apply_message(report, selected_count=len(actions)),
     )
     _revalidate_with_current_scope(content, qt_widgets)
 
@@ -826,14 +969,16 @@ def _refresh_issues_table_view(content: Any, qt_widgets: Any) -> None:
 
 
 def _populate_issue_details(content: Any, qt_widgets: Any, issue: Any) -> None:
+    fix_action = _fix_action_for_issue(content, issue)
     state = main_window.IssueDetailsState(
         message=str(issue.message),
         why=str(issue.why),
         current_value=str(issue.current_value),
         expected_value=str(issue.expected_value),
         graph_trace=" -> ".join(str(item) for item in issue.graph_trace) or "N/A",
+        reference_safety=_reference_safety_text(content, issue, fix_action),
         fix_available=bool(issue.auto_fix_available),
-        fix_description=str(issue.fix_id or "No safe fix selected."),
+        fix_description=_fix_description_text(issue, fix_action),
     )
     _set_label_text(
         content,
@@ -862,9 +1007,95 @@ def _populate_issue_details(content: Any, qt_widgets: Any, issue: Any) -> None:
     _set_label_text(
         content,
         qt_widgets,
+        main_window.DETAILS_REFERENCE_LABEL_OBJECT_NAME,
+        state.reference_safety,
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
         main_window.DETAILS_FIX_LABEL_OBJECT_NAME,
         f"Fix Available: {_yes_no(state.fix_available)}   {state.fix_description}",
     )
+
+
+def _fix_action_for_issue(content: Any, issue: Any) -> Any:
+    fix_plan = getattr(content, "_shader_health_fix_plan", None)
+    if fix_plan is None:
+        return None
+    issue_node = str(getattr(issue, "node", "") or "")
+    for action in getattr(fix_plan, "actions", ()):
+        if getattr(action, "rule_id", "") != getattr(issue, "rule_id", ""):
+            continue
+        target_node = str(getattr(action, "target_node", "") or "")
+        if issue_node and target_node and issue_node in {target_node, target_node.split("|")[-1]}:
+            return action
+        if issue_node and issue_node == target_node:
+            return action
+    for action in getattr(fix_plan, "actions", ()):
+        if getattr(action, "rule_id", "") == getattr(issue, "rule_id", ""):
+            return action
+    return None
+
+
+def _node_snapshot_for_issue(content: Any, issue: Any) -> Any:
+    snapshot = getattr(content, "_shader_health_snapshot", None)
+    if snapshot is None:
+        return None
+    issue_node = str(getattr(issue, "node", "") or "")
+    target_id = str(getattr(issue, "target_id", "") or "")
+    for node in getattr(snapshot, "nodes", ()):
+        candidates = {
+            str(getattr(node, "id", "") or ""),
+            str(getattr(node, "name", "") or ""),
+            str(getattr(node, "full_name", "") or ""),
+        }
+        if issue_node in candidates or target_id in candidates:
+            return node
+    return None
+
+
+def _reference_safety_text(content: Any, issue: Any, fix_action: Any) -> str:
+    referenced = bool(getattr(fix_action, "referenced", False))
+    locked = bool(getattr(fix_action, "locked", False))
+    reference_path = getattr(fix_action, "reference_path", None)
+    blocked = bool(getattr(fix_action, "blocked", False))
+    block_reasons = list(getattr(fix_action, "block_reasons", ()) or ())
+
+    node = _node_snapshot_for_issue(content, issue)
+    if node is not None:
+        referenced = referenced or bool(getattr(node, "referenced", False))
+        locked = locked or bool(getattr(node, "locked", False))
+        reference_path = reference_path or getattr(node, "reference_path", None)
+
+    if referenced:
+        path_label = str(reference_path or "unknown reference")
+        requires_edit = bool(getattr(fix_action, "requires_reference_edit", False))
+        if requires_edit and not locked:
+            return (
+                "Reference safety: referenced node "
+                f"({path_label}). Fixes apply here as reference edits."
+            )
+        blocked_here = blocked or "target_locked" in block_reasons
+        suffix = " Fix blocked in this scene." if blocked_here else ""
+        return f"Reference safety: referenced node ({path_label}).{suffix}"
+    if locked:
+        blocked_here = blocked or "target_locked" in block_reasons
+        suffix = " Fix blocked in this scene." if blocked_here else ""
+        return f"Reference safety: locked node.{suffix}"
+    return "Reference safety: local node — safe fixes may apply when not blocked by risk policy."
+
+
+def _fix_description_text(issue: Any, fix_action: Any) -> str:
+    if fix_action is None:
+        return str(getattr(issue, "fix_id", None) or "No safe fix selected.")
+    parts = [
+        str(getattr(fix_action, "fix_type", "") or getattr(issue, "fix_id", "")),
+        f"risk={getattr(fix_action, 'risk', '')}",
+    ]
+    if getattr(fix_action, "blocked", False):
+        reasons = ", ".join(getattr(fix_action, "block_reasons", ()) or ())
+        parts.append(f"blocked ({reasons or 'policy'})")
+    return " ".join(part for part in parts if part)
 
 
 def _issue_row_from_result(result: Any) -> main_window.IssueTableRow:
@@ -890,6 +1121,7 @@ def _populate_first_issue_details(
             current_value="N/A",
             expected_value="N/A",
             graph_trace="N/A",
+            reference_safety="Reference safety: N/A",
             fix_available=False,
             fix_description="No safe fix selected.",
         )
@@ -916,6 +1148,12 @@ def _populate_first_issue_details(
             qt_widgets,
             main_window.DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME,
             f"Graph Trace: {state.graph_trace}",
+        )
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.DETAILS_REFERENCE_LABEL_OBJECT_NAME,
+            state.reference_safety,
         )
         _set_label_text(
             content,
@@ -1022,6 +1260,20 @@ def _set_label_text(content: Any, qt_widgets: Any, object_name: str, text: str) 
     label = _find_child(content, qt_widgets.QLabel, object_name)
     if label is not None:
         label.setText(text)
+
+
+def _format_fix_apply_message(report: Any, *, selected_count: int) -> str:
+    applied = int(getattr(report, "applied_count", 0) or 0)
+    blocked = int(getattr(report, "blocked_count", 0) or 0)
+    failed = int(getattr(report, "failed_count", 0) or 0)
+    message = f"Applied {applied} of {selected_count} selected fix(es)."
+    if blocked:
+        message += f" {blocked} blocked at apply time."
+    if failed:
+        message += f" {failed} failed."
+    if applied == 0 and blocked == 0 and failed == 0:
+        message = "No fixes were applied."
+    return message
 
 
 def _yes_no(value: bool) -> str:

@@ -63,7 +63,10 @@ def test_texture_freshness_rule_pack_has_production_defaults():
     assert rule.check.type == "texture_version_latest"
     assert rule.policy.block_publish is False
     assert rule.policy.block_deadline is False
-    assert rule.policy.auto_fix_allowed is False
+    assert rule.policy.auto_fix_allowed is True
+    assert rule.fix is not None
+    assert rule.fix.type == "relink_path"
+    assert rule.fix.risk == "medium"
 
 
 def test_texture_freshness_rule_fails_for_outdated_version():
@@ -83,7 +86,8 @@ def test_texture_freshness_rule_fails_for_outdated_version():
     assert result.evidence["latest_version"] == "003"
     assert result.block_publish is False
     assert result.block_deadline is False
-    assert result.auto_fix_available is False
+    assert result.auto_fix_available is True
+    assert result.fix_id == "relink_path"
 
 
 def test_texture_freshness_rule_passes_for_latest_version():

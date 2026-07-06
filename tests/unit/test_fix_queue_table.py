@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from shader_health.ui.fix_queue import (
     FixQueueRow,
+    blocked_selection_message,
+    checked_fix_rows,
     fix_rows_from_table,
     safe_fix_rows,
     selected_fix_rows,
@@ -76,6 +78,53 @@ def test_selected_from_table_item():
     assert selected_from_table_item(FakeItem("YES")) is True
     assert selected_from_table_item(FakeItem("NO")) is False
     assert selected_from_table_item(None) is False
+
+
+def test_blocked_selection_message_lists_blocked_targets():
+    rows = (
+        FixQueueRow(
+            selected=True,
+            title="Blocked",
+            risk="medium",
+            target_node="demo_albedo_v001_2",
+            target_attr="fileTextureName",
+            before_value="D:/tex/old.exr",
+            after_value="${ASSET_ROOT}/tex/old.exr",
+            blocked=True,
+        ),
+    )
+
+    message = blocked_selection_message(rows)
+
+    assert "demo_albedo_v001_2.fileTextureName" in message
+    assert "blocked" in message.lower()
+
+
+def test_checked_fix_rows_includes_blocked_selection():
+    rows = (
+        FixQueueRow(
+            selected=True,
+            title="Blocked",
+            risk="medium",
+            target_node="file1",
+            target_attr="fileTextureName",
+            before_value="a",
+            after_value="b",
+            blocked=True,
+        ),
+        FixQueueRow(
+            selected=False,
+            title="Clear",
+            risk="low",
+            target_node="file2",
+            target_attr="colorSpace",
+            before_value="a",
+            after_value="b",
+        ),
+    )
+
+    assert len(checked_fix_rows(rows)) == 1
+    assert len(selected_fix_rows(rows)) == 0
 
 
 def test_safe_fix_rows_excludes_medium_and_high_risk_fixes():

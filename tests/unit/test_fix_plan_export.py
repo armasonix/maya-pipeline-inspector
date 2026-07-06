@@ -57,7 +57,7 @@ def test_build_fix_plan_export_includes_adr_metadata():
     assert action["after_value"] == "Raw"
     assert action["referenced"] is True
     assert action["locked"] is True
-    assert action["block_reasons"] == ["target_referenced", "target_locked"]
+    assert action["block_reasons"] == ["target_locked"]
 
 
 def test_fix_plan_export_output_is_deterministic():

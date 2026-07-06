@@ -96,9 +96,10 @@ class FakeVBoxLayout:
     def setSpacing(self, spacing: int) -> None:
         self.spacing = spacing
 
-    def addWidget(self, widget: Any) -> None:
+    def addWidget(self, widget: Any, stretch: Optional[int] = None) -> None:
         self.widgets.append(widget)
         self.parent.children.append(widget)
+        _ = stretch
 
     def addStretch(self, stretch: int) -> None:
         self.stretches.append(stretch)

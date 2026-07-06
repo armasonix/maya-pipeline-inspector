@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
 
-Status: v0.1 MVP. The dockable Maya UI, headless CLI, packaged profiles, waiver sidecars, and report export are implemented. See the demo scene under `examples/broken_scene/`.
+Status: **v0.2.0 shipped** (2026-07-06). See [CHANGELOG.md](../CHANGELOG.md) and [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md).
 
 Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
 
@@ -10,7 +10,7 @@ Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVE
 
 ## What the Tool Checks
 
-The v0.1 MVP validates:
+v0.2 adds expanded safe fixes, renderer policy packs, manifest diff, waiver manager, and pipeline integration docs. v0.1 MVP validates:
 
 - missing texture files;
 - local or unsafe texture paths;
@@ -213,6 +213,22 @@ Auto-fix: available
 
 ## Safe Auto-Fix Workflow
 
+Use the **checkboxes** in the Selected column to choose fixes. **Apply Safe Fixes** runs only non-blocked low-risk `set_attr` fixes. **Apply Selected Fixes** runs checked medium/high fixes (with confirmation when required).
+
+### Local development paths (no studio `$ASSET_ROOT` yet)
+
+When textures use absolute paths such as `D:/Workspace/.../examples/broken_scene/textures/...`, the `normalize_path` fix rewrites them relative to the detected project root (folder containing `src/shader_health/`) as `${ASSET_ROOT}/examples/broken_scene/...`.
+
+Paths outside the project (for example `C:/Users/.../Documents/local_only_texture.exr`) normalize to `${ASSET_ROOT}/textures/<filename>`. Copy or relink the file into your project textures folder after apply if needed.
+
+For a local-only workflow:
+
+1. Validate and review the **After** column — it must show a real `${ASSET_ROOT}/...` path, not the placeholder `path policy compliant`.
+2. Apply the normalize fix, then manually set Maya project/`ASSET_ROOT` resolver or replace `${ASSET_ROOT}` with your checkout path in file nodes.
+3. Missing texture paths (`DOES_NOT_EXIST_...`) cannot be auto-fixed — create the file or relink manually.
+
+Studio pipelines should configure `${ASSET_ROOT}` / `${TEXTURE_ROOT}` in rule packs and profiles per [`STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md).
+
 Auto-fix is never silent.
 
 Expected flow:
@@ -232,23 +248,32 @@ Low-risk example:
 file_roughness.colorSpace: ACEScg -> Raw
 ```
 
-High-risk fixes should require explicit confirmation or supervisor approval depending on profile.
+High-risk fixes require explicit confirmation before apply. The fix queue shows how many risky fixes are pending and how many are selected. Click **Select** on each row you want to apply, then use **Apply Selected Fixes**. Cancel on a confirmation dialog leaves the scene unchanged; confirm applies fixes inside a Maya undo chunk.
+
+Issue Details also shows **Reference safety** (referenced/locked node and whether fixes are blocked). See [`MAYA_V02_MANUAL_CHECKLIST.md`](MAYA_V02_MANUAL_CHECKLIST.md) for Maya verification sessions (demo, reference, renderer).
+
+- **Strict profiles** (`artist_relaxed`, `publish_strict`, `deadline_critical`, …): one confirmation dialog per risky fix.
+- **`supervisor_full`**: a single batch confirmation for all selected risky fixes.
 
 ## Reference Safety
 
-Referenced and locked nodes should not be modified by default.
+Referenced nodes can be fixed **in the current scene** as Maya reference edits when the node is not locked. Locked nodes remain blocked.
+
+The dockable panel shows **Reference safety** in Issue Details. Referenced fixes show **Blocked = NO** unless the node is locked or the fix is otherwise unplannable (for example an invalid normalize path). You do not need to open the reference file separately for typical attribute and path fixes.
 
 If an issue is inside a referenced asset, the tool should:
 
 - report the problem;
 - show the reference path;
-- block unsafe auto-fix by default;
-- suggest opening/fixing the source asset file;
+- apply safe fixes in-place when Maya allows reference edits;
+- block only locked nodes or policy-blocked fixes;
 - allow waiver only if profile policy permits it.
 
 ## Waivers
 
 Waivers are controlled exceptions for known issues.
+
+The dockable panel includes a **Waiver Manager** section that lists waivers from the scene sidecar (`*.shader_health_waivers.json`), shows rule id, target, approver, expiry, and whether each entry is active or expired. Expired waivers are labeled as ignored on validate. Use **Revoke Selected** to remove a waiver and revalidate.
 
 Expected behavior (implemented via waiver sidecar beside the scene file):
 
@@ -325,7 +350,7 @@ Expected behavior:
 
 ## Current Development Status
 
-v0.1 MVP is implemented: core rule engine, Maya scanner, snapshot enrichment, dockable UI, headless CLI, packaged profiles, waiver sidecars, JSON/HTML reports, shader manifest export, and safe-fix queue. Public CI runs pure Python tests; optional `mayapy` integration is documented in [`MAYA_INSTALL.md`](MAYA_INSTALL.md).
+v0.2 is implemented: expanded safe fixes, renderer policy packs, waiver manager, manifest diff, headless CLI parity, and optional Maya CI workflow. Public CI runs pure Python tests; optional `mayapy` integration is documented in [`MAYA_INSTALL.md`](MAYA_INSTALL.md).
 
 See also:
 

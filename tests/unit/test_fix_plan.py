@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from shader_health.core.fix_plan import (
     build_fix_plan,
+    project_root_from_scene,
     replace_path_prefix,
     resolve_normalize_path_value,
 )
@@ -87,8 +89,30 @@ def test_fix_planner_includes_referenced_and_locked_status():
     assert action.reference_path == "D:/show/assets/char/hero.ma"
     assert action.requires_reference_edit is True
     assert action.blocked is True
-    assert action.block_reasons == ["target_referenced", "target_locked"]
+    assert action.block_reasons == ["target_locked"]
     assert plan.blocked_count == 1
+
+
+def test_fix_planner_allows_referenced_fixes_when_not_locked():
+    rule = _rule_with_fix()
+    result = _failed_result()
+    snapshot = _snapshot(
+        NodeSnapshot(
+            id="node:file1",
+            name="file1",
+            type_name="file",
+            referenced=True,
+            reference_path="D:/show/assets/char/hero.ma",
+        )
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    action = plan.actions[0]
+    assert action.referenced is True
+    assert action.requires_reference_edit is True
+    assert action.blocked is False
+    assert action.block_reasons == []
 
 
 def test_fix_planner_marks_high_risk_actions_as_supervisor_required_and_blocked():
@@ -143,7 +167,8 @@ def test_fix_planner_resolves_material_target_to_underlying_node():
     action = plan.actions[0]
     assert action.target_node == "asset:mat1"
     assert action.referenced is True
-    assert action.block_reasons == ["target_referenced"]
+    assert action.block_reasons == []
+    assert action.blocked is False
 
 
 def test_replace_path_prefix_rewrites_matching_root():
@@ -162,6 +187,184 @@ def test_resolve_normalize_path_value_uses_replace_from_and_replace_to():
             "replace_to": "$ASSET_ROOT",
         },
     ) == "$ASSET_ROOT/tex/albedo.exr"
+
+
+def test_resolve_normalize_path_value_uses_scene_project_root_fallback(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    (repo_root / "src" / "shader_health").mkdir(parents=True)
+    scene_path = repo_root / "examples" / "broken_scene" / "demo.ma"
+    scene_path.parent.mkdir(parents=True)
+    texture_path = repo_root / "examples" / "broken_scene" / "textures" / "demo.exr"
+    texture_path.parent.mkdir(parents=True)
+
+    assert resolve_normalize_path_value(
+        str(texture_path).replace("\\", "/"),
+        {"replace_to": "${ASSET_ROOT}"},
+        scene_path=str(scene_path).replace("\\", "/"),
+    ) == "${ASSET_ROOT}/examples/broken_scene/textures/demo.exr"
+
+
+def test_resolve_normalize_path_value_maps_user_home_path_to_asset_root_textures():
+    assert resolve_normalize_path_value(
+        "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+        {"replace_to": "${ASSET_ROOT}"},
+        scene_path="D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/demo.ma",
+    ) == "${ASSET_ROOT}/textures/local_only_texture.exr"
+
+
+def test_project_root_from_scene_detects_shader_health_repo(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    (repo_root / "src" / "shader_health").mkdir(parents=True)
+    scene_path = repo_root / "examples" / "broken_scene" / "demo.ma"
+
+    root = project_root_from_scene(str(scene_path).replace("\\", "/"))
+    assert root == str(repo_root).replace("\\", "/")
+
+
+def test_fix_planner_builds_relink_path_action_from_texture_version_failure():
+    rule = _rule(
+        fix=RuleFix(
+            type="relink_path",
+            risk="medium",
+            params={"attribute": "fileTextureName"},
+        ),
+    )
+    result = _failed_result(
+        plug="version",
+        current_value="001",
+        target_kind="file_dependency",
+        target_id="node:file1",
+    )
+    result = RuleResult(
+        rule_id=result.rule_id,
+        severity=result.severity,
+        status="failed",
+        title=result.title,
+        message=result.message,
+        why=result.why,
+        owner=result.owner,
+        target_kind="file_dependency",
+        target_id="node:file1",
+        node="file1",
+        plug="version",
+        current_value="001",
+        expected_value="003",
+        auto_fix_available=True,
+        fix_id="relink_path",
+    )
+    from shader_health.core.models import FileDependencySnapshot
+
+    snapshot = GraphSnapshot(
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file1",
+                attr="fileTextureName",
+                raw_path="D:/show/tex/albedo_v001.<UDIM>.exr",
+                resolved_path="D:/show/tex/albedo_v001.<UDIM>.exr",
+                exists=True,
+                version="001",
+                latest_version="003",
+            )
+        ],
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+    action = plan.actions[0]
+
+    assert action.fix_type == "relink_path"
+    assert action.before_value == "D:/show/tex/albedo_v001.<UDIM>.exr"
+    assert action.after_value == "D:/show/tex/albedo_v003.<UDIM>.exr"
+
+
+def test_fix_planner_blocks_normalize_path_when_target_cannot_be_resolved():
+    rule = RuleDefinition(
+        id="common.texture.path.local_drive",
+        name="local drive",
+        enabled=True,
+        renderer=["common"],
+        scope="file_dependency",
+        severity="critical",
+        owner="pipeline_td",
+        message="local",
+        why="local",
+        match=RuleMatch(criteria={"dependency_kind": "texture"}),
+        check=RuleCheck(type="path_policy", params={"disallow": ["local_drive"]}),
+        policy=RulePolicy(auto_fix_allowed=True),
+        fix=RuleFix(
+            type="normalize_path",
+            risk="medium",
+            params={"attribute": "fileTextureName", "replace_to": "${ASSET_ROOT}"},
+        ),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="critical",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="file_dependency",
+        target_id="node:file1",
+        node="file1",
+        plug="fileTextureName",
+        current_value="Z:/no/scene/root/file.exr",
+        expected_value="path policy compliant",
+        auto_fix_available=True,
+        fix_id="normalize_path",
+    )
+    snapshot = GraphSnapshot(scene_path="")
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    action = plan.actions[0]
+    assert action.blocked is False
+    assert action.after_value == "${ASSET_ROOT}/textures/file.exr"
+
+
+def test_fix_planner_blocks_normalize_path_when_after_value_cannot_be_resolved():
+    rule = RuleDefinition(
+        id="common.texture.path.local_drive",
+        name="local drive",
+        enabled=True,
+        renderer=["common"],
+        scope="file_dependency",
+        severity="critical",
+        owner="pipeline_td",
+        message="local",
+        why="local",
+        match=RuleMatch(criteria={"dependency_kind": "texture"}),
+        check=RuleCheck(type="path_policy", params={"disallow": ["local_drive"]}),
+        policy=RulePolicy(auto_fix_allowed=True),
+        fix=RuleFix(
+            type="normalize_path",
+            risk="medium",
+            params={"attribute": "fileTextureName", "replace_to": "${ASSET_ROOT}"},
+        ),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="critical",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="file_dependency",
+        target_id="node:file1",
+        node="file1",
+        plug="fileTextureName",
+        current_value="",
+        expected_value="path policy compliant",
+        auto_fix_available=True,
+        fix_id="normalize_path",
+    )
+    snapshot = GraphSnapshot(scene_path="")
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.actions[0].blocked is True
+    assert "invalid_normalize_path" in plan.actions[0].block_reasons
 
 
 def test_fix_planner_builds_normalize_path_action_from_rule_fix():
