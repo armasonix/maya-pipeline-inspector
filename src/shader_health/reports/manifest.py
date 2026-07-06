@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional
 
@@ -12,19 +12,27 @@ from shader_health.core import (
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
+    RuleResult,
 )
+from shader_health.core.scoring import compute_health_score
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 
 JsonDict = dict[str, Any]
 
 
-def build_shader_manifest(snapshot: GraphSnapshot) -> JsonDict:
+def build_shader_manifest(
+    snapshot: GraphSnapshot,
+    *,
+    results: Optional[Iterable[RuleResult]] = None,
+    health_score: Optional[int] = None,
+) -> JsonDict:
     """Build a deterministic material manifest from a graph snapshot."""
 
     nodes_by_id = {node.id: node for node in snapshot.nodes}
     dependencies_by_node_id = _dependencies_by_node_id(snapshot.file_dependencies)
     semantic_by_node_id = _semantic_by_node_id(snapshot.connections, nodes_by_id)
+    issue_summary = _material_issue_summary(results)
 
     materials = [
         _material_entry(
@@ -32,11 +40,16 @@ def build_shader_manifest(snapshot: GraphSnapshot) -> JsonDict:
             nodes_by_id,
             dependencies_by_node_id,
             semantic_by_node_id,
+            issue_summary.get(material.node_id, issue_summary.get(material.name, {})),
         )
         for material in sorted(snapshot.materials, key=_material_sort_key)
     ]
 
-    return {
+    resolved_health_score = health_score
+    if resolved_health_score is None and results is not None:
+        resolved_health_score = compute_health_score(results).score
+
+    payload: JsonDict = {
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "snapshot_schema_version": snapshot.schema_version,
         "scene_path": snapshot.scene_path,
@@ -45,18 +58,36 @@ def build_shader_manifest(snapshot: GraphSnapshot) -> JsonDict:
         "scanned_at_utc": snapshot.scanned_at_utc,
         "materials": materials,
     }
+    if resolved_health_score is not None:
+        payload["health_score"] = resolved_health_score
+    return payload
 
 
-def dumps_shader_manifest(snapshot: GraphSnapshot, *, indent: Optional[int] = 2) -> str:
+def dumps_shader_manifest(
+    snapshot: GraphSnapshot,
+    *,
+    results: Optional[Iterable[RuleResult]] = None,
+    health_score: Optional[int] = None,
+    indent: Optional[int] = 2,
+) -> str:
     """Serialize a deterministic material manifest as JSON text."""
 
-    return json.dumps(build_shader_manifest(snapshot), indent=indent, sort_keys=True) + "\n"
+    return (
+        json.dumps(
+            build_shader_manifest(snapshot, results=results, health_score=health_score),
+            indent=indent,
+            sort_keys=True,
+        )
+        + "\n"
+    )
 
 
 def write_shader_manifest(
     path: str | Path,
     snapshot: GraphSnapshot,
     *,
+    results: Optional[Iterable[RuleResult]] = None,
+    health_score: Optional[int] = None,
     indent: Optional[int] = 2,
 ) -> Path:
     """Write a material manifest and return the output path."""
@@ -64,7 +95,12 @@ def write_shader_manifest(
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        dumps_shader_manifest(snapshot, indent=indent),
+        dumps_shader_manifest(
+            snapshot,
+            results=results,
+            health_score=health_score,
+            indent=indent,
+        ),
         encoding="utf-8",
     )
     return output_path
@@ -75,8 +111,9 @@ def _material_entry(
     nodes_by_id: dict[str, NodeSnapshot],
     dependencies_by_node_id: dict[str, list[FileDependencySnapshot]],
     semantic_by_node_id: dict[str, str],
+    issues: Mapping[str, Any],
 ) -> JsonDict:
-    return {
+    entry: JsonDict = {
         "node_id": material.node_id,
         "name": material.name,
         "type_name": material.type_name,
@@ -93,6 +130,37 @@ def _material_entry(
             semantic_by_node_id,
         ),
     }
+    if issues:
+        entry["issues"] = dict(issues)
+    return entry
+
+
+def _material_issue_summary(
+    results: Optional[Iterable[RuleResult]],
+) -> dict[str, JsonDict]:
+    if results is None:
+        return {}
+
+    summary: dict[str, JsonDict] = {}
+    for result in results:
+        if result.status != "failed":
+            continue
+        material_key = result.material or ""
+        if not material_key:
+            continue
+        bucket = summary.setdefault(
+            material_key,
+            {"failed": 0, "critical": 0, "error": 0, "warning": 0, "rule_ids": []},
+        )
+        bucket["failed"] = int(bucket["failed"]) + 1
+        severity = result.severity
+        if severity in bucket:
+            bucket[severity] = int(bucket[severity]) + 1
+        rule_ids = bucket.setdefault("rule_ids", [])
+        if isinstance(rule_ids, list) and result.rule_id not in rule_ids:
+            rule_ids.append(result.rule_id)
+            rule_ids.sort()
+    return summary
 
 
 def _texture_entries(

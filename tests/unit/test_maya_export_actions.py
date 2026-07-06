@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from tests.unit.test_manifest_diff_command import old_manifest
 
-from shader_health.core import GraphSnapshot
+from shader_health.core import GraphSnapshot, MaterialSnapshot, RuleResult
 from shader_health.maya import commands, export_actions
 from shader_health.reports.manifest import build_shader_manifest
 from shader_health.ui import main_window
@@ -62,6 +62,65 @@ def test_export_shader_manifest_writes_manifest_file(tmp_path: Path):
     assert Path(result.path) == output_path
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["manifest_schema_version"] == "1.0"
+
+
+def test_build_shader_manifest_includes_health_score_and_material_issues():
+    snapshot = GraphSnapshot(
+        scene_path="D:/show/asset/shading/demo.ma",
+        maya_version="2025",
+        renderer="vray",
+        scan_scope="scene",
+        scanned_at_utc="2026-07-01T12:00:00Z",
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+                graph_fingerprint="sha256:hero_graph",
+            )
+        ],
+    )
+    results = [
+        RuleResult(
+            rule_id="common.texture.missing",
+            severity="error",
+            status="failed",
+            title="Missing texture",
+            message="Texture file is missing.",
+            why="Publish requires resolvable texture paths.",
+            owner="lookdev",
+            material="hero_mtl",
+        ),
+        RuleResult(
+            rule_id="common.texture.path_policy",
+            severity="warning",
+            status="failed",
+            title="Local texture path",
+            message="Texture path is not publish-safe.",
+            why="Farm machines cannot resolve local paths.",
+            owner="pipeline",
+            material="hero_mtl",
+        ),
+    ]
+
+    manifest = build_shader_manifest(snapshot, results=results)
+
+    assert manifest["manifest_schema_version"] == "1.0"
+    assert manifest["health_score"] == 87
+    issues = manifest["materials"][0]["issues"]
+    assert issues["failed"] == 2
+    assert issues["error"] == 1
+    assert issues["warning"] == 1
+    assert issues["rule_ids"] == ["common.texture.missing", "common.texture.path_policy"]
+
+
+def test_build_shader_manifest_uses_explicit_health_score_override():
+    snapshot = make_snapshot("demo.ma")
+
+    manifest = build_shader_manifest(snapshot, health_score=42)
+
+    assert manifest["health_score"] == 42
+    assert manifest["materials"] == []
 
 
 def test_export_fix_plan_writes_fix_plan_file(tmp_path: Path):
