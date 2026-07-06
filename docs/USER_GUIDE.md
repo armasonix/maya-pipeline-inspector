@@ -284,13 +284,25 @@ python -m shader_health validate scene.ma --waiver-sidecar scene.shader_health_w
 
 The headless CLI uses the same validation pipeline as the Maya UI (`prepare_snapshot_for_validation`, profile loading, waivers, enrichment, fix planning).
 
+## Publish Preflight
+
+Publish tools can gate asset commits with the `publish_strict` profile (or a studio copy) via [`examples/publish/submit_preflight.py`](../examples/publish/submit_preflight.py). See [`docs/integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) for exit codes and integration snippets.
+
+Expected behavior:
+
+```text
+1. Artist triggers publish.
+2. Publish tool runs shader health validation with publish_strict profile.
+3. If block_publish is false, publish continues.
+4. If block_publish is true, publish stops and shows summary.
+5. JSON report is saved for review.
+```
+
 ## Deadline Submit Preflight
 
 Deadline preflight should run validation before render submission.
 
 Expected behavior:
-
-```text
 1. Artist submits render.
 2. Submit tool runs shader health validation with deadline_critical profile.
 3. If block_deadline is false, submission continues.

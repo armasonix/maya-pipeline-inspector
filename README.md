@@ -184,6 +184,7 @@ The package uses a `src` layout so imports during tests match installed-package 
 - [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) — rule pack authoring
 - [`docs/SNAPSHOT_SCHEMA.md`](docs/SNAPSHOT_SCHEMA.md) — snapshot contract
 - [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — farm preflight hook
+- [`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md) — publish preflight hook
 
 ## License
 

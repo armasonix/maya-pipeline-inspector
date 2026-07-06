@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Texture version freshness (`common.texture.version.latest`): clearer edge-case handling for multiple folder siblings, single-version folders, and missing `v###` tokens; added pass/fail snapshot fixtures and documented filesystem-only detection in [USER_GUIDE.md](docs/USER_GUIDE.md).
 
+### Added
+
+- Publish preflight hook example ([`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py)) and integration guide ([`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md)).
+
 ## [0.1.0] - 2026-07-03
 
 **Maya Shader Health Inspector v0.1 — Texture & Shader Preflight MVP**
