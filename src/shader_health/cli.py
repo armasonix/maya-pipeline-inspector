@@ -5,15 +5,18 @@ import argparse
 import importlib
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from shader_health.core import GraphSnapshot, RuleLoadError
+from shader_health.core.fix_plan import FixPlan, fix_plan_from_export
 from shader_health.core.manifest_gate import evaluate_manifest_gate
 from shader_health.core.rule_loader import load_profile
 from shader_health.maya.validation_pipeline import (
     DEFAULT_PROFILE_ID,
+    fix_audit_sidecar_path_for_scene,
+    persist_fix_apply_audit,
     run_validation,
 )
 from shader_health.reports import write_json_report
@@ -47,6 +50,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return diff_command(args)
     if args.command == "gate":
         return gate_command(args)
+    if args.command == "apply-fixes":
+        return apply_fixes_command(args)
     parser.print_help()
     return EXIT_CONFIG_ERROR
 
@@ -128,6 +133,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Packaged profile id when --profile is omitted.",
     )
     gate.add_argument("--out", help="Optional gate result JSON output path.")
+    apply_fixes = subparsers.add_parser(
+        "apply-fixes",
+        help="Apply planned fixes to a Maya scene (requires mayapy).",
+    )
+    apply_fixes.add_argument("input_path", help="Maya scene path.")
+    apply_fixes.add_argument(
+        "--fix-plan",
+        help="Fix plan export JSON path. When omitted, fixes are planned from validation.",
+    )
+    apply_fixes.add_argument("--report", help="Optional apply report JSON output path.")
+    apply_fixes.add_argument("--profile", help="Profile JSON path.")
+    apply_fixes.add_argument(
+        "--profile-id",
+        default=DEFAULT_PROFILE_ID,
+        help="Packaged profile id when --profile is omitted.",
+    )
+    apply_fixes.add_argument(
+        "--fix-ids",
+        action="append",
+        default=[],
+        help="Apply only the listed fix_id values.",
+    )
+    apply_fixes.add_argument(
+        "--allow-referenced",
+        action="store_true",
+        help="Allow fixes on referenced nodes.",
+    )
+    apply_fixes.add_argument(
+        "--allow-high-risk",
+        action="store_true",
+        help="Allow high-risk fixes without supervisor confirmation.",
+    )
+    apply_fixes.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Plan fixes without mutating the scene.",
+    )
     return parser
 
 
@@ -190,6 +232,52 @@ def gate_command(args: argparse.Namespace) -> int:
         return EXIT_RUNTIME_ERROR
 
 
+def apply_fixes_command(args: argparse.Namespace) -> int:
+    try:
+        scene_path = Path(args.input_path)
+        fix_plan = _load_fix_plan_for_scene(
+            scene_path,
+            profile_id=str(args.profile_id),
+            profile_path=_optional_path(args.profile),
+            fix_plan_path=_optional_path(args.fix_plan),
+        )
+        selected_actions = _filter_fix_actions(fix_plan, tuple(args.fix_ids))
+        if args.dry_run:
+            report = _dry_run_apply_report(selected_actions)
+            _write_apply_report(args.report, report)
+            return EXIT_OK
+
+        apply_report = _apply_fixes_in_scene(
+            scene_path,
+            selected_actions,
+            allow_referenced=bool(args.allow_referenced),
+            allow_high_risk=bool(args.allow_high_risk),
+        )
+        _write_apply_report(args.report, apply_report.to_dict())
+        audit_path, _ = persist_fix_apply_audit(
+            apply_report,
+            scene_path=str(scene_path),
+            profile_id=str(args.profile_id),
+            audit_sidecar_path=fix_audit_sidecar_path_for_scene(str(scene_path)),
+        )
+        if audit_path is not None:
+            print(f"Fix audit appended: {audit_path}")
+        if apply_report.failed_count:
+            return EXIT_RUNTIME_ERROR
+        if apply_report.blocked_count and not apply_report.applied_count:
+            return EXIT_PUBLISH_BLOCK
+        return EXIT_OK
+    except RuleLoadError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+    except ValueError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+    except Exception as exc:  # noqa: BLE001
+        print(f"Runtime error: {exc}", file=sys.stderr)
+        return EXIT_RUNTIME_ERROR
+
+
 def diff_command(args: argparse.Namespace) -> int:
     exit_code = execute_manifest_diff(
         Path(args.old_manifest),
@@ -233,6 +321,76 @@ def _manifest_gate_policy(profile_path: Optional[Path], profile_id: str):
     resolved_profile = profile_path or packaged_profile_path(profile_id)
     profile = load_profile(resolved_profile)
     return profile.manifest_diff_policy
+
+
+def _load_fix_plan_for_scene(
+    scene_path: Path,
+    *,
+    profile_id: str,
+    profile_path: Optional[Path],
+    fix_plan_path: Optional[Path],
+) -> FixPlan:
+    if fix_plan_path is not None:
+        payload = json.loads(fix_plan_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, Mapping):
+            raise ValueError("fix plan export must be a JSON object")
+        return fix_plan_from_export(payload)
+
+    snapshot = _snapshot_from_scene(scene_path)
+    run = run_validation(
+        snapshot,
+        profile_id=profile_id,
+        profile_path=profile_path,
+        scan_scope="scene",
+    )
+    return run.fix_plan
+
+
+def _filter_fix_actions(fix_plan: FixPlan, fix_ids: tuple[str, ...]) -> tuple[Any, ...]:
+    if not fix_ids:
+        return tuple(action for action in fix_plan.actions if not action.blocked)
+    allowed = {fix_id.strip() for fix_id in fix_ids if fix_id.strip()}
+    return tuple(action for action in fix_plan.actions if action.fix_id in allowed)
+
+
+def _apply_fixes_in_scene(
+    scene_path: Path,
+    actions: Sequence[Any],
+    *,
+    allow_referenced: bool = False,
+    allow_high_risk: bool = False,
+) -> Any:
+    cmds = importlib.import_module("maya.cmds")
+    fix_applier = importlib.import_module("shader_health.maya.fix_applier")
+    cmds.file(str(scene_path), open=True, force=True)
+    return fix_applier.apply_fix_actions(
+        actions,
+        cmds=cmds,
+        allow_referenced=allow_referenced,
+        allow_high_risk=allow_high_risk,
+    )
+
+
+def _dry_run_apply_report(actions: Sequence[Any]) -> dict[str, Any]:
+    records = [action.to_dict() for action in actions]
+    applied_count = sum(1 for action in actions if not action.blocked)
+    blocked_count = sum(1 for action in actions if action.blocked)
+    return {
+        "dry_run": True,
+        "total": len(records),
+        "applied_count": applied_count,
+        "blocked_count": blocked_count,
+        "failed_count": 0,
+        "records": records,
+    }
+
+
+def _write_apply_report(path: Optional[str], payload: Mapping[str, Any]) -> None:
+    if not path:
+        return
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _rule_root_path(value: Optional[str]) -> Optional[Path]:
