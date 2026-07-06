@@ -6,6 +6,8 @@ Status: v0.1 MVP. The dockable Maya UI, headless CLI, packaged profiles, waiver 
 
 Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
 
+Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md).
+
 ## What the Tool Checks
 
 The v0.1 MVP validates:

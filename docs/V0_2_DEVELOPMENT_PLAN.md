@@ -668,6 +668,7 @@ v0.2.0 is ready when:
 | [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) | Deadline preflight integration |
 | [integrations/publish_submit_preflight.md](integrations/publish_submit_preflight.md) | Publish preflight integration |
 | [MAYA_INSTALL.md](MAYA_INSTALL.md) | Maya module and pip install |
+| [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) | Studio custom rules and profile overrides |
 
 ### Documents to update during v0.2 implementation
 

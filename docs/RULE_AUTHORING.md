@@ -256,6 +256,8 @@ Example:
 }
 ```
 
+For studio deployment patterns (`--extra-rules`, custom profile folders, and UI pipeline hooks), see [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md).
+
 ## Rule ID Naming
 
 Use stable hierarchical IDs:

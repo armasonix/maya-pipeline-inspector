@@ -1,0 +1,19 @@
+{
+  "id": "show_publish_strict",
+  "display_name": "Show Publish Strict",
+  "rule_overrides": {
+    "common.texture.version.latest": {
+      "enabled": false
+    },
+    "common.texture.path.local_drive": {
+      "block_publish": true,
+      "block_deadline": true
+    },
+    "studio.texture.path.no_user_home": {
+      "enabled": true,
+      "severity": "critical",
+      "block_publish": true,
+      "block_deadline": true
+    }
+  }
+}

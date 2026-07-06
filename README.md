@@ -199,6 +199,7 @@ The package uses a `src` layout so imports during tests match installed-package 
 - [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — farm preflight hook
 - [`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md) — publish preflight hook
 - [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) — Maya module and `pip` install guide
+- [`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md) — custom rules and profile overrides
 
 ## License
 

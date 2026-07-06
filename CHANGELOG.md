@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Publish preflight hook example ([`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py)) and integration guide ([`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md)).
 - Maya install guide ([`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md)) for `MAYA_MODULE_PATH`, editable `pip`, and menu/shelf bootstrap.
+- Studio overrides guide ([`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md)) with worked `examples/studio/` rule pack and profile sample.
 
 ## [0.1.0] - 2026-07-03
 

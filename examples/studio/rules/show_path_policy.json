@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "studio.texture.path.no_user_home",
+      "name": "Texture path must not point to a user home folder",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "Texture path uses a user home directory.",
+      "why": "Home-folder texture paths are machine-specific and commonly break when scenes move between artists, publish bundles, or farm workers.",
+      "match": {
+        "dependency_kind": "texture"
+      },
+      "check": {
+        "type": "path_policy",
+        "disallow": ["user_home"]
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
