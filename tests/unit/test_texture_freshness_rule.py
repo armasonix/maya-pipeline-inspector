@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from shader_health.core import (
     FileDependencySnapshot,
     GraphSnapshot,
@@ -12,6 +14,12 @@ from shader_health.core import (
 
 ROOT = Path(__file__).resolve().parents[2]
 RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "texture_freshness.json"
+FIXTURES_ROOT = ROOT / "tests" / "fixtures" / "snapshots"
+
+TEXTURE_FRESHNESS_FIXTURE_CASES = (
+    ("texture_freshness_outdated", "failed"),
+    ("texture_freshness_latest", "passed"),
+)
 
 
 def load_texture_freshness_rule() -> RuleDefinition:
@@ -99,3 +107,42 @@ def test_texture_freshness_rule_skips_when_version_metadata_is_missing():
 
     assert result.status == "skipped"
     assert result.evidence["reason"] == "texture_version_latest_requires_version_metadata"
+
+
+def test_texture_freshness_rule_skips_when_only_version_token_is_missing():
+    rule = load_texture_freshness_rule()
+    snapshot = GraphSnapshot(
+        scene_path="demo.ma",
+        renderer="vray",
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file_albedo",
+                attr="fileTextureName",
+                raw_path="$ASSET_ROOT/tex/albedo.<UDIM>.exr",
+                resolved_path="D:/show/assets/tex/albedo.<UDIM>.exr",
+                exists=True,
+                is_udim=True,
+                udim_tiles=[1001, 1002],
+                version=None,
+                latest_version=None,
+                extension=".exr",
+            )
+        ],
+    )
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "skipped"
+    assert result.evidence["reason"] == "texture_version_latest_requires_version_metadata"
+
+
+@pytest.mark.parametrize(("fixture_stem", "expected_status"), TEXTURE_FRESHNESS_FIXTURE_CASES)
+def test_texture_freshness_fixture_cases(fixture_stem: str, expected_status: str):
+    rule = load_texture_freshness_rule()
+    fixture_path = FIXTURES_ROOT / f"{fixture_stem}.json"
+    snapshot = GraphSnapshot.from_json(fixture_path.read_text(encoding="utf-8"))
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == expected_status
+    assert result.rule_id == "common.texture.version.latest"
