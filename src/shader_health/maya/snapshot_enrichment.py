@@ -27,6 +27,8 @@ from shader_health.core import (
     NodeSnapshot,
     RuleResult,
 )
+from shader_health.core.graph_fingerprint import material_graph_fingerprint
+from shader_health.core.models import MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
@@ -135,11 +137,21 @@ def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
         _enrich_file_dependency(dependency, nodes_by_id.get(dependency.node_id), scene_dir)
         for dependency in snapshot.file_dependencies
     )
+    materials = tuple(
+        _enrich_material_fingerprint(
+            material,
+            nodes=nodes,
+            connections=connections,
+            file_dependencies=file_dependencies,
+        )
+        for material in snapshot.materials
+    )
     return replace(
         snapshot,
         nodes=list(nodes),
         connections=list(connections),
         file_dependencies=list(file_dependencies),
+        materials=list(materials),
     )
 
 
@@ -237,6 +249,43 @@ def _enrich_file_dependency(
         udim_tiles=tiles,
         missing_udim_tiles=_missing_udim_tiles(tiles),
     )
+
+
+def _enrich_material_fingerprint(
+    material: MaterialSnapshot,
+    *,
+    nodes: tuple[NodeSnapshot, ...],
+    connections: tuple[ConnectionSnapshot, ...],
+    file_dependencies: tuple[FileDependencySnapshot, ...],
+) -> MaterialSnapshot:
+    if material.graph_fingerprint:
+        return material
+
+    nodes_by_id = {node.id: node for node in nodes}
+    texture_paths = _material_texture_paths(material, file_dependencies)
+    fingerprint = material_graph_fingerprint(
+        material,
+        nodes_by_id=nodes_by_id,
+        connections=connections,
+        texture_paths=texture_paths,
+    )
+    return replace(material, graph_fingerprint=fingerprint)
+
+
+def _material_texture_paths(
+    material: MaterialSnapshot,
+    file_dependencies: tuple[FileDependencySnapshot, ...],
+) -> tuple[str, ...]:
+    deps_by_node = {dependency.node_id: dependency for dependency in file_dependencies}
+    paths: list[str] = []
+    for node_id in material.texture_nodes:
+        dependency = deps_by_node.get(node_id)
+        if dependency is None:
+            continue
+        path = dependency.resolved_path or dependency.raw_path
+        if path:
+            paths.append(path)
+    return tuple(paths)
 
 
 def _udim_pattern(raw_path: str, node: Optional[NodeSnapshot]) -> Optional[str]:

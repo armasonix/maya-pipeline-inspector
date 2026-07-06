@@ -116,7 +116,12 @@ def test_manifest_diff_lists_new_resolved_and_changed_issues():
     assert diff["manifest_diff_schema_version"] == MANIFEST_DIFF_SCHEMA_VERSION
     assert diff["old_manifest_schema_version"] == "1.0"
     assert diff["new_manifest_schema_version"] == "1.0"
-    assert diff["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+    assert diff["summary"] == {
+        "new": 1,
+        "resolved": 1,
+        "changed": 2,
+        "fingerprint_changes": 1,
+    }
 
     issues = diff["issues"]
     assert issues["new"][0]["kind"] == "texture"
@@ -145,6 +150,36 @@ def test_manifest_diff_json_output_is_deterministic():
     assert first == second
     assert first.endswith("\n")
     assert json.loads(first)["summary"]["changed"] == 2
+    assert json.loads(first)["summary"]["fingerprint_changes"] == 1
+
+
+def test_manifest_diff_reports_fingerprint_regression_hint():
+    old_manifest_payload = {
+        "materials": [
+            {
+                "node_id": "node:hero_mtl",
+                "name": "hero_mtl",
+                "graph_fingerprint": "sha256:old",
+                "textures": [],
+            }
+        ]
+    }
+    new_manifest_payload = {
+        "materials": [
+            {
+                "node_id": "node:hero_mtl",
+                "name": "hero_mtl",
+                "graph_fingerprint": "sha256:new",
+                "textures": [],
+            }
+        ]
+    }
+
+    diff = build_manifest_diff(old_manifest_payload, new_manifest_payload)
+
+    assert diff["summary"]["fingerprint_changes"] == 1
+    assert diff["regression"]["fingerprint_drift_detected"] is True
+    assert diff["regression"]["manifest_regression_blocked"] is False
 
 
 def test_manifest_diff_command_writes_json_output(tmp_path: Path):
@@ -161,7 +196,12 @@ def test_manifest_diff_command_writes_json_output(tmp_path: Path):
     assert exit_code == 0
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert payload["manifest_diff_schema_version"] == MANIFEST_DIFF_SCHEMA_VERSION
-    assert payload["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+    assert payload["summary"] == {
+        "new": 1,
+        "resolved": 1,
+        "changed": 2,
+        "fingerprint_changes": 1,
+    }
 
 
 def test_shader_health_diff_cli_writes_json_to_stdout(tmp_path: Path, capsys):
@@ -175,7 +215,12 @@ def test_shader_health_diff_cli_writes_json_to_stdout(tmp_path: Path, capsys):
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
     assert exit_code == cli.EXIT_OK
-    assert payload["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+    assert payload["summary"] == {
+        "new": 1,
+        "resolved": 1,
+        "changed": 2,
+        "fingerprint_changes": 1,
+    }
     assert captured.err == ""
 
 
@@ -202,7 +247,12 @@ def test_shader_health_diff_cli_writes_json_and_html_outputs(tmp_path: Path):
     assert exit_code == cli.EXIT_OK
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     html = html_path.read_text(encoding="utf-8")
-    assert payload["summary"] == {"new": 1, "resolved": 1, "changed": 2}
+    assert payload["summary"] == {
+        "new": 1,
+        "resolved": 1,
+        "changed": 2,
+        "fingerprint_changes": 1,
+    }
     assert html.startswith("<!doctype html>")
     assert "Maya Shader Health Manifest Diff" in html
     assert "file_roughness" in html

@@ -5,6 +5,16 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+from shader_health.core import (
+    ConnectionSnapshot,
+    FileDependencySnapshot,
+    GraphSnapshot,
+    MaterialSnapshot,
+    NodeSnapshot,
+)
+from shader_health.core.graph_fingerprint import material_graph_fingerprint
+from shader_health.maya.snapshot_enrichment import enrich_snapshot
+
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_PATH = ROOT / "maya_module" / "scripts" / "shader_health_inspector_bootstrap.py"
 USER_SETUP_PATH = ROOT / "maya_module" / "scripts" / "userSetup.py"
@@ -226,3 +236,99 @@ def test_plugin_uninitialize_calls_uninstall(monkeypatch):
     plugin.uninitializePlugin(object())
 
     assert calls == ["uninstall_ui"]
+
+
+def test_graph_fingerprint_is_deterministic_for_fixture_snapshot():
+    snapshot = GraphSnapshot(
+        scene_path="scene.ma",
+        nodes=[
+            NodeSnapshot(
+                id="node:file_albedo",
+                name="file_albedo",
+                type_name="file",
+                attrs={"colorSpace": "Raw", "fileTextureName": "albedo.exr"},
+            ),
+            NodeSnapshot(
+                id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+                attrs={"color": [1.0, 1.0, 1.0]},
+            ),
+        ],
+        connections=[
+            ConnectionSnapshot(
+                src_node="node:file_albedo",
+                src_attr="outColor",
+                dst_node="node:hero_mtl",
+                dst_attr="color",
+            )
+        ],
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="VRayMtl",
+                texture_nodes=["node:file_albedo"],
+            )
+        ],
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file_albedo",
+                attr="fileTextureName",
+                raw_path="albedo.exr",
+                resolved_path="P:/asset/albedo.exr",
+                exists=True,
+            )
+        ],
+    )
+
+    enriched = enrich_snapshot(snapshot)
+    material = enriched.materials[0]
+    assert material.graph_fingerprint.startswith("sha256:")
+    assert material.graph_fingerprint == enrich_snapshot(snapshot).materials[0].graph_fingerprint
+
+
+def test_material_graph_fingerprint_uses_connection_fields():
+    material = MaterialSnapshot(
+        node_id="node:hero_mtl",
+        name="hero_mtl",
+        type_name="VRayMtl",
+        texture_nodes=["node:file_albedo"],
+    )
+    nodes_by_id = {
+        "node:file_albedo": NodeSnapshot(
+            id="node:file_albedo",
+            name="file_albedo",
+            type_name="file",
+            attrs={"fileTextureName": "albedo.exr"},
+        ),
+        "node:hero_mtl": NodeSnapshot(
+            id="node:hero_mtl",
+            name="hero_mtl",
+            type_name="VRayMtl",
+        ),
+    }
+    connections = [
+        ConnectionSnapshot(
+            src_node="node:file_albedo",
+            src_attr="outColor",
+            dst_node="node:hero_mtl",
+            dst_attr="color",
+        )
+    ]
+
+    first = material_graph_fingerprint(
+        material,
+        nodes_by_id=nodes_by_id,
+        connections=connections,
+        texture_paths=("P:/asset/albedo.exr",),
+    )
+    second = material_graph_fingerprint(
+        material,
+        nodes_by_id=nodes_by_id,
+        connections=connections,
+        texture_paths=("P:/asset/albedo.exr",),
+    )
+
+    assert first == second
+    assert first.startswith("sha256:")
