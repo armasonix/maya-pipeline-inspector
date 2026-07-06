@@ -232,7 +232,10 @@ Low-risk example:
 file_roughness.colorSpace: ACEScg -> Raw
 ```
 
-High-risk fixes should require explicit confirmation or supervisor approval depending on profile.
+High-risk fixes require explicit confirmation before apply. The fix queue shows how many risky fixes are pending and how many are selected. **Apply Selected** opens a confirmation dialog with target, attribute, before/after values, and risk level. Cancel leaves the scene unchanged; confirm applies fixes inside a Maya undo chunk.
+
+- **Strict profiles** (`artist_relaxed`, `publish_strict`, `deadline_critical`, …): one confirmation dialog per risky fix.
+- **`supervisor_full`**: a single batch confirmation for all selected risky fixes.
 
 ## Reference Safety
 

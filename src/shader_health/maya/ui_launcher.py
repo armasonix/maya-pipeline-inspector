@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from shader_health.ui import main_window
 from shader_health.ui.fix_queue import (
+    FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
     FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
     confirm_risky_fixes,
@@ -13,6 +14,7 @@ from shader_health.ui.fix_queue import (
     risky_fix_rows,
     safe_fix_rows,
     selected_fix_rows,
+    update_risky_confirmation_label,
 )
 from shader_health.ui.qt import load_qt_widgets
 from shader_health.ui.waiver_manager import (
@@ -606,6 +608,23 @@ def _populate_fix_queue(content: Any, result: Any) -> None:
     table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
     if table is not None:
         populate_fix_queue(qt_widgets, table, fix_rows)
+    _refresh_fix_queue_confirmation_label(content, qt_widgets, fix_rows)
+
+
+def _refresh_fix_queue_confirmation_label(
+    content: Any,
+    qt_widgets: Any,
+    rows: tuple[FixQueueRow, ...],
+    *,
+    selected_rows: Optional[tuple[FixQueueRow, ...]] = None,
+) -> None:
+    label = _find_child(
+        content,
+        qt_widgets.QLabel,
+        FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
+    )
+    if label is not None:
+        update_risky_confirmation_label(label, rows, selected_rows=selected_rows)
 
 
 def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
@@ -730,7 +749,15 @@ def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
     stored_rows = getattr(content, "_shader_health_fix_rows", ())
     if table is None or not stored_rows:
         return
-    content._shader_health_fix_rows = fix_rows_from_table(table, stored_rows)
+    fix_rows = fix_rows_from_table(table, stored_rows)
+    content._shader_health_fix_rows = fix_rows
+    selected = selected_fix_rows(fix_rows)
+    _refresh_fix_queue_confirmation_label(
+        content,
+        qt_widgets,
+        fix_rows,
+        selected_rows=selected,
+    )
 
 
 def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -767,14 +794,16 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         in selected_ids
     )
-    if risky_fix_rows(selected) and not confirm_risky_fixes(qt_widgets, selected):
-        _set_label_text(
-            content,
-            qt_widgets,
-            "shaderHealthInspectorDescription",
-            "High-risk fixes were not applied.",
-        )
-        return
+    if risky_fix_rows(selected):
+        profile_id = getattr(content, "_shader_health_profile_id", "") or ""
+        if not confirm_risky_fixes(qt_widgets, selected, profile_id=profile_id):
+            _set_label_text(
+                content,
+                qt_widgets,
+                "shaderHealthInspectorDescription",
+                "High-risk fixes were not applied.",
+            )
+            return
     allow_high_risk = bool(risky_fix_rows(selected))
     report = apply_fix_actions(actions, allow_high_risk=allow_high_risk)
     _persist_fix_apply_audit(content, report)

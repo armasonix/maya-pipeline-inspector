@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Studio overrides guide ([`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md)) with worked `examples/studio/` rule pack and profile sample.
 - Optional Maya integration GitHub Actions workflow ([`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml), `workflow_dispatch` only).
 - Waiver manager UI in the Maya panel with sidecar revoke support.
+- High-risk fix confirmation dialog in the Safe Auto-Fix Queue: per-fix confirm for strict profiles, batch confirm for `supervisor_full`, with pending/selected risky counts on the helper label.
 
 ## [0.1.0] - 2026-07-03
 
