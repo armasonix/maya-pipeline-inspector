@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Publish preflight hook example ([`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py)) and integration guide ([`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md)).
+- Maya install guide ([`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md)) for `MAYA_MODULE_PATH`, editable `pip`, and menu/shelf bootstrap.
 
 ## [0.1.0] - 2026-07-03
 
@@ -88,7 +89,9 @@ cd maya-shader-health-inspector
 python -m pip install -e ".[dev]"
 ```
 
-In Maya, add the repo `src` path to `PYTHONPATH` or install the package into the Maya Python environment, then run:
+In Maya, add the repo to `MAYA_MODULE_PATH` or install the package into the Maya Python environment. See [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) for the full guide.
+
+Quick manual session setup:
 
 ```python
 from shader_health.maya.commands import install_ui, show_ui

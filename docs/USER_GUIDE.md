@@ -4,6 +4,8 @@ Maya Shader Health Inspector is a production-oriented material QA tool for Autod
 
 Status: v0.1 MVP. The dockable Maya UI, headless CLI, packaged profiles, waiver sidecars, and report export are implemented. See the demo scene under `examples/broken_scene/`.
 
+Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
+
 ## What the Tool Checks
 
 The v0.1 MVP validates:
@@ -325,6 +327,7 @@ v0.1 MVP is implemented: core rule engine, Maya scanner, snapshot enrichment, do
 
 See also:
 
+- `docs/MAYA_INSTALL.md`
 - `docs/DEVELOPMENT_PLAN.md`
 - `docs/ARCHITECTURE.md`
 - `docs/RULE_AUTHORING.md`

@@ -129,6 +129,19 @@ Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_
 
 Roadmap and issue tracking: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md)
 
+## Install in Maya
+
+For studio rollout from the repository module layout or an editable `pip` install into `mayapy`, see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md).
+
+Quick start with `MAYA_MODULE_PATH`:
+
+```powershell
+$env:MAYA_MODULE_PATH = "D:\tools\maya-shader-health-inspector\maya_module"
+maya
+```
+
+Maya runs `maya_module/scripts/userSetup.py` at startup and installs the **Shader Health** menu plus **ShaderHealth** shelf button automatically.
+
 ## Development
 
 ### Requirements
@@ -185,6 +198,7 @@ The package uses a `src` layout so imports during tests match installed-package 
 - [`docs/SNAPSHOT_SCHEMA.md`](docs/SNAPSHOT_SCHEMA.md) — snapshot contract
 - [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — farm preflight hook
 - [`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md) — publish preflight hook
+- [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) — Maya module and `pip` install guide
 
 ## License
 
