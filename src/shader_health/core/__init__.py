@@ -7,6 +7,8 @@ from shader_health.core.fix_plan import (
 )
 from shader_health.core.models import (
     SNAPSHOT_SCHEMA_VERSION,
+    ArnoldMaterialMetadata,
+    ArnoldSceneMetadata,
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
@@ -15,6 +17,8 @@ from shader_health.core.models import (
     NodeSnapshot,
     ReferenceSnapshot,
     ShadingEngineSnapshot,
+    VrayMaterialMetadata,
+    VraySceneMetadata,
 )
 from shader_health.core.rule_loader import (
     ProfileDefinition,
@@ -83,8 +87,12 @@ __all__ = [
     "RuleResult",
     "RuleSchemaError",
     "ShadingEngineSnapshot",
+    "ArnoldMaterialMetadata",
+    "ArnoldSceneMetadata",
     "ValidationEngine",
     "ValidationSummary",
+    "VrayMaterialMetadata",
+    "VraySceneMetadata",
     "WaiverRecord",
     "WaiverSidecar",
     "apply_profile_overrides",

@@ -56,8 +56,56 @@ This keeps the following systems aligned:
 | `shading_engines` | array | Yes | Shading engine assignments and shader links. |
 | `file_dependencies` | array | Yes | Texture/file dependencies collected from file nodes. |
 | `references` | array | Yes | Referenced scene metadata for reference-safe validation. |
+| `vray_scene_metadata` | object or null | No | V-Ray scene enrichment payload when enrichment runs. |
+| `arnold_scene_metadata` | object or null | No | Arnold scene enrichment payload when enrichment runs. |
 
 All arrays may be empty.
+
+### V-Ray scene metadata (`vray_scene_metadata`)
+
+Attached during validation enrichment when the snapshot is prepared for rules.
+
+```json
+{
+  "has_vray_plugin": true,
+  "vray_plugin_node_ids": ["node:vraySettings"],
+  "vray_material_count": 3,
+  "has_vray_materials": true
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `has_vray_plugin` | boolean | Scene contains a V-Ray settings/plugin node such as `VRaySettingsNode`. |
+| `vray_plugin_node_ids` | array[string] | Node IDs for detected V-Ray plugin/settings nodes. |
+| `vray_material_count` | integer | Count of V-Ray material nodes in the snapshot. |
+| `has_vray_materials` | boolean | True when one or more V-Ray materials are present. |
+
+### Arnold scene metadata (`arnold_scene_metadata`)
+
+Attached during validation enrichment when the snapshot is prepared for rules.
+
+```json
+{
+  "has_arnold_plugin": true,
+  "arnold_plugin_node_ids": ["node:defaultArnoldRenderOptions"],
+  "arnold_material_count": 2,
+  "has_arnold_materials": true,
+  "stand_in_node_ids": ["node:hero_proxyStandIn"],
+  "stand_in_count": 1,
+  "has_stand_ins": true
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `has_arnold_plugin` | boolean | Scene contains an Arnold options/plugin node such as `aiOptions`. |
+| `arnold_plugin_node_ids` | array[string] | Node IDs for detected Arnold plugin/options nodes. |
+| `arnold_material_count` | integer | Count of Arnold material nodes in the snapshot. |
+| `has_arnold_materials` | boolean | True when one or more Arnold materials are present. |
+| `stand_in_node_ids` | array[string] | Node IDs for detected Arnold stand-in/proxy nodes (`aiStandIn`). |
+| `stand_in_count` | integer | Count of Arnold stand-in nodes in the snapshot. |
+| `has_stand_ins` | boolean | True when one or more Arnold stand-in nodes are present. |
 
 ## NodeSnapshot
 
@@ -153,6 +201,69 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
 | `graph_node_count` | integer | Yes | Number of nodes in material graph. |
 | `graph_depth` | integer | Yes | Approximate upstream graph depth. |
 | `graph_fingerprint` | string | Yes | Stable graph fingerprint if computed, otherwise empty string. |
+| `vray_metadata` | object or null | No | V-Ray enrichment payload when the material is a V-Ray shader type. |
+| `arnold_metadata` | object or null | No | Arnold enrichment payload when the material is an Arnold shader type. |
+
+### V-Ray material metadata (`vray_metadata`)
+
+Attached during validation enrichment for V-Ray material types such as `VRayMtl`.
+
+```json
+{
+  "texture_count": 2,
+  "displacement_linked": true,
+  "subdivision_enabled": false,
+  "reflection_max_depth": 8,
+  "refraction_max_depth": 8,
+  "limit_attrs": {
+    "reflection_max_depth": 8,
+    "refraction_max_depth": 8,
+    "brdf": 3,
+    "force_displacement": true
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `texture_count` | integer | Number of texture nodes linked to the material. |
+| `displacement_linked` | boolean | Material has displacement nodes or a shading engine displacement shader. |
+| `subdivision_enabled` | boolean | V-Ray subdivision/displacement flags detected on the material node. |
+| `reflection_max_depth` | integer or null | Reflection trace depth limit when available. |
+| `refraction_max_depth` | integer or null | Refraction trace depth limit when available. |
+| `limit_attrs` | object | Additional normalized V-Ray limit attrs from the material node. |
+
+### Arnold material metadata (`arnold_metadata`)
+
+Attached during validation enrichment for Arnold material types such as `aiStandardSurface`.
+
+```json
+{
+  "texture_count": 3,
+  "displacement_linked": false,
+  "specular_roughness": 0.35,
+  "metalness": 0.0,
+  "transmission_weight": 0.0,
+  "transmission_depth": 8,
+  "key_attrs": {
+    "specular_roughness": 0.35,
+    "metalness": 0.0,
+    "transmission_weight": 0.0,
+    "transmission_depth": 8,
+    "opacity": 1.0
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `texture_count` | integer | Number of texture nodes linked to the material. |
+| `displacement_linked` | boolean | Material has displacement nodes or a shading engine displacement shader. |
+| `specular_roughness` | number or null | `specularRoughness` when available on the material node. |
+| `metalness` | number or null | `metalness` when available on the material node. |
+| `transmission_weight` | number or null | `transmission` weight when available on the material node. |
+| `transmission_depth` | integer or null | `transmissionDepth` when available on the material node. |
+| `key_attrs` | object | Additional normalized Arnold attrs from the material node. |
 
 ## ShadingEngineSnapshot
 

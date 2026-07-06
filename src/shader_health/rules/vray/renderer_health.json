@@ -51,6 +51,110 @@
         "waiver_allowed": true,
         "auto_fix_allowed": false
       }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "vray.scene.plugin_missing.error",
+      "name": "V-Ray plugin node missing when V-Ray materials are present",
+      "enabled": true,
+      "renderer": ["vray"],
+      "scope": "scene",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "Scene contains V-Ray materials but no V-Ray settings/plugin node.",
+      "why": "V-Ray materials require a V-Ray settings node such as VRaySettingsNode for predictable farm rendering and policy validation.",
+      "match": {
+        "vray_scene_metadata.has_vray_materials": true
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "vray_scene_metadata.has_vray_plugin",
+        "expected": true
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "vray.material.displacement_review.warning",
+      "name": "V-Ray material displacement requires review",
+      "enabled": true,
+      "renderer": ["vray"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "V-Ray material has displacement linked in its shading network.",
+      "why": "Displacement-linked V-Ray materials should be reviewed for farm-safe scale, subdivision, and trace depth before publish.",
+      "match": {
+        "node_type": ["VRayMtl", "VRayMtl2", "VRayAlSurface", "VRayBlendMtl", "VRayFastSSS2"]
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "vray_metadata.displacement_linked",
+        "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "vray.material.texture_budget.warning",
+      "name": "V-Ray material texture count exceeds budget",
+      "enabled": true,
+      "renderer": ["vray"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "V-Ray material uses more textures than the configured V-Ray texture budget.",
+      "why": "High texture counts increase IO, memory pressure, and review complexity. V-Ray enrichment tracks texture count separately from generic graph lists for renderer-specific policy checks.",
+      "match": {
+        "node_type": ["VRayMtl", "VRayMtl2", "VRayAlSurface", "VRayBlendMtl", "VRayFastSSS2"]
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "vray_metadata.texture_count",
+        "max": 24
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "vray.material.trace_depth.warning",
+      "name": "V-Ray material reflection trace depth exceeds budget",
+      "enabled": true,
+      "renderer": ["vray"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "V-Ray material reflection trace depth exceeds the configured budget.",
+      "why": "High reflection trace depth increases render cost and can hide unstable material settings. Enriched V-Ray metadata exposes trace depth limits for policy review.",
+      "match": {
+        "node_type": ["VRayMtl", "VRayMtl2", "VRayAlSurface"]
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "vray_metadata.reflection_max_depth",
+        "max": 8
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
     }
   ]
 }

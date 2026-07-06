@@ -1,0 +1,83 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "vray.scene.plugin_missing.error",
+          "severity": "error",
+          "block_publish": false,
+          "block_deadline": false
+        },
+        {
+          "rule_id": "vray.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "demo_displacement_MTL"
+        },
+        {
+          "rule_id": "vray.material.texture_budget.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "budget_mtl"
+        },
+        {
+          "rule_id": "vray.material.trace_depth.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_mtl"
+        }
+      ]
+    },
+    "publish_strict": {
+      "failed": [
+        {
+          "rule_id": "vray.scene.plugin_missing.error",
+          "severity": "error",
+          "block_publish": true,
+          "block_deadline": false
+        },
+        {
+          "rule_id": "vray.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": true,
+          "block_deadline": false,
+          "material": "demo_displacement_MTL"
+        },
+        {
+          "rule_id": "vray.material.texture_budget.warning",
+          "severity": "warning",
+          "block_publish": true,
+          "block_deadline": false,
+          "material": "budget_mtl"
+        }
+      ]
+    },
+    "deadline_critical": {
+      "failed": [
+        {
+          "rule_id": "vray.scene.plugin_missing.error",
+          "severity": "error",
+          "block_publish": false,
+          "block_deadline": true
+        },
+        {
+          "rule_id": "vray.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": true,
+          "material": "demo_displacement_MTL"
+        },
+        {
+          "rule_id": "vray.material.trace_depth.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": true,
+          "material": "hero_mtl"
+        }
+      ]
+    }
+  }
+}

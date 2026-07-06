@@ -1,0 +1,75 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "arnold.scene.plugin_missing.error",
+          "severity": "error",
+          "block_publish": false,
+          "block_deadline": false
+        },
+        {
+          "rule_id": "arnold.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "demo_displacement_MTL"
+        },
+        {
+          "rule_id": "arnold.material.transmission_depth.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_mtl"
+        },
+        {
+          "rule_id": "arnold.scene.stand_in_review.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false
+        }
+      ]
+    },
+    "publish_strict": {
+      "failed": [
+        {
+          "rule_id": "arnold.scene.plugin_missing.error",
+          "severity": "error",
+          "block_publish": true,
+          "block_deadline": false
+        },
+        {
+          "rule_id": "arnold.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": true,
+          "block_deadline": false,
+          "material": "demo_displacement_MTL"
+        }
+      ]
+    },
+    "deadline_critical": {
+      "failed": [
+        {
+          "rule_id": "arnold.scene.plugin_missing.error",
+          "severity": "error",
+          "block_publish": false,
+          "block_deadline": true
+        },
+        {
+          "rule_id": "arnold.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": true,
+          "material": "demo_displacement_MTL"
+        },
+        {
+          "rule_id": "arnold.material.transmission_depth.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": true,
+          "material": "hero_mtl"
+        }
+      ]
+    }
+  }
+}

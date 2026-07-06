@@ -28,6 +28,24 @@
     },
     "common.shader_network.default_material.assigned": {
       "enabled": false
+    },
+    "vray.scene.plugin_missing.error": {
+      "block_deadline": true
+    },
+    "vray.material.displacement_review.warning": {
+      "block_deadline": true
+    },
+    "vray.material.trace_depth.warning": {
+      "block_deadline": true
+    },
+    "arnold.scene.plugin_missing.error": {
+      "block_deadline": true
+    },
+    "arnold.material.displacement_review.warning": {
+      "block_deadline": true
+    },
+    "arnold.material.transmission_depth.warning": {
+      "block_deadline": true
     }
   }
 }

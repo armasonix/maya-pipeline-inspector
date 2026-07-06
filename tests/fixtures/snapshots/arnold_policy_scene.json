@@ -1,0 +1,113 @@
+{
+  "connections": [],
+  "file_dependencies": [],
+  "materials": [
+    {
+      "graph_depth": 1,
+      "graph_fingerprint": "",
+      "graph_node_count": 2,
+      "name": "hero_mtl",
+      "node_id": "node:hero_mtl",
+      "renderer_family": "arnold",
+      "shading_engines": ["node:hero_sg"],
+      "texture_nodes": ["node:file_basecolor"],
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "graph_depth": 2,
+      "graph_fingerprint": "",
+      "graph_node_count": 3,
+      "name": "demo_displacement_MTL",
+      "node_id": "node:demo_displacement_MTL",
+      "renderer_family": "arnold",
+      "shading_engines": ["node:disp_sg"],
+      "texture_nodes": ["node:file_disp"],
+      "displacement_nodes": ["node:displacementShader1"],
+      "type_name": "aiStandardSurface"
+    }
+  ],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {
+        "metalness": 0.0,
+        "specularRoughness": 0.35,
+        "transmission": 0.0,
+        "transmissionDepth": 16
+      },
+      "classification": ["material"],
+      "full_name": "hero_mtl",
+      "id": "node:hero_mtl",
+      "locked": false,
+      "name": "hero_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "demo_displacement_MTL",
+      "id": "node:demo_displacement_MTL",
+      "locked": false,
+      "name": "demo_displacement_MTL",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "attrs": {"scale": 12},
+      "classification": ["displacement"],
+      "full_name": "displacementShader1",
+      "id": "node:displacementShader1",
+      "locked": false,
+      "name": "displacementShader1",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "displacementShader"
+    },
+    {
+      "attrs": {},
+      "classification": ["utility"],
+      "full_name": "hero_proxyStandIn",
+      "id": "node:hero_proxyStandIn",
+      "locked": false,
+      "name": "hero_proxyStandIn",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiStandIn"
+    }
+  ],
+  "references": [],
+  "renderer": "arnold",
+  "scan_scope": "scene",
+  "scene_path": "tests/fixtures/snapshots/arnold_policy_scene.json",
+  "scanned_at_utc": "2026-07-06T10:00:00Z",
+  "schema_version": "1.0",
+  "shading_engines": [
+    {
+      "displacement_shader": null,
+      "members": ["mesh:hero_body"],
+      "name": "hero_sg",
+      "node_id": "node:hero_sg",
+      "surface_shader": "node:hero_mtl",
+      "volume_shader": null
+    },
+    {
+      "displacement_shader": "node:displacementShader1",
+      "members": ["mesh:disp_body"],
+      "name": "disp_sg",
+      "node_id": "node:disp_sg",
+      "surface_shader": "node:demo_displacement_MTL",
+      "volume_shader": null
+    }
+  ]
+}

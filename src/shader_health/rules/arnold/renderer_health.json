@@ -51,6 +51,136 @@
         "waiver_allowed": true,
         "auto_fix_allowed": false
       }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "arnold.scene.plugin_missing.error",
+      "name": "Arnold plugin node missing when Arnold materials are present",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "scene",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "Scene contains Arnold materials but no Arnold options/plugin node.",
+      "why": "Arnold materials require an aiOptions node for predictable farm rendering and policy validation.",
+      "match": {
+        "arnold_scene_metadata.has_arnold_materials": true
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "arnold_scene_metadata.has_arnold_plugin",
+        "expected": true
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "arnold.material.displacement_review.warning",
+      "name": "Arnold material displacement requires review",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Arnold material has displacement linked in its shading network.",
+      "why": "Displacement-linked Arnold materials should be reviewed for farm-safe scale and subdivision before publish.",
+      "match": {
+        "node_type": ["aiStandardSurface", "aiToon", "aiCarPaint", "aiLayerShader", "aiMixShader"]
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "arnold_metadata.displacement_linked",
+        "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "arnold.material.texture_budget.warning",
+      "name": "Arnold material texture count exceeds budget",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Arnold material uses more textures than the configured Arnold texture budget.",
+      "why": "High texture counts increase IO, memory pressure, and review complexity. Arnold enrichment tracks texture count separately from generic graph lists for renderer-specific policy checks.",
+      "match": {
+        "node_type": ["aiStandardSurface", "aiToon", "aiCarPaint", "aiLayerShader", "aiMixShader"]
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "arnold_metadata.texture_count",
+        "max": 24
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "arnold.material.transmission_depth.warning",
+      "name": "Arnold material transmission depth exceeds budget",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Arnold material transmission depth exceeds the configured budget.",
+      "why": "High transmission depth increases render cost and can hide unstable material settings. Enriched Arnold metadata exposes transmission depth limits for policy review.",
+      "match": {
+        "node_type": ["aiStandardSurface", "aiToon", "aiCarPaint"]
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "arnold_metadata.transmission_depth",
+        "max": 8
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "arnold.scene.stand_in_review.warning",
+      "name": "Arnold stand-in nodes require review",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "scene",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Scene contains Arnold stand-in/proxy nodes that require shading review.",
+      "why": "Arnold stand-ins can bypass local material graphs and hide missing textures or outdated proxies from routine shader validation.",
+      "match": {
+        "arnold_scene_metadata.has_arnold_materials": true
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "arnold_scene_metadata.has_stand_ins",
+        "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
     }
   ]
 }

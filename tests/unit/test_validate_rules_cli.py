@@ -16,6 +16,7 @@ from shader_health.core import (
     load_rule_stack,
     load_rules_from_path,
 )
+from shader_health.core.rule_loader import validate_profile_overrides
 
 ROOT = Path(__file__).resolve().parents[2]
 VALID_RULES = ROOT / "tests" / "fixtures" / "rules" / "valid"
@@ -163,9 +164,10 @@ def test_profile_override_unknown_rule_fails(tmp_path):
             "rule_overrides": {"missing.rule": {"severity": "critical"}},
         },
     )
+    profile = load_profile(profile_path)
 
     with pytest.raises(RuleLoadError, match="references unknown rule"):
-        apply_profile_overrides([rule], load_profile(profile_path))
+        validate_profile_overrides(profile, {rule.id: rule})
 
 
 def test_load_rules_from_path_rejects_missing_path(tmp_path):

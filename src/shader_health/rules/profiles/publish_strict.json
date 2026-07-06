@@ -1,5 +1,24 @@
 {
   "id": "publish_strict",
   "display_name": "Publish Strict",
-  "rule_overrides": {}
+  "rule_overrides": {
+    "vray.scene.plugin_missing.error": {
+      "block_publish": true
+    },
+    "vray.material.displacement_review.warning": {
+      "block_publish": true
+    },
+    "vray.material.texture_budget.warning": {
+      "block_publish": true
+    },
+    "arnold.scene.plugin_missing.error": {
+      "block_publish": true
+    },
+    "arnold.material.displacement_review.warning": {
+      "block_publish": true
+    },
+    "arnold.material.texture_budget.warning": {
+      "block_publish": true
+    }
+  }
 }
