@@ -61,7 +61,7 @@ def test_export_shader_manifest_writes_manifest_file(tmp_path: Path):
     assert result.succeeded is True
     assert Path(result.path) == output_path
     payload = json.loads(output_path.read_text(encoding="utf-8"))
-    assert payload["manifest_schema_version"] == "1.0"
+    assert payload["manifest_schema_version"] == "1.1"
 
 
 def test_build_shader_manifest_includes_health_score_and_material_issues():
@@ -105,7 +105,7 @@ def test_build_shader_manifest_includes_health_score_and_material_issues():
 
     manifest = build_shader_manifest(snapshot, results=results)
 
-    assert manifest["manifest_schema_version"] == "1.0"
+    assert manifest["manifest_schema_version"] == "1.1"
     assert manifest["health_score"] == 87
     issues = manifest["materials"][0]["issues"]
     assert issues["failed"] == 2

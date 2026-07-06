@@ -46,7 +46,8 @@ def uninstall_ui() -> None:
     """Remove menu, shelf, and panel for plugin unload."""
 
     _ensure_source_path()
-    from shader_health.maya.commands import reset_ui_install_state, uninstall_ui as _uninstall_ui
+    from shader_health.maya.commands import reset_ui_install_state
+    from shader_health.maya.commands import uninstall_ui as _uninstall_ui
 
     _uninstall_ui()
     reset_ui_install_state()

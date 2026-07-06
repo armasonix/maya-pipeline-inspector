@@ -73,7 +73,3 @@ gh pr create --base main --head dev \
   --title "Milestone 15: Maya Plugin Entry" \
   --body "Closes #91, Closes #92"
 ```
-
-## Local reference (optional)
-
-If you had a monolithic agent session, code may still exist under `tools/_v03_final_snapshot/` (gitignored). Use it only as a **read-only hint** when implementing an issue — do not bulk-copy into commits.

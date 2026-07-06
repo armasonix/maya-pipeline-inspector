@@ -16,7 +16,7 @@ from shader_health.core import (
 )
 from shader_health.core.scoring import compute_health_score
 
-MANIFEST_SCHEMA_VERSION = "1.0"
+MANIFEST_SCHEMA_VERSION = "1.1"
 
 JsonDict = dict[str, Any]
 

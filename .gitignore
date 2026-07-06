@@ -62,7 +62,3 @@ desktop.ini
 .idea/
 *.swp
 *.swo
-
-# Local v0.3 reference snapshot (not for commit)
-tools/_v03_final_snapshot/
-tools/_v03_stages/

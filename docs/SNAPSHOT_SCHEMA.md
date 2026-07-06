@@ -446,6 +446,38 @@ Versioning rules:
 
 Future migrations should provide compatibility loaders where practical.
 
+## Shader Manifest Schema
+
+The Material Passport / Shader Manifest is a separate JSON artifact from `GraphSnapshot`. It is produced by `shader_health.reports.manifest.build_shader_manifest()` and exported from the Maya UI or headless tools.
+
+Manifest schema is versioned independently via `manifest_schema_version`.
+
+### Manifest schema 1.1 (v0.3)
+
+Current manifest version:
+
+```text
+1.1
+```
+
+Migration from **1.0** is additive. Existing 1.0 manifests remain valid baselines for diff and gate workflows.
+
+| Change | Scope | Notes |
+|---|---|---|
+| `manifest_schema_version` | top-level | Bumped from `1.0` to `1.1`. |
+| `health_score` | top-level, optional | Integer `0..100` from validation results when `results` are passed to `build_shader_manifest()`. |
+| `issues` | per-material, optional | Failed-issue summary: `failed`, `critical`, `error`, `warning`, `rule_ids`. |
+
+Fields unchanged from 1.0 include `materials`, `textures`, `graph_fingerprint`, texture version metadata, and snapshot provenance fields (`scene_path`, `renderer`, `scan_scope`, `scanned_at_utc`).
+
+Readers that only understand 1.0 may ignore `health_score` and per-material `issues`. Diff tooling should continue to accept 1.0 baseline manifests.
+
+Implementation:
+
+```text
+src/shader_health/reports/manifest.py
+```
+
 ## Implementation Notes
 
 Current model implementation:
