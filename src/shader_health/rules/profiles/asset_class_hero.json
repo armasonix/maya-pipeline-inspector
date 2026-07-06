@@ -1,0 +1,20 @@
+{
+  "id": "asset_class_hero",
+  "display_name": "Asset Class Hero",
+  "manifest_diff_policy": {
+    "max_new_changes": 0,
+    "max_fingerprint_changes": 0,
+    "block_on_new_textures": true
+  },
+  "rule_overrides": {
+    "common.texture.resolution.hero.max": {
+      "enabled": true
+    },
+    "common.texture.resolution.prop.max": {
+      "enabled": false
+    },
+    "common.texture.resolution.background.max": {
+      "enabled": false
+    }
+  }
+}

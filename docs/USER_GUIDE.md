@@ -31,6 +31,26 @@ Rule `common.texture.version.latest` compares the `v###` token in a texture file
 
 The check is skipped when the filename has no `v###` version token or when the scanner cannot resolve version metadata from the path.
 
+## Texture resolution budgets
+
+Rules `common.texture.resolution.{hero,prop,background}.max` compare `max_dimension` (longest image edge in pixels) on texture file dependencies. The rules are **disabled by default**; enable one tier per asset using packaged profiles:
+
+| Profile | Max longest edge |
+|---|---|
+| `asset_class_hero` | 4096px |
+| `asset_class_prop` | 2048px |
+| `asset_class_background` | 1024px |
+
+During Maya scan, snapshot enrichment probes PNG/JPEG/WebP headers to populate `max_dimension` without a Pillow dependency. When metadata is unavailable, the rule is skipped rather than failed.
+
+Headless example:
+
+```bash
+python -m shader_health validate scene.ma --profile-id asset_class_hero --report report.json
+```
+
+Shader manifests (schema 1.1) include `max_dimension` per texture entry for diff review.
+
 ## Main User Roles
 
 ### Artist / Lookdev Artist
@@ -170,6 +190,9 @@ Packaged MVP profiles (under `src/shader_health/rules/profiles/`):
 | `deadline_critical` | Fast farm submission preflight. Critical-only where possible. |
 | `supervisor_full` | Full audit mode with all rules visible. |
 | `ci_headless` | Deterministic validation for automated checks. Same rule profile in UI and CLI; selecting it in Maya does not spawn a separate headless process. |
+| `asset_class_hero` | Hero asset publish gate with 4096px texture resolution budget. |
+| `asset_class_prop` | Prop asset publish gate with 2048px texture resolution budget. |
+| `asset_class_background` | Background asset checks with 1024px texture resolution budget. |
 
 The Maya UI and headless CLI both call the same validation pipeline (`run_validation`). Choosing `ci_headless` in the panel only changes which rules/overrides are applied to the current scene scan.
 
@@ -286,7 +309,7 @@ Expected behavior (implemented via waiver sidecar beside the scene file):
 Example:
 
 ```text
-Rule: common.texture.resolution.max
+Rule: common.texture.resolution.hero.max
 Reason: Hero close-up approved by supervisor.
 Approved by: supervisor_name
 Expires: 2026-07-30

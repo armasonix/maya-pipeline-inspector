@@ -35,6 +35,7 @@ TEXTURE_FIELDS = (
     "is_udim",
     "udim_tiles",
     "missing_udim_tiles",
+    "max_dimension",
 )
 
 

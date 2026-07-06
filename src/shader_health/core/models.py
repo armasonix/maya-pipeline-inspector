@@ -194,6 +194,7 @@ class FileDependencySnapshot:
     optimized_mtime_utc: Optional[str] = None
     optimized_is_stale: Optional[bool] = None
     size_bytes: Optional[int] = None
+    max_dimension: Optional[int] = None
     image_info: Optional[ImageInfo] = None
 
     def to_dict(self) -> JsonDict:
@@ -216,6 +217,7 @@ class FileDependencySnapshot:
             "optimized_mtime_utc": self.optimized_mtime_utc,
             "optimized_is_stale": self.optimized_is_stale,
             "size_bytes": self.size_bytes,
+            "max_dimension": self.max_dimension,
             "image_info": self.image_info.to_dict() if self.image_info else None,
         }
 
@@ -245,6 +247,7 @@ class FileDependencySnapshot:
             optimized_mtime_utc=data.get("optimized_mtime_utc"),
             optimized_is_stale=_as_optional_bool(data.get("optimized_is_stale")),
             size_bytes=data.get("size_bytes"),
+            max_dimension=data.get("max_dimension"),
             image_info=image_info,
         )
 

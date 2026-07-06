@@ -28,7 +28,8 @@ from shader_health.core import (
     RuleResult,
 )
 from shader_health.core.graph_fingerprint import material_graph_fingerprint
-from shader_health.core.models import MaterialSnapshot
+from shader_health.core.image_metadata import read_image_dimensions
+from shader_health.core.models import ImageInfo, MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
@@ -233,14 +234,15 @@ def _enrich_file_dependency(
     resolved_path = _resolve_path(udim_pattern or dependency.raw_path, scene_dir)
     is_udim = bool(udim_pattern) or dependency.is_udim
     if not is_udim:
-        return replace(
+        enriched = replace(
             dependency,
             resolved_path=resolved_path,
             exists=Path(resolved_path).is_file(),
         )
+        return _enrich_dependency_image_metadata(enriched)
 
     tiles = _existing_udim_tiles(resolved_path)
-    return replace(
+    enriched = replace(
         dependency,
         raw_path=udim_pattern or dependency.raw_path,
         resolved_path=resolved_path,
@@ -248,6 +250,39 @@ def _enrich_file_dependency(
         is_udim=True,
         udim_tiles=tiles,
         missing_udim_tiles=_missing_udim_tiles(tiles),
+    )
+    return _enrich_dependency_image_metadata(enriched)
+
+
+def _enrich_dependency_image_metadata(
+    dependency: FileDependencySnapshot,
+) -> FileDependencySnapshot:
+    if not dependency.exists or not dependency.resolved_path:
+        return dependency
+
+    resolved = dependency.resolved_path
+    if dependency.is_udim and "<UDIM>" in resolved:
+        tiles = dependency.udim_tiles or _existing_udim_tiles(resolved)
+        if tiles:
+            first_tile = str(resolved).replace("<UDIM>", f"{tiles[0]:04d}").replace(
+                "<udim>",
+                f"{tiles[0]:04d}",
+            )
+            width, height = read_image_dimensions(first_tile)
+        else:
+            width, height = None, None
+    else:
+        width, height = read_image_dimensions(resolved)
+
+    if width is None and height is None:
+        return dependency
+
+    max_dimension = max(width or 0, height or 0) or None
+    image_info = ImageInfo(width=width, height=height)
+    return replace(
+        dependency,
+        image_info=image_info,
+        max_dimension=max_dimension,
     )
 
 

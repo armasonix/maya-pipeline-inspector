@@ -206,6 +206,7 @@ def _texture_entry(
                 "is_udim": False,
                 "udim_tiles": [],
                 "missing_udim_tiles": [],
+                "max_dimension": None,
             }
         )
         return entry
@@ -222,6 +223,7 @@ def _texture_entry(
             "is_udim": dependency.is_udim,
             "udim_tiles": list(dependency.udim_tiles),
             "missing_udim_tiles": list(dependency.missing_udim_tiles),
+            "max_dimension": dependency.max_dimension,
         }
     )
     return entry

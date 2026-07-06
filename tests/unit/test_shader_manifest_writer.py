@@ -76,6 +76,7 @@ def make_snapshot() -> GraphSnapshot:
                 extension=".exr",
                 version="003",
                 latest_version="003",
+                max_dimension=4096,
             ),
             FileDependencySnapshot(
                 node_id="node:file_roughness",
@@ -86,6 +87,7 @@ def make_snapshot() -> GraphSnapshot:
                 extension=".exr",
                 version="001",
                 latest_version="004",
+                max_dimension=2048,
             ),
         ],
     )
@@ -113,10 +115,12 @@ def test_shader_manifest_contains_materials_textures_versions_and_fingerprint():
     assert textures["node:file_albedo"]["version"] == "003"
     assert textures["node:file_albedo"]["latest_version"] == "003"
     assert textures["node:file_albedo"]["udim_tiles"] == [1001, 1002]
+    assert textures["node:file_albedo"]["max_dimension"] == 4096
 
     assert textures["node:file_roughness"]["semantic"] == "roughness"
     assert textures["node:file_roughness"]["version"] == "001"
     assert textures["node:file_roughness"]["latest_version"] == "004"
+    assert textures["node:file_roughness"]["max_dimension"] == 2048
 
 
 def test_shader_manifest_output_is_deterministic():
