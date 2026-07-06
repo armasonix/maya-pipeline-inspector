@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from shader_health import cli
-from shader_health.core import GraphSnapshot, NodeSnapshot
+from shader_health.core import GraphSnapshot, MaterialSnapshot, NodeSnapshot
 
 
 def test_validate_snapshot_writes_report_and_returns_publish_block(tmp_path: Path):
@@ -173,6 +173,87 @@ def test_validate_scene_path_uses_scene_loader(monkeypatch, tmp_path: Path):
     assert report_path.exists()
 
 
+def test_gate_snapshot_blocks_fingerprint_drift(tmp_path: Path):
+    snapshot_path = _write_material_snapshot(tmp_path, "sha256:new")
+    baseline_path = tmp_path / "baseline_manifest.json"
+    gate_path = tmp_path / "gate.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "manifest_schema_version": "1.1",
+                "materials": [
+                    {
+                        "node_id": "node:hero_mtl",
+                        "name": "hero_mtl",
+                        "graph_fingerprint": "sha256:old",
+                        "textures": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    profile_path = _strict_manifest_gate_profile(tmp_path)
+
+    code = cli.main(
+        [
+            "gate",
+            str(snapshot_path),
+            str(baseline_path),
+            "--profile",
+            str(profile_path),
+            "--out",
+            str(gate_path),
+        ]
+    )
+
+    payload = json.loads(gate_path.read_text(encoding="utf-8"))
+    assert code == cli.EXIT_PUBLISH_BLOCK
+    assert payload["manifest_regression_blocked"] is True
+    assert any("fingerprint" in reason for reason in payload["reasons"])
+
+
+def test_validate_snapshot_runs_manifest_gate_after_passing_validation(tmp_path: Path):
+    snapshot_path = _write_material_snapshot(tmp_path, "sha256:new")
+    report_path = tmp_path / "report.json"
+    baseline_path = tmp_path / "baseline_manifest.json"
+    rule_root = _rule_root(tmp_path, block_publish=True)
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "manifest_schema_version": "1.1",
+                "materials": [
+                    {
+                        "node_id": "node:hero_mtl",
+                        "name": "hero_mtl",
+                        "graph_fingerprint": "sha256:old",
+                        "textures": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    code = cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--rule-root",
+            str(rule_root),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+            "--baseline-manifest",
+            str(baseline_path),
+        ]
+    )
+
+    assert code == cli.EXIT_PUBLISH_BLOCK
+    assert report_path.exists()
+
+
 def _write_snapshot(tmp_path: Path, color_space: str) -> Path:
     path = tmp_path / f"snapshot_{color_space}.json"
     path.write_text(_snapshot(color_space).to_json(), encoding="utf-8")
@@ -191,6 +272,46 @@ def _snapshot(color_space: str) -> GraphSnapshot:
             )
         ],
     )
+
+
+def _write_material_snapshot(tmp_path: Path, fingerprint: str) -> Path:
+    path = tmp_path / f"material_snapshot_{fingerprint.replace(':', '_')}.json"
+    path.write_text(_material_snapshot(fingerprint).to_json(), encoding="utf-8")
+    return path
+
+
+def _material_snapshot(fingerprint: str) -> GraphSnapshot:
+    return GraphSnapshot(
+        renderer="common",
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_mtl",
+                name="hero_mtl",
+                type_name="lambert",
+                graph_fingerprint=fingerprint,
+            )
+        ],
+    )
+
+
+def _strict_manifest_gate_profile(tmp_path: Path) -> Path:
+    path = tmp_path / "strict_gate_profile.json"
+    path.write_text(
+        json.dumps(
+            {
+                "id": "strict_gate",
+                "display_name": "Strict Gate",
+                "manifest_diff_policy": {
+                    "max_new_changes": 0,
+                    "max_fingerprint_changes": 0,
+                    "block_on_new_textures": True,
+                },
+                "rule_overrides": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def _rule_root(

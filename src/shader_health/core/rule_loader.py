@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Optional
 
+from shader_health.core.manifest_gate import ManifestGatePolicy
 from shader_health.core.rule_schema import (
     SEVERITIES,
     RuleDefinition,
@@ -114,6 +115,7 @@ class ProfileDefinition:
     id: str
     display_name: str
     rule_overrides: dict[str, RuleOverride]
+    manifest_diff_policy: ManifestGatePolicy = ManifestGatePolicy()
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ProfileDefinition:
@@ -129,11 +131,16 @@ class ProfileDefinition:
             str(rule_id): RuleOverride.from_dict(str(rule_id), _require_mapping(value, rule_id))
             for rule_id, value in raw_overrides.items()
         }
+        raw_policy = data.get("manifest_diff_policy")
+        policy = ManifestGatePolicy.from_mapping(
+            raw_policy if isinstance(raw_policy, Mapping) else None
+        )
 
         return cls(
             id=profile_id,
             display_name=str(data.get("display_name", profile_id)),
             rule_overrides=overrides,
+            manifest_diff_policy=policy,
         )
 
 

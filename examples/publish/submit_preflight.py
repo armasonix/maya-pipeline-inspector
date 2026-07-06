@@ -32,6 +32,7 @@ class PublishPreflightResult:
     validator_exit_code: int
     command: tuple[str, ...]
     report_path: Path
+    manifest_gate_exit_code: int = 0
     stdout: str = ""
     stderr: str = ""
 
@@ -62,6 +63,31 @@ def build_validator_command(
     )
 
 
+def build_manifest_gate_command(
+    *,
+    mayapy: str,
+    scene_path: Path,
+    baseline_manifest_path: Path,
+    profile_path: Path,
+    gate_report_path: Path | None = None,
+) -> tuple[str, ...]:
+    """Build the optional manifest regression gate command."""
+
+    command = [
+        mayapy,
+        "-m",
+        "shader_health",
+        "gate",
+        str(scene_path),
+        str(baseline_manifest_path),
+        "--profile",
+        str(profile_path),
+    ]
+    if gate_report_path is not None:
+        command.extend(["--out", str(gate_report_path)])
+    return tuple(command)
+
+
 def run_publish_preflight(
     *,
     scene_path: Path,
@@ -70,6 +96,8 @@ def run_publish_preflight(
     mayapy: str = "mayapy",
     repo_root: Path | None = None,
     extra_args: Sequence[str] = (),
+    baseline_manifest_path: Path | None = None,
+    gate_report_path: Path | None = None,
     runner: Runner = subprocess.run,
 ) -> PublishPreflightResult:
     """Run Shader Health validation and map result to a publish decision."""
@@ -79,7 +107,7 @@ def run_publish_preflight(
         scene_path=scene_path,
         report_path=report_path,
         profile_path=profile_path,
-        extra_args=extra_args,
+        extra_args=_validator_extra_args(extra_args, baseline_manifest_path),
     )
     completed = runner(
         command,
@@ -89,8 +117,35 @@ def run_publish_preflight(
     )
     validator_exit_code = int(completed.returncode)
     if validator_exit_code == VALIDATOR_OK:
-        return _result(
-            True, PUBLISH_ALLOWED, validator_exit_code, command, report_path, completed
+        if baseline_manifest_path is None:
+            return _result(
+                True, PUBLISH_ALLOWED, validator_exit_code, command, report_path, completed
+            )
+        gate_command = build_manifest_gate_command(
+            mayapy=mayapy,
+            scene_path=scene_path,
+            baseline_manifest_path=baseline_manifest_path,
+            profile_path=profile_path,
+            gate_report_path=gate_report_path,
+        )
+        gate_completed = runner(
+            gate_command,
+            cwd=str(repo_root) if repo_root else None,
+            capture_output=True,
+            text=True,
+        )
+        gate_exit_code = int(gate_completed.returncode)
+        allowed = gate_exit_code == VALIDATOR_OK
+        publish_exit = PUBLISH_ALLOWED if allowed else PUBLISH_BLOCKED
+        return PublishPreflightResult(
+            allowed=allowed,
+            exit_code=publish_exit,
+            validator_exit_code=validator_exit_code,
+            command=gate_command,
+            report_path=report_path,
+            manifest_gate_exit_code=gate_exit_code,
+            stdout=gate_completed.stdout,
+            stderr=gate_completed.stderr,
         )
     if validator_exit_code == VALIDATOR_PUBLISH_BLOCK:
         return _result(
@@ -112,6 +167,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"`{DEFAULT_PROFILE_ID}` from the packaged profiles folder."
         ),
     )
+    parser.add_argument(
+        "--baseline-manifest",
+        type=Path,
+        help="Optional approved manifest JSON path for regression gate evaluation.",
+    )
+    parser.add_argument(
+        "--gate-report",
+        type=Path,
+        help="Optional manifest gate JSON output path.",
+    )
     parser.add_argument("--mayapy", default="mayapy")
     parser.add_argument("--repo-root", type=Path)
     args, extra_args = parser.parse_known_args(argv)
@@ -123,10 +188,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         mayapy=args.mayapy,
         repo_root=args.repo_root,
         extra_args=extra_args,
+        baseline_manifest_path=args.baseline_manifest,
+        gate_report_path=args.gate_report,
     )
     if not result.allowed:
         print(_blocked_message(result), file=sys.stderr)
     return result.exit_code
+
+
+def _validator_extra_args(
+    extra_args: Sequence[str],
+    baseline_manifest_path: Path | None,
+) -> Sequence[str]:
+    if baseline_manifest_path is None:
+        return extra_args
+    if any(arg == "--baseline-manifest" for arg in extra_args):
+        return extra_args
+    return (
+        *tuple(extra_args),
+        "--baseline-manifest",
+        str(baseline_manifest_path),
+    )
 
 
 def _result(
@@ -149,6 +231,12 @@ def _result(
 
 
 def _blocked_message(result: PublishPreflightResult) -> str:
+    if result.manifest_gate_exit_code:
+        return (
+            "Publish blocked by Shader Health manifest gate. "
+            f"manifest_gate_exit_code={result.manifest_gate_exit_code}; "
+            f"report={result.report_path}"
+        )
     return (
         "Publish blocked by Shader Health preflight. "
         f"validator_exit_code={result.validator_exit_code}; "

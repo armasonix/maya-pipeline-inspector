@@ -26,6 +26,21 @@ mayapy examples/publish/submit_preflight.py \
   --renderer vray
 ```
 
+### Optional manifest regression gate (v0.3)
+
+When an approved manifest exists beside the asset, pass `--baseline-manifest` to run validation and manifest diff policy in one preflight:
+
+```bash
+mayapy examples/publish/submit_preflight.py \
+  D:/show/assets/char/hero/shading/hero_shading.ma \
+  --report D:/show/assets/char/hero/reports/shader_health_publish.json \
+  --profile D:/tools/maya-shader-health-inspector/src/shader_health/rules/profiles/publish_strict.json \
+  --baseline-manifest D:/show/assets/char/hero/shading/hero_shading_shader_health_manifest.json \
+  --gate-report D:/show/assets/char/hero/reports/shader_health_gate.json
+```
+
+Profile `manifest_diff_policy` controls allowed fingerprint drift and new texture entries.
+
 Arguments after the known preflight options are forwarded to the validator. This
 allows the publish tool to pass renderer IDs, extra rule folders, waiver sidecars,
 or other future headless validation options.
