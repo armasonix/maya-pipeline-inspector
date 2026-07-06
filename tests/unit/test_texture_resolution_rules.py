@@ -65,9 +65,9 @@ def test_texture_resolution_rule_pack_has_production_defaults():
         assert rule.check.params["attribute"] == "max_dimension"
         assert rule.policy.auto_fix_allowed is False
 
-    assert hero.check.params["max"] == 8192
-    assert prop.check.params["max"] == 4096
-    assert background.check.params["max"] == 2048
+    assert hero.check.params["max"] == 4096
+    assert prop.check.params["max"] == 2048
+    assert background.check.params["max"] == 1024
     assert hero.policy.block_publish is True
     assert prop.policy.block_publish is True
     assert background.policy.block_publish is False
@@ -105,21 +105,21 @@ def test_asset_class_profiles_enable_only_matching_tier():
 
 def test_hero_resolution_rule_fails_above_threshold():
     rule = enabled_resolution_rule("common.texture.resolution.hero.max")
-    snapshot = snapshot_for_texture_dimension(max_dimension=9000)
+    snapshot = snapshot_for_texture_dimension(max_dimension=5000)
 
     result = ValidationEngine().validate(snapshot, [rule])[0]
 
     assert result.status == "failed"
     assert result.target_kind == "file_dependency"
     assert result.target_id == "node:file_albedo"
-    assert result.current_value == 9000
-    assert result.expected_value == 8192
+    assert result.current_value == 5000
+    assert result.expected_value == 4096
     assert result.block_publish is True
 
 
 def test_hero_resolution_rule_passes_at_threshold():
     rule = enabled_resolution_rule("common.texture.resolution.hero.max")
-    snapshot = snapshot_for_texture_dimension(max_dimension=8192)
+    snapshot = snapshot_for_texture_dimension(max_dimension=4096)
 
     result = ValidationEngine().validate(snapshot, [rule])[0]
 
@@ -133,12 +133,12 @@ def test_prop_profile_rule_fails_above_prop_threshold():
         for rule in load_rule_stack(renderer_ids=["vray"], profile_path=PROP_PROFILE)
         if rule.id == "common.texture.resolution.prop.max"
     ]
-    snapshot = snapshot_for_texture_dimension(max_dimension=5000)
+    snapshot = snapshot_for_texture_dimension(max_dimension=3000)
 
     result = ValidationEngine().validate(snapshot, rules)[0]
 
     assert result.status == "failed"
-    assert result.expected_value == 4096
+    assert result.expected_value == 2048
     assert result.block_publish is True
 
 
