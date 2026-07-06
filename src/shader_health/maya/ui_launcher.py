@@ -15,6 +15,13 @@ from shader_health.ui.fix_queue import (
     selected_fix_rows,
 )
 from shader_health.ui.qt import load_qt_widgets
+from shader_health.ui.waiver_manager import (
+    WAIVER_STATUS_LABEL_OBJECT_NAME,
+    WAIVER_TABLE_OBJECT_NAME,
+    populate_waiver_table,
+    waiver_rows_from_records,
+    waiver_summary_text,
+)
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
@@ -86,13 +93,16 @@ def _create_dockable_panel() -> Any:
             export_callbacks=_export_action_callbacks(),
             validation_callbacks=_validation_action_callbacks(panel_state, qt_widgets),
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
+            waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
         )
         panel_state["content"] = content
         self._shader_health_content = content
         _wire_issues_table_interactions(content, qt_widgets)
+        _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
         layout.addWidget(content)
+        _refresh_waiver_manager(content, qt_widgets)
 
     panel_class = type(
         "ShaderHealthInspectorDock",
@@ -100,6 +110,25 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _waiver_manager_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> Any:
+    from shader_health.ui.waiver_manager import WaiverManagerCallbacks
+
+    return WaiverManagerCallbacks(
+        on_refresh=lambda: _refresh_waiver_manager(_panel_content(panel_state), qt_widgets),
+        on_revoke_selected=lambda: _revoke_selected_waiver_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_waiver_selected=lambda: _on_waiver_row_selected(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
 
 
 def _export_action_callbacks() -> main_window.ExportActionCallbacks:
@@ -346,6 +375,82 @@ def _waive_selected_issue_from_ui(content: Any, qt_widgets: Any) -> None:
     _revalidate_with_current_scope(content, qt_widgets)
 
 
+def _refresh_waiver_manager(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya import commands
+
+    try:
+        listing = commands.list_waivers_action(
+            getattr(content, "_shader_health_scene_path", None),
+        )
+    except Exception as exc:  # noqa: BLE001
+        _set_label_text(
+            content,
+            qt_widgets,
+            WAIVER_STATUS_LABEL_OBJECT_NAME,
+            f"Could not load waivers: {exc}",
+        )
+        return
+
+    waivers = getattr(listing, "waivers", ())
+    rows = waiver_rows_from_records(waivers)
+    table = _find_child(content, qt_widgets.QTableWidget, WAIVER_TABLE_OBJECT_NAME)
+    if table is not None:
+        table.setSortingEnabled(False)
+        populate_waiver_table(qt_widgets, table, rows)
+        table.setSortingEnabled(True)
+
+    content._shader_health_waiver_rows = rows
+    content._shader_health_waivers = tuple(waivers)
+    content._shader_health_waiver_sidecar_path = getattr(listing, "path", "")
+    _set_label_text(
+        content,
+        qt_widgets,
+        WAIVER_STATUS_LABEL_OBJECT_NAME,
+        waiver_summary_text(rows, sidecar_path=getattr(listing, "path", "")),
+    )
+    _on_waiver_row_selected(content, qt_widgets)
+
+
+def _revoke_selected_waiver_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya import commands
+
+    waiver_id = getattr(content, "_shader_health_selected_waiver_id", "")
+    if not waiver_id:
+        _set_label_text(
+            content,
+            qt_widgets,
+            WAIVER_STATUS_LABEL_OBJECT_NAME,
+            "Select a waiver row before revoking.",
+        )
+        return
+    try:
+        result = commands.revoke_waiver_action(
+            waiver_id,
+            getattr(content, "_shader_health_scene_path", None),
+        )
+    except Exception as exc:  # noqa: BLE001
+        _set_label_text(content, qt_widgets, WAIVER_STATUS_LABEL_OBJECT_NAME, str(exc))
+        return
+    _set_label_text(content, qt_widgets, WAIVER_STATUS_LABEL_OBJECT_NAME, result.message)
+    _refresh_waiver_manager(content, qt_widgets)
+    _revalidate_with_current_scope(content, qt_widgets)
+
+
+def _on_waiver_row_selected(content: Any, qt_widgets: Any) -> None:
+    table = _find_child(content, qt_widgets.QTableWidget, WAIVER_TABLE_OBJECT_NAME)
+    rows = getattr(content, "_shader_health_waiver_rows", ())
+    if table is None or not rows:
+        content._shader_health_selected_waiver_id = ""
+        return
+
+    current_row = getattr(table, "currentRow", lambda: -1)()
+    if current_row is None or int(current_row) < 0 or int(current_row) >= len(rows):
+        content._shader_health_selected_waiver_id = ""
+        return
+
+    content._shader_health_selected_waiver_id = rows[int(current_row)].waiver_id
+
+
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
     health = result.health_score
     _set_label_text(
@@ -395,6 +500,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         failed_results,
     )
     _populate_first_issue_details(content, qt_widgets, display_results)
+    _refresh_waiver_manager(content, qt_widgets)
 
 
 def _update_severity_filter_options(
@@ -473,6 +579,8 @@ def _store_validation_state(
     content._shader_health_snapshot = getattr(result, "snapshot", None)
     content._shader_health_results = getattr(result, "results", ())
     content._shader_health_profile_id = getattr(result, "profile_id", "")
+    snapshot = getattr(result, "snapshot", None)
+    content._shader_health_scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
     _populate_fix_queue(content, result)
 
 
@@ -548,6 +656,16 @@ def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
             connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+
+
+def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
+    table = _find_child(content, qt_widgets.QTableWidget, WAIVER_TABLE_OBJECT_NAME)
+    if table is not None:
+        selection_model = getattr(table, "selectionModel", lambda: None)()
+        selection_changed = getattr(selection_model, "selectionChanged", None)
+        connect = getattr(selection_changed, "connect", None)
+        if connect is not None:
+            connect(lambda *_: _on_waiver_row_selected(content, qt_widgets))
 
 
 def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:

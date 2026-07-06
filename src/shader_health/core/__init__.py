@@ -57,6 +57,9 @@ from shader_health.core.waivers import (
     apply_waivers,
     create_waiver_from_result,
     load_waiver_sidecar,
+    load_waiver_sidecar_optional,
+    revoke_waiver,
+    waiver_status_label,
     write_waiver_sidecar,
 )
 
@@ -106,6 +109,9 @@ __all__ = [
     "load_rule_stack",
     "load_rules_from_path",
     "load_waiver_sidecar",
+    "load_waiver_sidecar_optional",
+    "revoke_waiver",
     "summarize_results",
+    "waiver_status_label",
     "write_waiver_sidecar",
 ]

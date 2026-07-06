@@ -13,6 +13,8 @@ from shader_health.core.waivers import (
     WaiverSidecar,
     create_waiver_from_result,
     load_waiver_sidecar,
+    load_waiver_sidecar_optional,
+    revoke_waiver,
     write_waiver_sidecar,
 )
 from shader_health.maya.navigation import (
@@ -96,6 +98,49 @@ def waive_issue_action(result: Any, *, reason: str, approved_by: str = "artist")
         succeeded=True,
         path=str(sidecar_path),
         message=f"Waiver saved to {sidecar_path.name}.",
+    )
+
+
+def list_waivers_action(scene_path: Optional[str] = None) -> Any:
+    """Load waivers from the scene sidecar for UI display."""
+
+    snapshot_path = scene_path or _current_scene_path()
+    sidecar_path = waiver_sidecar_path_for_scene(snapshot_path)
+    if sidecar_path is None:
+        return SimpleNamespace(
+            action="list_waivers",
+            succeeded=True,
+            path="",
+            waivers=(),
+            message="Save the scene to locate the waiver sidecar.",
+        )
+
+    sidecar = load_waiver_sidecar_optional(sidecar_path)
+    return SimpleNamespace(
+        action="list_waivers",
+        succeeded=True,
+        path=str(sidecar_path),
+        waivers=tuple(sidecar.waivers),
+        message=f"Loaded {len(sidecar.waivers)} waiver(s) from {sidecar_path.name}.",
+    )
+
+
+def revoke_waiver_action(waiver_id: str, scene_path: Optional[str] = None) -> Any:
+    """Remove one waiver from the scene sidecar."""
+
+    snapshot_path = scene_path or _current_scene_path()
+    sidecar_path = waiver_sidecar_path_for_scene(snapshot_path)
+    if sidecar_path is None:
+        raise ValueError("Save the scene before revoking a waiver.")
+
+    sidecar = load_waiver_sidecar_optional(sidecar_path)
+    updated = revoke_waiver(sidecar, waiver_id)
+    write_waiver_sidecar(sidecar_path, updated)
+    return SimpleNamespace(
+        action="revoke_waiver",
+        succeeded=True,
+        path=str(sidecar_path),
+        message=f"Revoked waiver {waiver_id!r} in {sidecar_path.name}.",
     )
 
 

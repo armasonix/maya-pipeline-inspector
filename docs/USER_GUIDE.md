@@ -250,6 +250,8 @@ If an issue is inside a referenced asset, the tool should:
 
 Waivers are controlled exceptions for known issues.
 
+The dockable panel includes a **Waiver Manager** section that lists waivers from the scene sidecar (`*.shader_health_waivers.json`), shows rule id, target, approver, expiry, and whether each entry is active or expired. Expired waivers are labeled as ignored on validate. Use **Revoke Selected** to remove a waiver and revalidate.
+
 Expected behavior (implemented via waiver sidecar beside the scene file):
 
 - waiver must include reason;

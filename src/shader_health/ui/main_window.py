@@ -8,6 +8,7 @@ from typing import Any, Optional
 from shader_health.maya.validation_pipeline import list_packaged_profile_ids
 from shader_health.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
 from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
+from shader_health.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager
 
 PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
 PANEL_TITLE = "Maya Shader Health Inspector"
@@ -156,12 +157,14 @@ def build_main_widget(
     fix_queue_callbacks: Optional[FixQueueActionCallbacks] = None,
     validation_callbacks: Optional[ValidationActionCallbacks] = None,
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
+    waiver_callbacks: Optional[WaiverManagerCallbacks] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
     export_callbacks = export_callbacks or ExportActionCallbacks()
     validation_callbacks = validation_callbacks or ValidationActionCallbacks()
     issue_details_callbacks = issue_details_callbacks or IssueDetailsActionCallbacks()
+    waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
 
     widget = qt_widgets.QWidget()
     widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
@@ -181,6 +184,7 @@ def build_main_widget(
     layout.addWidget(build_validation_actions(qt_widgets, callbacks=validation_callbacks))
     layout.addWidget(build_issues_table(qt_widgets))
     layout.addWidget(build_issue_details_panel(qt_widgets, callbacks=issue_details_callbacks))
+    layout.addWidget(build_waiver_manager(qt_widgets, callbacks=waiver_callbacks))
     layout.addWidget(build_fix_queue(qt_widgets, callbacks=fix_queue_callbacks))
     layout.addWidget(build_export_actions(qt_widgets, callbacks=export_callbacks))
 

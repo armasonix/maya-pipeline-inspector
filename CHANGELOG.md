@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Maya install guide ([`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md)) for `MAYA_MODULE_PATH`, editable `pip`, and menu/shelf bootstrap.
 - Studio overrides guide ([`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md)) with worked `examples/studio/` rule pack and profile sample.
 - Optional Maya integration GitHub Actions workflow ([`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml), `workflow_dispatch` only).
+- Waiver manager UI in the Maya panel with sidecar revoke support.
 
 ## [0.1.0] - 2026-07-03
 
