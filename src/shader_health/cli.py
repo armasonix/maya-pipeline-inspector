@@ -147,6 +147,27 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PROFILE_ID,
         help="Packaged profile id when --profile is omitted.",
     )
+    apply_fixes.add_argument(
+        "--fix-ids",
+        action="append",
+        default=[],
+        help="Apply only the listed fix_id values.",
+    )
+    apply_fixes.add_argument(
+        "--allow-referenced",
+        action="store_true",
+        help="Allow fixes on referenced nodes.",
+    )
+    apply_fixes.add_argument(
+        "--allow-high-risk",
+        action="store_true",
+        help="Allow high-risk fixes without supervisor confirmation.",
+    )
+    apply_fixes.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Plan fixes without mutating the scene.",
+    )
     return parser
 
 
@@ -218,8 +239,18 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
             profile_path=_optional_path(args.profile),
             fix_plan_path=_optional_path(args.fix_plan),
         )
-        selected_actions = tuple(action for action in fix_plan.actions if not action.blocked)
-        apply_report = _apply_fixes_in_scene(scene_path, selected_actions)
+        selected_actions = _filter_fix_actions(fix_plan, tuple(args.fix_ids))
+        if args.dry_run:
+            report = _dry_run_apply_report(selected_actions)
+            _write_apply_report(args.report, report)
+            return EXIT_OK
+
+        apply_report = _apply_fixes_in_scene(
+            scene_path,
+            selected_actions,
+            allow_referenced=bool(args.allow_referenced),
+            allow_high_risk=bool(args.allow_high_risk),
+        )
         _write_apply_report(args.report, apply_report.to_dict())
         if apply_report.failed_count:
             return EXIT_RUNTIME_ERROR
@@ -305,11 +336,43 @@ def _load_fix_plan_for_scene(
     return run.fix_plan
 
 
-def _apply_fixes_in_scene(scene_path: Path, actions: Sequence[Any]) -> Any:
+def _filter_fix_actions(fix_plan: FixPlan, fix_ids: tuple[str, ...]) -> tuple[Any, ...]:
+    if not fix_ids:
+        return tuple(action for action in fix_plan.actions if not action.blocked)
+    allowed = {fix_id.strip() for fix_id in fix_ids if fix_id.strip()}
+    return tuple(action for action in fix_plan.actions if action.fix_id in allowed)
+
+
+def _apply_fixes_in_scene(
+    scene_path: Path,
+    actions: Sequence[Any],
+    *,
+    allow_referenced: bool = False,
+    allow_high_risk: bool = False,
+) -> Any:
     cmds = importlib.import_module("maya.cmds")
     fix_applier = importlib.import_module("shader_health.maya.fix_applier")
     cmds.file(str(scene_path), open=True, force=True)
-    return fix_applier.apply_fix_actions(actions, cmds=cmds)
+    return fix_applier.apply_fix_actions(
+        actions,
+        cmds=cmds,
+        allow_referenced=allow_referenced,
+        allow_high_risk=allow_high_risk,
+    )
+
+
+def _dry_run_apply_report(actions: Sequence[Any]) -> dict[str, Any]:
+    records = [action.to_dict() for action in actions]
+    applied_count = sum(1 for action in actions if not action.blocked)
+    blocked_count = sum(1 for action in actions if action.blocked)
+    return {
+        "dry_run": True,
+        "total": len(records),
+        "applied_count": applied_count,
+        "blocked_count": blocked_count,
+        "failed_count": 0,
+        "records": records,
+    }
 
 
 def _write_apply_report(path: Optional[str], payload: Mapping[str, Any]) -> None:
