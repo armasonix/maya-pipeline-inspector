@@ -1,26 +1,22 @@
-# Optional Maya integration tests for maintainers.
+# Maya integration tests on a self-hosted runner with Autodesk Maya installed.
 #
-# This workflow is NOT part of the default public CI gate (see ci.yml).
-# Trigger manually from GitHub Actions when a self-hosted runner with Maya is
-# available, or rely on the graceful skip when MAYA_PY is unset.
+# NOT part of the default public CI gate (see ci.yml). Requires runner labels:
+#   self-hosted, maya
 #
-# Setup:
-#   1. Configure a self-hosted runner with Autodesk Maya installed.
-#   2. Add repository secret MAYA_PY with the absolute path to mayapy, e.g.
-#      /usr/autodesk/maya2025/bin/mayapy
-#      or C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe
-#   3. Actions -> Maya integration -> Run workflow
-#      Optional workflow input `mayapy_path` overrides the secret for one run.
+# Windows self-hosted runners: uses Windows PowerShell (`powershell`) — not Git Bash or pwsh.
 #
-# Local equivalent:
-#   mayapy -m pip install -e ".[dev]"
-#   mayapy -m pytest tests/integration -v
-#   mayapy -m shader_health manifest examples/broken_scene/shader_health_demo_broken.ma \
-#     --out /tmp/shader_health_manifest_smoke.json --profile-id publish_strict
-#   mayapy -m shader_health gate examples/broken_scene/shader_health_demo_broken.ma \
-#     /tmp/shader_health_manifest_smoke.json --profile-id publish_strict --out /tmp/gate.json
+# Setup (maintainers):
+#   1. Register a self-hosted runner with labels `self-hosted` and `maya`.
+#   2. Install Maya and set repository secret MAYA_PY to the absolute mayapy path, e.g.
+#        C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe
+#        /usr/autodesk/maya2025/bin/mayapy
+#      Optional: repository variable MAYA_PY, runner env MAYA_PY, or workflow input mayapy_path.
+#   3. Actions -> Maya integration -> Run workflow (or wait for weekly schedule / same-repo PR).
 #
-# See docs/MAYA_INSTALL.md for full install and CI notes.
+# Fork pull requests are skipped (self-hosted runners must not execute untrusted fork code).
+# When this job runs, a missing mayapy path fails the job — there is no silent success skip.
+#
+# Local equivalent: docs/MAYA_INSTALL.md and docs/CLI_TESTING.md
 
 name: Maya integration
 
@@ -31,83 +27,155 @@ on:
         description: Optional absolute path to mayapy (overrides MAYA_PY secret)
         required: false
         default: ""
+  schedule:
+    - cron: "0 6 * * 1"
+  pull_request:
+    paths:
+      - "src/shader_health/maya/**"
+      - "maya_module/**"
+      - "tests/integration/**"
+      - "examples/deadline/**"
+      - "examples/broken_scene/**"
+      - ".github/workflows/maya-integration.yml"
+      - "tools/ci/**"
 
 permissions:
   contents: read
 
+concurrency:
+  group: maya-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: powershell
+
 jobs:
   maya-integration:
     name: Integration tests via mayapy
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, maya]
+    timeout-minutes: 90
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    env:
+      DEMO_SCENE: examples/broken_scene/shader_health_demo_broken_headless.ma
+      DEADLINE_PROFILE: src/shader_health/rules/profiles/deadline_critical.json
+      DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
+      DEBUG_RUN_ID: github-${{ github.run_id }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Diagnose runner shell
+        shell: powershell
+        run: |
+          Write-Host "PSVersion:" $PSVersionTable.PSVersion
+          Write-Host "PSEdition:" $PSVersionTable.PSEdition
+          Write-Host "OS:" $PSVersionTable.OS
+          foreach ($cmd in @('python','pwsh','powershell','bash','mayapy')) {
+            $found = Get-Command $cmd -ErrorAction SilentlyContinue
+            if ($found) { Write-Host "FOUND $cmd -> $($found.Source)" } else { Write-Host "MISSING $cmd" }
+          }
+
       - name: Resolve mayapy path
         id: mayapy
+        shell: cmd
         env:
           MAYA_PY_SECRET: ${{ secrets.MAYA_PY }}
+          MAYA_PY_VAR: ${{ vars.MAYA_PY }}
+          MAYA_PY_INPUT: ${{ inputs.mayapy_path }}
+          DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
+          DEBUG_RUN_ID: github-${{ github.run_id }}
+        run: python tools\ci\resolve_mayapy.py
+
+      - name: Verify demo scene exists
         run: |
-          candidate="${{ inputs.mayapy_path }}"
-          if [ -z "$candidate" ]; then
-            candidate="$MAYA_PY_SECRET"
-          fi
-
-          if [ -z "$candidate" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Maya integration skipped: set MAYA_PY repository secret or workflow input mayapy_path."
-            exit 0
-          fi
-
-          if [ ! -x "$candidate" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Maya integration skipped: mayapy not found or not executable at: $candidate"
-            exit 0
-          fi
-
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "path=$candidate" >> "$GITHUB_OUTPUT"
-          echo "Using mayapy: $candidate"
+          if (-not (Test-Path -LiteralPath $env:DEMO_SCENE)) {
+            Write-Error "Missing demo scene: $env:DEMO_SCENE"
+            exit 1
+          }
 
       - name: Install package into Maya Python
-        if: steps.mayapy.outputs.skip != 'true'
         run: |
-          "${{ steps.mayapy.outputs.path }}" -m pip install --upgrade pip
-          "${{ steps.mayapy.outputs.path }}" -m pip install -e ".[dev]"
+          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          & $mayapy -m pip install --upgrade pip
+          & $mayapy -m pip install -e ".[dev]"
 
       - name: Run integration tests with mayapy
-        if: steps.mayapy.outputs.skip != 'true'
         run: |
-          "${{ steps.mayapy.outputs.path }}" -m pytest tests/integration -v
+          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          & $mayapy -m pytest tests/integration -v
 
-      - name: Manifest export smoke
-        if: steps.mayapy.outputs.skip != 'true'
+      - name: Validate scene smoke (headless demo)
+        env:
+          REPORT: ${{ runner.temp }}/shader_health_validate_smoke.json
         run: |
-          DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
-          OUT_MANIFEST="${RUNNER_TEMP}/shader_health_manifest_smoke.json"
-          "${{ steps.mayapy.outputs.path }}" -m shader_health manifest \
-            "$DEMO_SCENE" \
-            --out "$OUT_MANIFEST" \
-            --profile-id publish_strict
-          test -s "$OUT_MANIFEST"
-          python3 -c "import json, pathlib; payload=json.loads(pathlib.Path('${OUT_MANIFEST}').read_text(encoding='utf-8')); assert payload.get('manifest_schema_version') == '1.1'"
+          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $report = $env:REPORT
+          & $mayapy -m shader_health validate $env:DEMO_SCENE `
+            --input-kind scene `
+            --profile-id publish_strict `
+            --report $report
+          $code = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $report)) {
+            Write-Error "Validate smoke did not write report: $report"
+            exit 1
+          }
+          if ($code -gt 2) {
+            Write-Error "Validate smoke failed with unexpected exit code $code (expected 0-2)"
+            exit 1
+          }
+          python tools/ci/maya_integration_checks.py validate $report
+          Write-Host "Validate smoke exit_code=$code"
+          exit 0
 
-      - name: Manifest gate smoke
-        if: steps.mayapy.outputs.skip != 'true'
+      - name: Manifest export and gate smoke
+        env:
+          OUT_MANIFEST: ${{ runner.temp }}/shader_health_manifest_smoke.json
+          GATE_REPORT: ${{ runner.temp }}/shader_health_gate_smoke.json
         run: |
-          DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
-          BASELINE="${RUNNER_TEMP}/shader_health_manifest_smoke.json"
-          GATE_REPORT="${RUNNER_TEMP}/shader_health_gate_smoke.json"
-          "${{ steps.mayapy.outputs.path }}" -m shader_health gate \
-            "$DEMO_SCENE" \
-            "$BASELINE" \
-            --profile-id publish_strict \
-            --out "$GATE_REPORT"
-          test -s "$GATE_REPORT"
-          python3 -c "import json, pathlib, sys; payload=json.loads(pathlib.Path('${GATE_REPORT}').read_text(encoding='utf-8')); sys.exit(1 if payload.get('manifest_regression_blocked') else 0)"
+          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $manifest = $env:OUT_MANIFEST
+          $gateReport = $env:GATE_REPORT
+          & $mayapy tools/ci/maya_manifest_gate_smoke.py $env:DEMO_SCENE `
+            --profile-id publish_strict `
+            --manifest-out $manifest `
+            --gate-out $gateReport
+          if (-not (Test-Path -LiteralPath $manifest)) {
+            Write-Error "Manifest smoke did not write file: $manifest"
+            exit 1
+          }
+          if (-not (Test-Path -LiteralPath $gateReport)) {
+            Write-Error "Gate smoke did not write report: $gateReport"
+            exit 1
+          }
+          python tools/ci/maya_integration_checks.py manifest $manifest
+          python tools/ci/maya_integration_checks.py gate $gateReport
+          exit 0
 
-      - name: Report graceful skip
-        if: steps.mayapy.outputs.skip == 'true'
+      - name: Deadline preflight smoke
+        env:
+          PREFLIGHT_REPORT: ${{ runner.temp }}/shader_health_deadline_preflight_smoke.json
         run: |
-          echo "::notice title=Maya integration skipped::No usable mayapy path. Default public CI in ci.yml remains Maya-free. Configure MAYA_PY on a self-hosted runner with Maya, then re-run this workflow."
+          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $report = $env:PREFLIGHT_REPORT
+          & $mayapy examples/deadline/submit_preflight.py $env:DEMO_SCENE `
+            --report $report `
+            --profile $env:DEADLINE_PROFILE `
+            --repo-root $env:GITHUB_WORKSPACE `
+            --mayapy $mayapy
+          $code = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $report)) {
+            Write-Error "Deadline preflight smoke did not write report: $report"
+            exit 1
+          }
+          if ($code -gt 2) {
+            Write-Error "Deadline preflight smoke failed with unexpected exit code $code (expected 0-2)"
+            exit 1
+          }
+          python tools/ci/maya_integration_checks.py deadline $report
+          Write-Host "Deadline preflight smoke exit_code=$code (0=allow, 1=publish block, 2=deadline block)"
+          exit 0

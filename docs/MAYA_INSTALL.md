@@ -264,19 +264,59 @@ mayapy -m shader_health gate "$DEMO_SCENE" "$OUT_MANIFEST" \
 
 ### Optional GitHub Actions workflow (maintainers)
 
-The repository ships a manual workflow at [`.github/workflows/maya-integration.yml`](../.github/workflows/maya-integration.yml). It is triggered by **workflow_dispatch only** and does not run on every pull request. When `mayapy` is available it runs the same manifest export and gate smoke steps after `tests/integration`.
+Real Maya integration runs on a **self-hosted runner** labeled `self-hosted` and `maya`. The workflow is [`.github/workflows/maya-integration.yml`](../.github/workflows/maya-integration.yml).
 
-1. Configure a self-hosted runner with Autodesk Maya installed.
-2. Add repository secret `MAYA_PY` with the absolute path to `mayapy`.
-3. In GitHub: **Actions → Maya integration → Run workflow**.
-4. Optionally pass workflow input `mayapy_path` to override the secret for one run.
+| Trigger | When it runs |
+|---------|----------------|
+| `workflow_dispatch` | Manual run from **Actions → Maya integration** |
+| `schedule` | Weekly (Monday 06:00 UTC) on the default branch |
+| `pull_request` | Same-repo PRs only, when paths under `src/shader_health/maya/`, `maya_module/`, `tests/integration/`, or related examples change |
 
-When `MAYA_PY` is unset or the path is missing, the workflow exits successfully and prints a skip notice. When Maya is available, it also runs v0.3 smoke checks: `shader_health manifest` export and `shader_health gate` against the freshly exported manifest (schema 1.1, `publish_strict` profile). Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Maya-free.
+**Fork pull requests are skipped** — untrusted code must not execute on a studio self-hosted runner.
 
-Local Windows example:
+#### Runner setup
+
+1. Register a self-hosted runner with labels **`self-hosted`** and **`maya`**. **Git Bash / pwsh are not required** — the workflow uses **Windows PowerShell** and `cmd` for the resolve step.
+2. Install Autodesk Maya on that machine.
+3. Configure **one** of these so the workflow can find `mayapy`:
+   - Repository secret **`MAYA_PY`** (recommended) — absolute path, e.g. `C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe`
+   - Repository variable **`MAYA_PY`**
+   - Runner environment variable **`MAYA_PY`**
+   - Workflow dispatch input **`mayapy_path`** (one-off override)
+   - `mayapy` on `PATH`
+
+4. In GitHub: **Actions → Maya integration → Run workflow** (optional `mayapy_path` input).
+
+**Failure behavior:** when the job runs on the self-hosted runner, a missing or invalid `mayapy` path **fails the job** (exit code 1). There is no silent skip that reports success without Maya.
+
+**Public forks / no runner:** if no runner matches `[self-hosted, maya]`, the workflow stays queued until timeout. Fork PRs never schedule this job.
+
+#### Smoke steps (v0.4)
+
+Demo scene: [`examples/broken_scene/shader_health_demo_broken_headless.ma`](../examples/broken_scene/shader_health_demo_broken_headless.ma)
+
+After `pytest tests/integration`:
+
+1. `shader_health validate` (publish_strict) — report written; exit codes 0–2 accepted
+2. `shader_health manifest` — schema **1.1**
+3. `shader_health gate` — baseline = freshly exported manifest (no regression expected)
+4. `examples/deadline/submit_preflight.py` — `deadline_critical` profile dry-run; exit codes 0–2 accepted
+
+Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Maya-free.
+
+#### Local Windows example
 
 ```powershell
 $env:MAYA_PY = "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
+$SCENE = "examples\broken_scene\shader_health_demo_broken_headless.ma"
 & $env:MAYA_PY -m pip install -e ".[dev]"
 & $env:MAYA_PY -m pytest tests/integration -v
+& $env:MAYA_PY -m shader_health validate $SCENE --input-kind scene --profile-id publish_strict --report "$env:TEMP\validate_smoke.json"
+& $env:MAYA_PY examples\deadline\submit_preflight.py $SCENE `
+  --report "$env:TEMP\deadline_preflight_smoke.json" `
+  --profile "src\shader_health\rules\profiles\deadline_critical.json" `
+  --repo-root (Get-Location) `
+  --mayapy $env:MAYA_PY
 ```
+
+See also [`docs/CLI_TESTING.md`](CLI_TESTING.md).

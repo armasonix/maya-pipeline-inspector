@@ -364,7 +364,18 @@ def _manifest_gate_exit(
     out_path: Optional[Path] = None,
 ) -> int:
     baseline_manifest = load_manifest_json(baseline_path)
-    current_manifest = build_shader_manifest(snapshot)
+    run = run_validation(
+        snapshot,
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+        profile_path=profile_path,
+        scan_scope=snapshot.scan_scope or "scene",
+    )
+    current_manifest = build_shader_manifest(
+        run.snapshot,
+        results=run.results,
+        health_score=run.health_score.score,
+    )
     policy = _manifest_gate_policy(profile_path, profile_id, asset_class_id=asset_class_id)
     gate_result = evaluate_manifest_gate(baseline_manifest, current_manifest, policy=policy)
     payload = gate_result.to_dict()

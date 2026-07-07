@@ -215,6 +215,43 @@ def test_gate_snapshot_blocks_fingerprint_drift(tmp_path: Path):
     assert any("fingerprint" in reason for reason in payload["reasons"])
 
 
+def test_gate_passes_when_baseline_matches_manifest_export(tmp_path: Path):
+    snapshot_path = _write_material_snapshot(tmp_path, "sha256:stable")
+    manifest_path = tmp_path / "exported_manifest.json"
+    gate_path = tmp_path / "gate_report.json"
+
+    manifest_code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--input-kind",
+            "snapshot",
+            "--profile-id",
+            "artist_relaxed",
+            "--out",
+            str(manifest_path),
+        ]
+    )
+    assert manifest_code == cli.EXIT_OK
+
+    gate_code = cli.main(
+        [
+            "gate",
+            str(snapshot_path),
+            str(manifest_path),
+            "--input-kind",
+            "snapshot",
+            "--profile-id",
+            "publish_strict",
+            "--out",
+            str(gate_path),
+        ]
+    )
+    assert gate_code == cli.EXIT_OK
+    payload = json.loads(gate_path.read_text(encoding="utf-8"))
+    assert payload["manifest_regression_blocked"] is False
+
+
 def test_validate_snapshot_runs_manifest_gate_after_passing_validation(tmp_path: Path):
     snapshot_path = _write_material_snapshot(tmp_path, "sha256:new")
     report_path = tmp_path / "report.json"

@@ -1,7 +1,7 @@
 name: CI
 
-# Default public CI is Maya-free. Optional Maya integration tests live in
-# .github/workflows/maya-integration.yml (workflow_dispatch only).
+# Default public CI is Maya-free. Real Maya jobs run on a self-hosted runner via
+# .github/workflows/maya-integration.yml (schedule, workflow_dispatch, same-repo PR).
 
 on:
   push:
