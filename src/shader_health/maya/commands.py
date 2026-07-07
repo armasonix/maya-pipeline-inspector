@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib
 import json
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace

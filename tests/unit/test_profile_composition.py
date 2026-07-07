@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from shader_health.core import GraphSnapshot, MaterialSnapshot
 from shader_health.core.rule_loader import RuleLoadError
 from shader_health.maya.validation_pipeline import (
     ASSET_CLASS_PROFILE_IDS,
@@ -11,7 +12,6 @@ from shader_health.maya.validation_pipeline import (
     list_workflow_profile_options,
     run_validation,
 )
-from shader_health.core import GraphSnapshot, MaterialSnapshot
 
 
 def test_list_workflow_profile_options_excludes_asset_class_and_ci_headless():

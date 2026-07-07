@@ -191,7 +191,10 @@ def test_populate_waiver_table_writes_status_and_rule_columns():
     assert table.items[(0, 1)].text == "common.texture.missing"
 
 
-def test_waiver_manager_callbacks_fire_refresh_revoke_and_make_waive(tmp_path: Path, monkeypatch: Any):
+def test_waiver_manager_callbacks_fire_refresh_revoke_and_make_waive(
+    tmp_path: Path,
+    monkeypatch: Any,
+):
     calls: list[str] = []
     callbacks = waiver_manager.WaiverManagerCallbacks(
         on_refresh=lambda: calls.append("refresh"),

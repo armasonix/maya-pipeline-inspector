@@ -386,7 +386,7 @@ def _manifest_gate_policy(
     *,
     asset_class_id: Optional[str] = None,
 ):
-    from shader_health.maya.validation_pipeline import compose_profiles, packaged_profile_path
+    from shader_health.maya.validation_pipeline import compose_profiles
 
     if profile_path is not None:
         profile = load_profile(profile_path)

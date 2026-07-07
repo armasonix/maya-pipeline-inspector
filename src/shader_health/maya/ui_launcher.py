@@ -412,7 +412,12 @@ def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
         return
 
     if not getattr(result, "succeeded", True):
-        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, result.message)
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            result.message,
+        )
         print(result.message)
         return
 
@@ -449,7 +454,8 @@ def _manifest_gate_from_ui(content: Any, qt_widgets: Any) -> None:
         _show_information_dialog(
             qt_widgets,
             "Manifest Gate",
-            "Validate the scene first, then export an approved manifest sidecar before running gate.",
+            "Validate the scene first, then export an approved manifest sidecar "
+            "before running gate.",
         )
         return
 
@@ -488,7 +494,12 @@ def _manifest_gate_from_ui(content: Any, qt_widgets: Any) -> None:
             f"New: {summary.get('new', 0)}, Changed: {summary.get('changed', 0)}, "
             f"Fingerprint changes: {summary.get('fingerprint_changes', 0)}."
         )
-    _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message.replace("\n", " "))
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        message.replace("\n", " "),
+    )
     _show_information_dialog(qt_widgets, "Manifest Gate", message)
     print(message)
 
@@ -719,7 +730,10 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         ),
     )
     description = result.message
-    snapshot = getattr(result, "snapshot", None) or getattr(content, "_shader_health_snapshot", None)
+    snapshot = (
+        getattr(result, "snapshot", None)
+        or getattr(content, "_shader_health_snapshot", None)
+    )
     asset_class_id = _selected_asset_class_id(content, qt_widgets)
     if snapshot is not None:
         description += _resolution_probe_hint(snapshot, asset_class_id)

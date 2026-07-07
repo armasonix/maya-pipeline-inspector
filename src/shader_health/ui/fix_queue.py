@@ -165,10 +165,17 @@ def fix_rows_from_table(
     synced: list[FixQueueRow] = []
     for row_index, row in enumerate(rows):
         cell_widget_fn = getattr(table, "cellWidget", None)
-        if cell_widget_fn is not None and cell_widget_fn(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX) is not None:
+        if (
+            cell_widget_fn is not None
+            and cell_widget_fn(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX) is not None
+        ):
             selected = is_fix_queue_select_checked(table, row_index)
         else:
-            item = table.item(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX) if hasattr(table, "item") else None
+            item = (
+                table.item(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX)
+                if hasattr(table, "item")
+                else None
+            )
             selected = selected_from_table_item(item) if item is not None else row.selected
         synced.append(
             FixQueueRow(

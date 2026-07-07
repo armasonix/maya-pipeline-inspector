@@ -12,7 +12,8 @@ class FakeSignal:
 
 
 class FakeBrokenSignal:
-    connect = lambda self, slot: (_ for _ in ()).throw(AttributeError("broken"))
+    def connect(self, slot) -> None:
+        raise AttributeError("broken")
 
 
 def test_connect_qt_signal_connects_slot():

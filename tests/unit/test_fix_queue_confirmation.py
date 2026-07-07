@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from shader_health.ui.fix_queue import (
-    FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
     allows_batch_risky_confirmation,
     confirm_risky_fixes,
