@@ -1,11 +1,8 @@
 """Safe Auto-Fix Queue UI helpers."""
 from __future__ import annotations
 
-import json
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Optional
 
 from shader_health.ui.table_widgets import (
@@ -44,7 +41,6 @@ FIX_QUEUE_COLUMNS = (
 )
 HIGH_RISK = "high"
 MEDIUM_RISK = "medium"
-_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-ee1eca.log"
 
 
 @dataclass(frozen=True)
@@ -141,19 +137,6 @@ def build_fix_queue(
     layout.addStretch(1)
 
     _set_widget_expanding_horizontal(qt_widgets, widget)
-    # #region agent log
-    _debug_fix_queue_log(
-        "F1",
-        "fix_queue.py:build_fix_queue",
-        "fix queue layout built",
-        {
-            "table_stretch": 0,
-            "actions_stretch": 0,
-            "bottom_spacer": True,
-            "row_count": len(fix_rows),
-        },
-    )
-    # #endregion
 
     return widget
 
@@ -421,23 +404,6 @@ def _configure_fix_queue_table(table: Any, qt_widgets: Any) -> None:
         ):
             set_section_resize_mode(column_index, stretch)
 
-    # #region agent log
-    _debug_fix_queue_log(
-        "F2",
-        "fix_queue.py:_configure_fix_queue_table",
-        "fix queue table resize modes configured",
-        {
-            "select_fixed": fixed is not None,
-            "stretch_columns": [
-                FIX_QUEUE_TARGET_COLUMN_INDEX,
-                FIX_QUEUE_ATTRIBUTE_COLUMN_INDEX,
-                FIX_QUEUE_BEFORE_COLUMN_INDEX,
-                FIX_QUEUE_AFTER_COLUMN_INDEX,
-            ],
-        },
-    )
-    # #endregion
-
 
 def _sync_fix_queue_table_height(table: Any, row_count: int) -> None:
     """Size the table to its row content so action buttons sit directly underneath."""
@@ -469,15 +435,6 @@ def _sync_fix_queue_table_height(table: Any, row_count: int) -> None:
                 setter(content_height)
                 break
 
-    # #region agent log
-    _debug_fix_queue_log(
-        "F3",
-        "fix_queue.py:_sync_fix_queue_table_height",
-        "fix queue table height synced to rows",
-        {"row_count": row_count, "content_height": content_height},
-    )
-    # #endregion
-
 
 def _set_widget_expanding_horizontal(qt_widgets: Any, widget: Any) -> None:
     size_policy = getattr(qt_widgets, "QSizePolicy", None)
@@ -488,27 +445,6 @@ def _set_widget_expanding_horizontal(qt_widgets: Any, widget: Any) -> None:
     preferred = getattr(size_policy, "Preferred", None)
     if expanding is not None and preferred is not None:
         set_size_policy(expanding, preferred)
-
-
-def _debug_fix_queue_log(
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict[str, Any],
-) -> None:
-    try:
-        payload = {
-            "sessionId": "ee1eca",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except OSError:
-        return
 
 
 def _confirm_risky_fix_batch(qt_widgets: Any, risky: Sequence[FixQueueRow]) -> bool:

@@ -208,6 +208,8 @@ class FakeSplitter(FakeWidget):
         self.widgets: list[Any] = []
         self.stretch_factors: list[tuple[int, int]] = []
         self.orientation: Any = None
+        self.children_collapsible: Optional[bool] = None
+        self.collapsible: dict[int, bool] = {}
 
     def setOrientation(self, orientation: Any) -> None:
         self.orientation = orientation
@@ -219,22 +221,84 @@ class FakeSplitter(FakeWidget):
     def setStretchFactor(self, index: int, stretch: int) -> None:
         self.stretch_factors.append((index, stretch))
 
+    def setChildrenCollapsible(self, enabled: bool) -> None:
+        self.children_collapsible = enabled
+
+    def setCollapsible(self, index: int, enabled: bool) -> None:
+        self.collapsible[index] = enabled
+
 
 class FakeQt:
     Horizontal = "horizontal"
     RichText = "rich_text"
+    ScrollBarAlwaysOff = "scroll_bar_always_off"
 
 
 class FakeSizePolicy:
     Preferred = "preferred"
     Fixed = "fixed"
     Maximum = "maximum"
+    Expanding = "expanding"
+    Minimum = "minimum"
+
+
+class FakeQScrollArea(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.widget_resizable = False
+        self.scroll_widget: Any = None
+        self.horizontal_scroll_policy: Any = None
+        self.size_policy: Optional[tuple[Any, Any]] = None
+
+    def setWidgetResizable(self, enabled: bool) -> None:
+        self.widget_resizable = enabled
+
+    def setHorizontalScrollBarPolicy(self, policy: Any) -> None:
+        self.horizontal_scroll_policy = policy
+
+    def setWidget(self, widget: Any) -> None:
+        self.scroll_widget = widget
+        self.children.append(widget)
+
+    def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
+        self.size_policy = (horizontal, vertical)
+
+
+class FakeProgressBar(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.visible = True
+        self.maximum = 1
+        self.minimum = 0
+        self.text_visible = True
+        self.fixed_height: Optional[int] = None
+        self.maximum_width: Optional[int] = None
+
+    def setTextVisible(self, visible: bool) -> None:
+        self.text_visible = visible
+
+    def setMaximum(self, value: int) -> None:
+        self.maximum = value
+
+    def setMinimum(self, value: int) -> None:
+        self.minimum = value
+
+    def setFixedHeight(self, height: int) -> None:
+        self.fixed_height = height
+
+    def setMaximumWidth(self, width: int) -> None:
+        self.maximum_width = width
+
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
 
 
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QFrame = FakeQFrame
+    QScrollArea = FakeQScrollArea
+    QProgressBar = FakeProgressBar
     QComboBox = FakeComboBox
     QPushButton = FakePushButton
     QCheckBox = FakeCheckBox
@@ -363,9 +427,14 @@ def test_validate_tab_uses_sticky_chrome_action_bar_and_splitter():
     _find(validate_tab, main_window.VALIDATE_ACTION_BAR_OBJECT_NAME)
     _find(validate_tab, main_window.VALIDATE_PRIMARY_ACTIONS_OBJECT_NAME)
     _find(validate_tab, main_window.VALIDATE_PIPELINE_ACTIONS_OBJECT_NAME)
+    _find(validate_tab, main_window.VALIDATE_STATUS_ROW_OBJECT_NAME)
+    progress = _find(validate_tab, main_window.VALIDATE_PROGRESS_BAR_OBJECT_NAME)
+    assert progress.visible is False
     splitter = _find(validate_tab, main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
     assert len(splitter.widgets) == 2
     assert splitter.stretch_factors == [(0, 3), (1, 2)]
+    assert splitter.children_collapsible is False
+    assert splitter.collapsible == {0: False, 1: False}
 
 
 def test_validation_action_bar_groups_primary_pipeline_and_triage_buttons():

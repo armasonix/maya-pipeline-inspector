@@ -27,6 +27,11 @@ from shader_health.ui.fix_queue import (
     selected_fix_rows,
     update_risky_confirmation_label,
 )
+from shader_health.ui.issues_triage import (
+    apply_combo_preference,
+    read_issue_filter_prefs,
+    read_issue_filter_prefs_from_widgets,
+)
 from shader_health.ui.qt import load_qt_widgets
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
@@ -38,6 +43,9 @@ from shader_health.ui.waiver_manager import (
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
+_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-ee1eca.log"
+
+VALIDATE_SPLITTER_SIZES_ATTR = "_shader_health_validate_splitter_sizes"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -134,6 +142,8 @@ def _create_dockable_panel() -> Any:
         _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
+        _wire_validate_tab_focus(content, qt_widgets)
+        _wire_validate_splitter_persistence(content, qt_widgets)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
@@ -409,19 +419,80 @@ def _farm_action_callbacks(
 
 
 def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None:
+    _schedule_ui_validation(content, qt_widgets, scan_scope=scan_scope)
+
+
+def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
+    _schedule_ui_validation(
+        content,
+        qt_widgets,
+        scan_scope="scene",
+        profile_id="publish_strict",
+        post_validate=_finish_publish_preflight,
+    )
+
+
+def _schedule_ui_validation(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    scan_scope: str,
+    profile_id: Optional[str] = None,
+    post_validate: Optional[Any] = None,
+) -> None:
+    if getattr(content, "_shader_health_validate_running", False):
+        return
+
+    content._shader_health_validate_running = True
+    busy_message = (
+        "Validating selection..."
+        if scan_scope == "selection"
+        else "Validating scene..."
+    )
+    _set_validate_busy_state(content, qt_widgets, busy=True, status_message=busy_message)
+
+    def _job() -> None:
+        try:
+            _run_validation_job(
+                content,
+                qt_widgets,
+                scan_scope=scan_scope,
+                profile_id=profile_id,
+                post_validate=post_validate,
+            )
+        finally:
+            content._shader_health_validate_running = False
+            _set_validate_busy_state(content, qt_widgets, busy=False)
+
+    cmds = _maya_cmds()
+    eval_deferred = getattr(cmds, "evalDeferred", None)
+    if eval_deferred is not None:
+        eval_deferred(_job, lowestPriority=True)
+    else:
+        _job()
+
+
+def _run_validation_job(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    scan_scope: str,
+    profile_id: Optional[str] = None,
+    post_validate: Optional[Any] = None,
+) -> None:
     try:
         from shader_health.maya.commands import validate_scene_action, validate_selection_action
 
-        profile_id = _selected_workflow_profile_id(content, qt_widgets)
+        selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         if scan_scope == "selection":
             result = validate_selection_action(
-                profile_id=profile_id,
+                profile_id=selected_profile,
                 asset_class_id=asset_class_id,
             )
         else:
             result = validate_scene_action(
-                profile_id=profile_id,
+                profile_id=selected_profile,
                 asset_class_id=asset_class_id,
             )
     except Exception as exc:  # noqa: BLE001
@@ -438,37 +509,13 @@ def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None
     content._shader_health_scan_scope = scan_scope
     _populate_validation_result(content, qt_widgets, result)
     _update_validation_chrome_labels(content, qt_widgets, result)
-    print(result.message)
-
-
-def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
-    try:
-        from shader_health.maya.commands import validate_scene_action
-
-        asset_class_id = _selected_asset_class_id(content, qt_widgets)
-        result = validate_scene_action(
-            profile_id="publish_strict",
-            asset_class_id=asset_class_id,
-        )
-    except Exception as exc:  # noqa: BLE001
-        message = f"Publish preflight failed: {exc}"
-        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
-        print(message)
-        return
-
-    if not getattr(result, "succeeded", True):
-        _set_label_text(
-            content,
-            qt_widgets,
-            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
-            result.message,
-        )
+    if post_validate is not None:
+        post_validate(content, qt_widgets, result)
+    else:
         print(result.message)
-        return
 
-    content._shader_health_scan_scope = "scene"
-    _populate_validation_result(content, qt_widgets, result)
-    _update_validation_chrome_labels(content, qt_widgets, result)
+
+def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:
     summary = getattr(result, "summary", None)
     block_publish = bool(getattr(summary, "block_publish", False)) if summary else False
     block_deadline = bool(getattr(summary, "block_deadline", False)) if summary else False
@@ -481,6 +528,58 @@ def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
     )
     _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
     print(message)
+
+
+def _set_validate_busy_state(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    busy: bool,
+    status_message: str = "",
+) -> None:
+    progress = _find_child(
+        content,
+        qt_widgets.QProgressBar,
+        main_window.VALIDATE_PROGRESS_BAR_OBJECT_NAME,
+    )
+    if progress is not None:
+        set_visible = getattr(progress, "setVisible", None)
+        if set_visible is not None:
+            set_visible(busy)
+
+    if status_message:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            status_message,
+        )
+
+    for object_name in (
+        main_window.VALIDATE_SCENE_BUTTON_OBJECT_NAME,
+        main_window.VALIDATE_SELECTION_BUTTON_OBJECT_NAME,
+        main_window.VALIDATE_PUBLISH_PREFLIGHT_BUTTON_OBJECT_NAME,
+    ):
+        button = _find_child(content, qt_widgets.QPushButton, object_name)
+        if button is not None:
+            set_enabled = getattr(button, "setEnabled", None)
+            if set_enabled is not None:
+                set_enabled(not busy)
+
+    app_class = getattr(qt_widgets, "QApplication", None)
+    if app_class is None:
+        return
+    instance = getattr(app_class, "instance", lambda: None)()
+    if instance is None:
+        return
+    set_override = getattr(instance, "setOverrideCursor", None)
+    restore_override = getattr(instance, "restoreOverrideCursor", None)
+    qt_module = getattr(qt_widgets, "Qt", None)
+    wait_cursor = getattr(qt_module, "WaitCursor", None) if qt_module is not None else None
+    if busy and set_override is not None and wait_cursor is not None:
+        set_override(wait_cursor)
+    elif not busy and restore_override is not None:
+        restore_override()
 
 
 def _refresh_farm_connection_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -973,6 +1072,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
 
     _update_severity_filter_options(content, qt_widgets, rows)
     _update_owner_filter_options(content, qt_widgets, rows)
+    _restore_issue_filter_controls(content, qt_widgets)
     _refresh_issues_table_view(content, qt_widgets)
 
     display_results = getattr(
@@ -1001,6 +1101,7 @@ def _update_severity_filter_options(
     if block_signals is not None:
         block_signals(True)
     try:
+        prefs = read_issue_filter_prefs(content)
         options = list(main_window.severity_filter_options(rows))
         clear = getattr(severity_filter, "clear", None)
         if clear is not None:
@@ -1008,9 +1109,12 @@ def _update_severity_filter_options(
         add_items = getattr(severity_filter, "addItems", None)
         if add_items is not None:
             add_items(options)
-        set_current = getattr(severity_filter, "setCurrentText", None)
-        if set_current is not None and options:
-            set_current(options[0])
+        apply_combo_preference(
+            severity_filter,
+            options,
+            prefs.severity,
+            fallback=main_window.ALL_SEVERITIES_LABEL,
+        )
     finally:
         if block_signals is not None:
             block_signals(False)
@@ -1033,6 +1137,7 @@ def _update_owner_filter_options(
     if block_signals is not None:
         block_signals(True)
     try:
+        prefs = read_issue_filter_prefs(content)
         options = list(main_window.owner_filter_options(rows))
         clear = getattr(owner_filter, "clear", None)
         if clear is not None:
@@ -1040,9 +1145,12 @@ def _update_owner_filter_options(
         add_items = getattr(owner_filter, "addItems", None)
         if add_items is not None:
             add_items(options)
-        set_current = getattr(owner_filter, "setCurrentText", None)
-        if set_current is not None and options:
-            set_current(options[0])
+        apply_combo_preference(
+            owner_filter,
+            options,
+            prefs.owner,
+            fallback=main_window.ALL_OWNERS_LABEL,
+        )
     finally:
         if block_signals is not None:
             block_signals(False)
@@ -1114,6 +1222,36 @@ def _refresh_fix_queue_confirmation_label(
         update_risky_confirmation_label(label, rows, selected_rows=selected_rows)
 
 
+def _restore_issue_filter_controls(content: Any, qt_widgets: Any) -> None:
+    prefs = read_issue_filter_prefs(content)
+    view_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_VIEW_FILTER_OBJECT_NAME,
+    )
+    sort_dropdown = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME,
+    )
+    apply_combo_preference(
+        view_filter,
+        (
+            main_window.ALL_ISSUES_LABEL,
+            main_window.BLOCKING_ONLY_LABEL,
+            main_window.AUTO_FIXABLE_LABEL,
+        ),
+        prefs.view,
+        fallback=main_window.ALL_ISSUES_LABEL,
+    )
+    apply_combo_preference(
+        sort_dropdown,
+        main_window.ISSUES_SORT_KEYS,
+        prefs.sort,
+        fallback="severity",
+    )
+
+
 def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
     table = _find_child(content, qt_widgets.QTableWidget, main_window.ISSUES_TABLE_OBJECT_NAME)
     severity_filter = _find_child(
@@ -1142,26 +1280,111 @@ def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
         connect = getattr(selection_changed, "connect", None)
         if connect is not None:
             connect(lambda *_: _on_issue_row_selected(content, qt_widgets))
+        item_double_clicked = getattr(table, "itemDoubleClicked", None)
+        double_connect = getattr(item_double_clicked, "connect", None)
+        if double_connect is not None:
+            double_connect(
+                lambda item: _on_issue_row_double_clicked(
+                    content,
+                    qt_widgets,
+                    int(getattr(item, "row", lambda: -1)()),
+                )
+            )
     if severity_filter is not None:
         current_text_changed = getattr(severity_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
     if sort_dropdown is not None:
         current_text_changed = getattr(sort_dropdown, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
     if owner_filter is not None:
         current_text_changed = getattr(owner_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
     if view_filter is not None:
         current_text_changed = getattr(view_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
+
+
+def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
+    splitter = _find_child(
+        content,
+        qt_widgets.QWidget,
+        main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME,
+    )
+    if splitter is None:
+        return
+
+    set_sizes = getattr(splitter, "setSizes", None)
+    saved_sizes = getattr(content, VALIDATE_SPLITTER_SIZES_ATTR, None)
+    if set_sizes is not None and saved_sizes:
+        set_sizes([int(size) for size in saved_sizes])
+
+    def _persist_splitter_sizes(*_args: Any) -> None:
+        sizes_fn = getattr(splitter, "sizes", None)
+        if sizes_fn is None:
+            return
+        sizes = tuple(int(size) for size in sizes_fn())
+        if len(sizes) >= 2 and sizes[1] >= main_window.DETAILS_PANEL_MIN_WIDTH:
+            setattr(content, VALIDATE_SPLITTER_SIZES_ATTR, sizes)
+        # #region agent log
+        _debug_details_layout_log(
+            content,
+            qt_widgets,
+            issue_id="splitter-moved",
+            message_len=0,
+            why_len=0,
+        )
+        # #endregion
+
+    splitter_moved = getattr(splitter, "splitterMoved", None)
+    connect = getattr(splitter_moved, "connect", None)
+    if connect is not None:
+        connect(_persist_splitter_sizes)
+
+
+def _wire_validate_tab_focus(content: Any, qt_widgets: Any) -> None:
+    tab_widget = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
+    if tab_widget is None:
+        return
+    current_changed = getattr(tab_widget, "currentChanged", None)
+    connect = getattr(current_changed, "connect", None)
+    if connect is not None:
+        connect(lambda index: _on_validate_tab_focused(content, qt_widgets, int(index)))
+
+
+def _on_validate_tab_focused(content: Any, qt_widgets: Any, tab_index: int) -> None:
+    if tab_index != 0:
+        return
+    if not getattr(content, "_shader_health_issue_rows", ()):
+        return
+    _restore_issue_filter_controls(content, qt_widgets)
+    _refresh_issues_table_view(content, qt_widgets)
+
+
+def _on_issue_filters_changed(content: Any, qt_widgets: Any) -> None:
+    read_issue_filter_prefs_from_widgets(content, qt_widgets, find_child=_find_child)
+    _refresh_issues_table_view(content, qt_widgets)
+
+
+def _on_issue_row_double_clicked(content: Any, qt_widgets: Any, row_index: int) -> None:
+    display_results = getattr(
+        content,
+        "_shader_health_display_failed_results",
+        getattr(content, "_shader_health_failed_results", ()),
+    )
+    if row_index < 0 or row_index >= len(display_results):
+        return
+    issue = display_results[row_index]
+    content._shader_health_selected_issue = issue
+    _populate_issue_details(content, qt_widgets, issue)
+    _run_navigation_action(content, qt_widgets, "select_node")
 
 
 def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
@@ -1497,6 +1720,113 @@ def _populate_issue_details(content: Any, qt_widgets: Any, issue: Any) -> None:
         main_window.DETAILS_FIX_LABEL_OBJECT_NAME,
         f"Fix Available: {_yes_no(state.fix_available)}   {state.fix_description}",
     )
+    # #region agent log
+    _debug_details_layout_log(
+        content,
+        qt_widgets,
+        issue_id=str(getattr(issue, "rule_id", "") or getattr(issue, "rule", "")),
+        message_len=len(state.message),
+        why_len=len(state.why),
+    )
+    # #endregion
+
+
+def _debug_details_layout_log(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    issue_id: str,
+    message_len: int,
+    why_len: int,
+) -> None:
+    try:
+        import json
+        import time
+
+        panel = _find_child(content, qt_widgets.QWidget, main_window.DETAILS_PANEL_OBJECT_NAME)
+        scroll_area = _find_child(
+            content,
+            qt_widgets.QWidget,
+            main_window.DETAILS_SCROLL_AREA_OBJECT_NAME,
+        )
+        splitter = _find_child(
+            content,
+            qt_widgets.QWidget,
+            main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME,
+        )
+        payload = {
+            "sessionId": "ee1eca",
+            "hypothesisId": "D6",
+            "location": "ui_launcher.py:_populate_issue_details",
+            "message": "issue details layout geometry",
+            "data": {
+                "issue_id": issue_id,
+                "message_len": message_len,
+                "why_len": why_len,
+                "panel_size": _widget_size(panel),
+                "panel_policy": _widget_size_policy(panel),
+                "scroll_size": _widget_size(scroll_area),
+                "scroll_frame_shape": _scroll_area_frame_shape(scroll_area),
+                "splitter_sizes": _splitter_sizes(splitter),
+                "saved_splitter_sizes": list(
+                    getattr(content, VALIDATE_SPLITTER_SIZES_ATTR, ()) or ()
+                ),
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    except OSError:
+        return
+
+
+def _widget_size(widget: Any) -> dict[str, int] | None:
+    if widget is None:
+        return None
+    size_fn = getattr(widget, "size", None)
+    if size_fn is None:
+        return None
+    size = size_fn()
+    width_fn = getattr(size, "width", None)
+    height_fn = getattr(size, "height", None)
+    if width_fn is None or height_fn is None:
+        return None
+    return {"width": int(width_fn()), "height": int(height_fn())}
+
+
+def _widget_size_policy(widget: Any) -> dict[str, int] | None:
+    if widget is None:
+        return None
+    policy_fn = getattr(widget, "sizePolicy", None)
+    if policy_fn is None:
+        return None
+    policy = policy_fn()
+    horizontal = getattr(policy, "horizontalPolicy", None)
+    vertical = getattr(policy, "verticalPolicy", None)
+    if horizontal is None or vertical is None:
+        return None
+    return {
+        "horizontal": int(horizontal()),
+        "vertical": int(vertical()),
+    }
+
+
+def _splitter_sizes(splitter: Any) -> list[int] | None:
+    if splitter is None:
+        return None
+    sizes_fn = getattr(splitter, "sizes", None)
+    if sizes_fn is None:
+        return None
+    return [int(size) for size in sizes_fn()]
+
+
+def _scroll_area_frame_shape(scroll_area: Any) -> int | None:
+    if scroll_area is None:
+        return None
+    frame_shape_fn = getattr(scroll_area, "frameShape", None)
+    if frame_shape_fn is None:
+        return None
+    return int(frame_shape_fn())
 
 
 def _fix_action_for_issue(content: Any, issue: Any) -> Any:

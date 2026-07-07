@@ -10,9 +10,17 @@ class FakeWidget:
         self.object_name: Optional[str] = None
         self.children: list[Any] = []
         self.layout: Optional[FakeVBoxLayout] = None
+        self.size_policy: Optional[tuple[Any, Any]] = None
+        self.minimum_width: Optional[int] = None
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
+
+    def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
+        self.size_policy = (horizontal, vertical)
+
+    def setMinimumWidth(self, width: int) -> None:
+        self.minimum_width = width
 
 
 class FakeLabel(FakeWidget):
@@ -142,6 +150,8 @@ class FakeCheckBox(FakeWidget):
 class FakeQFrame(FakeWidget):
     HLine = "hline"
     Sunken = "sunken"
+    NoFrame = "no_frame"
+    Plain = "plain"
 
     def __init__(self) -> None:
         super().__init__()
@@ -159,16 +169,92 @@ class FakeQFrame(FakeWidget):
         self.fixed_height = height
 
 
+class FakeProgressBar(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.visible = True
+        self.maximum = 1
+        self.minimum = 0
+        self.text_visible = True
+
+    def setTextVisible(self, visible: bool) -> None:
+        self.text_visible = visible
+
+    def setMaximum(self, value: int) -> None:
+        self.maximum = value
+
+    def setMinimum(self, value: int) -> None:
+        self.minimum = value
+
+    def setFixedHeight(self, height: int) -> None:
+        _ = height
+
+    def setMaximumWidth(self, width: int) -> None:
+        _ = width
+
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
+
+
+class FakeQScrollArea(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.widget_resizable = False
+        self.scroll_widget: Any = None
+        self.horizontal_scroll_policy: Any = None
+        self.size_policy: Optional[tuple[Any, Any]] = None
+        self.frame_shape: Optional[Any] = None
+        self.frame_shadow: Optional[Any] = None
+        self.line_width: Optional[int] = None
+        self.style_sheet = ""
+
+    def setWidgetResizable(self, enabled: bool) -> None:
+        self.widget_resizable = enabled
+
+    def setHorizontalScrollBarPolicy(self, policy: Any) -> None:
+        self.horizontal_scroll_policy = policy
+
+    def setWidget(self, widget: Any) -> None:
+        self.scroll_widget = widget
+        self.children.append(widget)
+
+    def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
+        self.size_policy = (horizontal, vertical)
+
+    def setFrameShape(self, shape: Any) -> None:
+        self.frame_shape = shape
+
+    def setFrameShadow(self, shadow: Any) -> None:
+        self.frame_shadow = shadow
+
+    def setLineWidth(self, width: int) -> None:
+        self.line_width = width
+
+    def setStyleSheet(self, style: str) -> None:
+        self.style_sheet = style
+
+    def frameShape(self) -> Any:
+        return self.frame_shape
+
+
 class FakeSizePolicy:
     Preferred = "preferred"
     Fixed = "fixed"
     Maximum = "maximum"
+    Expanding = "expanding"
+    Minimum = "minimum"
+
+
+class FakeQt:
+    ScrollBarAlwaysOff = "scroll_bar_always_off"
 
 
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QFrame = FakeQFrame
+    QScrollArea = FakeQScrollArea
+    QProgressBar = FakeProgressBar
     QPushButton = FakePushButton
     QComboBox = FakeComboBox
     QTableWidget = FakeTableWidget
@@ -179,6 +265,7 @@ class FakeQtWidgets:
     QTabWidget = FakeTabWidget
     QCheckBox = FakeCheckBox
     QSizePolicy = FakeSizePolicy
+    Qt = FakeQt
 
 
 def test_issue_details_defaults_show_empty_selection_state():
@@ -241,12 +328,28 @@ def test_issue_details_labels_are_word_wrapped():
     assert _find(details_panel, main_window.DETAILS_FIX_LABEL_OBJECT_NAME).word_wrap is True
 
 
+def test_issue_details_panel_uses_scroll_area_with_stable_expanding_policy():
+    details_panel = main_window.build_issue_details_panel(FakeQtWidgets)
+
+    assert details_panel.size_policy == ("expanding", "expanding")
+    assert details_panel.minimum_width == main_window.DETAILS_PANEL_MIN_WIDTH
+    scroll_area = _find(details_panel, main_window.DETAILS_SCROLL_AREA_OBJECT_NAME)
+    assert scroll_area.widget_resizable is True
+    assert scroll_area.scroll_widget is not None
+    assert scroll_area.size_policy == ("expanding", "expanding")
+    assert scroll_area.frame_shape == FakeQFrame.NoFrame
+    assert scroll_area.frame_shadow == FakeQFrame.Plain
+    assert scroll_area.line_width == 0
+    assert "border: none" in scroll_area.style_sheet
+
+
 def test_issue_details_panel_uses_horizontal_separators_between_sections():
     details_panel = main_window.build_issue_details_panel(FakeQtWidgets)
+    scroll_content = _find(details_panel, main_window.DETAILS_SCROLL_CONTENT_OBJECT_NAME)
 
     separators = [
         child
-        for child in details_panel.children
+        for child in scroll_content.children
         if getattr(child, "frame_shape", None) == FakeQFrame.HLine
     ]
     assert len(separators) == 5

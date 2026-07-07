@@ -58,6 +58,9 @@ ISSUES_SEVERITY_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesSeverityFilter"
 ISSUES_SORT_DROPDOWN_OBJECT_NAME = "shaderHealthInspectorIssuesSortDropdown"
 ISSUES_TABLE_OBJECT_NAME = "shaderHealthInspectorIssuesTable"
 DETAILS_PANEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsPanel"
+DETAILS_SCROLL_AREA_OBJECT_NAME = "shaderHealthInspectorIssueDetailsScrollArea"
+DETAILS_SCROLL_CONTENT_OBJECT_NAME = "shaderHealthInspectorIssueDetailsScrollContent"
+DETAILS_PANEL_MIN_WIDTH = 180
 DETAILS_MESSAGE_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsMessage"
 DETAILS_WHY_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsWhy"
 DETAILS_VALUES_LABEL_OBJECT_NAME = "shaderHealthInspectorIssueDetailsValues"
@@ -75,6 +78,8 @@ EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME = (
 )
 REPORTS_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorReportsStatusLabel"
 VALIDATE_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorDescription"
+VALIDATE_STATUS_ROW_OBJECT_NAME = "shaderHealthInspectorValidateStatusRow"
+VALIDATE_PROGRESS_BAR_OBJECT_NAME = "shaderHealthInspectorValidateProgressBar"
 VALIDATE_SCENE_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSceneButton"
 VALIDATE_SELECTION_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSelectionButton"
 VALIDATE_PUBLISH_PREFLIGHT_BUTTON_OBJECT_NAME = "shaderHealthInspectorPublishPreflightButton"
@@ -133,8 +138,6 @@ BLOCK_LAMP_COLORS = {
     True: "#e74c3c",
     False: "#2ecc71",
 }
-_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-ee1eca.log"
-
 
 @dataclass(frozen=True)
 class SummaryHeaderState:
@@ -338,14 +341,6 @@ def build_validation_actions(
     layout.addWidget(_action_bar_separator(qt_widgets))
     layout.addWidget(_build_triage_action_group(qt_widgets, issue_callbacks))
     layout.addStretch(1)
-    # #region agent log
-    _debug_ui_log(
-        "B",
-        "main_window.py:build_validation_actions",
-        "triage buttons placed in action bar",
-        {"has_triage_group": True},
-    )
-    # #endregion
     return widget
 
 
@@ -405,19 +400,6 @@ def build_summary_header(
     _set_compact_horizontal(qt_widgets, deadline_label)
     metrics_layout.addStretch(1)
     layout.addWidget(metrics_row)
-    # #region agent log
-    _debug_ui_log(
-        "D",
-        "main_window.py:build_summary_header",
-        "block indicators built",
-        {
-            "publish_block": summary_state.block_publish,
-            "deadline_block": summary_state.block_deadline,
-            "has_publish_lamp": True,
-            "has_deadline_lamp": True,
-        },
-    )
-    # #endregion
 
     context_row = qt_widgets.QWidget()
     context_layout = qt_widgets.QHBoxLayout(context_row)
@@ -516,45 +498,44 @@ def build_issues_table(
     filters_row.setObjectName(ISSUES_FILTERS_ROW_OBJECT_NAME)
     filters_layout = qt_widgets.QHBoxLayout(filters_row)
     filters_layout.setContentsMargins(0, 0, 0, 0)
-    filters_layout.setSpacing(8)
+    filters_layout.setSpacing(4)
 
-    severity_filter = _issues_filter_combo(
+    severity_filter = _issues_filter_combo_compact(
         qt_widgets,
         label="Severity",
         object_name=ISSUES_SEVERITY_FILTER_OBJECT_NAME,
         items=list(severity_filter_options(issue_rows)),
         tooltip="Filter issues by severity.",
     )
-    owner_filter = _issues_filter_combo(
+    owner_filter = _issues_filter_combo_compact(
         qt_widgets,
         label="Owner",
         object_name=ISSUES_OWNER_FILTER_OBJECT_NAME,
         items=[ALL_OWNERS_LABEL],
         tooltip="Filter issues by owner.",
     )
-    view_filter = _issues_filter_combo(
+    view_filter = _issues_filter_combo_compact(
         qt_widgets,
         label="View",
         object_name=ISSUES_VIEW_FILTER_OBJECT_NAME,
         items=[ALL_ISSUES_LABEL, BLOCKING_ONLY_LABEL, AUTO_FIXABLE_LABEL],
         tooltip="Filter blocking or auto-fixable issues.",
     )
-    sort_dropdown = _issues_filter_combo(
+    sort_dropdown = _issues_filter_combo_compact(
         qt_widgets,
         label="Sort",
         object_name=ISSUES_SORT_DROPDOWN_OBJECT_NAME,
         items=list(ISSUES_SORT_KEYS),
-        tooltip="Column sorting is enabled on the issues table.",
+        tooltip="Sort the issues table by column.",
         current_text="severity",
     )
 
-    for label, combo in (
+    for combo in (
         severity_filter,
         owner_filter,
         view_filter,
         sort_dropdown,
     ):
-        filters_layout.addWidget(label)
         filters_layout.addWidget(combo, 0)
 
     filters_layout.addStretch(1)
@@ -586,7 +567,10 @@ def build_issue_details_panel(
     layout = qt_widgets.QVBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(2)
-    _set_compact_vertical(qt_widgets, widget)
+    _set_expanding_panel(qt_widgets, widget)
+    set_minimum_width = getattr(widget, "setMinimumWidth", None)
+    if set_minimum_width is not None:
+        set_minimum_width(DETAILS_PANEL_MIN_WIDTH)
 
     title_label = qt_widgets.QLabel("Issue Details")
     _set_compact_horizontal(qt_widgets, title_label)
@@ -624,24 +608,47 @@ def build_issue_details_panel(
             _details_fix_text(details_state),
         ),
     )
+
+    scroll_area_class = getattr(qt_widgets, "QScrollArea", None)
+    if scroll_area_class is None:
+        for index, label in enumerate(detail_sections):
+            _set_details_section_label(qt_widgets, label)
+            layout.addWidget(label)
+            if index < len(detail_sections) - 1:
+                layout.addWidget(_details_separator(qt_widgets))
+        layout.addStretch(1)
+        return widget
+
+    scroll_area = scroll_area_class()
+    scroll_area.setObjectName(DETAILS_SCROLL_AREA_OBJECT_NAME)
+    _configure_borderless_scroll_area(scroll_area, qt_widgets)
+    set_widget_resizable = getattr(scroll_area, "setWidgetResizable", None)
+    if set_widget_resizable is not None:
+        set_widget_resizable(True)
+    set_horizontal_scroll = getattr(scroll_area, "setHorizontalScrollBarPolicy", None)
+    scroll_bar_policy = getattr(qt_widgets, "Qt", None)
+    if set_horizontal_scroll is not None and scroll_bar_policy is not None:
+        scroll_always_off = getattr(scroll_bar_policy, "ScrollBarAlwaysOff", None)
+        if scroll_always_off is not None:
+            set_horizontal_scroll(scroll_always_off)
+    _set_expanding_panel(qt_widgets, scroll_area)
+
+    scroll_content = qt_widgets.QWidget()
+    scroll_content.setObjectName(DETAILS_SCROLL_CONTENT_OBJECT_NAME)
+    content_layout = qt_widgets.QVBoxLayout(scroll_content)
+    content_layout.setContentsMargins(0, 0, 0, 0)
+    content_layout.setSpacing(2)
     for index, label in enumerate(detail_sections):
-        _set_compact_vertical(qt_widgets, label)
-        layout.addWidget(label)
+        _set_details_section_label(qt_widgets, label)
+        content_layout.addWidget(label)
         if index < len(detail_sections) - 1:
-            layout.addWidget(_details_separator(qt_widgets))
-    layout.addStretch(1)
-    # #region agent log
-    _debug_ui_log(
-        "A",
-        "main_window.py:build_issue_details_panel",
-        "details panel compact layout built",
-        {
-            "detail_section_count": len(detail_sections),
-            "separator_count": len(detail_sections) - 1,
-            "actions_in_action_bar": True,
-        },
-    )
-    # #endregion
+            content_layout.addWidget(_details_separator(qt_widgets))
+    content_layout.addStretch(1)
+
+    set_widget = getattr(scroll_area, "setWidget", None)
+    if set_widget is not None:
+        set_widget(scroll_content)
+    layout.addWidget(scroll_area, 1)
 
     return widget
 
@@ -760,19 +767,6 @@ def update_severity_count_indicators(
         set_text = getattr(severity_label, "setText", None)
         if set_text is not None:
             set_text(_severity_count_html(severity_key, label, count))
-    # #region agent log
-    _debug_ui_log(
-        "C",
-        "main_window.py:update_severity_count_indicators",
-        "summary severity counts updated",
-        {
-            "critical": critical_count,
-            "error": error_count,
-            "warning": warning_count,
-            "info": info_count,
-        },
-    )
-    # #endregion
 
 
 def update_block_status_indicators(
@@ -1046,12 +1040,42 @@ def _build_validate_tab(
         if set_stretch is not None:
             set_stretch(0, 3)
             set_stretch(1, 2)
+        set_children_collapsible = getattr(splitter, "setChildrenCollapsible", None)
+        if set_children_collapsible is not None:
+            set_children_collapsible(False)
+        set_collapsible = getattr(splitter, "setCollapsible", None)
+        if set_collapsible is not None:
+            set_collapsible(0, False)
+            set_collapsible(1, False)
         layout.addWidget(splitter, 1)
 
     description = qt_widgets.QLabel("Ready to validate the current scene or selection.")
     description.setObjectName(VALIDATE_STATUS_LABEL_OBJECT_NAME)
     description.setWordWrap(True)
-    layout.addWidget(description)
+
+    status_row = qt_widgets.QWidget()
+    status_row.setObjectName(VALIDATE_STATUS_ROW_OBJECT_NAME)
+    status_layout = qt_widgets.QHBoxLayout(status_row)
+    status_layout.setContentsMargins(0, 0, 0, 0)
+    status_layout.setSpacing(6)
+    status_layout.addWidget(description, 1)
+
+    progress_bar = qt_widgets.QProgressBar()
+    progress_bar.setObjectName(VALIDATE_PROGRESS_BAR_OBJECT_NAME)
+    progress_bar.setTextVisible(False)
+    progress_bar.setMaximum(0)
+    progress_bar.setMinimum(0)
+    set_fixed_height = getattr(progress_bar, "setFixedHeight", None)
+    set_max_width = getattr(progress_bar, "setMaximumWidth", None)
+    if set_fixed_height is not None:
+        set_fixed_height(8)
+    if set_max_width is not None:
+        set_max_width(160)
+    set_visible = getattr(progress_bar, "setVisible", None)
+    if set_visible is not None:
+        set_visible(False)
+    status_layout.addWidget(progress_bar, 0)
+    layout.addWidget(status_row)
     return tab
 
 
@@ -1248,6 +1272,27 @@ def _build_triage_action_group(
     return actions
 
 
+def _configure_borderless_scroll_area(scroll_area: Any, qt_widgets: Any) -> None:
+    """Remove the default QScrollArea frame so details blend with the splitter pane."""
+
+    frame_class = getattr(qt_widgets, "QFrame", None)
+    set_shape = getattr(scroll_area, "setFrameShape", None)
+    set_shadow = getattr(scroll_area, "setFrameShadow", None)
+    set_line_width = getattr(scroll_area, "setLineWidth", None)
+    set_style = getattr(scroll_area, "setStyleSheet", None)
+    if frame_class is not None and set_shape is not None:
+        no_frame = getattr(frame_class, "NoFrame", None)
+        plain = getattr(frame_class, "Plain", None)
+        if no_frame is not None:
+            set_shape(no_frame)
+        if set_shadow is not None and plain is not None:
+            set_shadow(plain)
+    if set_line_width is not None:
+        set_line_width(0)
+    if set_style is not None:
+        set_style("QScrollArea { border: none; background: transparent; }")
+
+
 def _details_separator(qt_widgets: Any) -> Any:
     separator = qt_widgets.QFrame()
     separator.setObjectName("shaderHealthInspectorIssueDetailsSeparator")
@@ -1271,25 +1316,6 @@ def _action_bar_separator(qt_widgets: Any) -> Any:
     separator = qt_widgets.QLabel("|")
     separator.setObjectName("shaderHealthInspectorValidateActionSeparator")
     return separator
-
-
-def _debug_ui_log(hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "ee1eca",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except OSError:
-        return
 
 
 def _find_child_widget(content: Any, qt_widgets: Any, object_name: str) -> Any:
@@ -1359,6 +1385,27 @@ def _set_issue_row_number_style(
     set_vertical_header_item = getattr(table, "setVerticalHeaderItem", None)
     if set_vertical_header_item is not None:
         set_vertical_header_item(row_index, row_item)
+
+
+def _set_expanding_panel(qt_widgets: Any, widget: Any) -> None:
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_policy = getattr(widget, "setSizePolicy", None)
+    if size_policy is None or set_policy is None:
+        return
+    expanding = getattr(size_policy, "Expanding", None)
+    if expanding is not None:
+        set_policy(expanding, expanding)
+
+
+def _set_details_section_label(qt_widgets: Any, widget: Any) -> None:
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_policy = getattr(widget, "setSizePolicy", None)
+    if size_policy is None or set_policy is None:
+        return
+    preferred = getattr(size_policy, "Preferred", None)
+    minimum = getattr(size_policy, "Minimum", None)
+    if preferred is not None and minimum is not None:
+        set_policy(preferred, minimum)
 
 
 def _set_compact_horizontal(qt_widgets: Any, widget: Any) -> None:
@@ -1441,6 +1488,38 @@ def _details_reference_text(state: IssueDetailsState) -> str:
 def _details_fix_text(state: IssueDetailsState) -> str:
     fix_status = _yes_no(state.fix_available)
     return f"Fix Available: {fix_status}   {state.fix_description}"
+
+
+def _issues_filter_combo_compact(
+    qt_widgets: Any,
+    *,
+    label: str,
+    object_name: str,
+    items: Sequence[str],
+    tooltip: str,
+    current_text: Optional[str] = None,
+) -> Any:
+    """Build a compact filter combo with tooltip text instead of a separate label."""
+
+    combo = qt_widgets.QComboBox()
+    combo.setObjectName(object_name)
+    combo.addItems(list(items))
+    combo.setToolTip(f"{label}: {tooltip}")
+    if current_text is not None:
+        combo.setCurrentText(current_text)
+    minimum_contents = getattr(combo, "setMinimumContentsLength", None)
+    if minimum_contents is not None:
+        minimum_contents(max(len(item) for item in items) if items else 8)
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    policy = getattr(combo, "setSizePolicy", None)
+    if size_policy is not None and policy is not None:
+        policy(size_policy.Preferred, size_policy.Fixed)
+    adjust_policy = getattr(combo, "setSizeAdjustPolicy", None)
+    combo_class = getattr(qt_widgets, "QComboBox", None)
+    adjust_to_contents = getattr(combo_class, "AdjustToContents", None)
+    if adjust_policy is not None and adjust_to_contents is not None:
+        adjust_policy(adjust_to_contents)
+    return combo
 
 
 def _issues_filter_combo(

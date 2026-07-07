@@ -180,6 +180,8 @@ class FakeSplitter(FakeWidget):
         self.widgets: list[Any] = []
         self.stretch_factors: list[tuple[int, int]] = []
         self.orientation: Optional[Any] = None
+        self.children_collapsible: Optional[bool] = None
+        self.collapsible: dict[int, bool] = {}
 
     def setOrientation(self, orientation: Any) -> None:
         self.orientation = orientation
@@ -191,22 +193,82 @@ class FakeSplitter(FakeWidget):
     def setStretchFactor(self, index: int, stretch: int) -> None:
         self.stretch_factors.append((index, stretch))
 
+    def setChildrenCollapsible(self, enabled: bool) -> None:
+        self.children_collapsible = enabled
+
+    def setCollapsible(self, index: int, enabled: bool) -> None:
+        self.collapsible[index] = enabled
+
+
+class FakeQScrollArea(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.widget_resizable = False
+        self.scroll_widget: Any = None
+        self.horizontal_scroll_policy: Any = None
+        self.size_policy: Optional[tuple[Any, Any]] = None
+
+    def setWidgetResizable(self, enabled: bool) -> None:
+        self.widget_resizable = enabled
+
+    def setHorizontalScrollBarPolicy(self, policy: Any) -> None:
+        self.horizontal_scroll_policy = policy
+
+    def setWidget(self, widget: Any) -> None:
+        self.scroll_widget = widget
+        self.children.append(widget)
+
+    def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
+        self.size_policy = (horizontal, vertical)
+
+
+class FakeProgressBar(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.visible = True
+        self.maximum = 1
+        self.minimum = 0
+        self.text_visible = True
+
+    def setTextVisible(self, visible: bool) -> None:
+        self.text_visible = visible
+
+    def setMaximum(self, value: int) -> None:
+        self.maximum = value
+
+    def setMinimum(self, value: int) -> None:
+        self.minimum = value
+
+    def setFixedHeight(self, height: int) -> None:
+        _ = height
+
+    def setMaximumWidth(self, width: int) -> None:
+        _ = width
+
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
+
 
 class FakeQt:
     Horizontal = "horizontal"
     RichText = "rich_text"
+    ScrollBarAlwaysOff = "scroll_bar_always_off"
 
 
 class FakeSizePolicy:
     Preferred = "preferred"
     Fixed = "fixed"
     Maximum = "maximum"
+    Expanding = "expanding"
+    Minimum = "minimum"
 
 
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QFrame = FakeQFrame
+    QScrollArea = FakeQScrollArea
+    QProgressBar = FakeProgressBar
     QPushButton = FakePushButton
     QComboBox = FakeComboBox
     QTableWidget = FakeTableWidget
@@ -248,6 +310,7 @@ def test_issues_table_builds_filter_and_sort_controls():
 
     assert filters_row.layout is not None
     assert widget.layout.widgets[0] is filters_row
+    assert "Severity:" in severity_filter.tooltip
     assert severity_filter.items == [
         main_window.ALL_SEVERITIES_LABEL,
         "critical",
