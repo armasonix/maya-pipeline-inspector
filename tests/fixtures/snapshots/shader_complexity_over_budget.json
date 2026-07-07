@@ -1,0 +1,237 @@
+{
+  "connections": [
+    {
+      "dst_attr": "coatMtl",
+      "dst_node": "node:blend_mtl",
+      "src_attr": "outColor",
+      "src_node": "node:coat_mtl"
+    },
+    {
+      "dst_attr": "baseMtl",
+      "dst_node": "node:blend_mtl",
+      "src_attr": "outColor",
+      "src_node": "node:base_mtl"
+    },
+    {
+      "dst_attr": "diffuseColor",
+      "dst_node": "node:coat_mtl",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:layered_tex"
+    },
+    {
+      "dst_attr": "diffuseColor",
+      "dst_node": "node:base_mtl",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_base"
+    },
+    {
+      "dst_attr": "inputs[0].color",
+      "dst_node": "node:layered_tex",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_a"
+    },
+    {
+      "dst_attr": "inputs[1].color",
+      "dst_node": "node:layered_tex",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_b"
+    },
+    {
+      "dst_attr": "inputs[2].color",
+      "dst_node": "node:layered_tex",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_c"
+    },
+    {
+      "dst_attr": "inputs[3].color",
+      "dst_node": "node:layered_tex",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_d"
+    },
+    {
+      "dst_attr": "inputs[4].color",
+      "dst_node": "node:layered_tex",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_e"
+    }
+  ],
+  "file_dependencies": [],
+  "materials": [
+    {
+      "assigned_shapes": ["mesh:hero_body"],
+      "displacement_nodes": [],
+      "graph_depth": 0,
+      "graph_fingerprint": "",
+      "graph_node_count": 0,
+      "name": "blend_mtl",
+      "node_id": "node:blend_mtl",
+      "renderer_family": "vray",
+      "shading_engines": ["node:hero_sg"],
+      "texture_nodes": [
+        "node:file_a",
+        "node:file_b",
+        "node:file_c",
+        "node:file_d",
+        "node:file_e",
+        "node:file_base"
+      ],
+      "type_name": "VRayBlendMtl"
+    }
+  ],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "blend_mtl",
+      "id": "node:blend_mtl",
+      "locked": false,
+      "name": "blend_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBlendMtl"
+    },
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "coat_mtl",
+      "id": "node:coat_mtl",
+      "locked": false,
+      "name": "coat_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayMtl"
+    },
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "base_mtl",
+      "id": "node:base_mtl",
+      "locked": false,
+      "name": "base_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayMtl"
+    },
+    {
+      "attrs": {},
+      "classification": ["utility"],
+      "full_name": "layered_tex",
+      "id": "node:layered_tex",
+      "locked": false,
+      "name": "layered_tex",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayLayeredTex"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_a",
+      "id": "node:file_a",
+      "locked": false,
+      "name": "file_a",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBitmap"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_b",
+      "id": "node:file_b",
+      "locked": false,
+      "name": "file_b",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBitmap"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_c",
+      "id": "node:file_c",
+      "locked": false,
+      "name": "file_c",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBitmap"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_d",
+      "id": "node:file_d",
+      "locked": false,
+      "name": "file_d",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBitmap"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_e",
+      "id": "node:file_e",
+      "locked": false,
+      "name": "file_e",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBitmap"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_base",
+      "id": "node:file_base",
+      "locked": false,
+      "name": "file_base",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayBitmap"
+    }
+  ],
+  "references": [],
+  "renderer": "vray",
+  "scan_scope": "scene",
+  "scene_path": "examples/broken_scene/shader_health_demo_broken.ma",
+  "scanned_at_utc": "2026-07-03T12:00:00Z",
+  "schema_version": "1.0",
+  "shading_engines": [
+    {
+      "displacement_shader": null,
+      "members": ["mesh:hero_body"],
+      "name": "hero_sg",
+      "node_id": "node:hero_sg",
+      "surface_shader": "node:blend_mtl",
+      "volume_shader": null
+    }
+  ]
+}

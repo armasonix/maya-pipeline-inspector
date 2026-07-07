@@ -3,17 +3,18 @@
     {
       "schema_version": "1.0",
       "id": "common.texture.optimized.exists",
-      "name": "Optimized texture file should exist when tracked",
+      "name": "Optimized texture derivative should exist for raster sources",
       "enabled": true,
       "renderer": ["common", "vray", "arnold"],
       "scope": "file_dependency",
       "severity": "warning",
       "owner": "pipeline_td",
-      "message": "Optimized texture derivative is missing.",
-      "why": "Missing optimized texture derivatives such as .tx files can increase render startup cost, texture IO, and farm memory pressure. When scanner metadata tracks an optimized derivative, the derivative should exist.",
+      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
+      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them.",
       "match": {
         "dependency_kind": "texture",
-        "optimized_exists": [true, false]
+        "exists": true,
+        "optimized_kind": ["tx", "udim_tx"]
       },
       "check": {
         "type": "attribute_equals",
@@ -37,15 +38,46 @@
       "severity": "warning",
       "owner": "pipeline_td",
       "message": "Optimized texture derivative is stale compared with its source texture.",
-      "why": "Stale optimized derivatives can render older pixels than the source texture and make local lookdev diverge from farm rendering. Freshness should be reported when scanner metadata detects a stale optimized derivative.",
+      "why": "Stale .tx derivatives can render older pixels than the source texture and make local lookdev diverge from farm rendering.",
       "match": {
         "dependency_kind": "texture",
+        "exists": true,
+        "optimized_kind": ["tx", "udim_tx"],
         "optimized_is_stale": [true, false]
       },
       "check": {
         "type": "attribute_equals",
         "attribute": "optimized_is_stale",
         "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.texture.optimized.udim_tx.missing",
+      "name": "UDIM optimized texture tiles should exist",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "file_dependency",
+      "severity": "warning",
+      "owner": "pipeline_td",
+      "message": "One or more UDIM .tx tiles are missing for a raster UDIM source texture.",
+      "why": "Partial UDIM .tx coverage causes farm renders to fall back to heavy source tiles or fail tile lookup. All published UDIM source tiles should have matching .tx tiles.",
+      "match": {
+        "dependency_kind": "texture",
+        "exists": true,
+        "is_udim": true,
+        "optimized_kind": "udim_tx"
+      },
+      "check": {
+        "type": "list_length_max",
+        "attribute": "optimized_missing_udim_tiles",
+        "max": 0
       },
       "policy": {
         "block_publish": false,

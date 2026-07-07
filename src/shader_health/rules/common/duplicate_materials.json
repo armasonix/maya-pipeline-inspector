@@ -1,0 +1,52 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_network.duplicate.fingerprint",
+      "name": "Duplicate material shading networks should be reviewed",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "graph",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Multiple materials share the same shading-network fingerprint.",
+      "why": "Duplicate material graphs increase scene complexity, memory use, and lookdev review cost. Reporting content-identical networks helps consolidate redundant shaders when assignments allow.",
+      "match": {},
+      "check": {
+        "type": "duplicate_material_fingerprints",
+        "max_materials": 250,
+        "min_group_size": 2
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_network.duplicate.scan_cap",
+      "name": "Duplicate scan budget exceeded for large scenes",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "graph",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Scene exceeds duplicate-scan material or texture budget; duplicate detection may be truncated.",
+      "why": "Large scenes can contain hundreds of materials and thousands of texture nodes. Capping duplicate scans keeps validation responsive while still reporting duplicates inside the scanned subset.",
+      "match": {},
+      "check": {
+        "type": "duplicate_scan_budget",
+        "max_materials": 250,
+        "max_file_dependencies": 2000
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

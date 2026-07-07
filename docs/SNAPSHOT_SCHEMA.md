@@ -184,7 +184,8 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
   "displacement_nodes": [],
   "graph_node_count": 2,
   "graph_depth": 1,
-  "graph_fingerprint": "sha256:demo"
+  "graph_fingerprint": "sha256:demo",
+  "graph_content_fingerprint": "sha256:content_demo"
 }
 ```
 
@@ -201,8 +202,82 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
 | `graph_node_count` | integer | Yes | Number of nodes in material graph. |
 | `graph_depth` | integer | Yes | Approximate upstream graph depth. |
 | `graph_fingerprint` | string | Yes | Stable graph fingerprint if computed, otherwise empty string. |
+| `graph_content_fingerprint` | string | Yes | Content-only fingerprint for duplicate material detection (ignores Maya node names). |
+| `complexity_metadata` | object or null | No | Shader complexity profiler payload computed during enrichment. |
+| `displacement_metadata` | object or null | No | Displacement risk analyzer payload computed during enrichment. |
 | `vray_metadata` | object or null | No | V-Ray enrichment payload when the material is a V-Ray shader type. |
 | `arnold_metadata` | object or null | No | Arnold enrichment payload when the material is an Arnold shader type. |
+
+### Shader complexity metadata (`complexity_metadata`)
+
+Attached during validation enrichment from upstream graph traversal and renderer adapter weights.
+
+```json
+{
+  "depth_histogram": {
+    "0": 1,
+    "1": 1,
+    "2": 1,
+    "3": 2,
+    "4": 1
+  },
+  "expensive_node_count": 1,
+  "expensive_node_types": {
+    "layeredTexture": 1
+  },
+  "farm_cost_score": 6.0,
+  "farm_cost_hint": "low"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `depth_histogram` | object | Count of graph nodes at each upstream depth from the material root. |
+| `expensive_node_count` | integer | Nodes whose adapter weight meets the expensive-node threshold. |
+| `expensive_node_types` | object | Per node-type counts for expensive nodes. |
+| `farm_cost_score` | number | Weighted render-cost estimate for the material subgraph. |
+| `farm_cost_hint` | string | Cost band: `low`, `medium`, `high`, or `critical`. |
+
+### Displacement risk metadata (`displacement_metadata`)
+
+Attached during validation enrichment from displacement nodes, bounds, subdivision flags, and renderer-specific attrs.
+
+```json
+{
+  "has_displacement": true,
+  "displacement_node_ids": ["node:displacementShader1"],
+  "max_amount": 12.0,
+  "texture_linked": true,
+  "subdivision_enabled": true,
+  "bounds_min": 0.0,
+  "bounds_max": 4.0,
+  "bounds_span": 4.0,
+  "renderer_flags": {
+    "force_displacement": true,
+    "subdivision_enabled": true
+  },
+  "force_displacement": true,
+  "vector_displacement": false,
+  "risk_score": 22.5,
+  "risk_hint": "critical"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `has_displacement` | boolean | Material or shading engine has displacement nodes linked. |
+| `displacement_node_ids` | array[string] | Displacement node IDs in the material network. |
+| `max_amount` | number or null | Highest displacement amount found on linked nodes. |
+| `texture_linked` | boolean | Upstream displacement texture dependency is present. |
+| `subdivision_enabled` | boolean | Subdivision/displacement flags detected on the material. |
+| `bounds_min` | number or null | Minimum displacement bound across linked nodes. |
+| `bounds_max` | number or null | Maximum displacement bound across linked nodes. |
+| `bounds_span` | number or null | `bounds_max - bounds_min` when both bounds are available. |
+| `renderer_flags` | object | Renderer-specific displacement flags captured during enrichment. |
+| `force_displacement` | boolean | V-Ray force-displacement flag detected. |
+| `vector_displacement` | boolean | Vector displacement flag detected on the material node. |
+| `risk_score` | number | Weighted displacement farm-risk estimate. |
+| `risk_hint` | string | Risk band: `low`, `medium`, `high`, or `critical`. |
 
 ### V-Ray material metadata (`vray_metadata`)
 
@@ -307,7 +382,14 @@ Represents a texture or renderer file dependency.
     "bit_depth": "16f",
     "color_space": null,
     "compression": null
-  }
+  },
+  "optimized_path": "D:/show/assets/char/demo/tex/roughness_v001.<UDIM>.tx",
+  "optimized_kind": "udim_tx",
+  "optimized_exists": false,
+  "optimized_mtime_utc": null,
+  "optimized_is_stale": null,
+  "optimized_udim_tiles": [1001, 1002],
+  "optimized_missing_udim_tiles": [1003]
 }
 ```
 
@@ -328,6 +410,13 @@ Represents a texture or renderer file dependency.
 | `mtime_utc` | string or null | No | Last modification time if known. |
 | `size_bytes` | integer or null | No | File size if known. |
 | `image_info` | object or null | No | Optional image metadata. |
+| `optimized_path` | string or null | No | Resolved `.tx` path (flat file or UDIM pattern). |
+| `optimized_kind` | string or null | No | `tx` for single-file optimized texture; `udim_tx` for tiled UDIM `.tx`. |
+| `optimized_exists` | boolean or null | No | Whether expected `.tx` file or full UDIM tile set exists. |
+| `optimized_mtime_utc` | string or null | No | `.tx` mtime when a single flat `.tx` is used. |
+| `optimized_is_stale` | boolean or null | No | True when source texture is newer than `.tx` (farm should re-bake). |
+| `optimized_udim_tiles` | array[integer] | Yes | UDIM tile numbers with existing `.tx` files. |
+| `optimized_missing_udim_tiles` | array[integer] | Yes | UDIM tiles expected from source but missing `.tx`. |
 
 ## ImageInfo
 

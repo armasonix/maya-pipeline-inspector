@@ -27,6 +27,7 @@ _OVERRIDE_KEYS = frozenset(
         "block_deadline",
         "waiver_allowed",
         "auto_fix_allowed",
+        "check",
     }
 )
 _POLICY_OVERRIDE_KEYS = frozenset(
@@ -54,6 +55,7 @@ class RuleOverride:
     block_deadline: Optional[bool] = None
     waiver_allowed: Optional[bool] = None
     auto_fix_allowed: Optional[bool] = None
+    check_params: Optional[JsonDict] = None
 
     @classmethod
     def from_dict(cls, rule_id: str, data: Mapping[str, Any]) -> RuleOverride:
@@ -70,10 +72,17 @@ class RuleOverride:
                 f"override for {rule_id!r} has invalid severity; expected: {allowed}"
             )
 
-        for key in sorted(_OVERRIDE_KEYS - {"severity"}):
+        for key in sorted(_OVERRIDE_KEYS - {"severity", "check"}):
             value = data.get(key)
             if value is not None and not isinstance(value, bool):
                 raise RuleLoadError(f"override for {rule_id!r}: {key} must be a boolean")
+
+        raw_check = data.get("check")
+        check_params = None
+        if raw_check is not None:
+            if not isinstance(raw_check, Mapping):
+                raise RuleLoadError(f"override for {rule_id!r}: check must be an object")
+            check_params = dict(raw_check)
 
         return cls(
             rule_id=rule_id,
@@ -83,6 +92,7 @@ class RuleOverride:
             block_deadline=data.get("block_deadline"),
             waiver_allowed=data.get("waiver_allowed"),
             auto_fix_allowed=data.get("auto_fix_allowed"),
+            check_params=check_params,
         )
 
     def apply(self, rule: RuleDefinition) -> RuleDefinition:
@@ -97,12 +107,19 @@ class RuleOverride:
         if new_fix is not None and not new_policy.auto_fix_allowed:
             new_fix = None
 
+        new_check = rule.check
+        if self.check_params:
+            merged_params = dict(rule.check.params)
+            merged_params.update(self.check_params)
+            new_check = replace(rule.check, params=merged_params)
+
         updated = replace(
             rule,
             enabled=rule.enabled if self.enabled is None else self.enabled,
             severity=rule.severity if self.severity is None else self.severity,
             policy=new_policy,
             fix=new_fix,
+            check=new_check,
         )
         updated.validate()
         return updated

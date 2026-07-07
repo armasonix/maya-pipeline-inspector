@@ -1,0 +1,82 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "common.displacement.amount.max",
+          "severity": "error",
+          "block_publish": true,
+          "block_deadline": true,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "common.displacement.risk_score.max",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "common.displacement.subdivision.enabled",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "common.displacement.bounds_span.max",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "vray.material.displacement_review.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "vray.material.displacement_force.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "vray.material.displacement_bounds.warning",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        }
+      ]
+    },
+    "publish_strict": {
+      "failed": [
+        {
+          "rule_id": "common.displacement.amount.max",
+          "severity": "error",
+          "block_publish": true,
+          "block_deadline": true,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "common.displacement.risk_score.max",
+          "severity": "warning",
+          "block_publish": true,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        },
+        {
+          "rule_id": "vray.material.displacement_force.warning",
+          "severity": "warning",
+          "block_publish": true,
+          "block_deadline": false,
+          "material": "hero_disp_mtl"
+        }
+      ]
+    }
+  }
+}

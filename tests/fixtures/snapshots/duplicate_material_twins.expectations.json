@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "common.shader_network.duplicate.fingerprint",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false
+        },
+        {
+          "rule_id": "common.texture.duplicates.same_path",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false
+        }
+      ]
+    }
+  }
+}

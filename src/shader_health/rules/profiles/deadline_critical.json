@@ -3,22 +3,91 @@
   "display_name": "Deadline Critical",
   "rule_overrides": {
     "common.shader_complexity.graph_nodes.max": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 40
+      }
     },
     "common.shader_complexity.texture_count.max": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 12
+      }
     },
     "common.shader_complexity.graph_depth.max": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 6
+      }
+    },
+    "common.shader_complexity.expensive_nodes.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 2
+      }
+    },
+    "common.shader_complexity.farm_cost_score.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 14
+      }
+    },
+    "common.displacement.risk_score.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 6.0
+      }
+    },
+    "common.displacement.subdivision.enabled": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
+    },
+    "common.displacement.bounds_span.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 2.0
+      }
     },
     "common.texture.duplicates.same_path": {
       "enabled": false
     },
+    "common.shader_network.duplicate.fingerprint": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "common.shader_network.duplicate.scan_cap": {
+      "enabled": true,
+      "severity": "warning"
+    },
     "common.texture.optimized.exists": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
     },
     "common.texture.optimized.fresh": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
+    },
+    "common.texture.optimized.udim_tx.missing": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
     },
     "common.texture.version.latest": {
       "enabled": false
@@ -35,6 +104,12 @@
     "vray.material.displacement_review.warning": {
       "block_deadline": true
     },
+    "vray.material.displacement_force.warning": {
+      "block_deadline": true
+    },
+    "vray.material.displacement_bounds.warning": {
+      "block_deadline": true
+    },
     "vray.material.trace_depth.warning": {
       "block_deadline": true
     },
@@ -42,6 +117,9 @@
       "block_deadline": true
     },
     "arnold.material.displacement_review.warning": {
+      "block_deadline": true
+    },
+    "arnold.material.displacement_bounds.warning": {
       "block_deadline": true
     },
     "arnold.material.transmission_depth.warning": {

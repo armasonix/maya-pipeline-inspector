@@ -13,7 +13,8 @@
       "why": "Duplicate texture nodes that point to the same file increase graph complexity and make material reviews harder. Reporting duplicate file usage helps consolidate redundant texture nodes when it is safe to do so.",
       "match": {},
       "check": {
-        "type": "duplicate_file_dependencies"
+        "type": "duplicate_file_dependencies",
+        "max_file_dependencies": 2000
       },
       "policy": {
         "block_publish": false,

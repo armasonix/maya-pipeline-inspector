@@ -27,10 +27,16 @@ from shader_health.core import (
     NodeSnapshot,
     RuleResult,
 )
-from shader_health.core.graph_fingerprint import material_graph_fingerprint
+from shader_health.core.graph_fingerprint import (
+    material_graph_content_fingerprint,
+    material_graph_fingerprint,
+)
 from shader_health.core.image_metadata import read_image_dimensions
 from shader_health.core.models import ImageInfo, MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
+from shader_health.maya.complexity_profiler import profile_material_complexity
+from shader_health.maya.displacement_enrichment import enrich_displacement_metadata
+from shader_health.maya.optimized_texture_enrichment import enrich_optimized_texture_metadata
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
@@ -45,7 +51,9 @@ def prepare_snapshot_for_validation(snapshot: GraphSnapshot) -> GraphSnapshot:
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
     resolved = resolver.apply_to_snapshot(enriched)
     propagated = _with_propagated_semantic_slots(resolved)
-    return enrich_arnold_metadata(enrich_vray_metadata(propagated))
+    return enrich_displacement_metadata(
+        enrich_arnold_metadata(enrich_vray_metadata(propagated))
+    )
 
 
 def enrich_rule_results(
@@ -140,7 +148,12 @@ def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
     )
     materials = tuple(
         _enrich_material_fingerprint(
-            material,
+            profile_material_complexity(
+                material,
+                nodes_by_id=nodes_by_id,
+                connections=connections,
+                adapter_registry=_default_adapter_registry(),
+            ),
             nodes=nodes,
             connections=connections,
             file_dependencies=file_dependencies,
@@ -275,14 +288,16 @@ def _enrich_dependency_image_metadata(
         width, height = read_image_dimensions(resolved)
 
     if width is None and height is None:
-        return dependency
+        return enrich_optimized_texture_metadata(dependency)
 
     max_dimension = max(width or 0, height or 0) or None
     image_info = ImageInfo(width=width, height=height)
-    return replace(
-        dependency,
-        image_info=image_info,
-        max_dimension=max_dimension,
+    return enrich_optimized_texture_metadata(
+        replace(
+            dependency,
+            image_info=image_info,
+            max_dimension=max_dimension,
+        )
     )
 
 
@@ -293,18 +308,28 @@ def _enrich_material_fingerprint(
     connections: tuple[ConnectionSnapshot, ...],
     file_dependencies: tuple[FileDependencySnapshot, ...],
 ) -> MaterialSnapshot:
-    if material.graph_fingerprint:
+    if material.graph_fingerprint and material.graph_content_fingerprint:
         return material
 
     nodes_by_id = {node.id: node for node in nodes}
     texture_paths = _material_texture_paths(material, file_dependencies)
-    fingerprint = material_graph_fingerprint(
+    fingerprint = material.graph_fingerprint or material_graph_fingerprint(
         material,
         nodes_by_id=nodes_by_id,
         connections=connections,
         texture_paths=texture_paths,
     )
-    return replace(material, graph_fingerprint=fingerprint)
+    content_fingerprint = material.graph_content_fingerprint or material_graph_content_fingerprint(
+        material,
+        nodes_by_id=nodes_by_id,
+        connections=connections,
+        texture_paths=texture_paths,
+    )
+    return replace(
+        material,
+        graph_fingerprint=fingerprint,
+        graph_content_fingerprint=content_fingerprint,
+    )
 
 
 def _material_texture_paths(

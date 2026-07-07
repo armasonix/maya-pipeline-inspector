@@ -61,8 +61,21 @@ _ATTRS_BY_TYPE = {
     ),
     "standardSurface": ("baseColor", "specularRoughness", "metalness"),
     "lambert": ("color", "transparency"),
-    "displacementShader": ("scale", "displacement", "displacementAmount"),
-    "VRayDisplacement": ("scale", "displacement", "displacementAmount"),
+    "displacementShader": (
+        "scale",
+        "displacement",
+        "displacementAmount",
+        "minValue",
+        "maxValue",
+    ),
+    "VRayDisplacement": (
+        "scale",
+        "displacement",
+        "displacementAmount",
+        "minValue",
+        "maxValue",
+        "shift",
+    ),
 }
 
 _TEXTURE_PATH_ATTRS = {

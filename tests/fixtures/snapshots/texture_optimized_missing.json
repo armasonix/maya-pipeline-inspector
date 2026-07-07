@@ -1,0 +1,45 @@
+{
+  "connections": [],
+  "file_dependencies": [
+    {
+      "attr": "fileTextureName",
+      "exists": true,
+      "extension": ".exr",
+      "is_udim": false,
+      "node_id": "node:file_albedo",
+      "optimized_exists": false,
+      "optimized_kind": "tx",
+      "optimized_missing_udim_tiles": [],
+      "optimized_path": "D:/show/assets/tex/albedo_v003.tx",
+      "optimized_udim_tiles": [],
+      "raw_path": "$ASSET_ROOT/tex/albedo_v003.exr",
+      "resolved_path": "D:/show/assets/tex/albedo_v003.exr"
+    }
+  ],
+  "materials": [],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {
+        "fileTextureName": "$ASSET_ROOT/tex/albedo_v003.exr"
+      },
+      "classification": ["texture", "file"],
+      "full_name": "file_albedo",
+      "id": "node:file_albedo",
+      "locked": false,
+      "name": "file_albedo",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "file"
+    }
+  ],
+  "references": [],
+  "renderer": "arnold",
+  "scan_scope": "scene",
+  "scene_path": "tests/fixtures/snapshots/texture_optimized_missing.json",
+  "scanned_at_utc": "2026-07-07T12:00:00Z",
+  "schema_version": "1.0",
+  "shading_engines": []
+}

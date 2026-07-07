@@ -190,9 +190,12 @@ class FileDependencySnapshot:
     latest_version: Optional[str] = None
     mtime_utc: Optional[str] = None
     optimized_path: Optional[str] = None
+    optimized_kind: Optional[str] = None
     optimized_exists: Optional[bool] = None
     optimized_mtime_utc: Optional[str] = None
     optimized_is_stale: Optional[bool] = None
+    optimized_udim_tiles: list[int] = field(default_factory=list)
+    optimized_missing_udim_tiles: list[int] = field(default_factory=list)
     size_bytes: Optional[int] = None
     max_dimension: Optional[int] = None
     image_info: Optional[ImageInfo] = None
@@ -213,9 +216,12 @@ class FileDependencySnapshot:
             "latest_version": self.latest_version,
             "mtime_utc": self.mtime_utc,
             "optimized_path": self.optimized_path,
+            "optimized_kind": self.optimized_kind,
             "optimized_exists": self.optimized_exists,
             "optimized_mtime_utc": self.optimized_mtime_utc,
             "optimized_is_stale": self.optimized_is_stale,
+            "optimized_udim_tiles": list(self.optimized_udim_tiles),
+            "optimized_missing_udim_tiles": list(self.optimized_missing_udim_tiles),
             "size_bytes": self.size_bytes,
             "max_dimension": self.max_dimension,
             "image_info": self.image_info.to_dict() if self.image_info else None,
@@ -243,9 +249,12 @@ class FileDependencySnapshot:
             latest_version=data.get("latest_version"),
             mtime_utc=data.get("mtime_utc"),
             optimized_path=data.get("optimized_path"),
+            optimized_kind=data.get("optimized_kind"),
             optimized_exists=_as_optional_bool(data.get("optimized_exists")),
             optimized_mtime_utc=data.get("optimized_mtime_utc"),
             optimized_is_stale=_as_optional_bool(data.get("optimized_is_stale")),
+            optimized_udim_tiles=_as_int_list(data.get("optimized_udim_tiles")),
+            optimized_missing_udim_tiles=_as_int_list(data.get("optimized_missing_udim_tiles")),
             size_bytes=data.get("size_bytes"),
             max_dimension=data.get("max_dimension"),
             image_info=image_info,
@@ -389,6 +398,102 @@ class ArnoldSceneMetadata:
 
 
 @dataclass(frozen=True)
+class ShaderComplexityMetadata:
+    """Shader graph complexity metrics computed during snapshot enrichment."""
+
+    depth_histogram: dict[str, int] = field(default_factory=dict)
+    expensive_node_count: int = 0
+    expensive_node_types: dict[str, int] = field(default_factory=dict)
+    farm_cost_score: float = 0.0
+    farm_cost_hint: str = "low"
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "depth_histogram": dict(self.depth_histogram),
+            "expensive_node_count": self.expensive_node_count,
+            "expensive_node_types": dict(self.expensive_node_types),
+            "farm_cost_score": self.farm_cost_score,
+            "farm_cost_hint": self.farm_cost_hint,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ShaderComplexityMetadata:
+        raw_histogram = data.get("depth_histogram", {})
+        depth_histogram: dict[str, int] = {}
+        if isinstance(raw_histogram, Mapping):
+            depth_histogram = {str(key): int(value) for key, value in raw_histogram.items()}
+        raw_expensive_types = data.get("expensive_node_types", {})
+        expensive_node_types: dict[str, int] = {}
+        if isinstance(raw_expensive_types, Mapping):
+            expensive_node_types = {
+                str(key): int(value) for key, value in raw_expensive_types.items()
+            }
+        return cls(
+            depth_histogram=depth_histogram,
+            expensive_node_count=int(data.get("expensive_node_count", 0)),
+            expensive_node_types=expensive_node_types,
+            farm_cost_score=float(data.get("farm_cost_score", 0.0)),
+            farm_cost_hint=str(data.get("farm_cost_hint", "low")),
+        )
+
+
+@dataclass(frozen=True)
+class DisplacementRiskMetadata:
+    """Displacement risk metrics computed during snapshot enrichment."""
+
+    has_displacement: bool = False
+    displacement_node_ids: list[str] = field(default_factory=list)
+    max_amount: Optional[float] = None
+    texture_linked: bool = False
+    subdivision_enabled: bool = False
+    bounds_min: Optional[float] = None
+    bounds_max: Optional[float] = None
+    bounds_span: Optional[float] = None
+    renderer_flags: dict[str, Any] = field(default_factory=dict)
+    force_displacement: bool = False
+    vector_displacement: bool = False
+    risk_score: float = 0.0
+    risk_hint: str = "low"
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "has_displacement": self.has_displacement,
+            "displacement_node_ids": list(self.displacement_node_ids),
+            "max_amount": self.max_amount,
+            "texture_linked": self.texture_linked,
+            "subdivision_enabled": self.subdivision_enabled,
+            "bounds_min": self.bounds_min,
+            "bounds_max": self.bounds_max,
+            "bounds_span": self.bounds_span,
+            "renderer_flags": dict(self.renderer_flags),
+            "force_displacement": self.force_displacement,
+            "vector_displacement": self.vector_displacement,
+            "risk_score": self.risk_score,
+            "risk_hint": self.risk_hint,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> DisplacementRiskMetadata:
+        raw_flags = data.get("renderer_flags", {})
+        renderer_flags = dict(raw_flags) if isinstance(raw_flags, Mapping) else {}
+        return cls(
+            has_displacement=bool(data.get("has_displacement", False)),
+            displacement_node_ids=_as_str_list(data.get("displacement_node_ids")),
+            max_amount=_as_optional_float(data.get("max_amount")),
+            texture_linked=bool(data.get("texture_linked", False)),
+            subdivision_enabled=bool(data.get("subdivision_enabled", False)),
+            bounds_min=_as_optional_float(data.get("bounds_min")),
+            bounds_max=_as_optional_float(data.get("bounds_max")),
+            bounds_span=_as_optional_float(data.get("bounds_span")),
+            renderer_flags=renderer_flags,
+            force_displacement=bool(data.get("force_displacement", False)),
+            vector_displacement=bool(data.get("vector_displacement", False)),
+            risk_score=float(data.get("risk_score", 0.0)),
+            risk_hint=str(data.get("risk_hint", "low")),
+        )
+
+
+@dataclass(frozen=True)
 class MaterialSnapshot:
     """Material-level summary extracted from the shader graph."""
 
@@ -403,6 +508,9 @@ class MaterialSnapshot:
     graph_node_count: int = 0
     graph_depth: int = 0
     graph_fingerprint: str = ""
+    graph_content_fingerprint: str = ""
+    complexity_metadata: Optional[ShaderComplexityMetadata] = None
+    displacement_metadata: Optional[DisplacementRiskMetadata] = None
     vray_metadata: Optional[VrayMaterialMetadata] = None
     arnold_metadata: Optional[ArnoldMaterialMetadata] = None
 
@@ -419,7 +527,12 @@ class MaterialSnapshot:
             "graph_node_count": self.graph_node_count,
             "graph_depth": self.graph_depth,
             "graph_fingerprint": self.graph_fingerprint,
+            "graph_content_fingerprint": self.graph_content_fingerprint,
         }
+        if self.complexity_metadata is not None:
+            payload["complexity_metadata"] = self.complexity_metadata.to_dict()
+        if self.displacement_metadata is not None:
+            payload["displacement_metadata"] = self.displacement_metadata.to_dict()
         if self.vray_metadata is not None:
             payload["vray_metadata"] = self.vray_metadata.to_dict()
         if self.arnold_metadata is not None:
@@ -436,6 +549,14 @@ class MaterialSnapshot:
         arnold_metadata = None
         if isinstance(raw_arnold_metadata, Mapping):
             arnold_metadata = ArnoldMaterialMetadata.from_dict(raw_arnold_metadata)
+        raw_complexity_metadata = data.get("complexity_metadata")
+        complexity_metadata = None
+        if isinstance(raw_complexity_metadata, Mapping):
+            complexity_metadata = ShaderComplexityMetadata.from_dict(raw_complexity_metadata)
+        raw_displacement_metadata = data.get("displacement_metadata")
+        displacement_metadata = None
+        if isinstance(raw_displacement_metadata, Mapping):
+            displacement_metadata = DisplacementRiskMetadata.from_dict(raw_displacement_metadata)
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -448,6 +569,9 @@ class MaterialSnapshot:
             graph_node_count=int(data.get("graph_node_count", 0)),
             graph_depth=int(data.get("graph_depth", 0)),
             graph_fingerprint=str(data.get("graph_fingerprint", "")),
+            graph_content_fingerprint=str(data.get("graph_content_fingerprint", "")),
+            complexity_metadata=complexity_metadata,
+            displacement_metadata=displacement_metadata,
             vray_metadata=vray_metadata,
             arnold_metadata=arnold_metadata,
         )

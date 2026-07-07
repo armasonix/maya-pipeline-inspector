@@ -431,6 +431,10 @@ class ValidationEngine:
             return self._evaluate_default_material_assignment(rule, target)
         if check_type == "duplicate_file_dependencies":
             return self._evaluate_duplicate_file_dependencies(rule, target)
+        if check_type == "duplicate_material_fingerprints":
+            return self._evaluate_duplicate_material_fingerprints(rule, target)
+        if check_type == "duplicate_scan_budget":
+            return self._evaluate_duplicate_scan_budget(rule, target)
         if check_type == "list_length_max":
             return self._evaluate_list_length_max(rule, target)
         if check_type == "list_length_min":
@@ -525,9 +529,16 @@ class ValidationEngine:
                 reason="duplicate_file_dependencies_requires_graph_snapshot",
             )
 
-        groups = _duplicate_file_dependency_groups(target.obj)
+        groups, scan_truncated = _duplicate_file_dependency_groups(
+            target.obj,
+            max_dependencies=_as_optional_int(rule.check.params.get("max_file_dependencies")),
+        )
         status = "failed" if groups else "passed"
-        evidence = {"duplicate_groups": groups} if groups else {}
+        evidence: JsonDict = {"duplicate_groups": groups} if groups else {}
+        if scan_truncated:
+            evidence["file_dependency_scan_truncated"] = True
+            evidence["file_dependency_count"] = len(target.obj.file_dependencies)
+            evidence["max_file_dependencies"] = rule.check.params.get("max_file_dependencies")
         return self._result(
             rule,
             status=status,
@@ -535,6 +546,93 @@ class ValidationEngine:
             current_value=len(groups),
             expected_value=0,
             plug="file_dependencies",
+            evidence=evidence,
+        )
+
+    def _evaluate_duplicate_material_fingerprints(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="duplicate_material_fingerprints_requires_graph_snapshot",
+            )
+
+        groups, scan_truncated, material_count, scanned_count = (
+            _duplicate_material_fingerprint_groups(
+                target.obj,
+                rule.check.params,
+            )
+        )
+        status = "failed" if groups else "passed"
+        evidence: JsonDict = {"duplicate_groups": groups} if groups else {}
+        evidence.update(
+            {
+                "material_count": material_count,
+                "scanned_material_count": scanned_count,
+            }
+        )
+        if scan_truncated:
+            evidence["material_scan_truncated"] = True
+            evidence["max_materials"] = rule.check.params.get("max_materials")
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=len(groups),
+            expected_value=0,
+            plug="materials",
+            evidence=evidence,
+        )
+
+    def _evaluate_duplicate_scan_budget(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="duplicate_scan_budget_requires_graph_snapshot",
+            )
+
+        max_materials = _as_optional_int(rule.check.params.get("max_materials"))
+        max_file_dependencies = _as_optional_int(rule.check.params.get("max_file_dependencies"))
+        material_count = len(target.obj.materials)
+        file_dependency_count = len(target.obj.file_dependencies)
+        material_exceeded = (
+            max_materials is not None and max_materials > 0 and material_count > max_materials
+        )
+        file_dependency_exceeded = (
+            max_file_dependencies is not None
+            and max_file_dependencies > 0
+            and file_dependency_count > max_file_dependencies
+        )
+        exceeded = material_exceeded or file_dependency_exceeded
+        status = "failed" if exceeded else "passed"
+        evidence = {
+            "material_count": material_count,
+            "file_dependency_count": file_dependency_count,
+        }
+        if max_materials is not None:
+            evidence["max_materials"] = max_materials
+        if max_file_dependencies is not None:
+            evidence["max_file_dependencies"] = max_file_dependencies
+        if material_exceeded:
+            evidence["material_scan_truncated"] = True
+        if file_dependency_exceeded:
+            evidence["file_dependency_scan_truncated"] = True
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=max(material_count, file_dependency_count),
+            expected_value=max(max_materials or 0, max_file_dependencies or 0),
+            plug="duplicate_scan_budget",
             evidence=evidence,
         )
 
@@ -887,16 +985,30 @@ def _default_material_assignments(
     return assignments
 
 
-def _duplicate_file_dependency_groups(snapshot: GraphSnapshot) -> list[JsonDict]:
+def _duplicate_file_dependency_groups(
+    snapshot: GraphSnapshot,
+    *,
+    max_dependencies: Optional[int] = None,
+) -> tuple[list[JsonDict], bool]:
+    dependencies = snapshot.file_dependencies
+    scan_truncated = False
+    if (
+        max_dependencies is not None
+        and max_dependencies > 0
+        and len(dependencies) > max_dependencies
+    ):
+        dependencies = sorted(dependencies, key=lambda item: item.node_id)[:max_dependencies]
+        scan_truncated = True
+
     grouped: dict[str, list[FileDependencySnapshot]] = {}
-    for dependency in snapshot.file_dependencies:
+    for dependency in dependencies:
         key = _duplicate_file_dependency_key(dependency)
         if key:
             grouped.setdefault(key, []).append(dependency)
 
     groups: list[JsonDict] = []
-    for path, dependencies in sorted(grouped.items()):
-        node_ids = sorted({dependency.node_id for dependency in dependencies})
+    for path, path_dependencies in sorted(grouped.items()):
+        node_ids = sorted({dependency.node_id for dependency in path_dependencies})
         if len(node_ids) > 1:
             groups.append(
                 {
@@ -905,7 +1017,43 @@ def _duplicate_file_dependency_groups(snapshot: GraphSnapshot) -> list[JsonDict]
                     "count": len(node_ids),
                 }
             )
-    return groups
+    return groups, scan_truncated
+
+
+def _duplicate_material_fingerprint_groups(
+    snapshot: GraphSnapshot,
+    params: Mapping[str, Any],
+) -> tuple[list[JsonDict], bool, int, int]:
+    max_materials = _as_optional_int(params.get("max_materials"))
+    min_group_size = _as_optional_int(params.get("min_group_size")) or 2
+    materials = sorted(snapshot.materials, key=lambda item: item.node_id)
+    material_count = len(materials)
+    scan_truncated = False
+    if max_materials is not None and max_materials > 0 and material_count > max_materials:
+        materials = materials[:max_materials]
+        scan_truncated = True
+
+    grouped: dict[str, list[MaterialSnapshot]] = {}
+    for material in materials:
+        fingerprint = material.graph_content_fingerprint
+        if not fingerprint:
+            continue
+        grouped.setdefault(fingerprint, []).append(material)
+
+    groups: list[JsonDict] = []
+    for fingerprint, duplicates in sorted(grouped.items()):
+        material_ids = sorted({item.node_id for item in duplicates})
+        if len(material_ids) < min_group_size:
+            continue
+        groups.append(
+            {
+                "fingerprint": fingerprint,
+                "material_ids": material_ids,
+                "material_names": sorted({item.name for item in duplicates}),
+                "count": len(material_ids),
+            }
+        )
+    return groups, scan_truncated, material_count, len(materials)
 
 
 def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
@@ -958,6 +1106,15 @@ def _as_float(value: Any) -> Optional[float]:
         return None
     try:
         return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_optional_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return int(value)
     except (TypeError, ValueError):
         return None
 

@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "duplicate_material_twins.ma",
+  "renderer": "vray",
+  "nodes": [
+    {
+      "id": "node:file_albedo_a",
+      "name": "file_albedo_a",
+      "type_name": "file",
+      "attrs": {
+        "colorSpace": "Raw",
+        "fileTextureName": "albedo.exr"
+      }
+    },
+    {
+      "id": "node:file_albedo_b",
+      "name": "file_albedo_b",
+      "type_name": "file",
+      "attrs": {
+        "colorSpace": "Raw",
+        "fileTextureName": "albedo.exr"
+      }
+    },
+    {
+      "id": "node:hero_mtl",
+      "name": "hero_mtl",
+      "type_name": "VRayMtl",
+      "attrs": {
+        "color": [1.0, 1.0, 1.0]
+      }
+    },
+    {
+      "id": "node:hero_mtl_copy",
+      "name": "hero_mtl_copy",
+      "type_name": "VRayMtl",
+      "attrs": {
+        "color": [1.0, 1.0, 1.0]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "src_node": "node:file_albedo_a",
+      "src_attr": "outColor",
+      "dst_node": "node:hero_mtl",
+      "dst_attr": "color"
+    },
+    {
+      "src_node": "node:file_albedo_b",
+      "src_attr": "outColor",
+      "dst_node": "node:hero_mtl_copy",
+      "dst_attr": "color"
+    }
+  ],
+  "materials": [
+    {
+      "node_id": "node:hero_mtl",
+      "name": "hero_mtl",
+      "type_name": "VRayMtl",
+      "texture_nodes": ["node:file_albedo_a"],
+      "assigned_shapes": ["shape:hero"]
+    },
+    {
+      "node_id": "node:hero_mtl_copy",
+      "name": "hero_mtl_copy",
+      "type_name": "VRayMtl",
+      "texture_nodes": ["node:file_albedo_b"],
+      "assigned_shapes": ["shape:prop"]
+    }
+  ],
+  "file_dependencies": [
+    {
+      "node_id": "node:file_albedo_a",
+      "attr": "fileTextureName",
+      "raw_path": "albedo.exr",
+      "resolved_path": "P:/asset/albedo.exr",
+      "exists": true,
+      "extension": ".exr"
+    },
+    {
+      "node_id": "node:file_albedo_b",
+      "attr": "fileTextureName",
+      "raw_path": "albedo.exr",
+      "resolved_path": "P:/asset/albedo.exr",
+      "exists": true,
+      "extension": ".exr"
+    }
+  ]
+}

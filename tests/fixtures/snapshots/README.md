@@ -12,6 +12,12 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `arnold_material_policy.json` | — | Arnold | Enrichment round-trip unit test |
 | `texture_freshness_outdated.json` | — | Common | Texture version freshness fail (`v001` vs latest `v003`) |
 | `texture_freshness_latest.json` | — | Common | Texture version freshness pass (`v003` is latest) |
+| `shader_complexity_layered_graph.json` | — | Common | Complexity profiler depth histogram and farm-cost enrichment |
+| `shader_complexity_over_budget.json` | — | V-Ray | VRayBlendMtl / VRayLayeredTex expensive-node profiling |
+| `displacement_risk_safe.json` | `displacement_risk_safe.expectations.json` | V-Ray | Displacement risk pass (no displacement linked) |
+| `displacement_risk_high_vray.json` | `displacement_risk_high_vray.expectations.json` | V-Ray | Displacement amount, bounds, subdivision, and risk-score failures |
+| `texture_optimized_missing.json` | `texture_optimized_missing.expectations.json` | Arnold | Missing .tx derivative; deadline_critical farm block |
+| `duplicate_material_twins.json` | `duplicate_material_twins.expectations.json` | V-Ray | Twin material graphs + duplicate texture path detection |
 
 ## Adding a renderer fixture case
 
