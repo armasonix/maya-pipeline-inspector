@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
 
-Status: **v0.3.0 shipped** (2026-07-07). Core engine, Maya integration, dockable UI, headless CLI, manifest gates, and packaged rule/profile assets are implemented.
+Status: **v0.3.0 shipped** (2026-07-07). **v0.4 in progress** — GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)): Maya dockable panel is the primary surface; CLI, reports, and Deadline hooks are integration surfaces on the same validation pipeline. Core engine, Maya integration, dockable UI, headless CLI, manifest gates, and packaged rule/profile assets are implemented.
 
 ## Goals
 
@@ -11,6 +11,26 @@ Status: **v0.3.0 shipped** (2026-07-07). Core engine, Maya integration, dockable
 - Make rules, profiles, block policies, ownership, and safe fixes data-driven.
 - Support headless validation for publish hooks, CI-like checks, and Deadline preflight.
 - Keep scene mutation safe, explicit, undoable, and reference-aware.
+- Treat the Maya dockable panel as the primary product surface; keep CLI and farm paths on the same pipeline (ADR 0005).
+
+## Product Surface (ADR 0005)
+
+Contributors should implement behavior in the shared validation pipeline first, then expose it in the dockable panel. Headless CLI, JSON/HTML reports, manifest export, apply-fixes, and Deadline integration call the same modules — they do not fork validation logic.
+
+```text
+Primary surface (artists / Shader TDs)
+  Maya dockable UI  ->  ui_launcher  ->  validation_pipeline  ->  core engine
+
+Integration surfaces (pipeline TDs / farm / CI)
+  CLI / mayapy  ->  validation_pipeline  ->  core engine
+  Deadline hook / Farm tab  ->  integrations.deadline  ->  validation_pipeline
+```
+
+Design constraints for panel work:
+
+- default flows: three clicks or fewer to an actionable validate/fix/submit result;
+- `block_publish` and `block_deadline` visible in panel summary without opening JSON;
+- safe actions avoid modal spam; risky fixes stay gated per ADR 0003/0004.
 
 ## High-level Layers
 
@@ -27,7 +47,47 @@ Maya scene
   -> RuleResult list
   -> Health score
   -> Fix plan
-  -> UI / JSON report / HTML report / headless exit code / Deadline hook
+  -> Maya dockable UI (primary)
+  -> JSON report / HTML report / headless CLI / Deadline hook (integration)
+```
+
+## UX Layer (panel)
+
+The dockable panel (`shader_health.ui.main_window`, launched via `shader_health.maya.ui_launcher`) is the primary artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and future `integrations.deadline` — no duplicated rule evaluation in widgets.
+
+```mermaid
+flowchart TD
+    subgraph primary [Primary_Product_Surface]
+        PANEL[Maya Dockable Panel]
+        VAL[Validate Tab]
+        FIX[Fixes Tab]
+        WAI[Waivers Tab]
+        REP[Reports Tab]
+        FARM[Farm Tab planned v0.4]
+    end
+    subgraph integration [Integration_Surfaces]
+        CLI[Headless CLI]
+        DL[Deadline Preflight / Submit]
+        RPT[JSON / HTML Export]
+    end
+    subgraph core [Shared_Pipeline]
+        VP[validation_pipeline]
+        ENG[Core Validator]
+    end
+    PANEL --> VAL
+    PANEL --> FIX
+    PANEL --> WAI
+    PANEL --> REP
+    PANEL --> FARM
+    VAL --> VP
+    FIX --> VP
+    FARM --> VP
+    CLI --> VP
+    DL --> VP
+    VP --> ENG
+    ENG --> RPT
+    ENG --> PANEL
+    ENG --> CLI
 ```
 
 ## Component Overview
@@ -46,9 +106,9 @@ flowchart TD
     RESULTS --> SCORE[Health Score]
     RESULTS --> FIXPLAN[Fix Planner]
     RESULTS --> REPORTS[JSON / HTML Reports]
-    RESULTS --> UI[Maya Dockable UI]
-    RESULTS --> CLI[Headless CLI]
-    RESULTS --> DEADLINE[Deadline Preflight]
+    RESULTS --> UI[Maya Dockable UI primary]
+    RESULTS --> CLI[Headless CLI integration]
+    RESULTS --> DEADLINE[Deadline Preflight integration]
     FIXPLAN --> UI
 ```
 
@@ -238,7 +298,7 @@ Safe-fix rules:
 
 ## Headless Parity
 
-UI and CLI both call `shader_health.maya.validation_pipeline.run_validation`, which runs snapshot enrichment, profile resolution, waiver loading, result enrichment, and fix planning in one shared path.
+UI and CLI both call `shader_health.maya.validation_pipeline.run_validation`, which runs snapshot enrichment, profile resolution, waiver loading, result enrichment, and fix planning in one shared path. ADR 0005 defines the panel as the primary product surface; headless and farm paths are integration surfaces on this same pipeline — not alternate implementations.
 
 ```bash
 python -m shader_health validate scene.ma --profile-id publish_strict --report report.json
@@ -259,4 +319,4 @@ Maya integration tests are optional/local unless Maya is available.
 
 ## Development Rule
 
-Extend the shared validation pipeline and snapshot contracts before adding UI-only behavior. Keep headless and UI entrypoints on the same enrichment path.
+Extend the shared validation pipeline and snapshot contracts before adding UI-only behavior. Keep headless and UI entrypoints on the same enrichment path. New v0.4+ features should add a panel affordance before (or alongside) CLI-only delivery ([ADR 0005](adr/0005-gui-first-product-philosophy.md)).

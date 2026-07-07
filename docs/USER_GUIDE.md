@@ -2,11 +2,25 @@
 
 Maya Shader Health Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
 
-Status: **v0.3.0 shipped** (2026-07-07). See [CHANGELOG.md](../CHANGELOG.md) and [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md).
+Status: **v0.3.0 shipped** (2026-07-07). **v0.4 in progress** — see [CHANGELOG.md](../CHANGELOG.md). See [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md) for the shipped v0.3 cycle.
 
 Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
 
 Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md).
+
+## GUI-first workflow
+
+Shader Health Inspector is built for daily use **inside the Maya dockable panel**. Pipeline TDs can automate the same checks headlessly, but artists and Shader TDs should not need a terminal or JSON export for routine validate → triage → fix → revalidate work.
+
+Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
+
+1. **Panel first** — Open **Window → Shader Health Inspector** (or the shelf button). Validate Scene, review blocking status, select nodes, and apply safe fixes from the tabs.
+2. **Fast paths** — Target three clicks or fewer from an open panel to an actionable result (for example: open panel → **Validate Scene** → double-click an issue to select the node).
+3. **Clear blocking state** — After validation, the summary shows health score, severity counts, and whether the scene **blocks publish** or **blocks Deadline** without opening a report file.
+4. **Low-friction fixes** — Safe auto-fixes use the Fixes tab queue; high-risk or referenced edits still require explicit confirmation per studio policy.
+5. **Same results everywhere** — The panel, `shader_health validate`, and Deadline preflight share one validation pipeline, so GUI and headless reports stay aligned.
+
+Headless CLI, manifest gates, and farm preflight remain available for publish hooks and render wranglers — see [CLI_TESTING.md](CLI_TESTING.md) and [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md). v0.4 adds a **Farm** tab for Deadline 10 on-prem preflight and submit from the panel.
 
 ## What the Tool Checks
 

@@ -12,7 +12,8 @@ Maya Shader Health Inspector is intended to become a production-ready, open-sour
 - renderer-specific behavior must stay outside the core;
 - scene mutation must be safe, explicit, undoable, and reference-aware;
 - rule packs and profiles must be data-driven;
-- UI, headless validation, reports, and Deadline integration should share the same validation core.
+- UI, headless validation, reports, and Deadline integration should share the same validation core;
+- the Maya dockable panel is the primary product surface; CLI and farm hooks are integration surfaces (ADR 0005).
 
 ADRs help keep these decisions visible as the codebase grows.
 
@@ -24,6 +25,7 @@ ADRs help keep these decisions visible as the codebase grows.
 | 0002 | Renderer adapter boundary | Accepted |
 | 0003 | Safe-fix and reference-safety policy | Accepted |
 | 0004 | Headless apply-fixes policy | Accepted |
+| 0005 | GUI-first product philosophy | Accepted |
 
 ## Status Values
 
