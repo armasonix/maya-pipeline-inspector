@@ -1,26 +1,20 @@
-# Optional Maya integration tests for maintainers.
+# Maya integration tests on a self-hosted runner with Autodesk Maya installed.
 #
-# This workflow is NOT part of the default public CI gate (see ci.yml).
-# Trigger manually from GitHub Actions when a self-hosted runner with Maya is
-# available, or rely on the graceful skip when MAYA_PY is unset.
+# NOT part of the default public CI gate (see ci.yml). Requires runner labels:
+#   self-hosted, maya
 #
-# Setup:
-#   1. Configure a self-hosted runner with Autodesk Maya installed.
-#   2. Add repository secret MAYA_PY with the absolute path to mayapy, e.g.
-#      /usr/autodesk/maya2025/bin/mayapy
-#      or C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe
-#   3. Actions -> Maya integration -> Run workflow
-#      Optional workflow input `mayapy_path` overrides the secret for one run.
+# Setup (maintainers):
+#   1. Register a self-hosted runner with labels `self-hosted` and `maya`.
+#   2. Install Maya and set repository secret MAYA_PY to the absolute mayapy path, e.g.
+#        C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe
+#        /usr/autodesk/maya2025/bin/mayapy
+#      Optional: repository variable MAYA_PY, runner env MAYA_PY, or workflow input mayapy_path.
+#   3. Actions -> Maya integration -> Run workflow (or wait for weekly schedule / same-repo PR).
 #
-# Local equivalent:
-#   mayapy -m pip install -e ".[dev]"
-#   mayapy -m pytest tests/integration -v
-#   mayapy -m shader_health manifest examples/broken_scene/shader_health_demo_broken.ma \
-#     --out /tmp/shader_health_manifest_smoke.json --profile-id publish_strict
-#   mayapy -m shader_health gate examples/broken_scene/shader_health_demo_broken.ma \
-#     /tmp/shader_health_manifest_smoke.json --profile-id publish_strict --out /tmp/gate.json
+# Fork pull requests are skipped (self-hosted runners must not execute untrusted fork code).
+# When this job runs, a missing mayapy path fails the job — there is no silent success skip.
 #
-# See docs/MAYA_INSTALL.md for full install and CI notes.
+# Local equivalent: docs/MAYA_INSTALL.md and docs/CLI_TESTING.md
 
 name: Maya integration
 
@@ -31,14 +25,36 @@ on:
         description: Optional absolute path to mayapy (overrides MAYA_PY secret)
         required: false
         default: ""
+  schedule:
+    - cron: "0 6 * * 1"
+  pull_request:
+    paths:
+      - "src/shader_health/maya/**"
+      - "maya_module/**"
+      - "tests/integration/**"
+      - "examples/deadline/**"
+      - "examples/broken_scene/**"
+      - ".github/workflows/maya-integration.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: maya-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   maya-integration:
     name: Integration tests via mayapy
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, maya]
+    timeout-minutes: 90
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    env:
+      DEMO_SCENE: examples/broken_scene/shader_health_demo_broken_headless.ma
+      DEADLINE_PROFILE: src/shader_health/rules/profiles/deadline_critical.json
 
     steps:
       - name: Checkout
@@ -48,55 +64,153 @@ jobs:
         id: mayapy
         env:
           MAYA_PY_SECRET: ${{ secrets.MAYA_PY }}
+          MAYA_PY_VAR: ${{ vars.MAYA_PY }}
+          MAYA_PY_INPUT: ${{ inputs.mayapy_path }}
+        shell: bash
         run: |
-          candidate="${{ inputs.mayapy_path }}"
-          if [ -z "$candidate" ]; then
-            candidate="$MAYA_PY_SECRET"
-          fi
+          python <<'PY'
+          import os
+          import shutil
+          import sys
+          from pathlib import Path
 
-          if [ -z "$candidate" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Maya integration skipped: set MAYA_PY repository secret or workflow input mayapy_path."
-            exit 0
-          fi
+          def is_executable(path: Path) -> bool:
+              return path.is_file()
 
-          if [ ! -x "$candidate" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Maya integration skipped: mayapy not found or not executable at: $candidate"
-            exit 0
-          fi
+          candidates: list[str] = []
+          for value in (
+              os.environ.get("MAYA_PY_INPUT", ""),
+              os.environ.get("MAYA_PY_SECRET", ""),
+              os.environ.get("MAYA_PY_VAR", ""),
+              os.environ.get("MAYA_PY", ""),
+          ):
+              text = str(value or "").strip()
+              if text:
+                  candidates.append(text)
 
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "path=$candidate" >> "$GITHUB_OUTPUT"
-          echo "Using mayapy: $candidate"
+          which = shutil.which("mayapy")
+          if which:
+              candidates.append(which)
+
+          for guess in (
+              r"C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe",
+              r"C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe",
+              "/usr/autodesk/maya2025/bin/mayapy",
+              "/usr/autodesk/maya2024/bin/mayapy",
+          ):
+              candidates.append(guess)
+
+          seen: set[str] = set()
+          for raw in candidates:
+              if not raw or raw in seen:
+                  continue
+              seen.add(raw)
+              path = Path(raw)
+              if is_executable(path):
+                  resolved = str(path.resolve())
+                  print(f"Using mayapy: {resolved}")
+                  github_output = os.environ["GITHUB_OUTPUT"]
+                  with open(github_output, "a", encoding="utf-8") as handle:
+                      handle.write(f"path={resolved}\n")
+                  sys.exit(0)
+
+          print(
+              "::error::Maya integration requires mayapy on the self-hosted runner. "
+              "Set repository secret MAYA_PY, variable MAYA_PY, runner env MAYA_PY, "
+              "workflow input mayapy_path, or install mayapy on PATH.",
+              file=sys.stderr,
+          )
+          sys.exit(1)
+          PY
+
+      - name: Verify demo scene exists
+        shell: bash
+        run: |
+          test -f "$DEMO_SCENE" || {
+            echo "::error::Missing demo scene: $DEMO_SCENE"
+            exit 1
+          }
 
       - name: Install package into Maya Python
-        if: steps.mayapy.outputs.skip != 'true'
+        shell: bash
         run: |
           "${{ steps.mayapy.outputs.path }}" -m pip install --upgrade pip
           "${{ steps.mayapy.outputs.path }}" -m pip install -e ".[dev]"
 
       - name: Run integration tests with mayapy
-        if: steps.mayapy.outputs.skip != 'true'
+        shell: bash
         run: |
           "${{ steps.mayapy.outputs.path }}" -m pytest tests/integration -v
 
-      - name: Manifest export smoke
-        if: steps.mayapy.outputs.skip != 'true'
+      - name: Validate scene smoke (headless demo)
+        shell: bash
         run: |
-          DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
+          REPORT="${RUNNER_TEMP}/shader_health_validate_smoke.json"
+          set +e
+          "${{ steps.mayapy.outputs.path }}" -m shader_health validate \
+            "$DEMO_SCENE" \
+            --input-kind scene \
+            --profile-id publish_strict \
+            --report "$REPORT"
+          code=$?
+          set -e
+          test -s "$REPORT" || {
+            echo "::error::Validate smoke did not write report: $REPORT"
+            exit 1
+          }
+          if [ "$code" -gt 2 ]; then
+            echo "::error::Validate smoke failed with unexpected exit code $code (expected 0–2)"
+            exit 1
+          fi
+          python <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          report = pathlib.Path(os.environ["REPORT"])
+          payload = json.loads(report.read_text(encoding="utf-8"))
+          if "health_score" not in payload:
+              print("::error::Validate smoke report missing health_score", file=sys.stderr)
+              sys.exit(1)
+          print(f"Validate smoke health_score={payload['health_score']}")
+          PY
+          echo "Validate smoke exit_code=$code"
+        env:
+          REPORT: ${{ runner.temp }}/shader_health_validate_smoke.json
+
+      - name: Manifest export smoke
+        shell: bash
+        run: |
           OUT_MANIFEST="${RUNNER_TEMP}/shader_health_manifest_smoke.json"
           "${{ steps.mayapy.outputs.path }}" -m shader_health manifest \
             "$DEMO_SCENE" \
             --out "$OUT_MANIFEST" \
             --profile-id publish_strict
           test -s "$OUT_MANIFEST"
-          python3 -c "import json, pathlib; payload=json.loads(pathlib.Path('${OUT_MANIFEST}').read_text(encoding='utf-8')); assert payload.get('manifest_schema_version') == '1.1'"
+          python <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          manifest = pathlib.Path(os.environ["OUT_MANIFEST"])
+          payload = json.loads(manifest.read_text(encoding="utf-8"))
+          if payload.get("manifest_schema_version") != "1.1":
+              print(
+                  "::error::Expected manifest schema 1.1, got "
+                  f"{payload.get('manifest_schema_version')!r}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print("Manifest smoke schema 1.1 OK")
+          PY
+        env:
+          OUT_MANIFEST: ${{ runner.temp }}/shader_health_manifest_smoke.json
 
       - name: Manifest gate smoke
-        if: steps.mayapy.outputs.skip != 'true'
+        shell: bash
         run: |
-          DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
           BASELINE="${RUNNER_TEMP}/shader_health_manifest_smoke.json"
           GATE_REPORT="${RUNNER_TEMP}/shader_health_gate_smoke.json"
           "${{ steps.mayapy.outputs.path }}" -m shader_health gate \
@@ -105,9 +219,46 @@ jobs:
             --profile-id publish_strict \
             --out "$GATE_REPORT"
           test -s "$GATE_REPORT"
-          python3 -c "import json, pathlib, sys; payload=json.loads(pathlib.Path('${GATE_REPORT}').read_text(encoding='utf-8')); sys.exit(1 if payload.get('manifest_regression_blocked') else 0)"
+          python <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
 
-      - name: Report graceful skip
-        if: steps.mayapy.outputs.skip == 'true'
+          gate = pathlib.Path(os.environ["GATE_REPORT"])
+          payload = json.loads(gate.read_text(encoding="utf-8"))
+          if payload.get("manifest_regression_blocked"):
+              print(
+                  "::error::Gate smoke expected no regression when baseline matches current export",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print("Manifest gate smoke OK")
+          PY
+        env:
+          GATE_REPORT: ${{ runner.temp }}/shader_health_gate_smoke.json
+
+      - name: Deadline preflight smoke
+        shell: bash
         run: |
-          echo "::notice title=Maya integration skipped::No usable mayapy path. Default public CI in ci.yml remains Maya-free. Configure MAYA_PY on a self-hosted runner with Maya, then re-run this workflow."
+          PREFLIGHT_REPORT="${RUNNER_TEMP}/shader_health_deadline_preflight_smoke.json"
+          set +e
+          "${{ steps.mayapy.outputs.path }}" examples/deadline/submit_preflight.py \
+            "$DEMO_SCENE" \
+            --report "$PREFLIGHT_REPORT" \
+            --profile "$DEADLINE_PROFILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --mayapy "${{ steps.mayapy.outputs.path }}"
+          code=$?
+          set -e
+          test -s "$PREFLIGHT_REPORT" || {
+            echo "::error::Deadline preflight smoke did not write report: $PREFLIGHT_REPORT"
+            exit 1
+          }
+          if [ "$code" -gt 2 ]; then
+            echo "::error::Deadline preflight smoke failed with unexpected exit code $code (expected 0–2)"
+            exit 1
+          fi
+          echo "Deadline preflight smoke exit_code=$code (0=allow, 1=publish block, 2=deadline block)"
+        env:
+          PREFLIGHT_REPORT: ${{ runner.temp }}/shader_health_deadline_preflight_smoke.json
