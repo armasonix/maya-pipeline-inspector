@@ -219,6 +219,68 @@ job = client.get_job(job_id)
 File paths in `AuxFiles` must be valid on the Web Service host, not the submitting
 workstation. See the [Deadline REST overview](https://docs.thinkboxsoftware.com/products/deadline/10.4/1_User%20Manual/manual/rest-overview.html).
 
+## Farm validation submit API (#100)
+
+Submit a utility job that runs Shader Health validation on a Deadline worker.
+The default path uses the **CommandScript** plugin with a `mayapy` command aux
+file. An alternate **MayaBatch** script job template is available for studios
+that prefer MayaBatch utility execution.
+
+```python
+from pathlib import Path
+
+from shader_health.integrations.deadline import (
+    DeadlineClient,
+    DeadlineConfig,
+    submit_shader_health_validation_job,
+)
+
+config = DeadlineConfig.from_env()
+client = DeadlineClient(config)
+result = submit_shader_health_validation_job(
+    client=client,
+    scene_path=Path("D:/show/shot/scene.ma"),
+    report_path=Path("D:/show/shot/reports/shader_health_farm.json"),
+    command_script_path=Path("//farm/share/deadline/shader_health_command.txt"),
+    run_local_preflight=False,
+)
+print(result.job_id, result.report_path)
+```
+
+### Job templates
+
+| Plugin mode | Deadline plugin | Worker behavior |
+| --- | --- | --- |
+| `command_script` (default) | `CommandScript` | Executes `mayapy -m shader_health validate ...` from an aux `.txt` file |
+| `maya_batch` | `MayaBatch` | Opens `SceneFile` and runs a Python `ScriptFile` utility job |
+
+CommandScript REST shape (Thinkbox Deadline 10):
+
+```json
+{
+  "JobInfo": {
+    "Name": "Shader Health | scene.ma",
+    "Plugin": "CommandScript",
+    "Frames": "0",
+    "ChunkSize": 1
+  },
+  "PluginInfo": {
+    "StartupDirectory": "D:/show/shot"
+  },
+  "AuxFiles": ["//farm/share/deadline/shader_health_command.txt"],
+  "IdOnly": true
+}
+```
+
+Example CLI wrapper:
+
+```bash
+python examples/deadline/submit_to_farm.py D:/show/scene.ma \
+  --report D:/show/reports/shader_health_farm.json \
+  --command-script //farm/share/deadline/shader_health_command.txt \
+  --check-eligibility
+```
+
 ## Operational notes
 
 - Keep the generated JSON report as a submit artifact.
@@ -232,5 +294,5 @@ workstation. See the [Deadline REST overview](https://docs.thinkboxsoftware.com/
 The integration module and example wrapper are covered by unit tests:
 
 ```bash
-python -m pytest tests/unit/test_deadline_integration.py tests/unit/test_deadline_eligibility.py tests/unit/test_deadline_submit_preflight_example.py -v
+python -m pytest tests/unit/test_deadline_integration.py tests/unit/test_deadline_eligibility.py tests/unit/test_deadline_submit.py tests/unit/test_deadline_submit_preflight_example.py -v
 ```
