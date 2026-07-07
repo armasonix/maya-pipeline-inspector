@@ -14,7 +14,7 @@ Shader Health Inspector is built for daily use **inside the Maya dockable panel*
 
 Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
 
-1. **Panel first** — Open **Window → Shader Health Inspector** (or the shelf button). Validate Scene, review blocking status, select nodes, and apply safe fixes from the tabs.
+1. **Panel first** — Open **Window → Shader Health Inspector** (or the shelf button). For farm preflight, use **Shader Health → Shader Health Farm Check** or the **Shader Health Farm Check** shelf button.
 2. **Fast paths** — Target three clicks or fewer from an open panel to an actionable result (for example: open panel → **Validate Scene** → double-click an issue to select the node).
 3. **Clear blocking state** — After validation, the summary shows health score, severity counts, and whether the scene **blocks publish** or **blocks Deadline** without opening a report file.
 4. **Low-friction fixes** — Safe auto-fixes use the Fixes tab queue; high-risk or referenced edits still require explicit confirmation per studio policy.

@@ -10,9 +10,9 @@ Regardless of install method, the UI entrypoints are the same:
 
 | Entrypoint | Name | Behavior |
 | --- | --- | --- |
-| Main menu | `Shader Health` | Items: **Open Shader Health Inspector**, **Close Shader Health Inspector** |
-| Shelf tab | `ShaderHealth` | Button: **Shader Health** — opens the dockable panel |
-| Python API | `shader_health.maya.commands` | `install_ui()`, `show_ui()`, `close_ui()`, validation and export commands |
+| Main menu | `Shader Health` | Items: **Open Shader Health Inspector**, **Shader Health Farm Check**, **Close Shader Health Inspector** |
+| Shelf tab | `ShaderHealth` | Buttons: **Shader Health** (open panel), **Shader Health Farm Check** (Farm tab + preflight) |
+| Python API | `shader_health.maya.commands` | `install_ui()`, `show_ui()`, `show_farm_check_ui()`, `close_ui()`, validation and export commands |
 
 On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers UI installation and runs **dual-install detection** ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)):
 
@@ -102,7 +102,7 @@ At Maya launch:
 4. Otherwise `userSetup.py` tries each path from `plugin_load_candidates()` in order.
 5. When a plug-in loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
 6. If every plug-in load fails, `userSetup.py` falls back to `install_ui()` directly.
-7. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
+7. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf buttons.
 8. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
 
 Troubleshooting in Script Editor:
@@ -172,6 +172,7 @@ from maya import cmds
 
 print(cmds.menu("shaderHealthInspectorMenu", q=True, exists=True))      # expect True
 print(cmds.shelfButton("shaderHealthInspectorShelfButton", q=True, exists=True))  # expect True
+print(cmds.shelfButton("shaderHealthInspectorFarmCheckShelfButton", q=True, exists=True))  # expect True
 
 from shader_health.maya.commands import show_ui
 show_ui()
@@ -219,7 +220,12 @@ Scene validation requires `mayapy`; regular system Python can validate snapshot 
 
 ## Optional MEL shelf helper
 
-[`maya_module/shelves/shelf_ShaderHealth.mel`](../maya_module/shelves/shelf_ShaderHealth.mel) defines a shelf button that calls:
+[`maya_module/shelves/shelf_ShaderHealth.mel`](../maya_module/shelves/shelf_ShaderHealth.mel) defines two shelf buttons:
+
+- **Shader Health** — opens the dockable panel
+- **Shader Health Farm Check** — opens the **Farm** tab and runs `deadline_critical` preflight
+
+The open-panel button calls:
 
 ```python
 import shader_health_inspector_bootstrap

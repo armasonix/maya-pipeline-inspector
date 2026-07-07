@@ -67,6 +67,23 @@ def show_panel() -> Any:
     return panel
 
 
+def show_farm_check_panel() -> Any:
+    """Open the panel on the Farm tab and run deadline_critical preflight."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _select_farm_tab(content, qt_widgets)
+    _run_farm_preflight_from_ui(content, qt_widgets)
+    return panel
+
+
+def _panel_content_from_panel(panel: Any) -> Any:
+    return getattr(panel, "_shader_health_content", None)
+
+
 def close_panel(*, delete: bool = True) -> None:
     """Close the dockable panel and optionally delete its Maya workspaceControl."""
 
@@ -603,9 +620,28 @@ def _farm_tab_widget(content: Any, qt_widgets: Any) -> Any:
     for index in range(count):
         widget = getattr(tabs, "widget", lambda _index: None)(index)
         object_name = getattr(widget, "objectName", lambda: "")()
+        if not object_name:
+            object_name = getattr(widget, "object_name", "")
         if widget is not None and object_name == FARM_TAB_OBJECT_NAME:
             return widget
     return _find_child(content, qt_widgets.QWidget, FARM_TAB_OBJECT_NAME)
+
+
+def _select_farm_tab(content: Any, qt_widgets: Any) -> None:
+    tabs = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
+    if tabs is None:
+        return
+    count = getattr(tabs, "count", lambda: 0)()
+    for index in range(count):
+        widget = getattr(tabs, "widget", lambda _index: None)(index)
+        object_name = getattr(widget, "objectName", lambda: "")()
+        if not object_name:
+            object_name = getattr(widget, "object_name", "")
+        if widget is not None and object_name == FARM_TAB_OBJECT_NAME:
+            set_current = getattr(tabs, "setCurrentIndex", None)
+            if set_current is not None:
+                set_current(index)
+            return
 
 
 def _current_scene_path() -> str:

@@ -108,7 +108,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | 3 | **Run Farm Preflight** | 1 | Evaluates `deadline_critical` eligibility + scene saved / renderer plug-in |
 | 4 | **Submit to Farm** (when allowed) | 1 | Submits CommandScript utility job; shows last job id |
 
-**Remaining:** shelf **Farm Check** (#102) for one-click open + preflight.
+**Remaining:** shelf **Farm Check** (#102) — **shipped**: menu + shelf shortcut opens Farm tab and runs preflight.
 
 ---
 
@@ -137,7 +137,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | F-19 | **No scene name in chrome** — `DEVELOPMENT_PLAN.md` mockup shows scene + renderer; panel omits scene file name | Validate | 3 | 2 | **P2** | #108 optional |
 | F-20 | **No severity color in table** — text-only severities; harder scan at a glance | Validate | 2 | 2 | **P2** | theme pass deferred |
 | F-21 | **Asset class hint always expanded** — three-line hint under combos consumes vertical space | Validate | 2 | 1 | **P2** | collapsible hint |
-| F-22 | **Shelf single action** — shelf opens panel only; no Quick Validate / Farm Check shortcuts | Shelf | 3 | 2 | **P1** | M26 #102 |
+| F-22 | ~~**Shelf single action**~~ — **Resolved (#102):** **Shader Health Farm Check** menu + shelf shortcut | Shelf | 3 | 2 | **P1** | M26 #102 ✅ |
 
 ---
 
