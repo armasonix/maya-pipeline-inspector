@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib
 import json
+import sys
 from pathlib import Path
 
 from shader_health import cli
@@ -252,6 +254,144 @@ def test_validate_snapshot_runs_manifest_gate_after_passing_validation(tmp_path:
 
     assert code == cli.EXIT_PUBLISH_BLOCK
     assert report_path.exists()
+
+
+def test_manifest_snapshot_writes_shader_manifest_with_health_score(tmp_path: Path):
+    snapshot_path = _write_snapshot(tmp_path, "ACEScg")
+    manifest_path = tmp_path / "manifest.json"
+
+    code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--out",
+            str(manifest_path),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert code == cli.EXIT_OK
+    assert payload["manifest_schema_version"] == "1.1"
+    assert payload["health_score"] == 100
+
+
+def test_manifest_snapshot_from_material_graph(tmp_path: Path):
+    snapshot_path = _write_material_snapshot(tmp_path, "sha256:hero")
+    manifest_path = tmp_path / "material_manifest.json"
+
+    code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--input-kind",
+            "snapshot",
+            "--out",
+            str(manifest_path),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert code == cli.EXIT_OK
+    assert payload["materials"][0]["graph_fingerprint"] == "sha256:hero"
+
+
+def test_manifest_scene_path_uses_scene_loader(monkeypatch, tmp_path: Path):
+    scene_path = tmp_path / "scene.ma"
+    scene_path.write_text("// scene", encoding="utf-8")
+    manifest_path = tmp_path / "scene_manifest.json"
+    monkeypatch.setattr(
+        cli,
+        "_snapshot_from_scene",
+        lambda path: _material_snapshot("sha256:scene"),
+    )
+
+    code = cli.main(
+        [
+            "manifest",
+            str(scene_path),
+            "--input-kind",
+            "scene",
+            "--out",
+            str(manifest_path),
+            "--profile",
+            str(_minimal_profile(tmp_path)),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["materials"][0]["graph_fingerprint"] == "sha256:scene"
+
+
+def test_validate_snapshot_accepts_asset_class_overlay(tmp_path: Path):
+    snapshot_path = _write_snapshot(tmp_path, "Raw")
+    report_path = tmp_path / "asset_class_report.json"
+
+    code = cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--profile-id",
+            "publish_strict",
+            "--asset-class-id",
+            "asset_class_hero",
+        ]
+    )
+
+    assert code != cli.EXIT_CONFIG_ERROR
+    assert report_path.exists()
+
+
+def test_ensure_maya_standalone_initializes_once(monkeypatch):
+    init_calls: list[str] = []
+
+    class FakeStandalone:
+        @staticmethod
+        def initialize(*, name: str = "python") -> None:
+            init_calls.append(name)
+
+    monkeypatch.setitem(sys.modules, "maya.standalone", FakeStandalone())
+    monkeypatch.setattr(cli, "_MAYA_STANDALONE_INITIALIZED", False)
+
+    cli._ensure_maya_standalone()
+    cli._ensure_maya_standalone()
+
+    assert init_calls == ["python"]
+
+
+def test_snapshot_from_scene_calls_maya_standalone_before_cmds_file(monkeypatch, tmp_path: Path):
+    scene_path = tmp_path / "scene.ma"
+    scene_path.write_text("//Maya ASCII", encoding="utf-8")
+    init_calls: list[str] = []
+    file_calls: list[str] = []
+
+    class FakeStandalone:
+        @staticmethod
+        def initialize(*, name: str = "python") -> None:
+            init_calls.append(name)
+
+    class FakeCmds:
+        @staticmethod
+        def file(path: str, *, open: bool = True, force: bool = True) -> None:
+            file_calls.append(path)
+
+    scanner = importlib.import_module("shader_health.maya.scanner")
+    monkeypatch.setitem(sys.modules, "maya.standalone", FakeStandalone())
+    monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds())
+    monkeypatch.setattr(cli, "_MAYA_STANDALONE_INITIALIZED", False)
+    monkeypatch.setattr(scanner, "scan_scene", lambda: _snapshot("Raw"))
+
+    snapshot = cli._snapshot_from_scene(scene_path)
+
+    assert init_calls == ["python"]
+    assert file_calls == [str(scene_path)]
+    assert snapshot.nodes[0].attrs["colorSpace"] == "Raw"
 
 
 def _write_snapshot(tmp_path: Path, color_space: str) -> Path:

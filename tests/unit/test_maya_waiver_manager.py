@@ -191,19 +191,24 @@ def test_populate_waiver_table_writes_status_and_rule_columns():
     assert table.items[(0, 1)].text == "common.texture.missing"
 
 
-def test_waiver_manager_callbacks_fire_refresh_and_revoke(tmp_path: Path, monkeypatch: Any):
+def test_waiver_manager_callbacks_fire_refresh_revoke_and_make_waive(
+    tmp_path: Path,
+    monkeypatch: Any,
+):
     calls: list[str] = []
     callbacks = waiver_manager.WaiverManagerCallbacks(
         on_refresh=lambda: calls.append("refresh"),
         on_revoke_selected=lambda: calls.append("revoke"),
+        on_make_waive=lambda: calls.append("make_waive"),
     )
 
     widget = waiver_manager.build_waiver_manager(FakeQtWidgets, callbacks=callbacks)
 
+    _find(widget, waiver_manager.WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, waiver_manager.WAIVER_REFRESH_BUTTON_OBJECT_NAME).clicked.emit()
     _find(widget, waiver_manager.WAIVER_REVOKE_BUTTON_OBJECT_NAME).clicked.emit()
 
-    assert calls == ["refresh", "revoke"]
+    assert calls == ["make_waive", "refresh", "revoke"]
 
 
 def test_revoke_waiver_action_updates_sidecar(tmp_path: Path, monkeypatch: Any):

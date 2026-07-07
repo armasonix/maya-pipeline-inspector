@@ -17,6 +17,12 @@ class FakeButton:
     def isChecked(self) -> bool:
         return self._checked
 
+    def setChecked(self, checked: bool) -> None:
+        self._checked = checked
+
+    def setText(self, _value: str) -> None:
+        return None
+
 
 class FakeCell:
     def __init__(

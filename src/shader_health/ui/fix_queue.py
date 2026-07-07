@@ -7,7 +7,6 @@ from typing import Any, Optional
 
 from shader_health.ui.table_widgets import (
     configure_read_only_table,
-    is_checkbox_checked,
     is_fix_queue_select_checked,
     make_fix_queue_select_cell,
     make_read_only_item,
@@ -17,10 +16,13 @@ FIX_QUEUE_OBJECT_NAME = "shaderHealthInspectorFixQueue"
 FIX_QUEUE_TABLE_OBJECT_NAME = "shaderHealthInspectorFixQueueTable"
 FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME = "shaderHealthInspectorApplySelectedFixesButton"
 FIX_QUEUE_APPLY_SAFE_BUTTON_OBJECT_NAME = "shaderHealthInspectorApplySafeFixesButton"
+FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportFixPlanButton"
 FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME = "shaderHealthInspectorRiskyFixConfirmationLabel"
 SUPERVISOR_FULL_PROFILE_ID = "supervisor_full"
+FIX_QUEUE_SELECT_COLUMN_INDEX = 0
+FIX_QUEUE_MIN_TABLE_HEIGHT = 320
 FIX_QUEUE_COLUMNS = (
-    "Selected",
+    "Select",
     "Risk",
     "Target",
     "Attribute",
@@ -54,6 +56,7 @@ class FixQueueActionCallbacks:
 
     on_apply_selected: Optional[Callable[[], None]] = None
     on_apply_safe: Optional[Callable[[], None]] = None
+    on_export_fix_plan: Optional[Callable[[], None]] = None
 
 
 def build_fix_queue(
@@ -72,45 +75,54 @@ def build_fix_queue(
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(4)
 
-    title_label = qt_widgets.QLabel("Safe Auto-Fix Queue")
-    set_tooltip = getattr(title_label, "setToolTip", None)
-    if set_tooltip is not None:
-        set_tooltip(
-            "Click the Select button on each row to choose fixes "
-            "for Apply Selected Fixes."
-        )
-    layout.addWidget(title_label)
-
     table = qt_widgets.QTableWidget()
     table.setObjectName(FIX_QUEUE_TABLE_OBJECT_NAME)
     table.setColumnCount(len(FIX_QUEUE_COLUMNS))
     table.setHorizontalHeaderLabels(list(FIX_QUEUE_COLUMNS))
-    populate_fix_queue(qt_widgets, table, fix_rows)
     configure_read_only_table(table, qt_widgets)
-    layout.addWidget(table)
+    _configure_fix_queue_table(table, qt_widgets)
+    layout.addWidget(table, 1)
+
+    populate_fix_queue(qt_widgets, table, fix_rows)
 
     confirmation_label = qt_widgets.QLabel(risky_confirmation_text(fix_rows))
     confirmation_label.setObjectName(FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME)
     confirmation_label.setWordWrap(True)
     layout.addWidget(confirmation_label)
 
-    apply_selected_button = _fix_queue_button(
-        qt_widgets,
-        "Apply Selected Fixes",
-        FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME,
-        "Click Select on each row, then apply checked fixes.",
-        fix_callbacks.on_apply_selected,
+    actions = qt_widgets.QWidget()
+    actions_layout = qt_widgets.QHBoxLayout(actions)
+    actions_layout.setContentsMargins(0, 0, 0, 0)
+    actions_layout.setSpacing(4)
+    actions_layout.addWidget(
+        _fix_queue_button(
+            qt_widgets,
+            "Fix Selected",
+            FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME,
+            "Apply fixes marked Select in the table.",
+            fix_callbacks.on_apply_selected,
+        )
     )
-    layout.addWidget(apply_selected_button)
-
-    apply_safe_button = _fix_queue_button(
-        qt_widgets,
-        "Apply Safe Fixes",
-        FIX_QUEUE_APPLY_SAFE_BUTTON_OBJECT_NAME,
-        "Apply all non-blocked low/medium risk fixes.",
-        fix_callbacks.on_apply_safe,
+    actions_layout.addWidget(
+        _fix_queue_button(
+            qt_widgets,
+            "Apply Safe Fixes",
+            FIX_QUEUE_APPLY_SAFE_BUTTON_OBJECT_NAME,
+            "Apply all non-blocked low/medium risk fixes.",
+            fix_callbacks.on_apply_safe,
+        )
     )
-    layout.addWidget(apply_safe_button)
+    actions_layout.addWidget(
+        _fix_queue_button(
+            qt_widgets,
+            "Export Fix Plan",
+            FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
+            "Write the current planned fix actions next to the scene without applying them.",
+            fix_callbacks.on_export_fix_plan,
+        )
+    )
+    actions_layout.addStretch(1)
+    layout.addWidget(actions)
 
     return widget
 
@@ -122,83 +134,48 @@ def populate_fix_queue(
     *,
     on_selection_changed: Optional[Callable[[], None]] = None,
 ) -> None:
-    """Populate a Qt table widget with fix queue rows."""
+    """Populate the fix queue table, including per-row Select controls."""
 
     table.setRowCount(len(rows))
     for row_index, row in enumerate(rows):
-        table.setCellWidget(
-            row_index,
-            0,
-            make_fix_queue_select_cell(
-                qt_widgets,
-                checked=row.selected,
-                on_toggled=lambda _checked, index=row_index: _on_select_toggled(
-                    table,
-                    index,
-                    on_selection_changed,
-                ),
-            ),
+        select_cell = make_fix_queue_select_cell(
+            qt_widgets,
+            checked=row.selected,
+            on_toggled=(lambda *_: on_selection_changed()) if on_selection_changed else None,
         )
-        for column_index, value in enumerate(fix_queue_row_cells(row)[1:], start=1):
-            table.setItem(row_index, column_index, make_read_only_item(qt_widgets, value))
+        set_cell_widget = getattr(table, "setCellWidget", None)
+        if set_cell_widget is not None:
+            set_cell_widget(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX, select_cell)
+
+        for column_offset, value in enumerate(fix_queue_row_cells(row)):
+            column_index = column_offset + 1
+            table.setItem(
+                row_index,
+                column_index,
+                make_read_only_item(qt_widgets, value),
+            )
 
 
-def _on_select_toggled(
+def fix_rows_from_table(
     table: Any,
-    row_index: int,
-    on_selection_changed: Optional[Callable[[], None]],
-) -> None:
-    if on_selection_changed is not None:
-        on_selection_changed()
-
-
-def selected_from_table_item(item: Any) -> bool:
-    """Return whether a fix queue Selected cell is checked."""
-
-    if item is None:
-        return False
-    if is_checkbox_checked(item):
-        return True
-    text = getattr(item, "text", lambda: "")()
-    return str(text).strip().upper() == "YES"
-
-
-def toggle_selected_table_item(item: Any) -> bool:
-    """Toggle a fix queue Selected checkbox cell."""
-
-    if item is None:
-        return False
-    set_check_state = getattr(item, "setCheckState", None)
-    check_state = getattr(item, "checkState", None)
-    if set_check_state is not None and check_state is not None:
-        try:
-            from shader_health.ui.qt import load_qt_core
-
-            qt = load_qt_core().Qt
-            checked_state = getattr(qt, "Checked", None)
-            unchecked_state = getattr(qt, "Unchecked", None)
-            if checked_state is not None and unchecked_state is not None:
-                selected = check_state() != checked_state
-                set_check_state(checked_state if selected else unchecked_state)
-                return selected
-        except RuntimeError:
-            pass
-    selected = not selected_from_table_item(item)
-    set_text = getattr(item, "setText", None)
-    if set_text is not None:
-        set_text(_yes_no(selected))
-    return selected
-
-
-def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
-    """Return fix queue rows with Selected state read from Select buttons."""
+    rows: Sequence[FixQueueRow],
+) -> tuple[FixQueueRow, ...]:
+    """Return fix queue rows with Selected state read from the table Select column."""
 
     synced: list[FixQueueRow] = []
     for row_index, row in enumerate(rows):
-        if hasattr(table, "cellWidget") and table.cellWidget(row_index, 0) is not None:
+        cell_widget_fn = getattr(table, "cellWidget", None)
+        if (
+            cell_widget_fn is not None
+            and cell_widget_fn(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX) is not None
+        ):
             selected = is_fix_queue_select_checked(table, row_index)
         else:
-            item = table.item(row_index, 0) if hasattr(table, "item") else None
+            item = (
+                table.item(row_index, FIX_QUEUE_SELECT_COLUMN_INDEX)
+                if hasattr(table, "item")
+                else None
+            )
             selected = selected_from_table_item(item) if item is not None else row.selected
         synced.append(
             FixQueueRow(
@@ -215,6 +192,15 @@ def fix_rows_from_table(table: Any, rows: Sequence[FixQueueRow]) -> tuple[FixQue
             )
         )
     return tuple(synced)
+
+
+def selected_from_table_item(item: Any) -> bool:
+    """Return whether a legacy fix queue Select cell is checked."""
+
+    if item is None:
+        return False
+    text = getattr(item, "text", lambda: "")()
+    return str(text).strip().upper() == "YES"
 
 
 def checked_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
@@ -270,11 +256,10 @@ def risky_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     )
 
 
-def fix_queue_row_cells(row: FixQueueRow) -> tuple[str, str, str, str, str, str, str]:
-    """Return display cells in fix queue column order."""
+def fix_queue_row_cells(row: FixQueueRow) -> tuple[str, str, str, str, str, str]:
+    """Return display cells in fix queue column order (excluding Select)."""
 
     return (
-        _yes_no(row.selected),
         row.risk,
         row.target_node,
         row.target_attr,
@@ -341,6 +326,33 @@ def confirm_risky_fixes(
         return _confirm_risky_fix_batch(qt_widgets, risky)
 
     return all(_confirm_single_risky_fix(qt_widgets, row) for row in risky)
+
+
+def _configure_fix_queue_table(table: Any, qt_widgets: Any) -> None:
+    set_minimum_height = getattr(table, "setMinimumHeight", None)
+    if set_minimum_height is not None:
+        set_minimum_height(FIX_QUEUE_MIN_TABLE_HEIGHT)
+
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_size_policy = getattr(table, "setSizePolicy", None)
+    if size_policy is not None and set_size_policy is not None:
+        expanding = getattr(size_policy, "Expanding", None)
+        preferred = getattr(size_policy, "Preferred", None)
+        if expanding is not None and preferred is not None:
+            set_size_policy(preferred, expanding)
+
+    horizontal_header = getattr(table, "horizontalHeader", lambda: None)()
+    if horizontal_header is None:
+        return
+    set_column_width = getattr(table, "setColumnWidth", None)
+    if set_column_width is not None:
+        set_column_width(FIX_QUEUE_SELECT_COLUMN_INDEX, 108)
+    resize_mode = getattr(qt_widgets, "QHeaderView", None)
+    set_section_resize_mode = getattr(horizontal_header, "setSectionResizeMode", None)
+    if resize_mode is not None and set_section_resize_mode is not None:
+        fixed = getattr(resize_mode, "Fixed", None)
+        if fixed is not None:
+            set_section_resize_mode(FIX_QUEUE_SELECT_COLUMN_INDEX, fixed)
 
 
 def _confirm_risky_fix_batch(qt_widgets: Any, risky: Sequence[FixQueueRow]) -> bool:

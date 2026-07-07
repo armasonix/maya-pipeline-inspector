@@ -15,6 +15,10 @@
 # Local equivalent:
 #   mayapy -m pip install -e ".[dev]"
 #   mayapy -m pytest tests/integration -v
+#   mayapy -m shader_health manifest examples/broken_scene/shader_health_demo_broken.ma \
+#     --out /tmp/shader_health_manifest_smoke.json --profile-id publish_strict
+#   mayapy -m shader_health gate examples/broken_scene/shader_health_demo_broken.ma \
+#     /tmp/shader_health_manifest_smoke.json --profile-id publish_strict --out /tmp/gate.json
 #
 # See docs/MAYA_INSTALL.md for full install and CI notes.
 
@@ -76,6 +80,32 @@ jobs:
         if: steps.mayapy.outputs.skip != 'true'
         run: |
           "${{ steps.mayapy.outputs.path }}" -m pytest tests/integration -v
+
+      - name: Manifest export smoke
+        if: steps.mayapy.outputs.skip != 'true'
+        run: |
+          DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
+          OUT_MANIFEST="${RUNNER_TEMP}/shader_health_manifest_smoke.json"
+          "${{ steps.mayapy.outputs.path }}" -m shader_health manifest \
+            "$DEMO_SCENE" \
+            --out "$OUT_MANIFEST" \
+            --profile-id publish_strict
+          test -s "$OUT_MANIFEST"
+          python3 -c "import json, pathlib; payload=json.loads(pathlib.Path('${OUT_MANIFEST}').read_text(encoding='utf-8')); assert payload.get('manifest_schema_version') == '1.1'"
+
+      - name: Manifest gate smoke
+        if: steps.mayapy.outputs.skip != 'true'
+        run: |
+          DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
+          BASELINE="${RUNNER_TEMP}/shader_health_manifest_smoke.json"
+          GATE_REPORT="${RUNNER_TEMP}/shader_health_gate_smoke.json"
+          "${{ steps.mayapy.outputs.path }}" -m shader_health gate \
+            "$DEMO_SCENE" \
+            "$BASELINE" \
+            --profile-id publish_strict \
+            --out "$GATE_REPORT"
+          test -s "$GATE_REPORT"
+          python3 -c "import json, pathlib, sys; payload=json.loads(pathlib.Path('${GATE_REPORT}').read_text(encoding='utf-8')); sys.exit(1 if payload.get('manifest_regression_blocked') else 0)"
 
       - name: Report graceful skip
         if: steps.mayapy.outputs.skip == 'true'

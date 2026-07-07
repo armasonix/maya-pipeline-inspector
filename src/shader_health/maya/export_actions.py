@@ -73,12 +73,19 @@ def export_shader_manifest(
     *,
     snapshot: Optional[GraphSnapshot] = None,
     snapshot_provider: Optional[SnapshotProvider] = None,
+    results: Iterable[RuleResult] = (),
+    health_score: Optional[int] = None,
 ) -> ExportActionResult:
     """Export the current Material Passport / Shader Manifest."""
 
     export_snapshot = _snapshot(snapshot, snapshot_provider)
     output_path = _output_path(path, export_snapshot, suffix="manifest", extension="json")
-    written_path = write_shader_manifest(output_path, export_snapshot)
+    written_path = write_shader_manifest(
+        output_path,
+        export_snapshot,
+        results=results,
+        health_score=health_score,
+    )
     return _result("export_shader_manifest", written_path, "Shader manifest exported.")
 
 

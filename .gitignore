@@ -33,11 +33,16 @@ config.local.yml
 
 # Runtime output (root-level report artifacts only)
 /reports/
+_cli_test_out/
+_parity_out/
+debug-*.log
 .shader_health_cache/
 *.shader_health_waivers.json
+*.shader_health_fix_audit.json
 
 # Maya runtime / temporary files
 *.mayaSwatches/
+**/.vrayThumbs/
 *.autosave
 *.ma~
 *.mb~

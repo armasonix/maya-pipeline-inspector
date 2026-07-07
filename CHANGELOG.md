@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Headless CLI `--asset-class-id` on `validate`, `gate`, `manifest`, and `apply-fixes` (parity with Maya UI asset class overlay).
+- `shader_health.util.paths` with `normalize_cli_path()` and `resolve_cli_path()` for Git Bash MSYS paths on Windows.
+- [`docs/CLI_TESTING.md`](CLI_TESTING.md) — one-liner smoke commands and GUI↔CLI parity script (`tools/compare_parity.py`).
+
+### Fixed
+
+- `mayapy` scene commands call `maya.standalone.initialize()` before `cmds.file`, fixing `maya.cmds has no attribute 'file'` on headless validate/manifest/apply-fixes.
+- `ci_headless` is accepted as a standalone pipeline profile in `compose_profiles()` (was: config error "Expected workflow profile").
+
 ## [0.2.0] - 2026-07-06
 
 **Maya Shader Health Inspector v0.2 — Production Hardening & Studio Readiness**

@@ -201,9 +201,13 @@ def load_rule_stack(
     rule_root: Path = DEFAULT_RULE_ROOT,
     renderer_ids: Iterable[str] = (),
     profile_path: Optional[Path] = None,
+    profile: Optional[ProfileDefinition] = None,
     extra_rule_paths: Iterable[Path] = (),
 ) -> list[RuleDefinition]:
     """Load common + renderer + extra rules and apply optional profile overrides."""
+
+    if profile_path is not None and profile is not None:
+        raise RuleLoadError("Provide either profile_path or profile, not both.")
 
     rules_by_id: dict[str, RuleDefinition] = {}
     for path in build_rule_search_paths(rule_root, renderer_ids, extra_rule_paths):
@@ -211,6 +215,8 @@ def load_rule_stack(
             rules_by_id[rule.id] = rule
 
     rules = list(rules_by_id.values())
+    if profile is not None:
+        return apply_profile_overrides(rules, profile)
     if profile_path is None:
         return rules
 

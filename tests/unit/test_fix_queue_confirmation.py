@@ -256,6 +256,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
     monkeypatch.setattr(ui_launcher, "_revalidate_with_current_scope", lambda *_a: None)
 
     class FakeQtWidgets:
+        QWidget = object
         QTableWidget = object
         QLabel = object
 

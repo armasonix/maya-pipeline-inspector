@@ -20,23 +20,53 @@ class FakeLabel(FakeWidget):
         super().__init__()
         self.text = text
         self.word_wrap = False
+        self.style_sheet = ""
 
     def setWordWrap(self, enabled: bool) -> None:
         self.word_wrap = enabled
+
+    def setStyleSheet(self, style: str) -> None:
+        self.style_sheet = style
 
 
 class FakeComboBox(FakeWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.items: list[str] = []
-        self.current_text = ""
+        self.items: list[tuple[str, str]] = []
+        self.current_index = 0
         self.tooltip = ""
 
+    def addItem(self, text: str, user_data: str = "") -> None:
+        self.items.append((text, user_data or text))
+
     def addItems(self, items: list[str]) -> None:
-        self.items.extend(items)
+        for item in items:
+            self.addItem(item)
 
     def setCurrentText(self, text: str) -> None:
-        self.current_text = text
+        for index, (label, _data) in enumerate(self.items):
+            if label == text:
+                self.current_index = index
+                return
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.current_index = index
+
+    def currentText(self) -> str:
+        if not self.items:
+            return ""
+        return self.items[self.current_index][0]
+
+    def currentData(self):
+        if not self.items:
+            return None
+        return self.items[self.current_index][1]
+
+    def findData(self, data: str) -> int:
+        for index, (_label, item_data) in enumerate(self.items):
+            if item_data == data:
+                return index
+        return -1
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
@@ -53,6 +83,18 @@ class FakePushButton(FakeLabel):
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
+
+
+class FakeCheckBox(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.checked = False
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
+    def setToolTip(self, _text: str) -> None:
+        return
 
 
 class FakeTableWidget(FakeWidget):
@@ -109,15 +151,34 @@ class FakeHBoxLayout(FakeVBoxLayout):
     pass
 
 
+class FakeGridLayout(FakeVBoxLayout):
+    def addWidget(self, widget: Any, row: int = 0, column: int = 0, *_args: Any) -> None:
+        self.parent.children.append(widget)
+        _ = (row, column)
+
+
+class FakeTabWidget(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tabs: list[tuple[str, FakeWidget]] = []
+
+    def addTab(self, widget: FakeWidget, title: str) -> None:
+        self.tabs.append((title, widget))
+        self.children.append(widget)
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QComboBox = FakeComboBox
     QPushButton = FakePushButton
+    QCheckBox = FakeCheckBox
     QTableWidget = FakeTableWidget
     QTableWidgetItem = FakeTableWidgetItem
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
+    QGridLayout = FakeGridLayout
+    QTabWidget = FakeTabWidget
 
 
 def test_summary_header_defaults_show_score_counts_blocks_and_profile_dropdown():
@@ -133,8 +194,11 @@ def test_summary_header_defaults_show_score_counts_blocks_and_profile_dropdown()
         == "Publish Block: NO   Deadline Block: NO"
     )
     profile_dropdown = _find(header, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
-    assert profile_dropdown.items == list(main_window.DEFAULT_PROFILE_OPTIONS)
-    assert profile_dropdown.current_text == "artist_relaxed"
+    asset_class_dropdown = _find(header, main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME)
+    workflow_ids = [option.profile_id for option in main_window.DEFAULT_WORKFLOW_PROFILE_OPTIONS]
+    assert [item[1] for item in profile_dropdown.items] == workflow_ids
+    assert profile_dropdown.currentText() == "Artist Relaxed"
+    assert asset_class_dropdown.currentText() == main_window.ASSET_CLASS_NONE_LABEL
 
 
 def test_summary_header_formats_failed_blocking_state():
@@ -160,28 +224,47 @@ def test_summary_header_formats_failed_blocking_state():
         _find(header, main_window.BLOCK_STATUS_LABEL_OBJECT_NAME).text
         == "Publish Block: YES   Deadline Block: YES"
     )
-    assert _find(header, main_window.PROFILE_DROPDOWN_OBJECT_NAME).current_text == "deadline_critical"
+    profile_dropdown = _find(header, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
+    assert profile_dropdown.currentData() == "deadline_critical"
 
 
 def test_summary_header_accepts_custom_profile_options():
-    state = main_window.SummaryHeaderState(profile_id="show_publish")
+    from shader_health.maya.validation_pipeline import ProfileOption
+
+    state = main_window.SummaryHeaderState(profile_id="publish_strict")
 
     header = main_window.build_summary_header(
         FakeQtWidgets,
         state=state,
-        profile_options=("artist_relaxed", "show_publish"),
+        workflow_options=(
+            ProfileOption("artist_relaxed", "Artist Relaxed"),
+            ProfileOption("publish_strict", "Publish Strict"),
+        ),
     )
 
     profile_dropdown = _find(header, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
-    assert profile_dropdown.items == ["artist_relaxed", "show_publish"]
-    assert profile_dropdown.current_text == "show_publish"
+    assert [item[1] for item in profile_dropdown.items] == ["artist_relaxed", "publish_strict"]
+    assert profile_dropdown.currentData() == "publish_strict"
 
 
-def test_main_widget_contains_summary_header():
+def test_main_widget_contains_tabbed_shell():
     widget = main_window.build_main_widget(FakeQtWidgets)
 
-    summary_header = _find(widget, main_window.SUMMARY_HEADER_OBJECT_NAME)
-    assert summary_header.object_name == main_window.SUMMARY_HEADER_OBJECT_NAME
+    tabs = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME)
+    assert tabs.object_name == main_window.TAB_WIDGET_OBJECT_NAME
+    assert [title for title, _tab in tabs.tabs] == [
+        "Validate",
+        "Waivers",
+        "Fixes",
+        "Reports",
+    ]
+
+
+def test_panel_header_includes_version():
+    header = main_window.build_panel_header(FakeQtWidgets, version="0.3.0")
+
+    assert "Maya Shader Health Inspector" in header.text
+    assert "v0.3.0" in header.text
 
 
 def _find(widget: Any, object_name: str) -> Any:
