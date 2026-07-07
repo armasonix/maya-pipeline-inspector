@@ -1,27 +1,32 @@
 """Maya startup hook for Shader Health Inspector development module."""
 from __future__ import annotations
 
-PLUGIN_FILE = "shader_health_inspector.py"
-
 
 def _install_shader_health_ui() -> None:
     try:
+        import shader_health_inspector_bootstrap as bootstrap
         from maya import cmds  # type: ignore[import-not-found]
 
-        if cmds.pluginInfo(PLUGIN_FILE, query=True, loaded=True):
-            return
+        maya_year = bootstrap.resolve_maya_year(lambda: cmds.about(version=True))
         try:
-            cmds.loadPlugin(PLUGIN_FILE, quiet=True)
-            return
+            if cmds.pluginInfo(bootstrap.PLUGIN_NAME, query=True, loaded=True):
+                return
         except Exception:
             pass
+
+        for plugin_file in bootstrap.plugin_load_candidates(maya_year):
+            try:
+                cmds.loadPlugin(plugin_file, quiet=True)
+                return
+            except Exception:
+                continue
     except Exception:
         pass
 
     try:
-        import shader_health_inspector_bootstrap
+        import shader_health_inspector_bootstrap as bootstrap
 
-        shader_health_inspector_bootstrap.install_ui()
+        bootstrap.install_ui()
     except Exception as exc:  # pragma: no cover - Maya startup visibility only.
         try:
             from maya import cmds  # type: ignore[import-not-found]

@@ -83,12 +83,13 @@ At Maya launch:
 
 1. Maya executes `maya_module/scripts/userSetup.py`.
 2. `userSetup.py` defers `_install_shader_health_ui()`.
-3. **v0.4 target:** deferred hook tries `plug-ins/{mayaYear}/shader_health_inspector.mll` when present.
-4. Otherwise tries `cmds.loadPlugin("shader_health_inspector.py", quiet=True)`.
-5. When a plug-in loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
-6. If plug-in load fails, `userSetup.py` falls back to calling `install_ui()` directly.
-7. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
-8. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
+3. **v0.4 target:** deferred hook loads the native `.mll` by **absolute path** from `plug-ins/{mayaYear}/` when that file exists (Maya does not search plug-in subfolders by relative name).
+4. A copy is also placed at `plug-ins/shader_health_inspector.mll` during build so **Plug-in Manager** lists the native binary at the top level.
+5. Otherwise tries `cmds.loadPlugin("shader_health_inspector.py", quiet=True)`.
+6. When a plug-in loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
+7. If plug-in load fails, `userSetup.py` falls back to calling `install_ui()` directly.
+8. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
+9. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
 
 The bootstrap module also ensures the repository `src/` directory is on `sys.path` before importing `shader_health`, even if the `.mod` path is customized.
 
@@ -96,13 +97,21 @@ The bootstrap module also ensures the repository `src/` directory is on `sys.pat
 
 | Delivery | File | When used |
 | --- | --- | --- |
-| Native bootstrap (v0.4+, preferred) | `plug-ins/{year}/shader_health_inspector.mll` | Prebuilt binary matching the running Maya year (2024 / 2025 / 2026) |
+| Native bootstrap (v0.4+, preferred) | `plug-ins/{year}/shader_health_inspector.mll` plus a copy at `plug-ins/shader_health_inspector.mll` for Plug-in Manager | Prebuilt binary matching the running Maya year (2024 / 2025 / 2026) |
 | Python fallback (v0.3+) | `plug-ins/shader_health_inspector.py` | Source checkout, unsupported OS, or no `.mll` for this year |
 | Module-only fallback | `shader_health_inspector_bootstrap.install_ui()` | Plug-in load failed; backward-compatible path |
 
-The native `.mll` is a **thin C++ bootstrap** only — it calls the same `shader_health_inspector_bootstrap` Python module as the `.py` plug-in. Validation and UI logic are unchanged. Build requirements and per-year matrix: [ADR 0006](adr/0006-native-mll-plugin-strategy.md). CMake scaffolding lands in issues #096–#097.
+The native `.mll` is a **thin C++ bootstrap** only — it calls the same `shader_health_inspector_bootstrap` Python module as the `.py` plug-in. Validation and UI logic are unchanged. Build requirements and per-year matrix: [ADR 0006](adr/0006-native-mll-plugin-strategy.md).
 
-Until release binaries are attached, developers use the `.py` plug-in path documented below.
+### Build the native plug-in (optional)
+
+CMake scaffold lives in [`native/`](../native/README.md). From the repo root (Windows example):
+
+```powershell
+.\tools\build_native_plugin.ps1 -MayaVersion 2025
+```
+
+This installs `shader_health_inspector.mll` to `maya_module/plug-ins/2025/`. Source checkouts without a local build continue to use `shader_health_inspector.py`.
 
 ## Plug-in Manager vs module-only (v0.3 dual install)
 
@@ -115,7 +124,7 @@ Until release binaries are attached, developers use the `.py` plug-in path docum
 
 1. Ensure `MAYA_MODULE_PATH` points at `maya_module/` (see Option A above).
 2. Open **Settings → Plug-in Manager**.
-3. Enable **Loaded** for `shader_health_inspector.py` (vendor: Shader Health Inspector).
+3. Enable **Loaded** for `shader_health_inspector` (native `.mll` under `plug-ins/{year}/` when built, or `shader_health_inspector.py` fallback).
 4. Confirm the **Shader Health** menu and **ShaderHealth** shelf appear.
 5. Unload the plugin to remove menu, shelf, and panel without restarting Maya.
 

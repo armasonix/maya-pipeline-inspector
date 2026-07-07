@@ -101,7 +101,30 @@ def test_user_setup_import_is_harmless_outside_maya():
     load_module(USER_SETUP_PATH, "shader_health_user_setup_outside_maya")
 
 
-def test_user_setup_prefers_plugin_load(monkeypatch):
+def test_maya_year_from_version_extracts_four_digit_year():
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_year")
+
+    assert bootstrap.maya_year_from_version("2025") == "2025"
+    assert bootstrap.maya_year_from_version("Maya 2024 Update 3") == "2024"
+    assert bootstrap.maya_year_from_version("unsupported") is None
+
+
+def test_plugin_load_candidates_prefers_native_binary_on_windows(monkeypatch):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_candidates")
+    monkeypatch.setattr("sys.platform", "win32")
+
+    native_path = bootstrap.native_plugin_path("2024")
+    if native_path.is_file():
+        assert bootstrap.plugin_load_candidates("2024") == (
+            str(native_path),
+            "shader_health_inspector.py",
+        )
+    else:
+        assert bootstrap.plugin_load_candidates("2024") == ("shader_health_inspector.py",)
+    assert bootstrap.plugin_load_candidates(None) == ("shader_health_inspector.py",)
+
+
+def test_user_setup_prefers_native_plugin_load(monkeypatch):
     deferred: list[str] = []
 
     class FakeCmds:
@@ -112,8 +135,17 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
             return None
 
         @staticmethod
+        def about(**kwargs):
+            if kwargs.get("version"):
+                return "2024"
+            return ""
+
+        @staticmethod
         def pluginInfo(plugin_name, query=True, loaded=True):
-            _ = plugin_name, query, loaded
+            _ = query, loaded
+            if plugin_name == "shader_health_inspector":
+                return False
+            _ = plugin_name
             return False
 
         @staticmethod
@@ -128,6 +160,123 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
     fake_maya = ModuleType("maya")
     fake_maya.cmds = FakeCmds
 
+    monkeypatch.setattr("sys.platform", "win32")
+    monkeypatch.setitem(
+        sys.modules,
+        "shader_health_inspector_bootstrap",
+        load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_native_user_setup"),
+    )
+    monkeypatch.setitem(sys.modules, "maya", fake_maya)
+    monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
+
+    load_module(USER_SETUP_PATH, "shader_health_user_setup_native_plugin")
+
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_native_assert")
+    expected = str(bootstrap.native_plugin_path("2024"))
+    if Path(expected).is_file():
+        assert deferred == ["deferred", f"load:{expected}:True"]
+    else:
+        assert deferred == ["deferred", "load:shader_health_inspector.py:True"]
+
+
+def test_user_setup_falls_back_to_py_plugin(monkeypatch):
+    deferred: list[str] = []
+
+    class FakeCmds:
+        @staticmethod
+        def evalDeferred(callback):
+            deferred.append("deferred")
+            callback()
+            return None
+
+        @staticmethod
+        def about(**kwargs):
+            if kwargs.get("version"):
+                return "2024"
+            return ""
+
+        @staticmethod
+        def pluginInfo(plugin_name, query=True, loaded=True):
+            _ = query, loaded
+            if plugin_name == "shader_health_inspector":
+                return False
+            _ = plugin_name
+            return False
+
+        @staticmethod
+        def loadPlugin(plugin_name, quiet=True):
+            deferred.append(f"load:{plugin_name}:{quiet}")
+            if str(plugin_name).endswith(".mll"):
+                raise RuntimeError("native plug-in missing")
+            return "shader_health_inspector"
+
+        @staticmethod
+        def warning(message: str):
+            _ = message
+
+    fake_maya = ModuleType("maya")
+    fake_maya.cmds = FakeCmds
+
+    monkeypatch.setattr("sys.platform", "win32")
+    monkeypatch.setitem(
+        sys.modules,
+        "shader_health_inspector_bootstrap",
+        load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_native_user_setup"),
+    )
+    monkeypatch.setitem(sys.modules, "maya", fake_maya)
+    monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
+
+    load_module(USER_SETUP_PATH, "shader_health_user_setup_py_fallback")
+
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_py_fallback_assert")
+    native_path = str(bootstrap.native_plugin_path("2024"))
+    expected = ["deferred"]
+    if Path(native_path).is_file():
+        expected.append(f"load:{native_path}:True")
+    expected.append("load:shader_health_inspector.py:True")
+    assert deferred == expected
+
+
+def test_user_setup_prefers_plugin_load(monkeypatch):
+    deferred: list[str] = []
+
+    class FakeCmds:
+        @staticmethod
+        def evalDeferred(callback):
+            deferred.append("deferred")
+            callback()
+            return None
+
+        @staticmethod
+        def about(**kwargs):
+            _ = kwargs
+            return ""
+
+        @staticmethod
+        def pluginInfo(plugin_name, query=True, loaded=True):
+            _ = query, loaded
+            if plugin_name == "shader_health_inspector":
+                return False
+            _ = plugin_name
+            return False
+
+        @staticmethod
+        def loadPlugin(plugin_name, quiet=True):
+            deferred.append(f"load:{plugin_name}:{quiet}")
+            return "shader_health_inspector"
+
+        @staticmethod
+        def warning(message: str):
+            _ = message
+
+    fake_maya = ModuleType("maya")
+    fake_maya.cmds = FakeCmds
+
+    monkeypatch.setitem(
+        sys.modules,
+        "shader_health_inspector_bootstrap",
+        load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_py_user_setup"),
+    )
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
 
@@ -147,8 +296,17 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
             return None
 
         @staticmethod
+        def about(**kwargs):
+            if kwargs.get("version"):
+                return "2024"
+            return ""
+
+        @staticmethod
         def pluginInfo(plugin_name, query=True, loaded=True):
-            _ = plugin_name, query, loaded
+            _ = query, loaded
+            if plugin_name == "shader_health_inspector":
+                return False
+            _ = plugin_name
             return False
 
         @staticmethod
@@ -166,6 +324,10 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
         deferred.append("install_ui")
 
     fake_bootstrap.install_ui = install_ui
+    fake_bootstrap.resolve_maya_year = lambda provider: "2025"
+    fake_bootstrap.PLUGIN_NAME = "shader_health_inspector"
+    real_bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_fallback_paths")
+    fake_bootstrap.plugin_load_candidates = real_bootstrap.plugin_load_candidates
 
     fake_maya = ModuleType("maya")
     fake_maya.cmds = FakeCmds

@@ -33,6 +33,7 @@ on:
     paths:
       - "src/shader_health/maya/**"
       - "maya_module/**"
+      - "native/**"
       - "tests/integration/**"
       - "examples/deadline/**"
       - "examples/broken_scene/**"
