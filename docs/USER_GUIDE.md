@@ -20,6 +20,8 @@ Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
 4. **Low-friction fixes** — Safe auto-fixes use the Fixes tab queue; high-risk or referenced edits still require explicit confirmation per studio policy.
 5. **Same results everywhere** — The panel, `shader_health validate`, and Deadline preflight share one validation pipeline, so GUI and headless reports stay aligned.
 
+UX friction and Wave 1 backlog: [MAYA_UX_AUDIT_v0.4.md](MAYA_UX_AUDIT_v0.4.md).
+
 Headless CLI, manifest gates, and farm preflight remain available for publish hooks and render wranglers — see [CLI_TESTING.md](CLI_TESTING.md) and [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md). v0.4 adds a **Farm** tab for Deadline 10 on-prem preflight and submit from the panel.
 
 ## What the Tool Checks
