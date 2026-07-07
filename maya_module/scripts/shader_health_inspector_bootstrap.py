@@ -33,56 +33,84 @@ def module_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def native_plugin_suffix() -> str:
+    if sys.platform == "win32":
+        return ".mll"
+    if sys.platform == "darwin":
+        return ".bundle"
+    return ".so"
+
+
 def native_plugin_path(maya_year: str) -> Path:
     """Absolute path to the year-specific native plug-in binary when packaged."""
 
-    if sys.platform == "win32":
-        suffix = ".mll"
-    elif sys.platform == "darwin":
-        suffix = ".bundle"
-    else:
-        suffix = ".so"
-    return module_root() / "plug-ins" / maya_year / f"shader_health_inspector{suffix}"
+    return (
+        module_root()
+        / "plug-ins"
+        / maya_year
+        / f"shader_health_inspector{native_plugin_suffix()}"
+    )
+
+
+def manager_native_plugin_path() -> Path:
+    """Top-level native plug-in copy used by Plug-in Manager browsing."""
+
+    return module_root() / "plug-ins" / f"shader_health_inspector{native_plugin_suffix()}"
+
+
+def python_plugin_name() -> str:
+    return "shader_health_inspector.py"
+
+
+INSTALL_MODE_NATIVE_YEAR = "native_year"
+INSTALL_MODE_NATIVE_MANAGER = "native_manager"
+INSTALL_MODE_PYTHON = "python"
+INSTALL_MODE_MODULE_ONLY = "module_only"
+
+
+def detect_install_mode(maya_year: str | None = None) -> str:
+    """Return which dual-install delivery path is available on disk."""
+
+    if maya_year and native_plugin_path(maya_year).is_file():
+        return INSTALL_MODE_NATIVE_YEAR
+    if manager_native_plugin_path().is_file():
+        return INSTALL_MODE_NATIVE_MANAGER
+    if (module_root() / "plug-ins" / python_plugin_name()).is_file():
+        return INSTALL_MODE_PYTHON
+    return INSTALL_MODE_MODULE_ONLY
 
 
 def plugin_load_candidates(maya_year: str | None = None) -> tuple[str, ...]:
     """Plug-in paths to try in load order (native binary first, then .py fallback)."""
 
     candidates: list[str] = []
-    if maya_year:
-        native_path = native_plugin_path(maya_year)
-        if native_path.is_file():
-            candidates.append(str(native_path))
-        # region agent log
-        try:
-            import json
-            import time
+    seen: set[str] = set()
 
-            log_path = module_root().parent / "debug-ee1eca.log"
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "sessionId": "ee1eca",
-                            "runId": "plugin-load",
-                            "hypothesisId": "H-PATH",
-                            "location": "shader_health_inspector_bootstrap.py",
-                            "message": "native_plugin_candidate",
-                            "data": {
-                                "maya_year": maya_year,
-                                "native_path": str(native_path),
-                                "exists": native_path.is_file(),
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # endregion
-    candidates.append("shader_health_inspector.py")
+    def add(path: Path | str) -> None:
+        text = str(path)
+        if text not in seen:
+            seen.add(text)
+            candidates.append(text)
+
+    if maya_year:
+        year_path = native_plugin_path(maya_year)
+        if year_path.is_file():
+            add(year_path)
+    manager_path = manager_native_plugin_path()
+    if manager_path.is_file():
+        add(manager_path)
+    add(python_plugin_name())
     return tuple(candidates)
+
+
+def describe_dual_install(maya_year: str | None = None) -> dict[str, object]:
+    """Summarize dual-install detection for troubleshooting and unit tests."""
+
+    return {
+        "maya_year": maya_year,
+        "install_mode": detect_install_mode(maya_year),
+        "load_candidates": list(plugin_load_candidates(maya_year)),
+    }
 
 
 PLUGIN_NAME = "shader_health_inspector"

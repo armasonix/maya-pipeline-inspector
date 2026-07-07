@@ -3,11 +3,14 @@ from __future__ import annotations
 
 
 def _install_shader_health_ui() -> None:
+    """Load Shader Health via dual-install detection: native .mll, then .py, then bootstrap."""
+
     try:
         import shader_health_inspector_bootstrap as bootstrap
         from maya import cmds  # type: ignore[import-not-found]
 
         maya_year = bootstrap.resolve_maya_year(lambda: cmds.about(version=True))
+
         try:
             if cmds.pluginInfo(bootstrap.PLUGIN_NAME, query=True, loaded=True):
                 return

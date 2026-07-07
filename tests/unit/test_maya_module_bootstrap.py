@@ -113,15 +113,113 @@ def test_plugin_load_candidates_prefers_native_binary_on_windows(monkeypatch):
     bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_candidates")
     monkeypatch.setattr("sys.platform", "win32")
 
-    native_path = bootstrap.native_plugin_path("2024")
-    if native_path.is_file():
-        assert bootstrap.plugin_load_candidates("2024") == (
-            str(native_path),
-            "shader_health_inspector.py",
-        )
-    else:
-        assert bootstrap.plugin_load_candidates("2024") == ("shader_health_inspector.py",)
-    assert bootstrap.plugin_load_candidates(None) == ("shader_health_inspector.py",)
+    assert bootstrap.plugin_load_candidates("2024") == _expected_candidates(bootstrap, "2024")
+    assert bootstrap.plugin_load_candidates(None) == _expected_candidates(bootstrap, None)
+
+
+def _expected_candidates(bootstrap, maya_year: str | None) -> tuple[str, ...]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+    if maya_year:
+        year_path = bootstrap.native_plugin_path(maya_year)
+        if year_path.is_file():
+            text = str(year_path)
+            seen.add(text)
+            candidates.append(text)
+    manager_path = bootstrap.manager_native_plugin_path()
+    if manager_path.is_file():
+        text = str(manager_path)
+        if text not in seen:
+            candidates.append(text)
+    candidates.append("shader_health_inspector.py")
+    return tuple(candidates)
+
+
+def test_detect_install_mode_native_year(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_year")
+    year_file = tmp_path / "2024.mll"
+    year_file.write_bytes(b"native")
+    monkeypatch.setattr(bootstrap, "native_plugin_path", lambda year: year_file)
+    monkeypatch.setattr(bootstrap, "manager_native_plugin_path", lambda: tmp_path / "missing.mll")
+    monkeypatch.setattr(
+        bootstrap,
+        "module_root",
+        lambda: tmp_path,
+    )
+
+    assert bootstrap.detect_install_mode("2024") == bootstrap.INSTALL_MODE_NATIVE_YEAR
+
+
+def test_detect_install_mode_native_manager(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_manager")
+    manager_file = tmp_path / "shader_health_inspector.mll"
+    manager_file.write_bytes(b"native")
+    monkeypatch.setattr(
+        bootstrap,
+        "native_plugin_path",
+        lambda year: tmp_path / "missing" / "shader_health_inspector.mll",
+    )
+    monkeypatch.setattr(bootstrap, "manager_native_plugin_path", lambda: manager_file)
+    monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
+
+    assert bootstrap.detect_install_mode("2024") == bootstrap.INSTALL_MODE_NATIVE_MANAGER
+
+
+def test_detect_install_mode_python_only(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_python")
+    plug_ins = tmp_path / "plug-ins"
+    plug_ins.mkdir()
+    (plug_ins / "shader_health_inspector.py").write_text("# plugin", encoding="utf-8")
+    monkeypatch.setattr(
+        bootstrap,
+        "native_plugin_path",
+        lambda year: plug_ins / "missing.mll",
+    )
+    monkeypatch.setattr(
+        bootstrap,
+        "manager_native_plugin_path",
+        lambda: plug_ins / "missing.mll",
+    )
+    monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
+
+    assert bootstrap.detect_install_mode("2024") == bootstrap.INSTALL_MODE_PYTHON
+
+
+def test_detect_install_mode_module_only(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_module")
+    monkeypatch.setattr(
+        bootstrap,
+        "native_plugin_path",
+        lambda year: tmp_path / "missing.mll",
+    )
+    monkeypatch.setattr(bootstrap, "manager_native_plugin_path", lambda: tmp_path / "missing.mll")
+    monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
+
+    assert bootstrap.detect_install_mode("2024") == bootstrap.INSTALL_MODE_MODULE_ONLY
+
+
+def test_describe_dual_install_reports_load_order(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_describe")
+    plug_ins = tmp_path / "plug-ins"
+    plug_ins.mkdir()
+    (plug_ins / "shader_health_inspector.py").write_text("# plugin", encoding="utf-8")
+    monkeypatch.setattr(
+        bootstrap,
+        "native_plugin_path",
+        lambda year: plug_ins / "2024" / "shader_health_inspector.mll",
+    )
+    monkeypatch.setattr(
+        bootstrap,
+        "manager_native_plugin_path",
+        lambda: plug_ins / "shader_health_inspector.mll",
+    )
+    monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
+
+    payload = bootstrap.describe_dual_install("2024")
+
+    assert payload["maya_year"] == "2024"
+    assert payload["install_mode"] == bootstrap.INSTALL_MODE_PYTHON
+    assert payload["load_candidates"] == ["shader_health_inspector.py"]
 
 
 def test_user_setup_prefers_native_plugin_load(monkeypatch):
@@ -230,9 +328,12 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
 
     bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_py_fallback_assert")
     native_path = str(bootstrap.native_plugin_path("2024"))
+    manager_path = str(bootstrap.manager_native_plugin_path())
     expected = ["deferred"]
     if Path(native_path).is_file():
         expected.append(f"load:{native_path}:True")
+    if Path(manager_path).is_file():
+        expected.append(f"load:{manager_path}:True")
     expected.append("load:shader_health_inspector.py:True")
     assert deferred == expected
 
@@ -282,7 +383,17 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
 
     load_module(USER_SETUP_PATH, "shader_health_user_setup_plugin")
 
-    assert deferred == ["deferred", "load:shader_health_inspector.py:True"]
+    bootstrap = load_module(
+        BOOTSTRAP_PATH,
+        "shader_health_inspector_bootstrap_py_user_setup_assert",
+    )
+    expected = ["deferred"]
+    manager_path = str(bootstrap.manager_native_plugin_path())
+    if Path(manager_path).is_file():
+        expected.append(f"load:{manager_path}:True")
+    else:
+        expected.append("load:shader_health_inspector.py:True")
+    assert deferred == expected
 
 
 def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):

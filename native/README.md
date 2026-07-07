@@ -62,13 +62,14 @@ Artifact suffix: `.so` (Linux) or `.bundle` (macOS).
 
 ## Runtime load order
 
-`maya_module/scripts/userSetup.py` tries, in order:
+`maya_module/scripts/userSetup.py` calls `shader_health_inspector_bootstrap.plugin_load_candidates()`:
 
-1. `{year}/shader_health_inspector.mll` (or `.so` / `.bundle`)
-2. `shader_health_inspector.py` (Python fallback)
-3. `shader_health_inspector_bootstrap.install_ui()` (module-only fallback)
+1. `plug-ins/{year}/shader_health_inspector.mll` when the year-specific binary exists (absolute path load)
+2. `plug-ins/shader_health_inspector.mll` when the Plug-in Manager copy exists
+3. `shader_health_inspector.py` (Python fallback)
+4. `shader_health_inspector_bootstrap.install_ui()` when all plug-in loads fail
 
-Source checkouts without a built `.mll` continue to work via the `.py` path.
+Use `describe_dual_install()` in Script Editor to inspect detection output. See [docs/MAYA_INSTALL.md](../docs/MAYA_INSTALL.md).
 
 ## Version string
 

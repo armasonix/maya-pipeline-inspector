@@ -230,7 +230,7 @@ Unload must call `shader_health_inspector_bootstrap.uninstall_ui()` synchronousl
 
 - Issue: `#095 - ADR 0006 native Maya plugin (.mll) strategy` (GitHub #123)
 - Issue: `#096 - CMake scaffold + shader_health_inspector.mll bootstrap` (GitHub #124)
-- Issue: `#097 - Dual install packaging + native load smoke` (GitHub #125, planned)
+- Issue: `#097 - Dual install docs + detection in userSetup` (GitHub #125)
 - ADR: `0001-snapshot-first-core.md`
 - ADR: `0005-gui-first-product-philosophy.md`
 - Document: `docs/ARCHITECTURE.md`

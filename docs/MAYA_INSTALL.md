@@ -14,7 +14,12 @@ Regardless of install method, the UI entrypoints are the same:
 | Shelf tab | `ShaderHealth` | Button: **Shader Health** — opens the dockable panel |
 | Python API | `shader_health.maya.commands` | `install_ui()`, `show_ui()`, `close_ui()`, validation and export commands |
 
-On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers UI installation. **v0.3** tries `cmds.loadPlugin("shader_health_inspector.py")` first, then falls back to [`shader_health_inspector_bootstrap.install_ui()`](../maya_module/scripts/shader_health_inspector_bootstrap.py). **v0.4** ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)) adds a preferred native `.mll` per Maya year (`plug-ins/2024/`, `2025/`, `2026/`) when prebuilt binaries are present; the `.py` plug-in remains the fallback for source checkouts and machines without a devkit build.
+On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers UI installation and runs **dual-install detection** ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)):
+
+1. Year-specific native `.mll` at `plug-ins/{mayaYear}/` (absolute path load)
+2. Top-level native `.mll` at `plug-ins/shader_health_inspector.mll` (Plug-in Manager copy)
+3. Python plug-in `plug-ins/shader_health_inspector.py`
+4. Direct `shader_health_inspector_bootstrap.install_ui()` when plug-in load fails
 
 ## Supported Maya versions (best-effort)
 
@@ -65,41 +70,67 @@ For a persistent studio setup, set `MAYA_MODULE_PATH` in the facility launcher, 
 [`maya_module/shader_health_inspector.mod`](../maya_module/shader_health_inspector.mod):
 
 ```text
-+ shader_health_inspector 0.3 .
++ shader_health_inspector 0.4 .
 PYTHONPATH +:= ../src
 scripts: scripts
 shelves: shelves
 plug-ins: plug-ins
 ```
 
+- `plug-ins: plug-ins` exposes both the Python fallback (`shader_health_inspector.py`) and any built native binaries (`shader_health_inspector.mll`, plus year folders `2024/`, `2025/`, `2026/`).
+
 - `PYTHONPATH +:= ../src` adds the repository `src/` folder so `import shader_health` resolves without a separate `pip` install.
 - `scripts: scripts` puts `maya_module/scripts/` on Maya's script path so `userSetup.py` runs at startup.
 - `shelves: shelves` publishes the optional MEL shelf helper in `maya_module/shelves/`.
-- `plug-ins: plug-ins` registers the Python plugin for **Settings → Plug-in Manager** (v0.3+).
 
-### 4. Startup behavior
+### 4. Dual install detection and startup behavior
+
+[`shader_health_inspector_bootstrap.py`](../maya_module/scripts/shader_health_inspector_bootstrap.py) resolves the active Maya year from `cmds.about(version=True)` and picks the first available delivery path:
+
+| Priority | `detect_install_mode` | File | Notes |
+| --- | --- | --- | --- |
+| 1 | `native_year` | `plug-ins/{year}/shader_health_inspector.mll` | Preferred when built for the running Maya year; loaded by **absolute path** (Maya does not search plug-in subfolders by relative name). |
+| 2 | `native_manager` | `plug-ins/shader_health_inspector.mll` | Top-level copy created by `tools/build_native_plugin.ps1` so Plug-in Manager can browse the native binary. |
+| 3 | `python` | `plug-ins/shader_health_inspector.py` | Default for source checkouts without a local native build. |
+| 4 | `module_only` | _(no plug-in file)_ | `userSetup.py` calls `install_ui()` directly. |
 
 At Maya launch:
 
 1. Maya executes `maya_module/scripts/userSetup.py`.
 2. `userSetup.py` defers `_install_shader_health_ui()`.
-3. **v0.4 target:** deferred hook loads the native `.mll` by **absolute path** from `plug-ins/{mayaYear}/` when that file exists (Maya does not search plug-in subfolders by relative name).
-4. A copy is also placed at `plug-ins/shader_health_inspector.mll` during build so **Plug-in Manager** lists the native binary at the top level.
-5. Otherwise tries `cmds.loadPlugin("shader_health_inspector.py", quiet=True)`.
-6. When a plug-in loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
-7. If plug-in load fails, `userSetup.py` falls back to calling `install_ui()` directly.
-8. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
-9. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
+3. If `shader_health_inspector` is already loaded, startup exits early.
+4. Otherwise `userSetup.py` tries each path from `plugin_load_candidates()` in order.
+5. When a plug-in loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
+6. If every plug-in load fails, `userSetup.py` falls back to `install_ui()` directly.
+7. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf button.
+8. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
+
+Troubleshooting in Script Editor:
+
+```python
+import shader_health_inspector_bootstrap as bootstrap
+from maya import cmds
+
+print(bootstrap.describe_dual_install(
+    bootstrap.resolve_maya_year(lambda: cmds.about(version=True))
+))
+print(cmds.pluginInfo("shader_health_inspector", q=True, path=True))
+```
+
+Expected native load: `plugin_path` ends with `.mll` under `plug-ins/2024/` (or the top-level manager copy).
 
 The bootstrap module also ensures the repository `src/` directory is on `sys.path` before importing `shader_health`, even if the `.mod` path is customized.
 
-## Plug-in Manager: Python fallback and native `.mll` (ADR 0006)
+## Plug-in Manager: dual install (native `.mll` + Python fallback)
 
 | Delivery | File | When used |
 | --- | --- | --- |
-| Native bootstrap (v0.4+, preferred) | `plug-ins/{year}/shader_health_inspector.mll` plus a copy at `plug-ins/shader_health_inspector.mll` for Plug-in Manager | Prebuilt binary matching the running Maya year (2024 / 2025 / 2026) |
-| Python fallback (v0.3+) | `plug-ins/shader_health_inspector.py` | Source checkout, unsupported OS, or no `.mll` for this year |
-| Module-only fallback | `shader_health_inspector_bootstrap.install_ui()` | Plug-in load failed; backward-compatible path |
+| Native year build | `plug-ins/{year}/shader_health_inspector.mll` | Built for the running Maya year; highest priority at startup |
+| Native manager copy | `plug-ins/shader_health_inspector.mll` | Same binary copied to plug-ins root for Plug-in Manager browsing |
+| Python fallback | `plug-ins/shader_health_inspector.py` | Source checkout or machines without a devkit build |
+| Module-only fallback | `shader_health_inspector_bootstrap.install_ui()` | All plug-in loads failed |
+
+Do **not** load both `.mll` and `.py` at the same time — they register the same plug-in name (`shader_health_inspector`). `userSetup.py` loads the first successful candidate only.
 
 The native `.mll` is a **thin C++ bootstrap** only — it calls the same `shader_health_inspector_bootstrap` Python module as the `.py` plug-in. Validation and UI logic are unchanged. Build requirements and per-year matrix: [ADR 0006](adr/0006-native-mll-plugin-strategy.md).
 
@@ -111,16 +142,14 @@ CMake scaffold lives in [`native/`](../native/README.md). From the repo root (Wi
 .\tools\build_native_plugin.ps1 -MayaVersion 2025
 ```
 
-This installs `shader_health_inspector.mll` to `maya_module/plug-ins/2025/`. Source checkouts without a local build continue to use `shader_health_inspector.py`.
+This installs `shader_health_inspector.mll` to `maya_module/plug-ins/{year}/` and copies it to `maya_module/plug-ins/shader_health_inspector.mll` for Plug-in Manager.
 
-## Plug-in Manager vs module-only (v0.3 dual install)
+## Plug-in Manager workflow
 
 | Path | Plug-in Manager | Module `userSetup` |
 | --- | --- | --- |
-| Dual install (recommended v0.3+) | Load/unload `shader_health_inspector` | Tries `loadPlugin` on startup |
-| Module-only (backward compatible) | Plugin not loaded | Direct `install_ui()` fallback |
-
-### Plug-in Manager workflow
+| Dual install (recommended) | Lists `.mll` and `.py` at plug-ins root; year binaries under `2024/` etc. are loaded by absolute path | Detects year → native → `.py` → bootstrap |
+| Module-only (backward compatible) | Plug-in not loaded | Direct `install_ui()` fallback |
 
 1. Ensure `MAYA_MODULE_PATH` points at `maya_module/` (see Option A above).
 2. Open **Settings → Plug-in Manager**.
