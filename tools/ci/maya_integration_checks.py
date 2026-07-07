@@ -70,10 +70,54 @@ def check_gate_report(path: Path) -> None:
     print("Manifest gate smoke OK")
 
 
+def check_deadline_preflight_report(path: Path) -> None:
+    payload = _load(path)
+    block_deadline = payload.get("block_deadline")
+    health_score = payload.get("health_score")
+    # region agent log
+    try:
+        import os
+        import time
+
+        log_path = Path(os.environ.get("DEBUG_SESSION_LOG", "debug-ee1eca.log"))
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "sessionId": "ee1eca",
+                        "runId": os.environ.get("DEBUG_RUN_ID", "ci"),
+                        "hypothesisId": "H-PS",
+                        "location": "tools/ci/maya_integration_checks.py",
+                        "message": "deadline_preflight_report",
+                        "data": {
+                            "block_deadline": block_deadline,
+                            "health_score": health_score,
+                        },
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # endregion
+    if health_score is None:
+        print("::error::Deadline preflight report missing health_score", file=sys.stderr)
+        raise SystemExit(1)
+    print(
+        "Deadline preflight smoke OK "
+        f"health_score={health_score} block_deadline={block_deadline}"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(argv or sys.argv[1:])
     if len(args) != 2:
-        print("usage: maya_integration_checks.py <validate|manifest|gate> <path>", file=sys.stderr)
+        print(
+            "usage: maya_integration_checks.py <validate|manifest|gate|deadline> <path>",
+            file=sys.stderr,
+        )
         return 2
     command, raw_path = args
     path = Path(raw_path)
@@ -83,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         check_manifest(path)
     elif command == "gate":
         check_gate_report(path)
+    elif command == "deadline":
+        check_deadline_preflight_report(path)
     else:
         print(f"unknown command: {command}", file=sys.stderr)
         return 2

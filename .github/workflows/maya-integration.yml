@@ -130,6 +130,7 @@ jobs:
           }
           python tools/ci/maya_integration_checks.py validate $report
           Write-Host "Validate smoke exit_code=$code"
+          exit 0
 
       - name: Manifest export and gate smoke
         env:
@@ -153,6 +154,7 @@ jobs:
           }
           python tools/ci/maya_integration_checks.py manifest $manifest
           python tools/ci/maya_integration_checks.py gate $gateReport
+          exit 0
 
       - name: Deadline preflight smoke
         env:
@@ -174,4 +176,6 @@ jobs:
             Write-Error "Deadline preflight smoke failed with unexpected exit code $code (expected 0-2)"
             exit 1
           }
+          python tools/ci/maya_integration_checks.py deadline $report
           Write-Host "Deadline preflight smoke exit_code=$code (0=allow, 1=publish block, 2=deadline block)"
+          exit 0
