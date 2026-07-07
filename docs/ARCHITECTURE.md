@@ -26,6 +26,8 @@ Integration surfaces (pipeline TDs / farm / CI)
   Deadline hook / Farm tab  ->  integrations.deadline  ->  validation_pipeline
 ```
 
+See [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) for the v0.4 Deadline 10 studio guide (Web Service, pool/group routing, GUI + headless flows).
+
 Design constraints for panel work:
 
 - default flows: three clicks or fewer to an actionable validate/fix/submit result;

@@ -286,7 +286,7 @@ When using Plug-in Manager, unloading `shader_health_inspector` runs the same cl
 
 - [`USER_GUIDE.md`](USER_GUIDE.md) — artist and TD workflow inside the panel
 - [`integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) — publish gate example
-- [`integrations/deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md) — farm submit gate example
+- [`integrations/deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
 
 ## Automated checks
 
