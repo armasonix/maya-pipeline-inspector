@@ -190,9 +190,12 @@ class FileDependencySnapshot:
     latest_version: Optional[str] = None
     mtime_utc: Optional[str] = None
     optimized_path: Optional[str] = None
+    optimized_kind: Optional[str] = None
     optimized_exists: Optional[bool] = None
     optimized_mtime_utc: Optional[str] = None
     optimized_is_stale: Optional[bool] = None
+    optimized_udim_tiles: list[int] = field(default_factory=list)
+    optimized_missing_udim_tiles: list[int] = field(default_factory=list)
     size_bytes: Optional[int] = None
     max_dimension: Optional[int] = None
     image_info: Optional[ImageInfo] = None
@@ -213,9 +216,12 @@ class FileDependencySnapshot:
             "latest_version": self.latest_version,
             "mtime_utc": self.mtime_utc,
             "optimized_path": self.optimized_path,
+            "optimized_kind": self.optimized_kind,
             "optimized_exists": self.optimized_exists,
             "optimized_mtime_utc": self.optimized_mtime_utc,
             "optimized_is_stale": self.optimized_is_stale,
+            "optimized_udim_tiles": list(self.optimized_udim_tiles),
+            "optimized_missing_udim_tiles": list(self.optimized_missing_udim_tiles),
             "size_bytes": self.size_bytes,
             "max_dimension": self.max_dimension,
             "image_info": self.image_info.to_dict() if self.image_info else None,
@@ -243,9 +249,12 @@ class FileDependencySnapshot:
             latest_version=data.get("latest_version"),
             mtime_utc=data.get("mtime_utc"),
             optimized_path=data.get("optimized_path"),
+            optimized_kind=data.get("optimized_kind"),
             optimized_exists=_as_optional_bool(data.get("optimized_exists")),
             optimized_mtime_utc=data.get("optimized_mtime_utc"),
             optimized_is_stale=_as_optional_bool(data.get("optimized_is_stale")),
+            optimized_udim_tiles=_as_int_list(data.get("optimized_udim_tiles")),
+            optimized_missing_udim_tiles=_as_int_list(data.get("optimized_missing_udim_tiles")),
             size_bytes=data.get("size_bytes"),
             max_dimension=data.get("max_dimension"),
             image_info=image_info,

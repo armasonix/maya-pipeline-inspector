@@ -1,0 +1,24 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "common.texture.optimized.exists",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false
+        }
+      ]
+    },
+    "deadline_critical": {
+      "failed": [
+        {
+          "rule_id": "common.texture.optimized.exists",
+          "severity": "error",
+          "block_publish": false,
+          "block_deadline": true
+        }
+      ]
+    }
+  }
+}

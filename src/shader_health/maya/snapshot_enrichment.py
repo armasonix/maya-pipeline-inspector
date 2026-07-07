@@ -33,6 +33,7 @@ from shader_health.core.models import ImageInfo, MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
 from shader_health.maya.complexity_profiler import profile_material_complexity
 from shader_health.maya.displacement_enrichment import enrich_displacement_metadata
+from shader_health.maya.optimized_texture_enrichment import enrich_optimized_texture_metadata
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
@@ -284,14 +285,16 @@ def _enrich_dependency_image_metadata(
         width, height = read_image_dimensions(resolved)
 
     if width is None and height is None:
-        return dependency
+        return enrich_optimized_texture_metadata(dependency)
 
     max_dimension = max(width or 0, height or 0) or None
     image_info = ImageInfo(width=width, height=height)
-    return replace(
-        dependency,
-        image_info=image_info,
-        max_dimension=max_dimension,
+    return enrich_optimized_texture_metadata(
+        replace(
+            dependency,
+            image_info=image_info,
+            max_dimension=max_dimension,
+        )
     )
 
 

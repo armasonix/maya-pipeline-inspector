@@ -380,7 +380,14 @@ Represents a texture or renderer file dependency.
     "bit_depth": "16f",
     "color_space": null,
     "compression": null
-  }
+  },
+  "optimized_path": "D:/show/assets/char/demo/tex/roughness_v001.<UDIM>.tx",
+  "optimized_kind": "udim_tx",
+  "optimized_exists": false,
+  "optimized_mtime_utc": null,
+  "optimized_is_stale": null,
+  "optimized_udim_tiles": [1001, 1002],
+  "optimized_missing_udim_tiles": [1003]
 }
 ```
 
@@ -401,6 +408,13 @@ Represents a texture or renderer file dependency.
 | `mtime_utc` | string or null | No | Last modification time if known. |
 | `size_bytes` | integer or null | No | File size if known. |
 | `image_info` | object or null | No | Optional image metadata. |
+| `optimized_path` | string or null | No | Resolved `.tx` path (flat file or UDIM pattern). |
+| `optimized_kind` | string or null | No | `tx` for single-file optimized texture; `udim_tx` for tiled UDIM `.tx`. |
+| `optimized_exists` | boolean or null | No | Whether expected `.tx` file or full UDIM tile set exists. |
+| `optimized_mtime_utc` | string or null | No | `.tx` mtime when a single flat `.tx` is used. |
+| `optimized_is_stale` | boolean or null | No | True when source texture is newer than `.tx` (farm should re-bake). |
+| `optimized_udim_tiles` | array[integer] | Yes | UDIM tile numbers with existing `.tx` files. |
+| `optimized_missing_udim_tiles` | array[integer] | Yes | UDIM tiles expected from source but missing `.tx`. |
 
 ## ImageInfo
 

@@ -67,10 +67,19 @@
       "enabled": false
     },
     "common.texture.optimized.exists": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
     },
     "common.texture.optimized.fresh": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
+    },
+    "common.texture.optimized.udim_tx.missing": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
     },
     "common.texture.version.latest": {
       "enabled": false

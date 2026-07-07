@@ -60,6 +60,15 @@
         "max": 2.5
       }
     },
+    "common.texture.optimized.exists": {
+      "block_publish": true
+    },
+    "common.texture.optimized.fresh": {
+      "block_publish": true
+    },
+    "common.texture.optimized.udim_tx.missing": {
+      "block_publish": true
+    },
     "vray.scene.plugin_missing.error": {
       "block_publish": true
     },
