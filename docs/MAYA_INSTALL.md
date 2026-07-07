@@ -276,7 +276,7 @@ Real Maya integration runs on a **self-hosted runner** labeled `self-hosted` and
 
 #### Runner setup
 
-1. Register a self-hosted runner with labels **`self-hosted`** and **`maya`** (Git Bash recommended on Windows for workflow bash steps).
+1. Register a self-hosted runner with labels **`self-hosted`** and **`maya`**. **Git Bash is not required** — the workflow uses **PowerShell (`pwsh`)** and Python on Windows runners.
 2. Install Autodesk Maya on that machine.
 3. Configure **one** of these so the workflow can find `mayapy`:
    - Repository secret **`MAYA_PY`** (recommended) — absolute path, e.g. `C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe`
