@@ -1,6 +1,6 @@
 # v0.3 Development Plan — Pipeline Automation & Manifest Depth
 
-**Status:** In progress (v0.3.0 not yet released)  
+**Status:** **v0.3.0 shipped** (2026-07-07)  
 **Baseline release:** [CHANGELOG.md](../CHANGELOG.md) — `[0.2.0]`  
 **Workflow:** [V0_3_WORKFLOW.md](V0_3_WORKFLOW.md) — one issue, one commit on `dev`
 

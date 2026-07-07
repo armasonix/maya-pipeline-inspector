@@ -7,16 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-07
+
+**Maya Shader Health Inspector v0.3 — Pipeline Automation & Manifest Depth**
+
+Extends v0.2 with manifest schema 1.1, graph fingerprinting, manifest regression gates, headless `apply-fixes`, texture resolution budgets by asset class, and Maya plugin dual-install.
+
 ### Added
 
-- Headless CLI `--asset-class-id` on `validate`, `gate`, `manifest`, and `apply-fixes` (parity with Maya UI asset class overlay).
-- `shader_health.util.paths` with `normalize_cli_path()` and `resolve_cli_path()` for Git Bash MSYS paths on Windows.
-- [`docs/CLI_TESTING.md`](CLI_TESTING.md) — one-liner smoke commands and GUI↔CLI parity script (`tools/compare_parity.py`).
+#### Plugin and install (M15)
+
+- Python MPx plugin stub (`shader_health_inspector.py`) with dual install path (plugin + module bootstrap).
+- [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) — Plug-in Manager vs module-only policy and `autoLoad` studio guidance.
+
+#### Manifest fingerprint and schema 1.1 (M16)
+
+- Material graph fingerprint algorithm for deterministic passport hashing.
+- `build_shader_manifest()` extended for schema **1.1** (`manifest_schema_version`, fingerprints, enrichment metadata).
+- Manifest schema 1.1 migration notes in [`docs/SNAPSHOT_SCHEMA.md`](docs/SNAPSHOT_SCHEMA.md).
+- Manifest diff fingerprint regression hints in diff reports.
+
+#### Manifest gates and preflight (M17)
+
+- Profile `manifest_diff_policy` overrides per workflow profile.
+- `shader_health gate` CLI and `validate --baseline-manifest` regression evaluation.
+- Publish preflight optional manifest gate in [`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py).
+
+#### Headless apply-fixes (M18)
+
+- [ADR 0004](docs/adr/0004-headless-apply-fixes-policy.md) — headless apply-fixes policy.
+- `shader_health apply-fixes` subcommand with `--dry-run`, `--confirm-risky`, and supervisor policy flags.
+- Fix apply audit integration and documented exit codes.
+
+#### Texture resolution budgets (M19)
+
+- Texture dimension metadata enrichment (including lightweight OpenEXR header probe).
+- Resolution budget rules: `asset_class_hero`, `asset_class_prop`, `asset_class_background` profile overlays.
+- Asset class dropdown in Maya UI; `--asset-class-id` on headless `validate`, `gate`, `manifest`, and `apply-fixes`.
+
+#### Pipeline UX and automation polish (M20)
+
+- **Compare to Approved Manifest** UI shortcut (sidecar-first, no file picker).
+- `shader_health manifest` headless CLI subcommand.
+- Maya CI manifest export + gate smoke in [`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml) (`workflow_dispatch`).
+- Maya UI: **Publish Preflight**, **Manifest Gate**, tabbed panel layout polish.
+- [`docs/CLI_TESTING.md`](docs/CLI_TESTING.md) and [`tools/compare_parity.py`](tools/compare_parity.py) for GUI↔CLI parity smoke.
+- `shader_health.util.paths` — `normalize_cli_path()` / `resolve_cli_path()` for Git Bash MSYS paths on Windows.
+- Headless demo scene: `examples/broken_scene/shader_health_demo_broken_headless.ma`.
 
 ### Fixed
 
-- `mayapy` scene commands call `maya.standalone.initialize()` before `cmds.file`, fixing `maya.cmds has no attribute 'file'` on headless validate/manifest/apply-fixes.
-- `ci_headless` is accepted as a standalone pipeline profile in `compose_profiles()` (was: config error "Expected workflow profile").
+- `mayapy` scene commands call `maya.standalone.initialize()` before `cmds.file` (fixes `maya.cmds has no attribute 'file'`).
+- `ci_headless` accepted as standalone pipeline profile in `compose_profiles()`.
+- GUI Export Shader Manifest uses shared `build_shader_manifest()` path (schema 1.1 parity with CLI).
+
+### Known limitations (v0.3)
+
+- Texture resolution probing is filesystem/header-based (no render-farm TX cache integration).
+- `cleanup_orphan` auto-delete remains preview-only per ADR 0003.
+- Public CI runs without Maya; optional `workflow_dispatch` Maya job only.
+- Rule authoring remains JSON-only (no rule editor UI).
+
+### Install
+
+Same as v0.2 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
+**Planning for v0.4+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md), [V0_3_DEVELOPMENT_PLAN.md](docs/V0_3_DEVELOPMENT_PLAN.md) (completed).
 
 ## [0.2.0] - 2026-07-06
 
@@ -189,5 +245,6 @@ python -m shader_health validate examples/broken_scene/shader_health_demo_broken
 - Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Deadline preflight: [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md)
 
+[0.3.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.3.0
 [0.2.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.2.0
 [0.1.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.1.0

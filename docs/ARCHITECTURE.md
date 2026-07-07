@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
 
-Status: **v0.2.0 shipped** (2026-07-06). Core engine, Maya integration, dockable UI, headless CLI, and packaged rule/profile assets are implemented.
+Status: **v0.3.0 shipped** (2026-07-07). Core engine, Maya integration, dockable UI, headless CLI, manifest gates, and packaged rule/profile assets are implemented.
 
 ## Goals
 
