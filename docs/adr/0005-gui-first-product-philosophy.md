@@ -147,4 +147,5 @@ When adding a feature, use this checklist:
 - ADR: `0006-native-mll-plugin-strategy.md` (planned, #095)
 - Document: `docs/ARCHITECTURE.md`
 - Document: `docs/USER_GUIDE.md`
+- Document: `docs/MAYA_UX_AUDIT_v0.4.md` (planned, #092)
 - Document: `docs/V0_4_DEVELOPMENT_PLAN.md` (planned)
