@@ -429,6 +429,62 @@ class ShaderComplexityMetadata:
 
 
 @dataclass(frozen=True)
+class DisplacementRiskMetadata:
+    """Displacement risk metrics computed during snapshot enrichment."""
+
+    has_displacement: bool = False
+    displacement_node_ids: list[str] = field(default_factory=list)
+    max_amount: Optional[float] = None
+    texture_linked: bool = False
+    subdivision_enabled: bool = False
+    bounds_min: Optional[float] = None
+    bounds_max: Optional[float] = None
+    bounds_span: Optional[float] = None
+    renderer_flags: dict[str, Any] = field(default_factory=dict)
+    force_displacement: bool = False
+    vector_displacement: bool = False
+    risk_score: float = 0.0
+    risk_hint: str = "low"
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "has_displacement": self.has_displacement,
+            "displacement_node_ids": list(self.displacement_node_ids),
+            "max_amount": self.max_amount,
+            "texture_linked": self.texture_linked,
+            "subdivision_enabled": self.subdivision_enabled,
+            "bounds_min": self.bounds_min,
+            "bounds_max": self.bounds_max,
+            "bounds_span": self.bounds_span,
+            "renderer_flags": dict(self.renderer_flags),
+            "force_displacement": self.force_displacement,
+            "vector_displacement": self.vector_displacement,
+            "risk_score": self.risk_score,
+            "risk_hint": self.risk_hint,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> DisplacementRiskMetadata:
+        raw_flags = data.get("renderer_flags", {})
+        renderer_flags = dict(raw_flags) if isinstance(raw_flags, Mapping) else {}
+        return cls(
+            has_displacement=bool(data.get("has_displacement", False)),
+            displacement_node_ids=_as_str_list(data.get("displacement_node_ids")),
+            max_amount=_as_optional_float(data.get("max_amount")),
+            texture_linked=bool(data.get("texture_linked", False)),
+            subdivision_enabled=bool(data.get("subdivision_enabled", False)),
+            bounds_min=_as_optional_float(data.get("bounds_min")),
+            bounds_max=_as_optional_float(data.get("bounds_max")),
+            bounds_span=_as_optional_float(data.get("bounds_span")),
+            renderer_flags=renderer_flags,
+            force_displacement=bool(data.get("force_displacement", False)),
+            vector_displacement=bool(data.get("vector_displacement", False)),
+            risk_score=float(data.get("risk_score", 0.0)),
+            risk_hint=str(data.get("risk_hint", "low")),
+        )
+
+
+@dataclass(frozen=True)
 class MaterialSnapshot:
     """Material-level summary extracted from the shader graph."""
 
@@ -444,6 +500,7 @@ class MaterialSnapshot:
     graph_depth: int = 0
     graph_fingerprint: str = ""
     complexity_metadata: Optional[ShaderComplexityMetadata] = None
+    displacement_metadata: Optional[DisplacementRiskMetadata] = None
     vray_metadata: Optional[VrayMaterialMetadata] = None
     arnold_metadata: Optional[ArnoldMaterialMetadata] = None
 
@@ -463,6 +520,8 @@ class MaterialSnapshot:
         }
         if self.complexity_metadata is not None:
             payload["complexity_metadata"] = self.complexity_metadata.to_dict()
+        if self.displacement_metadata is not None:
+            payload["displacement_metadata"] = self.displacement_metadata.to_dict()
         if self.vray_metadata is not None:
             payload["vray_metadata"] = self.vray_metadata.to_dict()
         if self.arnold_metadata is not None:
@@ -483,6 +542,10 @@ class MaterialSnapshot:
         complexity_metadata = None
         if isinstance(raw_complexity_metadata, Mapping):
             complexity_metadata = ShaderComplexityMetadata.from_dict(raw_complexity_metadata)
+        raw_displacement_metadata = data.get("displacement_metadata")
+        displacement_metadata = None
+        if isinstance(raw_displacement_metadata, Mapping):
+            displacement_metadata = DisplacementRiskMetadata.from_dict(raw_displacement_metadata)
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -496,6 +559,7 @@ class MaterialSnapshot:
             graph_depth=int(data.get("graph_depth", 0)),
             graph_fingerprint=str(data.get("graph_fingerprint", "")),
             complexity_metadata=complexity_metadata,
+            displacement_metadata=displacement_metadata,
             vray_metadata=vray_metadata,
             arnold_metadata=arnold_metadata,
         )

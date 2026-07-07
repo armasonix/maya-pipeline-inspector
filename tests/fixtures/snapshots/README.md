@@ -14,6 +14,8 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `texture_freshness_latest.json` | — | Common | Texture version freshness pass (`v003` is latest) |
 | `shader_complexity_layered_graph.json` | — | Common | Complexity profiler depth histogram and farm-cost enrichment |
 | `shader_complexity_over_budget.json` | — | V-Ray | VRayBlendMtl / VRayLayeredTex expensive-node profiling |
+| `displacement_risk_safe.json` | `displacement_risk_safe.expectations.json` | V-Ray | Displacement risk pass (no displacement linked) |
+| `displacement_risk_high_vray.json` | `displacement_risk_high_vray.expectations.json` | V-Ray | Displacement amount, bounds, subdivision, and risk-score failures |
 
 ## Adding a renderer fixture case
 

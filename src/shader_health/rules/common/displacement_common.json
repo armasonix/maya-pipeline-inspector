@@ -37,7 +37,7 @@
       "message": "Displacement amount is above the configured production risk budget.",
       "why": "Excessive displacement can explode render time, memory, tessellation, and silhouette changes. Keeping amount within a profile-defined budget reduces farm risk.",
       "match": {
-        "node_type": ["displacementShader", "VRayDisplacement"]
+        "node_type": ["displacementShader", "VRayDisplacement", "aiDisplacement"]
       },
       "check": {
         "type": "numeric_max",
@@ -55,6 +55,84 @@
         "attribute": "scale",
         "value": 0.0,
         "risk": "high"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.displacement.risk_score.max",
+      "name": "Material displacement risk score must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material displacement risk score exceeds the configured budget.",
+      "why": "Weighted displacement risk combines amount, subdivision, bounds, and renderer flags into a single farm-risk signal for TD review.",
+      "match": {
+        "displacement_metadata.has_displacement": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "displacement_metadata.risk_score",
+        "max": 8.0
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.displacement.subdivision.enabled",
+      "name": "Displacement with subdivision requires review",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material uses displacement with subdivision enabled.",
+      "why": "Subdivision combined with displacement increases tessellation cost and farm memory pressure. These materials need TD review before publish.",
+      "match": {
+        "displacement_metadata.has_displacement": true
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "displacement_metadata.subdivision_enabled",
+        "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.displacement.bounds_span.max",
+      "name": "Displacement bounds span must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material displacement bounds span exceeds the configured budget.",
+      "why": "Wide displacement bounds increase silhouette change and memory cost. Tighter bounds keep farm renders predictable.",
+      "match": {
+        "displacement_metadata.has_displacement": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "displacement_metadata.bounds_span",
+        "max": 3.0
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
       }
     }
   ]

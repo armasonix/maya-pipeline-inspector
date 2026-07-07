@@ -42,6 +42,27 @@
         "max": 14
       }
     },
+    "common.displacement.risk_score.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 6.0
+      }
+    },
+    "common.displacement.subdivision.enabled": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true
+    },
+    "common.displacement.bounds_span.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 2.0
+      }
+    },
     "common.texture.duplicates.same_path": {
       "enabled": false
     },
@@ -66,6 +87,12 @@
     "vray.material.displacement_review.warning": {
       "block_deadline": true
     },
+    "vray.material.displacement_force.warning": {
+      "block_deadline": true
+    },
+    "vray.material.displacement_bounds.warning": {
+      "block_deadline": true
+    },
     "vray.material.trace_depth.warning": {
       "block_deadline": true
     },
@@ -73,6 +100,9 @@
       "block_deadline": true
     },
     "arnold.material.displacement_review.warning": {
+      "block_deadline": true
+    },
+    "arnold.material.displacement_bounds.warning": {
       "block_deadline": true
     },
     "arnold.material.transmission_depth.warning": {

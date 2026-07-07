@@ -158,6 +158,33 @@
     },
     {
       "schema_version": "1.0",
+      "id": "arnold.material.displacement_bounds.warning",
+      "name": "Arnold displacement bounds span exceeds budget",
+      "enabled": true,
+      "renderer": ["arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Arnold material displacement bounds span exceeds the configured budget.",
+      "why": "Wide Arnold displacement bounds increase silhouette change and memory cost. Enriched displacement metadata exposes bounds span for renderer-specific policy checks.",
+      "match": {
+        "node_type": ["aiStandardSurface", "aiToon", "aiCarPaint", "aiLayerShader", "aiMixShader"],
+        "displacement_metadata.has_displacement": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "displacement_metadata.bounds_span",
+        "max": 2.5
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
       "id": "arnold.scene.stand_in_review.warning",
       "name": "Arnold stand-in nodes require review",
       "enabled": true,

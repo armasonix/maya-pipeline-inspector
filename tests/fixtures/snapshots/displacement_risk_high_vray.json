@@ -1,0 +1,105 @@
+{
+  "connections": [
+    {
+      "dst_attr": "displacement",
+      "dst_node": "node:displacementShader1",
+      "semantic": "displacement",
+      "src_attr": "outAlpha",
+      "src_node": "node:file_disp"
+    }
+  ],
+  "file_dependencies": [
+    {
+      "attr": "fileTextureName",
+      "exists": true,
+      "extension": ".exr",
+      "node_id": "node:file_disp",
+      "raw_path": "textures/demo_displacement_v001.1001.exr",
+      "resolved_path": "textures/demo_displacement_v001.1001.exr"
+    }
+  ],
+  "materials": [
+    {
+      "assigned_shapes": ["mesh:disp_body"],
+      "displacement_nodes": ["node:displacementShader1"],
+      "graph_depth": 2,
+      "graph_fingerprint": "",
+      "graph_node_count": 3,
+      "name": "hero_disp_mtl",
+      "node_id": "node:hero_disp_mtl",
+      "renderer_family": "vray",
+      "shading_engines": ["node:disp_sg"],
+      "texture_nodes": ["node:file_disp"],
+      "type_name": "VRayMtl"
+    }
+  ],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {
+        "fde": true,
+        "igi": true
+      },
+      "classification": ["material"],
+      "full_name": "hero_disp_mtl",
+      "id": "node:hero_disp_mtl",
+      "locked": false,
+      "name": "hero_disp_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "vray",
+      "type_name": "VRayMtl"
+    },
+    {
+      "attrs": {
+        "amount": 12,
+        "maxValue": 4,
+        "minValue": 0,
+        "scale": 12
+      },
+      "classification": ["displacement"],
+      "full_name": "displacementShader1",
+      "id": "node:displacementShader1",
+      "locked": false,
+      "name": "displacementShader1",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "displacementShader"
+    },
+    {
+      "attrs": {
+        "colorSpace": "Raw",
+        "fileTextureName": "textures/demo_displacement_v001.1001.exr"
+      },
+      "classification": ["texture", "file"],
+      "full_name": "file_disp",
+      "id": "node:file_disp",
+      "locked": false,
+      "name": "file_disp",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "file"
+    }
+  ],
+  "references": [],
+  "renderer": "vray",
+  "scan_scope": "scene",
+  "scene_path": "examples/broken_scene/shader_health_demo_broken.ma",
+  "scanned_at_utc": "2026-07-07T12:00:00Z",
+  "schema_version": "1.0",
+  "shading_engines": [
+    {
+      "displacement_shader": "node:displacementShader1",
+      "members": ["mesh:disp_body"],
+      "name": "disp_sg",
+      "node_id": "node:disp_sg",
+      "surface_shader": "node:hero_disp_mtl",
+      "volume_shader": null
+    }
+  ]
+}

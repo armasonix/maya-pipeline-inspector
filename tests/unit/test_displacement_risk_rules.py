@@ -162,7 +162,7 @@ def test_displacement_amount_rule_pack_has_production_defaults():
     assert rule.scope == "node"
     assert rule.severity == "error"
     assert rule.match.criteria == {
-        "node_type": ["displacementShader", "VRayDisplacement"]
+        "node_type": ["displacementShader", "VRayDisplacement", "aiDisplacement"]
     }
     assert rule.check.type == "numeric_max"
     assert rule.check.params["attribute"] == "amount"
@@ -210,3 +210,61 @@ def test_displacement_amount_rule_skips_missing_numeric_metadata():
 
     assert result.status == "skipped"
     assert result.evidence["reason"] == "numeric_max_requires_numeric_values"
+
+
+def test_displacement_risk_score_rule_fails_above_threshold():
+    from shader_health.core import DisplacementRiskMetadata, MaterialSnapshot
+
+    rule = load_rule(DISPLACEMENT_RULE_PATH, "common.displacement.risk_score.max")
+    snapshot = GraphSnapshot(
+        scene_path="demo.ma",
+        renderer="vray",
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_material",
+                name="hero_material",
+                type_name="VRayMtl",
+                renderer_family="vray",
+                displacement_metadata=DisplacementRiskMetadata(
+                    has_displacement=True,
+                    risk_score=9.5,
+                ),
+            )
+        ],
+    )
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "failed"
+    assert result.plug == "displacement_metadata.risk_score"
+    assert result.current_value == 9.5
+    assert result.expected_value == 8.0
+
+
+def test_displacement_subdivision_rule_fails_when_subdivision_enabled():
+    from shader_health.core import DisplacementRiskMetadata, MaterialSnapshot
+
+    rule = load_rule(DISPLACEMENT_RULE_PATH, "common.displacement.subdivision.enabled")
+    snapshot = GraphSnapshot(
+        scene_path="demo.ma",
+        renderer="vray",
+        materials=[
+            MaterialSnapshot(
+                node_id="node:hero_material",
+                name="hero_material",
+                type_name="VRayMtl",
+                renderer_family="vray",
+                displacement_metadata=DisplacementRiskMetadata(
+                    has_displacement=True,
+                    subdivision_enabled=True,
+                ),
+            )
+        ],
+    )
+
+    result = ValidationEngine().validate(snapshot, [rule])[0]
+
+    assert result.status == "failed"
+    assert result.plug == "displacement_metadata.subdivision_enabled"
+    assert result.current_value is True
+    assert result.expected_value is False

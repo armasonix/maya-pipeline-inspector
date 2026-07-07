@@ -32,6 +32,7 @@ from shader_health.core.image_metadata import read_image_dimensions
 from shader_health.core.models import ImageInfo, MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
 from shader_health.maya.complexity_profiler import profile_material_complexity
+from shader_health.maya.displacement_enrichment import enrich_displacement_metadata
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
@@ -46,7 +47,9 @@ def prepare_snapshot_for_validation(snapshot: GraphSnapshot) -> GraphSnapshot:
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
     resolved = resolver.apply_to_snapshot(enriched)
     propagated = _with_propagated_semantic_slots(resolved)
-    return enrich_arnold_metadata(enrich_vray_metadata(propagated))
+    return enrich_displacement_metadata(
+        enrich_arnold_metadata(enrich_vray_metadata(propagated))
+    )
 
 
 def enrich_rule_results(

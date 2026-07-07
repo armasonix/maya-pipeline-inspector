@@ -202,6 +202,7 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
 | `graph_depth` | integer | Yes | Approximate upstream graph depth. |
 | `graph_fingerprint` | string | Yes | Stable graph fingerprint if computed, otherwise empty string. |
 | `complexity_metadata` | object or null | No | Shader complexity profiler payload computed during enrichment. |
+| `displacement_metadata` | object or null | No | Displacement risk analyzer payload computed during enrichment. |
 | `vray_metadata` | object or null | No | V-Ray enrichment payload when the material is a V-Ray shader type. |
 | `arnold_metadata` | object or null | No | Arnold enrichment payload when the material is an Arnold shader type. |
 
@@ -234,6 +235,47 @@ Attached during validation enrichment from upstream graph traversal and renderer
 | `expensive_node_types` | object | Per node-type counts for expensive nodes. |
 | `farm_cost_score` | number | Weighted render-cost estimate for the material subgraph. |
 | `farm_cost_hint` | string | Cost band: `low`, `medium`, `high`, or `critical`. |
+
+### Displacement risk metadata (`displacement_metadata`)
+
+Attached during validation enrichment from displacement nodes, bounds, subdivision flags, and renderer-specific attrs.
+
+```json
+{
+  "has_displacement": true,
+  "displacement_node_ids": ["node:displacementShader1"],
+  "max_amount": 12.0,
+  "texture_linked": true,
+  "subdivision_enabled": true,
+  "bounds_min": 0.0,
+  "bounds_max": 4.0,
+  "bounds_span": 4.0,
+  "renderer_flags": {
+    "force_displacement": true,
+    "subdivision_enabled": true
+  },
+  "force_displacement": true,
+  "vector_displacement": false,
+  "risk_score": 22.5,
+  "risk_hint": "critical"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `has_displacement` | boolean | Material or shading engine has displacement nodes linked. |
+| `displacement_node_ids` | array[string] | Displacement node IDs in the material network. |
+| `max_amount` | number or null | Highest displacement amount found on linked nodes. |
+| `texture_linked` | boolean | Upstream displacement texture dependency is present. |
+| `subdivision_enabled` | boolean | Subdivision/displacement flags detected on the material. |
+| `bounds_min` | number or null | Minimum displacement bound across linked nodes. |
+| `bounds_max` | number or null | Maximum displacement bound across linked nodes. |
+| `bounds_span` | number or null | `bounds_max - bounds_min` when both bounds are available. |
+| `renderer_flags` | object | Renderer-specific displacement flags captured during enrichment. |
+| `force_displacement` | boolean | V-Ray force-displacement flag detected. |
+| `vector_displacement` | boolean | Vector displacement flag detected on the material node. |
+| `risk_score` | number | Weighted displacement farm-risk estimate. |
+| `risk_hint` | string | Risk band: `low`, `medium`, `high`, or `critical`. |
 
 ### V-Ray material metadata (`vray_metadata`)
 

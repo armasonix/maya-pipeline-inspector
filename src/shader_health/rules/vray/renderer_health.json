@@ -155,6 +155,60 @@
         "waiver_allowed": true,
         "auto_fix_allowed": false
       }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "vray.material.displacement_force.warning",
+      "name": "V-Ray force displacement flag requires review",
+      "enabled": true,
+      "renderer": ["vray"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "V-Ray material has force displacement enabled.",
+      "why": "Force displacement bypasses renderer heuristics and can increase tessellation cost on farm workers. These materials need TD review before publish.",
+      "match": {
+        "node_type": ["VRayMtl", "VRayMtl2", "VRayAlSurface", "VRayBlendMtl", "VRayFastSSS2"],
+        "displacement_metadata.has_displacement": true
+      },
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "displacement_metadata.force_displacement",
+        "expected": false
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "vray.material.displacement_bounds.warning",
+      "name": "V-Ray displacement bounds span exceeds budget",
+      "enabled": true,
+      "renderer": ["vray"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "V-Ray material displacement bounds span exceeds the configured budget.",
+      "why": "Wide V-Ray displacement bounds increase silhouette change and memory cost. Enriched displacement metadata exposes bounds span for renderer-specific policy checks.",
+      "match": {
+        "node_type": ["VRayMtl", "VRayMtl2", "VRayAlSurface", "VRayBlendMtl", "VRayFastSSS2"],
+        "displacement_metadata.has_displacement": true
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "displacement_metadata.bounds_span",
+        "max": 2.5
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
     }
   ]
 }

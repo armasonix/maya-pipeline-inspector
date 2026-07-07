@@ -42,10 +42,34 @@
         "max": 16
       }
     },
+    "common.displacement.risk_score.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 6.0
+      }
+    },
+    "common.displacement.subdivision.enabled": {
+      "enabled": true,
+      "block_publish": true
+    },
+    "common.displacement.bounds_span.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 2.5
+      }
+    },
     "vray.scene.plugin_missing.error": {
       "block_publish": true
     },
     "vray.material.displacement_review.warning": {
+      "block_publish": true
+    },
+    "vray.material.displacement_force.warning": {
+      "block_publish": true
+    },
+    "vray.material.displacement_bounds.warning": {
       "block_publish": true
     },
     "vray.material.texture_budget.warning": {
@@ -55,6 +79,9 @@
       "block_publish": true
     },
     "arnold.material.displacement_review.warning": {
+      "block_publish": true
+    },
+    "arnold.material.displacement_bounds.warning": {
       "block_publish": true
     },
     "arnold.material.texture_budget.warning": {
