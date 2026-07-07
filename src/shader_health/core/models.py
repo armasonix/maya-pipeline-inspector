@@ -389,6 +389,46 @@ class ArnoldSceneMetadata:
 
 
 @dataclass(frozen=True)
+class ShaderComplexityMetadata:
+    """Shader graph complexity metrics computed during snapshot enrichment."""
+
+    depth_histogram: dict[str, int] = field(default_factory=dict)
+    expensive_node_count: int = 0
+    expensive_node_types: dict[str, int] = field(default_factory=dict)
+    farm_cost_score: float = 0.0
+    farm_cost_hint: str = "low"
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "depth_histogram": dict(self.depth_histogram),
+            "expensive_node_count": self.expensive_node_count,
+            "expensive_node_types": dict(self.expensive_node_types),
+            "farm_cost_score": self.farm_cost_score,
+            "farm_cost_hint": self.farm_cost_hint,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ShaderComplexityMetadata:
+        raw_histogram = data.get("depth_histogram", {})
+        depth_histogram: dict[str, int] = {}
+        if isinstance(raw_histogram, Mapping):
+            depth_histogram = {str(key): int(value) for key, value in raw_histogram.items()}
+        raw_expensive_types = data.get("expensive_node_types", {})
+        expensive_node_types: dict[str, int] = {}
+        if isinstance(raw_expensive_types, Mapping):
+            expensive_node_types = {
+                str(key): int(value) for key, value in raw_expensive_types.items()
+            }
+        return cls(
+            depth_histogram=depth_histogram,
+            expensive_node_count=int(data.get("expensive_node_count", 0)),
+            expensive_node_types=expensive_node_types,
+            farm_cost_score=float(data.get("farm_cost_score", 0.0)),
+            farm_cost_hint=str(data.get("farm_cost_hint", "low")),
+        )
+
+
+@dataclass(frozen=True)
 class MaterialSnapshot:
     """Material-level summary extracted from the shader graph."""
 
@@ -403,6 +443,7 @@ class MaterialSnapshot:
     graph_node_count: int = 0
     graph_depth: int = 0
     graph_fingerprint: str = ""
+    complexity_metadata: Optional[ShaderComplexityMetadata] = None
     vray_metadata: Optional[VrayMaterialMetadata] = None
     arnold_metadata: Optional[ArnoldMaterialMetadata] = None
 
@@ -420,6 +461,8 @@ class MaterialSnapshot:
             "graph_depth": self.graph_depth,
             "graph_fingerprint": self.graph_fingerprint,
         }
+        if self.complexity_metadata is not None:
+            payload["complexity_metadata"] = self.complexity_metadata.to_dict()
         if self.vray_metadata is not None:
             payload["vray_metadata"] = self.vray_metadata.to_dict()
         if self.arnold_metadata is not None:
@@ -436,6 +479,10 @@ class MaterialSnapshot:
         arnold_metadata = None
         if isinstance(raw_arnold_metadata, Mapping):
             arnold_metadata = ArnoldMaterialMetadata.from_dict(raw_arnold_metadata)
+        raw_complexity_metadata = data.get("complexity_metadata")
+        complexity_metadata = None
+        if isinstance(raw_complexity_metadata, Mapping):
+            complexity_metadata = ShaderComplexityMetadata.from_dict(raw_complexity_metadata)
         return cls(
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
@@ -448,6 +495,7 @@ class MaterialSnapshot:
             graph_node_count=int(data.get("graph_node_count", 0)),
             graph_depth=int(data.get("graph_depth", 0)),
             graph_fingerprint=str(data.get("graph_fingerprint", "")),
+            complexity_metadata=complexity_metadata,
             vray_metadata=vray_metadata,
             arnold_metadata=arnold_metadata,
         )

@@ -31,6 +31,7 @@ from shader_health.core.graph_fingerprint import material_graph_fingerprint
 from shader_health.core.image_metadata import read_image_dimensions
 from shader_health.core.models import ImageInfo, MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
+from shader_health.maya.complexity_profiler import profile_material_complexity
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
@@ -140,7 +141,12 @@ def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
     )
     materials = tuple(
         _enrich_material_fingerprint(
-            material,
+            profile_material_complexity(
+                material,
+                nodes_by_id=nodes_by_id,
+                connections=connections,
+                adapter_registry=_default_adapter_registry(),
+            ),
             nodes=nodes,
             connections=connections,
             file_dependencies=file_dependencies,

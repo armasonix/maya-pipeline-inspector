@@ -3,13 +3,44 @@
   "display_name": "Deadline Critical",
   "rule_overrides": {
     "common.shader_complexity.graph_nodes.max": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 40
+      }
     },
     "common.shader_complexity.texture_count.max": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 12
+      }
     },
     "common.shader_complexity.graph_depth.max": {
-      "enabled": false
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 6
+      }
+    },
+    "common.shader_complexity.expensive_nodes.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 2
+      }
+    },
+    "common.shader_complexity.farm_cost_score.max": {
+      "enabled": true,
+      "severity": "error",
+      "block_deadline": true,
+      "check": {
+        "max": 14
+      }
     },
     "common.texture.duplicates.same_path": {
       "enabled": false

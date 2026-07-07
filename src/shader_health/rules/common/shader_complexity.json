@@ -15,7 +15,7 @@
       "check": {
         "type": "numeric_max",
         "attribute": "graph_node_count",
-        "max": 80
+        "max": 64
       },
       "policy": {
         "block_publish": false,
@@ -39,7 +39,7 @@
       "check": {
         "type": "list_length_max",
         "attribute": "texture_nodes",
-        "max": 32
+        "max": 24
       },
       "policy": {
         "block_publish": false,
@@ -63,7 +63,55 @@
       "check": {
         "type": "numeric_max",
         "attribute": "graph_depth",
-        "max": 12
+        "max": 10
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_complexity.expensive_nodes.max",
+      "name": "Material expensive node count must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material uses more high-cost shader nodes than the configured budget.",
+      "why": "Layered, blend, and SSS shader nodes increase shading cost disproportionately. Counting expensive node types helps flag materials that may slow farm renders.",
+      "match": {},
+      "check": {
+        "type": "numeric_max",
+        "attribute": "complexity_metadata.expensive_node_count",
+        "max": 4
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.shader_complexity.farm_cost_score.max",
+      "name": "Material farm cost score must stay within budget",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material weighted farm cost score exceeds the configured budget.",
+      "why": "Weighted graph cost estimates aggregate node-type render expense. Materials above the budget are more likely to increase farm time and memory pressure.",
+      "match": {},
+      "check": {
+        "type": "numeric_max",
+        "attribute": "complexity_metadata.farm_cost_score",
+        "max": 18
       },
       "policy": {
         "block_publish": false,

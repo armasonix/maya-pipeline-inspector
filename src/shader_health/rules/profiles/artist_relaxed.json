@@ -11,6 +11,12 @@
     "common.shader_complexity.graph_depth.max": {
       "enabled": false
     },
+    "common.shader_complexity.expensive_nodes.max": {
+      "enabled": false
+    },
+    "common.shader_complexity.farm_cost_score.max": {
+      "enabled": false
+    },
     "common.texture.duplicates.same_path": {
       "block_deadline": false
     },

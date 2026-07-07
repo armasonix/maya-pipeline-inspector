@@ -1,0 +1,151 @@
+{
+  "connections": [
+    {
+      "dst_attr": "inputs[0].color",
+      "dst_node": "node:layered",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_a"
+    },
+    {
+      "dst_attr": "inputs[1].color",
+      "dst_node": "node:layered",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:file_b"
+    },
+    {
+      "dst_attr": "color",
+      "dst_node": "node:blend",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:layered"
+    },
+    {
+      "dst_attr": "baseColor",
+      "dst_node": "node:hero_mtl",
+      "semantic": "base_color",
+      "src_attr": "output",
+      "src_node": "node:blend"
+    },
+    {
+      "dst_attr": "coverage",
+      "dst_node": "node:file_a",
+      "src_attr": "outUV",
+      "src_node": "node:place2d"
+    }
+  ],
+  "file_dependencies": [],
+  "materials": [
+    {
+      "assigned_shapes": ["mesh:hero_body"],
+      "displacement_nodes": [],
+      "graph_depth": 0,
+      "graph_fingerprint": "",
+      "graph_node_count": 0,
+      "name": "hero_mtl",
+      "node_id": "node:hero_mtl",
+      "renderer_family": "common",
+      "shading_engines": ["node:hero_sg"],
+      "texture_nodes": ["node:file_a", "node:file_b"],
+      "type_name": "standardSurface"
+    }
+  ],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "hero_mtl",
+      "id": "node:hero_mtl",
+      "locked": false,
+      "name": "hero_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "standardSurface"
+    },
+    {
+      "attrs": {},
+      "classification": ["utility"],
+      "full_name": "layered",
+      "id": "node:layered",
+      "locked": false,
+      "name": "layered",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "layeredTexture"
+    },
+    {
+      "attrs": {},
+      "classification": ["utility"],
+      "full_name": "blend",
+      "id": "node:blend",
+      "locked": false,
+      "name": "blend",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "blendColors"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_a",
+      "id": "node:file_a",
+      "locked": false,
+      "name": "file_a",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "file"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_b",
+      "id": "node:file_b",
+      "locked": false,
+      "name": "file_b",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "file"
+    },
+    {
+      "attrs": {},
+      "classification": ["placement", "utility"],
+      "full_name": "place2d",
+      "id": "node:place2d",
+      "locked": false,
+      "name": "place2d",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "common",
+      "type_name": "place2dTexture"
+    }
+  ],
+  "references": [],
+  "renderer": "common",
+  "scan_scope": "scene",
+  "scene_path": "examples/broken_scene/shader_health_demo_broken.ma",
+  "scanned_at_utc": "2026-07-03T12:00:00Z",
+  "schema_version": "1.0",
+  "shading_engines": [
+    {
+      "displacement_shader": null,
+      "members": ["mesh:hero_body"],
+      "name": "hero_sg",
+      "node_id": "node:hero_sg",
+      "surface_shader": "node:hero_mtl",
+      "volume_shader": null
+    }
+  ]
+}

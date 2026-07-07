@@ -201,8 +201,39 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
 | `graph_node_count` | integer | Yes | Number of nodes in material graph. |
 | `graph_depth` | integer | Yes | Approximate upstream graph depth. |
 | `graph_fingerprint` | string | Yes | Stable graph fingerprint if computed, otherwise empty string. |
+| `complexity_metadata` | object or null | No | Shader complexity profiler payload computed during enrichment. |
 | `vray_metadata` | object or null | No | V-Ray enrichment payload when the material is a V-Ray shader type. |
 | `arnold_metadata` | object or null | No | Arnold enrichment payload when the material is an Arnold shader type. |
+
+### Shader complexity metadata (`complexity_metadata`)
+
+Attached during validation enrichment from upstream graph traversal and renderer adapter weights.
+
+```json
+{
+  "depth_histogram": {
+    "0": 1,
+    "1": 1,
+    "2": 1,
+    "3": 2,
+    "4": 1
+  },
+  "expensive_node_count": 1,
+  "expensive_node_types": {
+    "layeredTexture": 1
+  },
+  "farm_cost_score": 6.0,
+  "farm_cost_hint": "low"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `depth_histogram` | object | Count of graph nodes at each upstream depth from the material root. |
+| `expensive_node_count` | integer | Nodes whose adapter weight meets the expensive-node threshold. |
+| `expensive_node_types` | object | Per node-type counts for expensive nodes. |
+| `farm_cost_score` | number | Weighted render-cost estimate for the material subgraph. |
+| `farm_cost_hint` | string | Cost band: `low`, `medium`, `high`, or `critical`. |
 
 ### V-Ray material metadata (`vray_metadata`)
 

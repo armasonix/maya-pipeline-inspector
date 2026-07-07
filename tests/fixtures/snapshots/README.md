@@ -12,6 +12,8 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `arnold_material_policy.json` | — | Arnold | Enrichment round-trip unit test |
 | `texture_freshness_outdated.json` | — | Common | Texture version freshness fail (`v001` vs latest `v003`) |
 | `texture_freshness_latest.json` | — | Common | Texture version freshness pass (`v003` is latest) |
+| `shader_complexity_layered_graph.json` | — | Common | Complexity profiler depth histogram and farm-cost enrichment |
+| `shader_complexity_over_budget.json` | — | V-Ray | VRayBlendMtl / VRayLayeredTex expensive-node profiling |
 
 ## Adding a renderer fixture case
 

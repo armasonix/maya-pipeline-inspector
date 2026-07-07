@@ -7,6 +7,41 @@
     "block_on_new_textures": true
   },
   "rule_overrides": {
+    "common.shader_complexity.graph_nodes.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 48
+      }
+    },
+    "common.shader_complexity.texture_count.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 16
+      }
+    },
+    "common.shader_complexity.graph_depth.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 8
+      }
+    },
+    "common.shader_complexity.expensive_nodes.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 3
+      }
+    },
+    "common.shader_complexity.farm_cost_score.max": {
+      "enabled": true,
+      "block_publish": true,
+      "check": {
+        "max": 16
+      }
+    },
     "vray.scene.plugin_missing.error": {
       "block_publish": true
     },
