@@ -13,6 +13,7 @@ WAIVER_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorWaiverStatusLabel"
 WAIVER_TABLE_OBJECT_NAME = "shaderHealthInspectorWaiverTable"
 WAIVER_REVOKE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRevokeWaiverButton"
 WAIVER_REFRESH_BUTTON_OBJECT_NAME = "shaderHealthInspectorRefreshWaiversButton"
+WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME = "shaderHealthInspectorMakeWaiveButton"
 
 WAIVER_TABLE_COLUMNS = (
     "Status",
@@ -41,6 +42,7 @@ class WaiverManagerCallbacks:
 
     on_refresh: Optional[Callable[[], None]] = None
     on_revoke_selected: Optional[Callable[[], None]] = None
+    on_make_waive: Optional[Callable[[], None]] = None
     on_waiver_selected: Optional[Callable[[], None]] = None
 
 
@@ -78,6 +80,18 @@ def build_waiver_manager(
     actions_layout = qt_widgets.QHBoxLayout(actions)
     actions_layout.setContentsMargins(0, 0, 0, 0)
     actions_layout.setSpacing(4)
+    actions_layout.addWidget(
+        _button(
+            qt_widgets,
+            "Make Waive",
+            WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+            (
+                "Approve a known exception for the selected issue on the Validate tab: "
+                "writes a waiver sidecar next to the saved scene."
+            ),
+            manager_callbacks.on_make_waive,
+        )
+    )
     actions_layout.addWidget(
         _button(
             qt_widgets,

@@ -29,6 +29,9 @@ from shader_health.reports.manifest_diff_cli import (
     execute_manifest_diff,
     load_manifest_json,
 )
+from shader_health.util.paths import normalize_cli_path
+
+_MAYA_STANDALONE_INITIALIZED = False
 
 EXIT_OK = 0
 EXIT_PUBLISH_BLOCK = 1
@@ -39,6 +42,13 @@ EXIT_CONFIG_ERROR = 4
 INPUT_AUTO = "auto"
 INPUT_SCENE = "scene"
 INPUT_SNAPSHOT = "snapshot"
+ASSET_CLASS_ID_HELP = (
+    "Optional asset class overlay: asset_class_hero, asset_class_prop, asset_class_background."
+)
+
+
+def _add_asset_class_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--asset-class-id", default="", help=ASSET_CLASS_ID_HELP)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -103,6 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--baseline-manifest",
         help="Optional approved manifest JSON path for regression gate evaluation.",
     )
+    _add_asset_class_argument(validate)
     diff = subparsers.add_parser(
         "diff",
         help="Compare two shader manifest JSON files.",
@@ -135,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Packaged profile id when --profile is omitted.",
     )
     gate.add_argument("--out", help="Optional gate result JSON output path.")
+    _add_asset_class_argument(gate)
     manifest = subparsers.add_parser(
         "manifest",
         help="Export a shader manifest from a Maya scene or snapshot.",
@@ -152,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PROFILE_ID,
         help="Packaged profile id when --profile is omitted.",
     )
+    _add_asset_class_argument(manifest)
     apply_fixes = subparsers.add_parser(
         "apply-fixes",
         help="Apply planned fixes to a Maya scene (requires mayapy).",
@@ -189,27 +202,31 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Plan fixes without mutating the scene.",
     )
+    _add_asset_class_argument(apply_fixes)
     return parser
 
 
 def validate_command(args: argparse.Namespace) -> int:
     try:
-        snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
+        input_path = _cli_path(args.input_path)
+        report_path = _cli_path(args.report)
+        snapshot = _load_snapshot(input_path, args.input_kind)
         if args.renderer:
             snapshot = _snapshot_with_renderer(snapshot, tuple(args.renderer))
         run = run_validation(
             snapshot,
             profile_id=str(args.profile_id),
+            asset_class_id=_asset_class_id_from_args(args),
             profile_path=_optional_path(args.profile),
             rule_root=_rule_root_path(args.rule_root),
-            extra_rule_paths=tuple(Path(path) for path in args.extra_rules),
+            extra_rule_paths=tuple(_cli_path(path) for path in args.extra_rules),
             waiver_sidecar_path=_optional_path(args.waiver_sidecar),
             scan_scope="scene",
         )
-        write_json_report(args.report, run.snapshot, run.results)
+        write_json_report(report_path, run.snapshot, run.results)
         if args.export_fix_plan and run.fix_plan.total:
             write_fix_plan_export(
-                args.export_fix_plan,
+                _cli_path(args.export_fix_plan),
                 run.fix_plan,
                 snapshot=run.snapshot,
                 profile_id=run.profile_id,
@@ -220,9 +237,10 @@ def validate_command(args: argparse.Namespace) -> int:
         if args.baseline_manifest:
             return _manifest_gate_exit(
                 run.snapshot,
-                Path(args.baseline_manifest),
+                _cli_path(args.baseline_manifest),
                 profile_path=_optional_path(args.profile),
                 profile_id=str(args.profile_id),
+                asset_class_id=_asset_class_id_from_args(args),
             )
         return EXIT_OK
     except RuleLoadError as exc:
@@ -235,12 +253,13 @@ def validate_command(args: argparse.Namespace) -> int:
 
 def gate_command(args: argparse.Namespace) -> int:
     try:
-        snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
+        snapshot = _load_snapshot(_cli_path(args.input_path), args.input_kind)
         return _manifest_gate_exit(
             snapshot,
-            Path(args.baseline_manifest),
+            _cli_path(args.baseline_manifest),
             profile_path=_optional_path(args.profile),
             profile_id=str(args.profile_id),
+            asset_class_id=_asset_class_id_from_args(args),
             out_path=_optional_path(args.out),
         )
     except RuleLoadError as exc:
@@ -253,15 +272,16 @@ def gate_command(args: argparse.Namespace) -> int:
 
 def manifest_command(args: argparse.Namespace) -> int:
     try:
-        snapshot = _load_snapshot(Path(args.input_path), args.input_kind)
+        snapshot = _load_snapshot(_cli_path(args.input_path), args.input_kind)
         run = run_validation(
             snapshot,
             profile_id=str(args.profile_id),
+            asset_class_id=_asset_class_id_from_args(args),
             profile_path=_optional_path(args.profile),
             scan_scope="scene",
         )
         write_shader_manifest(
-            args.out,
+            _cli_path(args.out),
             run.snapshot,
             results=run.results,
             health_score=run.health_score.score,
@@ -277,10 +297,11 @@ def manifest_command(args: argparse.Namespace) -> int:
 
 def apply_fixes_command(args: argparse.Namespace) -> int:
     try:
-        scene_path = Path(args.input_path)
+        scene_path = _cli_path(args.input_path)
         fix_plan = _load_fix_plan_for_scene(
             scene_path,
             profile_id=str(args.profile_id),
+            asset_class_id=_asset_class_id_from_args(args),
             profile_path=_optional_path(args.profile),
             fix_plan_path=_optional_path(args.fix_plan),
         )
@@ -323,8 +344,8 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
 
 def diff_command(args: argparse.Namespace) -> int:
     exit_code = execute_manifest_diff(
-        Path(args.old_manifest),
-        Path(args.new_manifest),
+        _cli_path(args.old_manifest),
+        _cli_path(args.new_manifest),
         out_path=_optional_path(args.out),
         html_path=_optional_path(args.html),
     )
@@ -339,11 +360,12 @@ def _manifest_gate_exit(
     *,
     profile_path: Optional[Path],
     profile_id: str,
+    asset_class_id: Optional[str] = None,
     out_path: Optional[Path] = None,
 ) -> int:
     baseline_manifest = load_manifest_json(baseline_path)
     current_manifest = build_shader_manifest(snapshot)
-    policy = _manifest_gate_policy(profile_path, profile_id)
+    policy = _manifest_gate_policy(profile_path, profile_id, asset_class_id=asset_class_id)
     gate_result = evaluate_manifest_gate(baseline_manifest, current_manifest, policy=policy)
     payload = gate_result.to_dict()
     if out_path is not None:
@@ -358,11 +380,18 @@ def _manifest_gate_exit(
     return EXIT_OK
 
 
-def _manifest_gate_policy(profile_path: Optional[Path], profile_id: str):
-    from shader_health.maya.validation_pipeline import packaged_profile_path
+def _manifest_gate_policy(
+    profile_path: Optional[Path],
+    profile_id: str,
+    *,
+    asset_class_id: Optional[str] = None,
+):
+    from shader_health.maya.validation_pipeline import compose_profiles, packaged_profile_path
 
-    resolved_profile = profile_path or packaged_profile_path(profile_id)
-    profile = load_profile(resolved_profile)
+    if profile_path is not None:
+        profile = load_profile(profile_path)
+    else:
+        profile = compose_profiles(profile_id, asset_class_id)
     return profile.manifest_diff_policy
 
 
@@ -370,6 +399,7 @@ def _load_fix_plan_for_scene(
     scene_path: Path,
     *,
     profile_id: str,
+    asset_class_id: Optional[str],
     profile_path: Optional[Path],
     fix_plan_path: Optional[Path],
 ) -> FixPlan:
@@ -383,6 +413,7 @@ def _load_fix_plan_for_scene(
     run = run_validation(
         snapshot,
         profile_id=profile_id,
+        asset_class_id=asset_class_id,
         profile_path=profile_path,
         scan_scope="scene",
     )
@@ -403,6 +434,7 @@ def _apply_fixes_in_scene(
     allow_referenced: bool = False,
     allow_high_risk: bool = False,
 ) -> Any:
+    _ensure_maya_standalone()
     cmds = importlib.import_module("maya.cmds")
     fix_applier = importlib.import_module("shader_health.maya.fix_applier")
     cmds.file(str(scene_path), open=True, force=True)
@@ -431,7 +463,7 @@ def _dry_run_apply_report(actions: Sequence[Any]) -> dict[str, Any]:
 def _write_apply_report(path: Optional[str], payload: Mapping[str, Any]) -> None:
     if not path:
         return
-    output_path = Path(path)
+    output_path = _cli_path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -439,14 +471,37 @@ def _write_apply_report(path: Optional[str], payload: Mapping[str, Any]) -> None
 def _rule_root_path(value: Optional[str]) -> Optional[Path]:
     if not value:
         return None
-    path = Path(value)
+    path = _cli_path(value)
     if not path.exists():
         raise RuleLoadError(f"Rule root does not exist: {path}")
     return path
 
 
 def _optional_path(value: Optional[str]) -> Optional[Path]:
-    return Path(value) if value else None
+    return _cli_path(value) if value else None
+
+
+def _cli_path(value: str | Path) -> Path:
+    """Normalize CLI paths (including Git Bash /d/foo MSYS paths on Windows)."""
+
+    return normalize_cli_path(value)
+
+
+def _asset_class_id_from_args(args: argparse.Namespace) -> Optional[str]:
+    normalized = str(getattr(args, "asset_class_id", "") or "").strip()
+    return normalized or None
+
+
+def _ensure_maya_standalone() -> None:
+    global _MAYA_STANDALONE_INITIALIZED
+    if _MAYA_STANDALONE_INITIALIZED:
+        return
+    try:
+        standalone = importlib.import_module("maya.standalone")
+    except ImportError as exc:
+        raise RuntimeError("scene validation requires Autodesk Maya / mayapy") from exc
+    standalone.initialize(name="python")
+    _MAYA_STANDALONE_INITIALIZED = True
 
 
 def _load_snapshot(path: Path, input_kind: str) -> GraphSnapshot:
@@ -469,6 +524,7 @@ def _snapshot_from_scene(path: Path) -> GraphSnapshot:
     except ImportError as exc:
         raise RuntimeError("scene validation requires Autodesk Maya / mayapy") from exc
 
+    _ensure_maya_standalone()
     cmds.file(str(path), open=True, force=True)
     snapshot = scanner.scan_scene()
     if not isinstance(snapshot, GraphSnapshot):

@@ -133,23 +133,41 @@ def reveal_file(
     """Reveal a file or folder in the host OS file browser where supported."""
 
     target = _require_text(path, field_name="path")
-    resolved_path = Path(target).expanduser()
+    reveal_target = _existing_reveal_target(Path(target).expanduser())
     system_name = platform_name or platform.system()
+    if reveal_target is None:
+        return _result(
+            "reveal_file",
+            target,
+            False,
+            f"File path does not exist: {target}",
+        )
+
     launcher = process_launcher or _launch_process
-    command = _reveal_command(resolved_path, system_name)
+    command = _reveal_command(reveal_target, system_name)
     if command is None:
         return _result("reveal_file", target, False, f"Unsupported platform: {system_name}.")
     launcher(command)
     return _result("reveal_file", target, True, "Reveal command launched.")
 
 
+def _existing_reveal_target(target: Path) -> Optional[Path]:
+    if target.exists():
+        return target.resolve()
+    parent = target.parent
+    if parent.exists():
+        return parent.resolve()
+    return None
+
+
 def _reveal_command(path: Path, system_name: str) -> Optional[list[str]]:
+    target_text = str(path)
     if system_name == "Windows":
-        if path.is_dir():
-            return ["explorer", str(path)]
-        return ["explorer", f"/select,{path}"]
+        if path.is_file():
+            return ["explorer", f"/select,{target_text}"]
+        return ["explorer", target_text]
     if system_name == "Darwin":
-        return ["open", "-R", str(path)]
+        return ["open", "-R", target_text]
     if system_name == "Linux":
         reveal_target = path if path.is_dir() else path.parent
         return ["xdg-open", str(reveal_target)]

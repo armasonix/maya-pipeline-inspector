@@ -318,6 +318,10 @@ class FakeLabel(FakeWidget):
     def __init__(self, text: str = "") -> None:
         super().__init__()
         self.text = text
+        self.word_wrap = False
+
+    def setWordWrap(self, enabled: bool) -> None:
+        self.word_wrap = enabled
 
 
 class FakePushButton(FakeLabel):
@@ -344,12 +348,61 @@ class FakeVBoxLayout:
         self.parent.children.append(widget)
         _ = stretch
 
+    def addStretch(self, stretch: int) -> None:
+        _ = stretch
+
+
+class FakeHBoxLayout(FakeVBoxLayout):
+    pass
+
+
+class FakeGridLayout(FakeVBoxLayout):
+    def addWidget(self, widget: Any, row: int = 0, column: int = 0, *_args: Any) -> None:
+        self.parent.children.append(widget)
+        _ = (row, column)
+
+
+class FakeTableWidget(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.column_count = 0
+        self.row_count = 0
+        self.headers: list[str] = []
+
+    def setColumnCount(self, count: int) -> None:
+        self.column_count = count
+
+    def setRowCount(self, count: int) -> None:
+        self.row_count = count
+
+    def setHorizontalHeaderLabels(self, headers: list[str]) -> None:
+        self.headers = headers
+
+
+class FakeTableWidgetItem:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class FakeCheckBox(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.checked = False
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
 
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QPushButton = FakePushButton
     QVBoxLayout = FakeVBoxLayout
+    QHBoxLayout = FakeHBoxLayout
+    QGridLayout = FakeGridLayout
+    QTableWidget = FakeTableWidget
+    QTableWidgetItem = FakeTableWidgetItem
+    QCheckBox = FakeCheckBox
 
 
 def test_approved_manifest_sidecar_path_uses_scene_sidecar(tmp_path: Path):
@@ -415,7 +468,6 @@ def test_export_buttons_connect_to_callbacks():
         on_export_manifest=lambda: calls.append("manifest"),
         on_export_manifest_diff=lambda: calls.append("manifest_diff"),
         on_compare_approved_manifest=lambda: calls.append("compare_approved_manifest"),
-        on_export_fix_plan=lambda: calls.append("fix_plan"),
     )
 
     widget = main_window.build_export_actions(FakeQtWidgets, callbacks=callbacks)
@@ -428,15 +480,28 @@ def test_export_buttons_connect_to_callbacks():
         widget,
         main_window.EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
     ).clicked.emit()
-    _find(widget, main_window.EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME).clicked.emit()
     assert calls == [
         "json",
         "html",
         "manifest",
         "manifest_diff",
         "compare_approved_manifest",
-        "fix_plan",
     ]
+
+
+def test_fix_queue_export_fix_plan_button_connects_to_callback():
+    from shader_health.ui.fix_queue import (
+        FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
+        FixQueueActionCallbacks,
+        build_fix_queue,
+    )
+
+    calls: list[str] = []
+    callbacks = FixQueueActionCallbacks(on_export_fix_plan=lambda: calls.append("fix_plan"))
+    widget = build_fix_queue(FakeQtWidgets, callbacks=callbacks)
+
+    _find(widget, FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME).clicked.emit()
+    assert calls == ["fix_plan"]
 
 
 def _find(widget: Any, object_name: str) -> Any:

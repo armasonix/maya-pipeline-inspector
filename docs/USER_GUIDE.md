@@ -112,30 +112,50 @@ Main needs:
 
 ## Maya UI Layout
 
+The dockable panel uses four tabs. Each tab shows the panel title and version at the top.
+
 ```text
 +--------------------------------------------------------------------------------+
-| Maya Shader Health Inspector                                                    |
-| Health: 78/100   Critical: 2   Error: 5   Warning: 17   Deadline Block: YES     |
-| Profile: publish_strict                                                         |
-| [Validate Scene] [Validate Selection]                                           |
+| Maya Shader Health Inspector  v0.3.0                                           |
+| [Validate] [Waivers] [Fixes] [Reports]                                         |
 +--------------------------------------------------------------------------------+
-| Sort: [severity]  Severity: [All severities]  Owner: [All owners]               |
-| View: [All issues | Blocking only | Auto-fixable]                               |
+| Validate tab (default)                                                         |
+| Health: 78/100   Critical: 2   Error: 5   Warning: 17   Info: 8                |
+| Publish Block: YES   Deadline Block: YES                                         |
+| Workflow: [Publish Strict]   Asset class: [None | Hero | Prop | Background]    |
+| [Validate Scene] [Validate Selection]                                          |
+| Severity [All]  Owner [All]  View [All issues]  Sort [severity]                 |
+| Issues table ...                                                               |
+| Issue Details + [Select Node] [Hypershade] [Copy Path] [Reveal File]           |
 +--------------------------------------------------------------------------------+
-| Sev | Material | Node | Issue | Owner | Rule                                    |
-+--------------------------------------------------------------------------------+
-| Details                                                                        |
-| What: Roughness texture is color-managed as ACEScg.                             |
-| Why: Roughness is scalar data; color transforms alter numeric values.           |
-| Current: ACEScg                                                                 |
-| Expected: Raw                                                                   |
-| Trace: file_roughness.outAlpha -> material.roughness                           |
-| [Select Node] [Open in Hypershade] [Copy Path] [Reveal File] [Waive]          |
-+--------------------------------------------------------------------------------+
-| Fix Queue: preview safe fixes, apply selected or all safe fixes                 |
-| Export: JSON / HTML / Shader Manifest                                           |
+| Waivers tab: status, waiver table, [Make Waive] [Refresh] [Revoke Selected]     |
+| Fixes tab: checkbox column + fix queue table, [Fix Selected] [Apply Safe Fixes]  |
+|            [Export Fix Plan]                                                   |
+| Reports tab: compact export buttons for JSON/HTML/manifest/diff/compare        |
 +--------------------------------------------------------------------------------+
 ```
+
+### Validation profiles (Workflow + Asset class)
+
+**Workflow** profiles control role and publish/deadline blocking policy:
+
+| Profile | Typical use |
+|---|---|
+| `artist_relaxed` | Daily lookdev with fewer complexity warnings |
+| `publish_strict` | Publish gate — blocking issues stop submission |
+| `deadline_critical` | Farm submit preflight |
+| `supervisor_full` | Full review with batch risky-fix confirmation |
+
+**Asset class** is an optional overlay for texture resolution budgets:
+
+| Profile | Max longest edge |
+|---|---|
+| None | No resolution tier (rules stay disabled) |
+| `asset_class_hero` | 4096px |
+| `asset_class_prop` | 2048px |
+| `asset_class_background` | 1024px |
+
+When an asset class is selected, its resolution rule overrides are merged onto the active workflow profile. Pipeline-only profiles such as `ci_headless` are headless-only and do not appear in the Maya UI dropdown.
 
 ## Health Score
 
@@ -328,7 +348,7 @@ JSON reports are intended for pipeline systems. HTML reports are self-contained,
 
 ### Compare to Approved Manifest (v0.3)
 
-Export a shader manifest beside the scene (`{scene}_shader_health_manifest.json`), then use **Compare to Approved Manifest** in the panel to diff against that sidecar without a file picker. If the sidecar is missing, the action falls back to the baseline manifest file picker (same as **Export Manifest Diff**).
+Export a shader manifest beside the scene (`{scene}_shader_health_manifest.json`), then open the **Reports** tab or use **Compare to Approved Manifest** to diff against that sidecar without a file picker. If the sidecar is missing, the action falls back to the baseline manifest file picker (same as **Export Manifest Diff**). Use **Make Waive** on the **Waivers** tab for the selected issue from the Validate tab.
 
 ## Headless Usage
 

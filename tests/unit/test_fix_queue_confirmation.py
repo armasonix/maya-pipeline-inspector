@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from shader_health.ui.fix_queue import (
+    FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueRow,
     allows_batch_risky_confirmation,
     confirm_risky_fixes,
@@ -256,6 +257,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
     monkeypatch.setattr(ui_launcher, "_revalidate_with_current_scope", lambda *_a: None)
 
     class FakeQtWidgets:
+        QWidget = object
         QTableWidget = object
         QLabel = object
 

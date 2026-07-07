@@ -1,12 +1,15 @@
 """Maya dockable panel launcher."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 from shader_health.ui import main_window
 from shader_health.ui.fix_queue import (
+    FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
     FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
     FIX_QUEUE_TABLE_OBJECT_NAME,
+    FixQueueActionCallbacks,
     FixQueueRow,
     blocked_selection_message,
     checked_fix_rows,
@@ -95,6 +98,7 @@ def _create_dockable_panel() -> Any:
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
+            fix_queue_callbacks=_fix_queue_action_callbacks(panel_state, qt_widgets),
             validation_callbacks=_validation_action_callbacks(panel_state, qt_widgets),
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
             waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
@@ -124,6 +128,10 @@ def _waiver_manager_callbacks(
 
     return WaiverManagerCallbacks(
         on_refresh=lambda: _refresh_waiver_manager(_panel_content(panel_state), qt_widgets),
+        on_make_waive=lambda: _waive_selected_issue_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_revoke_selected=lambda: _revoke_selected_waiver_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -135,6 +143,23 @@ def _waiver_manager_callbacks(
     )
 
 
+def _fix_queue_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> FixQueueActionCallbacks:
+    return FixQueueActionCallbacks(
+        on_apply_selected=lambda: _apply_selected_fixes_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_apply_safe=lambda: _apply_safe_fixes_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_export_fix_plan=_export_fix_plan_from_ui,
+    )
+
+
 def _export_action_callbacks() -> main_window.ExportActionCallbacks:
     return main_window.ExportActionCallbacks(
         on_export_json=_export_json_from_ui,
@@ -142,7 +167,11 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_manifest=_export_manifest_from_ui,
         on_export_manifest_diff=_export_manifest_diff_from_ui,
         on_compare_approved_manifest=_compare_approved_manifest_from_ui,
-        on_export_fix_plan=_export_fix_plan_from_ui,
+        on_compare_after_fixes=_compare_after_fixes_from_ui,
+        on_manifest_gate=lambda: _manifest_gate_from_ui(
+            _active_panel_content(),
+            load_qt_widgets(),
+        ),
     )
 
 
@@ -175,9 +204,46 @@ def _export_html_from_ui() -> None:
 
 
 def _export_manifest_from_ui() -> None:
+    content = _active_panel_content()
+    snapshot = getattr(content, "_shader_health_snapshot", None) if content is not None else None
+    results = getattr(content, "_shader_health_results", None) if content is not None else None
+    if snapshot is not None:
+        from shader_health.core.scoring import compute_health_score
+        from shader_health.maya import export_actions
+
+        health_score = compute_health_score(results or ()).score if results is not None else None
+        result = export_actions.export_shader_manifest(
+            snapshot=snapshot,
+            results=results or (),
+            health_score=health_score,
+        )
+        _print_export_result(result)
+        return
+
     from shader_health.maya.commands import export_shader_manifest_action
 
     _print_export_result(export_shader_manifest_action())
+
+
+def _compare_after_fixes_from_ui() -> None:
+    qt_widgets = load_qt_widgets()
+    _show_information_dialog(
+        qt_widgets,
+        "Compare After Fixes",
+        (
+            "This compares Material Passport snapshots (textures, paths, graph fingerprints), "
+            "not validation fixes like colorSpace.\n\n"
+            "Workflow:\n"
+            "1. Export Shader Manifest when the scene is approved (baseline sidecar).\n"
+            "2. Apply fixes or edit shading.\n"
+            "3. Press Compare After Fixes to revalidate and diff vs the baseline.\n\n"
+            "Changes to colorSpace alone may not appear in the manifest diff."
+        ),
+    )
+    content = _active_panel_content()
+    if content is not None:
+        _revalidate_with_current_scope(content, qt_widgets)
+    _compare_approved_manifest_from_ui()
 
 
 def _export_manifest_diff_from_ui() -> None:
@@ -251,7 +317,19 @@ def _validation_action_callbacks(
             qt_widgets,
             scan_scope="selection",
         ),
+        on_publish_preflight=lambda: _publish_preflight_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_manifest_gate=lambda: _manifest_gate_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_profile_changed=lambda: _revalidate_with_current_scope(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_asset_class_changed=lambda: _revalidate_with_current_scope(
             _panel_content(panel_state),
             qt_widgets,
         ),
@@ -283,10 +361,6 @@ def _issue_details_action_callbacks(
             qt_widgets,
             "reveal_file",
         ),
-        on_waive_issue=lambda: _waive_selected_issue_from_ui(
-            _panel_content(panel_state),
-            qt_widgets,
-        ),
     )
 
 
@@ -294,11 +368,18 @@ def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None
     try:
         from shader_health.maya.commands import validate_scene_action, validate_selection_action
 
-        profile_id = _selected_profile_id(content, qt_widgets)
+        profile_id = _selected_workflow_profile_id(content, qt_widgets)
+        asset_class_id = _selected_asset_class_id(content, qt_widgets)
         if scan_scope == "selection":
-            result = validate_selection_action(profile_id=profile_id)
+            result = validate_selection_action(
+                profile_id=profile_id,
+                asset_class_id=asset_class_id,
+            )
         else:
-            result = validate_scene_action(profile_id=profile_id)
+            result = validate_scene_action(
+                profile_id=profile_id,
+                asset_class_id=asset_class_id,
+            )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
         _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", message)
@@ -315,13 +396,119 @@ def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None
     print(result.message)
 
 
+def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
+    try:
+        from shader_health.maya.commands import validate_scene_action
+
+        asset_class_id = _selected_asset_class_id(content, qt_widgets)
+        result = validate_scene_action(
+            profile_id="publish_strict",
+            asset_class_id=asset_class_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        message = f"Publish preflight failed: {exc}"
+        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
+        print(message)
+        return
+
+    if not getattr(result, "succeeded", True):
+        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, result.message)
+        print(result.message)
+        return
+
+    content._shader_health_scan_scope = "scene"
+    _populate_validation_result(content, qt_widgets, result)
+    summary = getattr(result, "summary", None)
+    block_publish = bool(getattr(summary, "block_publish", False)) if summary else False
+    block_deadline = bool(getattr(summary, "block_deadline", False)) if summary else False
+    health = getattr(result, "health_score", None)
+    score = getattr(health, "score", None)
+    score_text = f"{score}/100" if score is not None else "N/A"
+    message = (
+        f"Publish preflight (publish_strict) complete. Health {score_text}. "
+        f"Publish Block: {_yes_no(block_publish)}. Deadline Block: {_yes_no(block_deadline)}."
+    )
+    _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
+    _show_information_dialog(qt_widgets, "Publish Preflight", message)
+    print(message)
+
+
+def _manifest_gate_from_ui(content: Any, qt_widgets: Any) -> None:
+    if content is None:
+        _show_information_dialog(
+            qt_widgets,
+            "Manifest Gate",
+            "Open the Shader Health Inspector panel and validate the scene first.",
+        )
+        return
+    snapshot = getattr(content, "_shader_health_snapshot", None)
+    if snapshot is None:
+        _validate_from_ui(content, qt_widgets, scan_scope="scene")
+        snapshot = getattr(content, "_shader_health_snapshot", None)
+    if snapshot is None:
+        _show_information_dialog(
+            qt_widgets,
+            "Manifest Gate",
+            "Validate the scene first, then export an approved manifest sidecar before running gate.",
+        )
+        return
+
+    from shader_health.core.manifest_gate import evaluate_manifest_gate
+    from shader_health.maya.commands import _approved_manifest_sidecar_path
+    from shader_health.maya.validation_pipeline import compose_profiles
+    from shader_health.reports.manifest import build_shader_manifest
+    from shader_health.reports.manifest_diff_cli import load_manifest_json
+
+    baseline_path = _approved_manifest_sidecar_path(snapshot)
+    if not baseline_path:
+        _show_information_dialog(
+            qt_widgets,
+            "Manifest Gate",
+            "No approved manifest sidecar found. Use Reports → Export Shader Manifest first.",
+        )
+        return
+
+    profile_id = _selected_workflow_profile_id(content, qt_widgets)
+    asset_class_id = _selected_asset_class_id(content, qt_widgets)
+    profile = compose_profiles(profile_id, asset_class_id or None)
+    old_manifest = load_manifest_json(Path(baseline_path))
+    new_manifest = build_shader_manifest(snapshot)
+    gate_result = evaluate_manifest_gate(
+        old_manifest,
+        new_manifest,
+        policy=profile.manifest_diff_policy,
+    )
+    summary = gate_result.diff_summary
+    reasons = gate_result.reasons
+    if gate_result.blocked:
+        message = "Manifest gate BLOCKED.\n\n" + "\n".join(f"- {reason}" for reason in reasons)
+    else:
+        message = (
+            "Manifest gate PASSED.\n\n"
+            f"New: {summary.get('new', 0)}, Changed: {summary.get('changed', 0)}, "
+            f"Fingerprint changes: {summary.get('fingerprint_changes', 0)}."
+        )
+    _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message.replace("\n", " "))
+    _show_information_dialog(qt_widgets, "Manifest Gate", message)
+    print(message)
+
+
+def _show_information_dialog(qt_widgets: Any, title: str, message: str) -> None:
+    message_box = getattr(qt_widgets, "QMessageBox", None)
+    if message_box is None:
+        return
+    information = getattr(message_box, "information", None)
+    if information is not None:
+        information(None, title, message)
+
+
 def _revalidate_with_current_scope(content: Any, qt_widgets: Any) -> None:
     scan_scope = getattr(content, "_shader_health_scan_scope", "scene")
     if getattr(content, "_shader_health_failed_results", ()):
         _validate_from_ui(content, qt_widgets, scan_scope=scan_scope)
 
 
-def _selected_profile_id(content: Any, qt_widgets: Any) -> str:
+def _selected_workflow_profile_id(content: Any, qt_widgets: Any) -> str:
     profile_dropdown = _find_child(
         content,
         qt_widgets.QComboBox,
@@ -329,8 +516,19 @@ def _selected_profile_id(content: Any, qt_widgets: Any) -> str:
     )
     if profile_dropdown is None:
         return "artist_relaxed"
-    current_text = getattr(profile_dropdown, "currentText", lambda: "artist_relaxed")()
-    return str(current_text or "artist_relaxed")
+    profile_id = main_window.combo_profile_id(profile_dropdown)
+    return profile_id or "artist_relaxed"
+
+
+def _selected_asset_class_id(content: Any, qt_widgets: Any) -> str:
+    asset_class_dropdown = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME,
+    )
+    if asset_class_dropdown is None:
+        return ""
+    return main_window.combo_profile_id(asset_class_dropdown)
 
 
 def _selected_issue(content: Any) -> Any:
@@ -469,6 +667,29 @@ def _on_waiver_row_selected(content: Any, qt_widgets: Any) -> None:
     content._shader_health_selected_waiver_id = rows[int(current_row)].waiver_id
 
 
+def _resolution_probe_hint(snapshot: Any, asset_class_id: str) -> str:
+    from shader_health.maya.validation_pipeline import ASSET_CLASS_NONE_ID
+
+    if not asset_class_id or asset_class_id == ASSET_CLASS_NONE_ID:
+        return ""
+    unprobed: list[str] = []
+    for dep in getattr(snapshot, "file_dependencies", ()) or ():
+        if not getattr(dep, "exists", False):
+            continue
+        if getattr(dep, "max_dimension", None) is not None:
+            continue
+        label = dep.raw_path or dep.resolved_path or dep.node_id
+        unprobed.append(label)
+    if not unprobed:
+        return ""
+    sample = ", ".join(unprobed[:2])
+    suffix = f" (+{len(unprobed) - 2} more)" if len(unprobed) > 2 else ""
+    return (
+        f" Resolution skipped for {len(unprobed)} texture(s) — format not probed or unreadable:"
+        f" {sample}{suffix}."
+    )
+
+
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
     health = result.health_score
     _set_label_text(
@@ -497,7 +718,12 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
             f"Deadline Block: {_yes_no(health.block_deadline)}"
         ),
     )
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+    description = result.message
+    snapshot = getattr(result, "snapshot", None) or getattr(content, "_shader_health_snapshot", None)
+    asset_class_id = _selected_asset_class_id(content, qt_widgets)
+    if snapshot is not None:
+        description += _resolution_probe_hint(snapshot, asset_class_id)
+    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", description)
 
     failed_results = tuple(item for item in result.results if item.status == "failed")
     rows = tuple(_issue_row_from_result(item) for item in failed_results)
@@ -597,6 +823,7 @@ def _store_validation_state(
     content._shader_health_snapshot = getattr(result, "snapshot", None)
     content._shader_health_results = getattr(result, "results", ())
     content._shader_health_profile_id = getattr(result, "profile_id", "")
+    content._shader_health_asset_class_id = getattr(result, "asset_class_id", "")
     snapshot = getattr(result, "snapshot", None)
     content._shader_health_scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
     _populate_fix_queue(content, result)
@@ -710,7 +937,6 @@ def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
 
 
 def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
-    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
     apply_selected = _find_child(
         content,
         qt_widgets.QPushButton,
@@ -721,13 +947,11 @@ def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
         qt_widgets.QPushButton,
         "shaderHealthInspectorApplySafeFixesButton",
     )
-    if table is not None:
-        item_changed = getattr(table, "itemChanged", None)
-        connect_changed = getattr(item_changed, "connect", None)
-        if connect_changed is not None:
-            connect_changed(
-                lambda item: _on_fix_queue_item_changed(content, qt_widgets, item),
-            )
+    export_fix_plan = _find_child(
+        content,
+        qt_widgets.QPushButton,
+        FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
+    )
     if apply_selected is not None:
         clicked = getattr(apply_selected, "clicked", None)
         connect = getattr(clicked, "connect", None)
@@ -738,14 +962,19 @@ def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
         connect = getattr(clicked, "connect", None)
         if connect is not None:
             connect(lambda *_: _apply_safe_fixes_from_ui(content, qt_widgets))
+    if export_fix_plan is not None:
+        clicked = getattr(export_fix_plan, "clicked", None)
+        connect = getattr(clicked, "connect", None)
+        if connect is not None:
+            connect(lambda *_: _export_fix_plan_from_ui())
 
 
-def _on_fix_queue_item_changed(content: Any, qt_widgets: Any, item: Any) -> None:
-    _sync_fix_queue_selection(content, qt_widgets)
+def _fix_queue_table(content: Any, qt_widgets: Any) -> Any:
+    return _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
 
 
 def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
-    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    table = _fix_queue_table(content, qt_widgets)
     stored_rows = getattr(content, "_shader_health_fix_rows", ())
     if table is None or not stored_rows:
         return
@@ -764,7 +993,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya.fix_applier import apply_fix_actions
 
     fix_plan = getattr(content, "_shader_health_fix_plan", None)
-    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    table = _fix_queue_table(content, qt_widgets)
     stored_rows = getattr(content, "_shader_health_fix_rows", ())
     if fix_plan is None or not stored_rows or table is None:
         return
@@ -777,7 +1006,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
             content,
             qt_widgets,
             "shaderHealthInspectorDescription",
-            "No fixes selected. Click Select on rows in the Safe Auto-Fix Queue first.",
+            "No fixes selected. Check rows in the Select column on the Fixes tab first.",
         )
         return
     blocked_message = blocked_selection_message(fix_rows)
@@ -834,7 +1063,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya.fix_applier import apply_fix_actions
 
     fix_plan = getattr(content, "_shader_health_fix_plan", None)
-    table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    table = _fix_queue_table(content, qt_widgets)
     stored_rows = getattr(content, "_shader_health_fix_rows", ())
     if fix_plan is None or not stored_rows or table is None:
         return
@@ -1224,6 +1453,7 @@ def _reset_panel_state(
     content._shader_health_snapshot = None
     content._shader_health_results = ()
     content._shader_health_profile_id = ""
+    content._shader_health_asset_class_id = ""
     content._shader_health_last_fix_audit = None
 
     _set_label_text(
@@ -1256,7 +1486,7 @@ def _reset_panel_state(
         issues_table.setRowCount(0)
         issues_table.setSortingEnabled(True)
 
-    fix_table = _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
+    fix_table = _fix_queue_table(content, qt_widgets)
     if fix_table is not None:
         populate_fix_queue(qt_widgets, fix_table, ())
 

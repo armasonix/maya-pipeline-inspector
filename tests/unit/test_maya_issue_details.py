@@ -111,6 +111,31 @@ class FakeHBoxLayout(FakeVBoxLayout):
     pass
 
 
+class FakeGridLayout(FakeVBoxLayout):
+    def addWidget(self, widget: Any, row: int = 0, column: int = 0, *_args: Any) -> None:
+        self.parent.children.append(widget)
+        _ = (row, column)
+
+
+class FakeTabWidget(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tabs: list[tuple[str, FakeWidget]] = []
+
+    def addTab(self, widget: FakeWidget, title: str) -> None:
+        self.tabs.append((title, widget))
+        self.children.append(widget)
+
+
+class FakeCheckBox(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.checked = False
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
@@ -120,6 +145,9 @@ class FakeQtWidgets:
     QTableWidgetItem = FakeTableWidgetItem
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
+    QGridLayout = FakeGridLayout
+    QTabWidget = FakeTabWidget
+    QCheckBox = FakeCheckBox
 
 
 def test_issue_details_defaults_show_empty_selection_state():

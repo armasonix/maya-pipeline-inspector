@@ -1,9 +1,25 @@
 """Shared Qt table helpers for Maya Shader Health Inspector UI."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Optional
 
 from shader_health.ui.qt import load_qt_core
+
+
+def connect_qt_signal(signal: Any, slot: Callable[..., Any]) -> bool:
+    """Connect a Qt signal to a slot across PySide/PyQt binding differences."""
+
+    if signal is None:
+        return False
+    connect = getattr(signal, "connect", None)
+    if not callable(connect):
+        return False
+    try:
+        connect(slot)
+    except (AttributeError, RuntimeError, TypeError):
+        return False
+    return True
 
 
 def configure_read_only_table(table: Any, qt_widgets: Any) -> None:
@@ -66,42 +82,43 @@ def make_fix_queue_select_cell(
     checked: bool = False,
     on_toggled: Optional[Any] = None,
 ) -> Any:
-    """Return a right-aligned Select toggle button for the fix queue table."""
+    """Return a centered Select checkbox for the fix queue table."""
 
     cell = qt_widgets.QWidget()
     layout = qt_widgets.QHBoxLayout(cell)
     set_margins = getattr(layout, "setContentsMargins", None)
     if set_margins is not None:
-        set_margins(4, 2, 4, 2)
+        set_margins(2, 0, 2, 0)
     add_stretch = getattr(layout, "addStretch", None)
     if add_stretch is not None:
         add_stretch()
 
-    button = qt_widgets.QPushButton(_fix_queue_select_label(checked))
-    button.setObjectName(FIX_QUEUE_SELECT_BUTTON_OBJECT_NAME)
-    button.setCheckable(True)
-    button.setChecked(checked)
-    set_tooltip = getattr(button, "setToolTip", None)
+    checkbox = qt_widgets.QCheckBox(_fix_queue_select_label(checked))
+    checkbox.setObjectName(FIX_QUEUE_SELECT_BUTTON_OBJECT_NAME)
+    checkbox.setChecked(checked)
+    set_tooltip = getattr(checkbox, "setToolTip", None)
     if set_tooltip is not None:
-        set_tooltip("Select this fix for Apply Selected Fixes.")
-    _update_fix_queue_select_button_style(button, checked)
+        set_tooltip("Select this fix for Fix Selected.")
+    _update_fix_queue_select_control(checkbox, checked)
 
-    clicked = getattr(button, "clicked", None)
-    connect = getattr(clicked, "connect", None)
+    state_changed = getattr(checkbox, "stateChanged", None)
+    connect = getattr(state_changed, "connect", None)
     if connect is not None and on_toggled is not None:
 
-        def _emit_toggled(_checked: bool = False) -> None:
-            is_checked = getattr(button, "isChecked", None)
+        def _emit_toggled(_state: int = 0) -> None:
+            is_checked = getattr(checkbox, "isChecked", None)
             checked_now = bool(is_checked()) if is_checked is not None else False
-            _update_fix_queue_select_button_style(button, checked_now)
+            _update_fix_queue_select_control(checkbox, checked_now)
             on_toggled(checked_now)
 
         connect(_emit_toggled)
 
     add_widget = getattr(layout, "addWidget", None)
     if add_widget is not None:
-        add_widget(button)
-    cell._shader_health_select_button = button
+        add_widget(checkbox)
+    if add_stretch is not None:
+        add_stretch()
+    cell._shader_health_select_button = checkbox
     return cell
 
 
@@ -119,18 +136,18 @@ def is_fix_queue_select_checked(table: Any, row_index: int) -> bool:
 
 
 def set_fix_queue_select_checked(table: Any, row_index: int, checked: bool) -> bool:
-    """Update a fix-queue Select button and return the new checked state."""
+    """Update a fix-queue Select control and return the new checked state."""
 
     cell_widget = table.cellWidget(row_index, 0) if hasattr(table, "cellWidget") else None
     if cell_widget is None:
         return checked
-    button = _find_fix_queue_select_button(cell_widget)
-    if button is None:
+    control = _find_fix_queue_select_button(cell_widget)
+    if control is None:
         return checked
-    set_checked = getattr(button, "setChecked", None)
+    set_checked = getattr(control, "setChecked", None)
     if set_checked is not None:
         set_checked(checked)
-    _update_fix_queue_select_button_style(button, checked)
+    _update_fix_queue_select_control(control, checked)
     return checked
 
 
@@ -153,10 +170,14 @@ def _fix_queue_select_label(checked: bool) -> str:
     return "Selected" if checked else "Select"
 
 
-def _update_fix_queue_select_button_style(button: Any, checked: bool) -> None:
-    set_text = getattr(button, "setText", None)
+def _update_fix_queue_select_control(control: Any, checked: bool) -> None:
+    set_text = getattr(control, "setText", None)
     if set_text is not None:
         set_text(_fix_queue_select_label(checked))
+
+
+def _update_fix_queue_select_button_style(button: Any, checked: bool) -> None:
+    _update_fix_queue_select_control(button, checked)
 
 
 def is_checkbox_checked(item: Any) -> bool:

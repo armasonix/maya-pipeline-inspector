@@ -56,16 +56,32 @@ def close_ui(*, delete: bool = True) -> None:
     close_panel(delete=delete)
 
 
-def validate_scene_action(*, profile_id: str = DEFAULT_PROFILE_ID) -> Any:
+def validate_scene_action(
+    *,
+    profile_id: str = DEFAULT_PROFILE_ID,
+    asset_class_id: str = "",
+) -> Any:
     """Validate the current Maya scene and return a UI-friendly result object."""
 
-    return _validate(scan_scope="scene", profile_id=profile_id)
+    return _validate(
+        scan_scope="scene",
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+    )
 
 
-def validate_selection_action(*, profile_id: str = DEFAULT_PROFILE_ID) -> Any:
+def validate_selection_action(
+    *,
+    profile_id: str = DEFAULT_PROFILE_ID,
+    asset_class_id: str = "",
+) -> Any:
     """Validate the current Maya selection and return a UI-friendly result object."""
 
-    return _validate(scan_scope="selection", profile_id=profile_id)
+    return _validate(
+        scan_scope="selection",
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+    )
 
 
 def waive_issue_action(result: Any, *, reason: str, approved_by: str = "artist") -> Any:
@@ -320,7 +336,12 @@ def reset_ui_install_state() -> None:
     _UI_INSTALLED = False
 
 
-def _validate(*, scan_scope: str, profile_id: str) -> Any:
+def _validate(
+    *,
+    scan_scope: str,
+    profile_id: str,
+    asset_class_id: str = "",
+) -> Any:
     from shader_health.maya.scanner import scan_scene, scan_selection, selection_node_names
 
     if scan_scope == "selection":
@@ -342,7 +363,12 @@ def _validate(*, scan_scope: str, profile_id: str) -> Any:
             )
     else:
         raw_snapshot = scan_scene()
-    run = run_validation(raw_snapshot, profile_id=profile_id, scan_scope=scan_scope)
+    run = run_validation(
+        raw_snapshot,
+        profile_id=profile_id,
+        asset_class_id=asset_class_id or None,
+        scan_scope=scan_scope,
+    )
     return _validation_result(run, action=f"validate_{scan_scope}")
 
 
@@ -388,6 +414,7 @@ def _validation_result(run: ValidationRunResult, *, action: str) -> Any:
         health_score=run.health_score,
         message=run.message,
         profile_id=run.profile_id,
+        asset_class_id=getattr(run, "asset_class_id", ""),
         scan_scope=run.scan_scope,
     )
 
@@ -411,20 +438,23 @@ def _export_html_report(path: Optional[str]) -> Any:
 
 
 def _export_shader_manifest(path: Optional[str]) -> Any:
+    from shader_health.maya import export_actions
+
     validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
     output_path = _runtime_output_path(path, validation.snapshot.scene_path, "manifest", "json")
-    payload = {
-        "manifest_schema_version": "maya-runtime-1.0",
-        "scene_path": validation.snapshot.scene_path,
-        "maya_version": validation.snapshot.maya_version,
-        "renderer": validation.snapshot.renderer,
-        "scan_scope": validation.snapshot.scan_scope,
-        "materials": [asdict(material) for material in validation.snapshot.materials],
-        "file_dependencies": [asdict(item) for item in validation.snapshot.file_dependencies],
-        "results": [result.to_dict() for result in validation.results],
-    }
-    _write_json(output_path, payload)
-    return _runtime_result("export_shader_manifest", output_path, "Shader manifest exported.")
+    health_score = getattr(getattr(validation, "health_score", None), "score", None)
+    result = export_actions.export_shader_manifest(
+        output_path,
+        snapshot=validation.snapshot,
+        results=validation.results,
+        health_score=health_score,
+    )
+    return _runtime_result(
+        "export_shader_manifest",
+        Path(result.path),
+        result.message,
+        succeeded=result.succeeded,
+    )
 
 
 def _export_fix_plan(path: Optional[str]) -> Any:

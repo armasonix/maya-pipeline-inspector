@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
-from typing import Optional
+from typing import BinaryIO, Optional
+
+_EXR_MAGIC = 20000630
 
 
 def read_image_dimensions(path: str | Path) -> tuple[Optional[int], Optional[int]]:
@@ -28,6 +30,9 @@ def read_image_dimensions(path: str | Path) -> tuple[Optional[int], Optional[int
 
     if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
         return _webp_dimensions(file_path)
+
+    if len(header) >= 8 and struct.unpack("<I", header[:4])[0] == _EXR_MAGIC:
+        return _exr_dimensions(file_path)
 
     return None, None
 
@@ -82,3 +87,58 @@ def _webp_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
             return int(width), int(height)
     except OSError:
         return None, None
+    return None, None
+
+
+def _exr_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
+    """Read OpenEXR dataWindow/displayWindow without the OpenEXR library."""
+
+    try:
+        with path.open("rb") as handle:
+            magic = struct.unpack("<I", handle.read(4))[0]
+            if magic != _EXR_MAGIC:
+                return None, None
+            handle.read(4)  # version flags
+
+            data_window: tuple[Optional[int], Optional[int]] = (None, None)
+            while True:
+                name = _read_cstring(handle)
+                if not name:
+                    break
+                type_name = _read_cstring(handle)
+                if not type_name:
+                    break
+                size_bytes = handle.read(4)
+                if len(size_bytes) != 4:
+                    break
+                (value_size,) = struct.unpack("<I", size_bytes)
+                value = handle.read(value_size)
+                padding = (4 - (value_size % 4)) % 4
+                if padding:
+                    handle.read(padding)
+                if type_name == "box2i" and len(value) >= 16 and name in {
+                    "dataWindow",
+                    "displayWindow",
+                }:
+                    x_min, y_min, x_max, y_max = struct.unpack("<iiii", value[:16])
+                    width = int(x_max - x_min + 1)
+                    height = int(y_max - y_min + 1)
+                    if width > 0 and height > 0:
+                        data_window = (width, height)
+            return data_window
+    except OSError:
+        return None, None
+    return None, None
+
+
+def _read_cstring(handle: BinaryIO) -> str:
+    chars: list[int] = []
+    while True:
+        chunk = handle.read(1)
+        if not chunk:
+            break
+        byte = chunk[0]
+        if byte == 0:
+            break
+        chars.append(byte)
+    return bytes(chars).decode("ascii", errors="ignore")
