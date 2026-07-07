@@ -12,8 +12,21 @@ htmlcov/
 # Build / packaging
 dist/
 build/
+native/build/
 *.egg-info/
 .eggs/
+
+# Native Maya plug-in binaries (build locally or attach to releases)
+maya_module/plug-ins/shader_health_inspector.mll
+maya_module/plug-ins/2024/*.mll
+maya_module/plug-ins/2025/*.mll
+maya_module/plug-ins/2026/*.mll
+maya_module/plug-ins/2024/*.so
+maya_module/plug-ins/2025/*.so
+maya_module/plug-ins/2026/*.so
+maya_module/plug-ins/2024/*.bundle
+maya_module/plug-ins/2025/*.bundle
+maya_module/plug-ins/2026/*.bundle
 
 # Virtual environments
 .venv/

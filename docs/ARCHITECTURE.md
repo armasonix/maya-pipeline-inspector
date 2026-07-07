@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
 
-Status: **v0.3.0 shipped** (2026-07-07). **v0.4 in progress** — GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)): Maya dockable panel is the primary surface; CLI, reports, and Deadline hooks are integration surfaces on the same validation pipeline. Core engine, Maya integration, dockable UI, headless CLI, manifest gates, and packaged rule/profile assets are implemented.
+Status: **v0.3.0 shipped** (2026-07-07). **v0.4 in progress** — GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Maya dockable panel is the primary surface; CLI, reports, and Deadline hooks are integration surfaces on the same validation pipeline. Core engine, Maya integration, dockable UI, headless CLI, manifest gates, and packaged rule/profile assets are implemented.
 
 ## Goals
 
@@ -89,6 +89,29 @@ flowchart TD
     ENG --> PANEL
     ENG --> CLI
 ```
+
+## Maya Plugin Delivery (ADR 0006)
+
+Maya integration uses a **thin native bootstrap** plus **Python implementation**. The compiled plug-in (`.mll` / `.so` / `.bundle`) exists only to register with Maya and call existing Python bootstrap code; validation, UI, and rules stay in `src/shader_health/`.
+
+```text
+maya_module/
+  scripts/userSetup.py          # deferred startup; year-aware load order
+  scripts/shader_health_inspector_bootstrap.py
+  plug-ins/
+    {2024,2025,2026}/shader_health_inspector.mll   # preferred when built (#096–#097)
+    shader_health_inspector.py                     # OpenMayaMPx fallback (v0.3+)
+        |
+        v
+  shader_health.maya.commands / ui_launcher / validation_pipeline
+        |
+        v
+  src/shader_health/ (core + maya + ui)
+```
+
+Load priority: **native `.mll` for current Maya year → `.py` plugin → direct `install_ui()`**. Open-source checkouts without compiled binaries continue to work via the `.py` path.
+
+Build matrix and devkit requirements: [ADR 0006](adr/0006-native-mll-plugin-strategy.md).
 
 ## Component Overview
 

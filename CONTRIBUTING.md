@@ -236,6 +236,16 @@ mayapy -m pytest tests/integration -v
 
 Maintainers can run the optional Maya workflow [`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml) on a self-hosted runner labeled `maya` (manual dispatch, weekly schedule, or same-repo PR). See [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md).
 
+### Native Maya plug-in (optional)
+
+The thin C++ bootstrap is built with CMake against a licensed Maya devkit. Pure Python contributors can skip this step — the `.py` plug-in fallback remains supported.
+
+```powershell
+.\tools\build_native_plugin.ps1 -MayaVersion 2025
+```
+
+Details: [`native/README.md`](native/README.md), [ADR 0006](docs/adr/0006-native-mll-plugin-strategy.md).
+
 ## Documentation Contributions
 
 Documentation should be practical and production-oriented.

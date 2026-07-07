@@ -144,7 +144,7 @@ When adding a feature, use this checklist:
 - ADR: `0001-snapshot-first-core.md`
 - ADR: `0003-safe-fix-reference-safety-policy.md`
 - ADR: `0004-headless-apply-fixes-policy.md`
-- ADR: `0006-native-mll-plugin-strategy.md` (planned, #095)
+- ADR: `0006-native-mll-plugin-strategy.md`
 - Document: `docs/ARCHITECTURE.md`
 - Document: `docs/USER_GUIDE.md`
 - Document: `docs/MAYA_UX_AUDIT_v0.4.md` (planned, #092)
