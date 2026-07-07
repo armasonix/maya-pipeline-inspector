@@ -1,8 +1,11 @@
 """Safe Auto-Fix Queue UI helpers."""
 from __future__ import annotations
 
+import json
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 from shader_health.ui.table_widgets import (
@@ -14,13 +17,22 @@ from shader_health.ui.table_widgets import (
 
 FIX_QUEUE_OBJECT_NAME = "shaderHealthInspectorFixQueue"
 FIX_QUEUE_TABLE_OBJECT_NAME = "shaderHealthInspectorFixQueueTable"
+FIX_QUEUE_ACTIONS_ROW_OBJECT_NAME = "shaderHealthInspectorFixQueueActionsRow"
 FIX_QUEUE_APPLY_SELECTED_BUTTON_OBJECT_NAME = "shaderHealthInspectorApplySelectedFixesButton"
 FIX_QUEUE_APPLY_SAFE_BUTTON_OBJECT_NAME = "shaderHealthInspectorApplySafeFixesButton"
 FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME = "shaderHealthInspectorExportFixPlanButton"
 FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME = "shaderHealthInspectorRiskyFixConfirmationLabel"
 SUPERVISOR_FULL_PROFILE_ID = "supervisor_full"
 FIX_QUEUE_SELECT_COLUMN_INDEX = 0
-FIX_QUEUE_MIN_TABLE_HEIGHT = 320
+FIX_QUEUE_RISK_COLUMN_INDEX = 1
+FIX_QUEUE_TARGET_COLUMN_INDEX = 2
+FIX_QUEUE_ATTRIBUTE_COLUMN_INDEX = 3
+FIX_QUEUE_BEFORE_COLUMN_INDEX = 4
+FIX_QUEUE_AFTER_COLUMN_INDEX = 5
+FIX_QUEUE_BLOCKED_COLUMN_INDEX = 6
+FIX_QUEUE_MIN_TABLE_HEIGHT = 280
+FIX_QUEUE_MAX_TABLE_HEIGHT = 520
+FIX_QUEUE_ROW_HEIGHT = 24
 FIX_QUEUE_COLUMNS = (
     "Select",
     "Risk",
@@ -32,6 +44,7 @@ FIX_QUEUE_COLUMNS = (
 )
 HIGH_RISK = "high"
 MEDIUM_RISK = "medium"
+_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-ee1eca.log"
 
 
 @dataclass(frozen=True)
@@ -72,7 +85,7 @@ def build_fix_queue(
     widget.setObjectName(FIX_QUEUE_OBJECT_NAME)
 
     layout = qt_widgets.QVBoxLayout(widget)
-    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
 
     table = qt_widgets.QTableWidget()
@@ -81,16 +94,18 @@ def build_fix_queue(
     table.setHorizontalHeaderLabels(list(FIX_QUEUE_COLUMNS))
     configure_read_only_table(table, qt_widgets)
     _configure_fix_queue_table(table, qt_widgets)
-    layout.addWidget(table, 1)
+    layout.addWidget(table, 0)
 
     populate_fix_queue(qt_widgets, table, fix_rows)
+    _sync_fix_queue_table_height(table, len(fix_rows))
 
     confirmation_label = qt_widgets.QLabel(risky_confirmation_text(fix_rows))
     confirmation_label.setObjectName(FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME)
     confirmation_label.setWordWrap(True)
-    layout.addWidget(confirmation_label)
+    layout.addWidget(confirmation_label, 0)
 
     actions = qt_widgets.QWidget()
+    actions.setObjectName(FIX_QUEUE_ACTIONS_ROW_OBJECT_NAME)
     actions_layout = qt_widgets.QHBoxLayout(actions)
     actions_layout.setContentsMargins(0, 0, 0, 0)
     actions_layout.setSpacing(4)
@@ -122,7 +137,23 @@ def build_fix_queue(
         )
     )
     actions_layout.addStretch(1)
-    layout.addWidget(actions)
+    layout.addWidget(actions, 0)
+    layout.addStretch(1)
+
+    _set_widget_expanding_horizontal(qt_widgets, widget)
+    # #region agent log
+    _debug_fix_queue_log(
+        "F1",
+        "fix_queue.py:build_fix_queue",
+        "fix queue layout built",
+        {
+            "table_stretch": 0,
+            "actions_stretch": 0,
+            "bottom_spacer": True,
+            "row_count": len(fix_rows),
+        },
+    )
+    # #endregion
 
     return widget
 
@@ -154,6 +185,7 @@ def populate_fix_queue(
                 column_index,
                 make_read_only_item(qt_widgets, value),
             )
+    _sync_fix_queue_table_height(table, len(rows))
 
 
 def fix_rows_from_table(
@@ -329,30 +361,154 @@ def confirm_risky_fixes(
 
 
 def _configure_fix_queue_table(table: Any, qt_widgets: Any) -> None:
-    set_minimum_height = getattr(table, "setMinimumHeight", None)
-    if set_minimum_height is not None:
-        set_minimum_height(FIX_QUEUE_MIN_TABLE_HEIGHT)
-
     size_policy = getattr(qt_widgets, "QSizePolicy", None)
     set_size_policy = getattr(table, "setSizePolicy", None)
     if size_policy is not None and set_size_policy is not None:
         expanding = getattr(size_policy, "Expanding", None)
         preferred = getattr(size_policy, "Preferred", None)
+        minimum = getattr(size_policy, "Minimum", None)
         if expanding is not None and preferred is not None:
-            set_size_policy(preferred, expanding)
+            set_size_policy(expanding, preferred)
+        elif expanding is not None and minimum is not None:
+            set_size_policy(expanding, minimum)
+
+    set_minimum_height = getattr(table, "setMinimumHeight", None)
+    if set_minimum_height is not None:
+        set_minimum_height(FIX_QUEUE_MIN_TABLE_HEIGHT)
+
+    vertical_header = getattr(table, "verticalHeader", lambda: None)()
+    if vertical_header is not None:
+        set_default_section_size = getattr(vertical_header, "setDefaultSectionSize", None)
+        if set_default_section_size is not None:
+            set_default_section_size(FIX_QUEUE_ROW_HEIGHT)
+        resize_mode = getattr(qt_widgets, "QHeaderView", None)
+        set_section_resize_mode = getattr(vertical_header, "setSectionResizeMode", None)
+        if resize_mode is not None and set_section_resize_mode is not None:
+            fixed = getattr(resize_mode, "Fixed", None)
+            if fixed is not None:
+                set_section_resize_mode(fixed)
 
     horizontal_header = getattr(table, "horizontalHeader", lambda: None)()
     if horizontal_header is None:
         return
-    set_column_width = getattr(table, "setColumnWidth", None)
-    if set_column_width is not None:
-        set_column_width(FIX_QUEUE_SELECT_COLUMN_INDEX, 108)
+
     resize_mode = getattr(qt_widgets, "QHeaderView", None)
     set_section_resize_mode = getattr(horizontal_header, "setSectionResizeMode", None)
-    if resize_mode is not None and set_section_resize_mode is not None:
-        fixed = getattr(resize_mode, "Fixed", None)
-        if fixed is not None:
-            set_section_resize_mode(FIX_QUEUE_SELECT_COLUMN_INDEX, fixed)
+    if resize_mode is None or set_section_resize_mode is None:
+        return
+
+    fixed = getattr(resize_mode, "Fixed", None)
+    stretch = getattr(resize_mode, "Stretch", None)
+    resize_to_contents = getattr(resize_mode, "ResizeToContents", None)
+    set_stretch_last_section = getattr(horizontal_header, "setStretchLastSection", None)
+    if set_stretch_last_section is not None:
+        set_stretch_last_section(False)
+
+    set_column_width = getattr(table, "setColumnWidth", None)
+    if fixed is not None:
+        set_section_resize_mode(FIX_QUEUE_SELECT_COLUMN_INDEX, fixed)
+        if set_column_width is not None:
+            set_column_width(FIX_QUEUE_SELECT_COLUMN_INDEX, 108)
+    if resize_to_contents is not None:
+        set_section_resize_mode(FIX_QUEUE_RISK_COLUMN_INDEX, resize_to_contents)
+        set_section_resize_mode(FIX_QUEUE_BLOCKED_COLUMN_INDEX, resize_to_contents)
+    if stretch is not None:
+        for column_index in (
+            FIX_QUEUE_TARGET_COLUMN_INDEX,
+            FIX_QUEUE_ATTRIBUTE_COLUMN_INDEX,
+            FIX_QUEUE_BEFORE_COLUMN_INDEX,
+            FIX_QUEUE_AFTER_COLUMN_INDEX,
+        ):
+            set_section_resize_mode(column_index, stretch)
+
+    # #region agent log
+    _debug_fix_queue_log(
+        "F2",
+        "fix_queue.py:_configure_fix_queue_table",
+        "fix queue table resize modes configured",
+        {
+            "select_fixed": fixed is not None,
+            "stretch_columns": [
+                FIX_QUEUE_TARGET_COLUMN_INDEX,
+                FIX_QUEUE_ATTRIBUTE_COLUMN_INDEX,
+                FIX_QUEUE_BEFORE_COLUMN_INDEX,
+                FIX_QUEUE_AFTER_COLUMN_INDEX,
+            ],
+        },
+    )
+    # #endregion
+
+
+def _sync_fix_queue_table_height(table: Any, row_count: int) -> None:
+    """Size the table to its row content so action buttons sit directly underneath."""
+
+    vertical_header = getattr(table, "verticalHeader", lambda: None)()
+    header_height = 28
+    if vertical_header is not None:
+        header_height_fn = getattr(vertical_header, "height", None)
+        if callable(header_height_fn):
+            measured = int(header_height_fn() or 0)
+            if measured > 0:
+                header_height = measured
+
+    content_height = max(
+        FIX_QUEUE_MIN_TABLE_HEIGHT,
+        header_height + row_count * FIX_QUEUE_ROW_HEIGHT + 4,
+    )
+    if content_height > FIX_QUEUE_MAX_TABLE_HEIGHT:
+        set_minimum_height = getattr(table, "setMinimumHeight", None)
+        set_maximum_height = getattr(table, "setMaximumHeight", None)
+        if set_minimum_height is not None:
+            set_minimum_height(FIX_QUEUE_MIN_TABLE_HEIGHT)
+        if set_maximum_height is not None:
+            set_maximum_height(FIX_QUEUE_MAX_TABLE_HEIGHT)
+    else:
+        for setter_name in ("setFixedHeight", "setMinimumHeight"):
+            setter = getattr(table, setter_name, None)
+            if setter is not None:
+                setter(content_height)
+                break
+
+    # #region agent log
+    _debug_fix_queue_log(
+        "F3",
+        "fix_queue.py:_sync_fix_queue_table_height",
+        "fix queue table height synced to rows",
+        {"row_count": row_count, "content_height": content_height},
+    )
+    # #endregion
+
+
+def _set_widget_expanding_horizontal(qt_widgets: Any, widget: Any) -> None:
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_size_policy = getattr(widget, "setSizePolicy", None)
+    if size_policy is None or set_size_policy is None:
+        return
+    expanding = getattr(size_policy, "Expanding", None)
+    preferred = getattr(size_policy, "Preferred", None)
+    if expanding is not None and preferred is not None:
+        set_size_policy(expanding, preferred)
+
+
+def _debug_fix_queue_log(
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict[str, Any],
+) -> None:
+    try:
+        payload = {
+            "sessionId": "ee1eca",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    except OSError:
+        return
 
 
 def _confirm_risky_fix_batch(qt_widgets: Any, risky: Sequence[FixQueueRow]) -> bool:

@@ -63,10 +63,6 @@ def build_farm_tab(
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(6)
 
-    from shader_health.ui.main_window import build_panel_header
-
-    layout.addWidget(build_panel_header(qt_widgets))
-
     connection_label = qt_widgets.QLabel(_connection_text(farm_state))
     connection_label.setObjectName(FARM_CONNECTION_LABEL_OBJECT_NAME)
     connection_label.setWordWrap(True)

@@ -10,9 +10,13 @@ class FakeWidget:
         self.object_name: Optional[str] = None
         self.children: list[Any] = []
         self.layout: Optional[FakeVBoxLayout] = None
+        self.size_policy: Optional[tuple[Any, Any]] = None
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
+
+    def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
+        self.size_policy = (horizontal, vertical)
 
 
 class FakeLabel(FakeWidget):
@@ -23,6 +27,12 @@ class FakeLabel(FakeWidget):
 
     def setWordWrap(self, enabled: bool) -> None:
         self.word_wrap = enabled
+
+    def setText(self, text: str) -> None:
+        self.text = text
+
+    def setTextFormat(self, text_format: Any) -> None:
+        _ = text_format
 
 
 class FakePushButton(FakeLabel):
@@ -63,6 +73,7 @@ class FakeTableWidget(FakeWidget):
         self.headers: list[str] = []
         self.sorting_enabled = False
         self.items: dict[tuple[int, int], FakeTableWidgetItem] = {}
+        self.vertical_header: dict[int, FakeTableWidgetItem] = {}
 
     def setColumnCount(self, count: int) -> None:
         self.column_count = count
@@ -79,10 +90,17 @@ class FakeTableWidget(FakeWidget):
     def setItem(self, row: int, column: int, item: FakeTableWidgetItem) -> None:
         self.items[(row, column)] = item
 
+    def setVerticalHeaderItem(self, row: int, item: FakeTableWidgetItem) -> None:
+        self.vertical_header[row] = item
+
 
 class FakeTableWidgetItem:
     def __init__(self, text: str) -> None:
         self.text = text
+        self.foreground_color: Any = None
+
+    def setForeground(self, brush: Any) -> None:
+        self.foreground_color = brush
 
 
 class FakeVBoxLayout:
@@ -136,9 +154,59 @@ class FakeCheckBox(FakeWidget):
         self.checked = checked
 
 
+class FakeQFrame(FakeWidget):
+    HLine = "hline"
+    Sunken = "sunken"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.frame_shape: Optional[Any] = None
+        self.frame_shadow: Optional[Any] = None
+        self.fixed_height: Optional[int] = None
+
+    def setFrameShape(self, shape: Any) -> None:
+        self.frame_shape = shape
+
+    def setFrameShadow(self, shadow: Any) -> None:
+        self.frame_shadow = shadow
+
+    def setFixedHeight(self, height: int) -> None:
+        self.fixed_height = height
+
+
+class FakeSplitter(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.widgets: list[Any] = []
+        self.stretch_factors: list[tuple[int, int]] = []
+        self.orientation: Optional[Any] = None
+
+    def setOrientation(self, orientation: Any) -> None:
+        self.orientation = orientation
+
+    def addWidget(self, widget: Any) -> None:
+        self.widgets.append(widget)
+        self.children.append(widget)
+
+    def setStretchFactor(self, index: int, stretch: int) -> None:
+        self.stretch_factors.append((index, stretch))
+
+
+class FakeQt:
+    Horizontal = "horizontal"
+    RichText = "rich_text"
+
+
+class FakeSizePolicy:
+    Preferred = "preferred"
+    Fixed = "fixed"
+    Maximum = "maximum"
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
+    QFrame = FakeQFrame
     QPushButton = FakePushButton
     QComboBox = FakeComboBox
     QTableWidget = FakeTableWidget
@@ -148,6 +216,9 @@ class FakeQtWidgets:
     QGridLayout = FakeGridLayout
     QTabWidget = FakeTabWidget
     QCheckBox = FakeCheckBox
+    QSplitter = FakeSplitter
+    QSizePolicy = FakeSizePolicy
+    Qt = FakeQt
 
 
 def test_issues_table_displays_required_columns_and_cells():
@@ -213,6 +284,31 @@ def test_sort_issue_rows_rejects_unknown_sort_key():
         assert "Unsupported issue table sort key" in str(exc)
     else:
         raise AssertionError("Expected unknown issue table sort key to fail")
+
+
+def test_populate_issues_table_colors_severity_column_by_severity(monkeypatch):
+    class FakeColor:
+        def __init__(self, hex_color: str) -> None:
+            self.hex_color = hex_color
+
+    class FakeBrush:
+        def __init__(self, color: FakeColor) -> None:
+            self.color = color
+
+    class FakeQtCore:
+        QColor = FakeColor
+        QBrush = FakeBrush
+
+    monkeypatch.setattr(main_window, "load_qt_core", lambda: FakeQtCore())
+
+    table = FakeTableWidget()
+    rows = _sample_rows()
+    main_window.populate_issues_table(FakeQtWidgets, table, rows)
+
+    assert table.items[(0, 0)].foreground_color.color.hex_color == "#f1c40f"
+    assert table.items[(1, 0)].foreground_color.color.hex_color == "#e74c3c"
+    assert table.items[(2, 0)].foreground_color.color.hex_color == "#e67e22"
+    assert table.vertical_header == {}
 
 
 def test_main_widget_contains_issues_table():

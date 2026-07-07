@@ -133,6 +133,7 @@ def _create_dockable_panel() -> Any:
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
+        _wire_validate_shortcuts(content, qt_widgets, panel_state)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
@@ -193,10 +194,6 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_manifest_diff=_export_manifest_diff_from_ui,
         on_compare_approved_manifest=_compare_approved_manifest_from_ui,
         on_compare_after_fixes=_compare_after_fixes_from_ui,
-        on_manifest_gate=lambda: _manifest_gate_from_ui(
-            _active_panel_content(),
-            load_qt_widgets(),
-        ),
     )
 
 
@@ -429,7 +426,7 @@ def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
-        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", message)
+        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
         print(message)
         return
 
@@ -440,6 +437,7 @@ def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None
 
     content._shader_health_scan_scope = scan_scope
     _populate_validation_result(content, qt_widgets, result)
+    _update_validation_chrome_labels(content, qt_widgets, result)
     print(result.message)
 
 
@@ -470,6 +468,7 @@ def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
 
     content._shader_health_scan_scope = "scene"
     _populate_validation_result(content, qt_widgets, result)
+    _update_validation_chrome_labels(content, qt_widgets, result)
     summary = getattr(result, "summary", None)
     block_publish = bool(getattr(summary, "block_publish", False)) if summary else False
     block_deadline = bool(getattr(summary, "block_deadline", False)) if summary else False
@@ -481,7 +480,6 @@ def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
         f"Publish Block: {_yes_no(block_publish)}. Deadline Block: {_yes_no(block_deadline)}."
     )
     _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
-    _show_information_dialog(qt_widgets, "Publish Preflight", message)
     print(message)
 
 
@@ -523,6 +521,7 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
 
     content._shader_health_scan_scope = "scene"
     _populate_validation_result(content, qt_widgets, validation)
+    _update_validation_chrome_labels(content, qt_widgets, validation)
     connection_state = getattr(content, "_shader_health_farm_tab_state", None)
     result = run_farm_preflight_action(
         summary=getattr(validation, "summary", None),
@@ -777,9 +776,19 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
         else:
             return
     except Exception as exc:  # noqa: BLE001
-        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", str(exc))
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            str(exc),
+        )
         return
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        result.message,
+    )
 
 
 def _issue_path(issue: Any) -> str:
@@ -806,9 +815,19 @@ def _waive_selected_issue_from_ui(content: Any, qt_widgets: Any) -> None:
             reason="Approved from Maya Shader Health Inspector UI.",
         )
     except Exception as exc:  # noqa: BLE001
-        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", str(exc))
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            str(exc),
+        )
         return
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        result.message,
+    )
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -919,25 +938,19 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         main_window.HEALTH_SCORE_LABEL_OBJECT_NAME,
         f"Health: {health.score} / 100",
     )
-    _set_label_text(
+    main_window.update_severity_count_indicators(
         content,
         qt_widgets,
-        main_window.SEVERITY_COUNTS_LABEL_OBJECT_NAME,
-        (
-            f"Critical: {health.critical}   "
-            f"Error: {health.error}   "
-            f"Warning: {health.warning}   "
-            f"Info: {health.info}"
-        ),
+        critical_count=int(health.critical),
+        error_count=int(health.error),
+        warning_count=int(health.warning),
+        info_count=int(health.info),
     )
-    _set_label_text(
+    main_window.update_block_status_indicators(
         content,
         qt_widgets,
-        main_window.BLOCK_STATUS_LABEL_OBJECT_NAME,
-        (
-            f"Publish Block: {_yes_no(health.block_publish)}   "
-            f"Deadline Block: {_yes_no(health.block_deadline)}"
-        ),
+        block_publish=bool(health.block_publish),
+        block_deadline=bool(health.block_deadline),
     )
     description = result.message
     snapshot = (
@@ -947,7 +960,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
     asset_class_id = _selected_asset_class_id(content, qt_widgets)
     if snapshot is not None:
         description += _resolution_probe_hint(snapshot, asset_class_id)
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", description)
+    _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, description)
 
     failed_results = tuple(item for item in result.results if item.status == "failed")
     rows = tuple(_issue_row_from_result(item) for item in failed_results)
@@ -1230,7 +1243,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             "No fixes selected. Check rows in the Select column on the Fixes tab first.",
         )
         return
@@ -1239,7 +1252,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             blocked_message
             or "Selected fixes are blocked and were not applied.",
         )
@@ -1254,7 +1267,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             "No matching fix actions found for the selected queue rows.",
         )
         return
@@ -1264,7 +1277,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
             _set_label_text(
                 content,
                 qt_widgets,
-                "shaderHealthInspectorDescription",
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
                 "High-risk fixes were not applied.",
             )
             return
@@ -1278,7 +1291,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_label_text(
         content,
         qt_widgets,
-        "shaderHealthInspectorDescription",
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(selected)),
     )
     _revalidate_with_current_scope(content, qt_widgets)
@@ -1300,7 +1313,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             "No safe fixes available. Referenced, locked, medium/high-risk, "
             "or unplannable fixes are skipped.",
         )
@@ -1310,7 +1323,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_label_text(
         content,
         qt_widgets,
-        "shaderHealthInspectorDescription",
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(actions)),
     )
     _revalidate_with_current_scope(content, qt_widgets)
@@ -1635,6 +1648,92 @@ def _populate_first_issue_details(
     content._shader_health_selected_issue = failed_results[0]
 
 
+def _wire_validate_shortcuts(content: Any, qt_widgets: Any, panel_state: dict[str, Any]) -> None:
+    shortcut_class = getattr(qt_widgets, "QShortcut", None)
+    key_sequence = getattr(qt_widgets, "QKeySequence", None)
+    if shortcut_class is None or key_sequence is None:
+        return
+    shortcut = shortcut_class(key_sequence("F5"), content)
+    activated = getattr(shortcut, "activated", None)
+    connect = getattr(activated, "connect", None)
+    if connect is None:
+        return
+    connect(
+        lambda: _validate_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            scan_scope="scene",
+        )
+    )
+
+
+def _update_validation_chrome_labels(content: Any, qt_widgets: Any, result: Any) -> None:
+    snapshot = getattr(result, "snapshot", None)
+    scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
+    scanned_at_utc = getattr(snapshot, "scanned_at_utc", "") if snapshot else ""
+    scan_scope = getattr(content, "_shader_health_scan_scope", "scene")
+    profile_id = getattr(result, "profile_id", "") or _selected_workflow_profile_id(
+        content,
+        qt_widgets,
+    )
+    asset_class_id = getattr(result, "asset_class_id", "") or _selected_asset_class_id(
+        content,
+        qt_widgets,
+    )
+
+    content._shader_health_last_validated_at = scanned_at_utc
+    content._shader_health_scene_path = scene_path
+
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SCENE_NAME_LABEL_OBJECT_NAME,
+        main_window.format_scene_display_name(scene_path),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.PROFILE_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_profile_chip_text(
+            main_window.profile_display_name(profile_id),
+            profile_id,
+        ),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.ASSET_CLASS_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_asset_class_chip_text(
+            main_window.asset_class_display_name(asset_class_id),
+        ),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.LAST_VALIDATED_LABEL_OBJECT_NAME,
+        main_window.format_last_validated_display(scanned_at_utc),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SCAN_SCOPE_LABEL_OBJECT_NAME,
+        main_window.format_scan_scope_display(scan_scope),
+    )
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(
+            scene_path=scene_path,
+            scanned_at_utc=scanned_at_utc,
+            scan_scope=scan_scope,
+        ),
+    )
+
+
+def _set_reports_status_label(content: Any, qt_widgets: Any, message: str) -> None:
+    _set_label_text(content, qt_widgets, main_window.REPORTS_STATUS_LABEL_OBJECT_NAME, message)
+
+
 def _wire_scene_change_reset(content: Any, qt_widgets: Any) -> None:
     global _SCRIPT_JOBS
     cmds = _maya_cmds()
@@ -1679,6 +1778,7 @@ def _reset_panel_state(
     content._shader_health_results = ()
     content._shader_health_profile_id = ""
     content._shader_health_asset_class_id = ""
+    content._shader_health_last_validated_at = ""
     content._shader_health_last_fix_audit = None
 
     _set_label_text(
@@ -1687,19 +1787,61 @@ def _reset_panel_state(
         main_window.HEALTH_SCORE_LABEL_OBJECT_NAME,
         "Health: 100 / 100",
     )
-    _set_label_text(
+    main_window.update_severity_count_indicators(
         content,
         qt_widgets,
-        main_window.SEVERITY_COUNTS_LABEL_OBJECT_NAME,
-        "Critical: 0   Error: 0   Warning: 0   Info: 0",
+        critical_count=0,
+        error_count=0,
+        warning_count=0,
+        info_count=0,
+    )
+    main_window.update_block_status_indicators(
+        content,
+        qt_widgets,
+        block_publish=False,
+        block_deadline=False,
     )
     _set_label_text(
         content,
         qt_widgets,
-        main_window.BLOCK_STATUS_LABEL_OBJECT_NAME,
-        "Publish Block: NO   Deadline Block: NO",
+        main_window.SCENE_NAME_LABEL_OBJECT_NAME,
+        main_window.format_scene_display_name(""),
     )
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", status_message)
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.PROFILE_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_profile_chip_text("Artist Relaxed", "artist_relaxed"),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.ASSET_CLASS_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_asset_class_chip_text(main_window.ASSET_CLASS_NONE_LABEL),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.LAST_VALIDATED_LABEL_OBJECT_NAME,
+        main_window.format_last_validated_display(""),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SCAN_SCOPE_LABEL_OBJECT_NAME,
+        main_window.format_scan_scope_display(""),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        status_message,
+    )
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(),
+    )
 
     issues_table = _find_child(
         content,
@@ -1751,6 +1893,26 @@ def _yes_no(value: bool) -> str:
 
 def _print_export_result(result: Any) -> None:
     print(f"{result.message} {result.path}")
+    content = _active_panel_content()
+    if content is None:
+        return
+    path = str(getattr(result, "path", "") or "").strip()
+    if not path:
+        return
+    qt_widgets = load_qt_widgets()
+    scanned_at_utc = getattr(content, "_shader_health_last_validated_at", "")
+    scene_path = getattr(content, "_shader_health_scene_path", "")
+    scan_scope = getattr(content, "_shader_health_scan_scope", "")
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(
+            scene_path=scene_path,
+            scanned_at_utc=scanned_at_utc,
+            scan_scope=scan_scope,
+            export_message=f"Exported: {path}",
+        ),
+    )
 
 
 def _workspace_control_exists(cmds: Any) -> bool:

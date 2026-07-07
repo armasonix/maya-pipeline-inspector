@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
 
+import pytest
 from tests.unit.test_manifest_diff_command import old_manifest
 
 from shader_health.core import GraphSnapshot, MaterialSnapshot, RuleResult
@@ -487,6 +488,13 @@ def test_export_buttons_connect_to_callbacks():
         "manifest_diff",
         "compare_approved_manifest",
     ]
+
+
+def test_reports_export_grid_omits_manifest_gate_button():
+    widget = main_window.build_export_actions(FakeQtWidgets)
+
+    with pytest.raises(AssertionError):
+        _find(widget, main_window.VALIDATE_MANIFEST_GATE_BUTTON_OBJECT_NAME)
 
 
 def test_fix_queue_export_fix_plan_button_connects_to_callback():

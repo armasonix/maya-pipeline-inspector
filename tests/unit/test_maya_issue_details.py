@@ -24,6 +24,9 @@ class FakeLabel(FakeWidget):
     def setWordWrap(self, enabled: bool) -> None:
         self.word_wrap = enabled
 
+    def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
+        _ = (horizontal, vertical)
+
 
 class FakePushButton(FakeLabel):
     def __init__(self, text: str = "") -> None:
@@ -136,9 +139,36 @@ class FakeCheckBox(FakeWidget):
         self.checked = checked
 
 
+class FakeQFrame(FakeWidget):
+    HLine = "hline"
+    Sunken = "sunken"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.frame_shape: Optional[Any] = None
+        self.frame_shadow: Optional[Any] = None
+        self.fixed_height: Optional[int] = None
+
+    def setFrameShape(self, shape: Any) -> None:
+        self.frame_shape = shape
+
+    def setFrameShadow(self, shadow: Any) -> None:
+        self.frame_shadow = shadow
+
+    def setFixedHeight(self, height: int) -> None:
+        self.fixed_height = height
+
+
+class FakeSizePolicy:
+    Preferred = "preferred"
+    Fixed = "fixed"
+    Maximum = "maximum"
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
+    QFrame = FakeQFrame
     QPushButton = FakePushButton
     QComboBox = FakeComboBox
     QTableWidget = FakeTableWidget
@@ -148,6 +178,7 @@ class FakeQtWidgets:
     QGridLayout = FakeGridLayout
     QTabWidget = FakeTabWidget
     QCheckBox = FakeCheckBox
+    QSizePolicy = FakeSizePolicy
 
 
 def test_issue_details_defaults_show_empty_selection_state():
@@ -208,6 +239,17 @@ def test_issue_details_labels_are_word_wrapped():
     assert _find(details_panel, main_window.DETAILS_WHY_LABEL_OBJECT_NAME).word_wrap is True
     assert _find(details_panel, main_window.DETAILS_GRAPH_TRACE_LABEL_OBJECT_NAME).word_wrap is True
     assert _find(details_panel, main_window.DETAILS_FIX_LABEL_OBJECT_NAME).word_wrap is True
+
+
+def test_issue_details_panel_uses_horizontal_separators_between_sections():
+    details_panel = main_window.build_issue_details_panel(FakeQtWidgets)
+
+    separators = [
+        child
+        for child in details_panel.children
+        if getattr(child, "frame_shape", None) == FakeQFrame.HLine
+    ]
+    assert len(separators) == 5
 
 
 def test_main_widget_contains_issue_details_panel():
