@@ -12,6 +12,13 @@ from shader_health.integrations.deadline.config import (
     DEFAULT_PROFILE_ID,
     DeadlineConfig,
 )
+from shader_health.integrations.deadline.eligibility import (
+    FarmEligibilityDecision,
+    FarmEligibilityResult,
+    FarmSceneState,
+    FarmValidationResult,
+    evaluate_farm_submit_eligibility,
+)
 from shader_health.integrations.deadline.preflight import (
     PREFLIGHT_ERROR,
     SUBMISSION_ALLOWED,
@@ -34,6 +41,10 @@ __all__ = [
     "DeadlineConfig",
     "DeadlinePreflightResult",
     "DeadlineResponse",
+    "FarmEligibilityDecision",
+    "FarmEligibilityResult",
+    "FarmSceneState",
+    "FarmValidationResult",
     "HttpRequest",
     "HttpTransport",
     "PREFLIGHT_ERROR",
@@ -47,5 +58,6 @@ __all__ = [
     "blocked_message",
     "build_validator_command",
     "default_http_transport",
+    "evaluate_farm_submit_eligibility",
     "run_deadline_preflight",
 ]

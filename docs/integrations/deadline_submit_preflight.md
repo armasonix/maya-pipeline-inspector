@@ -8,6 +8,7 @@ v0.4 adds a shared package at `shader_health.integrations.deadline` with:
 - `DeadlineConfig` — Web Service URL, profile defaults, queue/pool routing
 - `DeadlineClient` — thin REST wrapper for Deadline 10 on-prem
 - `run_deadline_preflight()` — headless validation gate used by examples and the Farm tab
+- `evaluate_farm_submit_eligibility()` — scene-state + validation matrix for farm submit (#099)
 
 The example script is a thin CLI wrapper around the shared module. It does not
 submit a job by itself.
@@ -119,6 +120,54 @@ The submit preflight maps those into submit decisions:
 | `2` | Block Deadline submission because farm-blocking issues were found. |
 | `3` | Block submission because the preflight itself could not complete safely. |
 
+## Farm eligibility gate (#099)
+
+After validation, combine the validator outcome with Maya scene state before
+enabling farm submit in the panel or a custom submitter:
+
+```python
+from shader_health.integrations.deadline import (
+    FarmSceneState,
+    FarmValidationResult,
+    evaluate_farm_submit_eligibility,
+)
+
+validation = FarmValidationResult.from_json_report(report_payload)
+scene_state = FarmSceneState(
+    scene_saved=True,
+    renderer_plugin_loaded=True,
+)
+
+eligibility = evaluate_farm_submit_eligibility(validation, scene_state)
+if not eligibility.allowed:
+    raise RuntimeError(f"Farm submit blocked: {eligibility.reasons}")
+if eligibility.decision.value == "warn":
+    print(f"Farm submit allowed with warnings: {eligibility.warnings}")
+```
+
+### Scene state inputs
+
+| Field | When false |
+| --- | --- |
+| `scene_saved` | Block — unsaved `.ma` / `.mb` must be saved before farm submit |
+| `renderer_plugin_loaded` | Block — active renderer plug-in (V-Ray, Arnold, …) is not loaded |
+
+### Eligibility matrix
+
+Evaluated in priority order (first match wins):
+
+| Validation / scene signal | Decision | Farm allowed | Exit code |
+| --- | --- | --- | --- |
+| Validator exit `3` or `4` | Block | No | `3` (preflight error) |
+| `scene_saved=false` | Block | No | `3` |
+| `renderer_plugin_loaded=false` | Block | No | `3` |
+| `block_deadline=true` or validator exit `2` | Block | No | `2` |
+| `block_publish=true` or validator exit `1` (publish only) | Warn | Yes | `0` |
+| Validator exit `0`, scene ready | Allow | Yes | `0` |
+
+Publish-only issues do not block farm submission, but the Farm tab and submit
+hooks should surface `eligibility.warnings` to the artist.
+
 ## Integration pattern
 
 In a studio submitter, call the shared preflight helper before the actual
@@ -183,5 +232,5 @@ workstation. See the [Deadline REST overview](https://docs.thinkboxsoftware.com/
 The integration module and example wrapper are covered by unit tests:
 
 ```bash
-python -m pytest tests/unit/test_deadline_integration.py tests/unit/test_deadline_submit_preflight_example.py -v
+python -m pytest tests/unit/test_deadline_integration.py tests/unit/test_deadline_eligibility.py tests/unit/test_deadline_submit_preflight_example.py -v
 ```
