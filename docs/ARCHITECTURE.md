@@ -53,7 +53,7 @@ Maya scene
 
 ## UX Layer (panel)
 
-The dockable panel (`shader_health.ui.main_window`, launched via `shader_health.maya.ui_launcher`) is the primary artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and future `integrations.deadline` — no duplicated rule evaluation in widgets.
+The dockable panel (`shader_health.ui.main_window`, launched via `shader_health.maya.ui_launcher`) is the primary artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and `shader_health.integrations.deadline` — no duplicated rule evaluation in widgets.
 
 ```mermaid
 flowchart TD

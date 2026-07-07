@@ -1,0 +1,7 @@
+{
+  "api_url": "http://localhost:8081",
+  "profile_id": "deadline_critical",
+  "mayapy": "mayapy",
+  "timeout_seconds": 30,
+  "queue": "shader_health"
+}
