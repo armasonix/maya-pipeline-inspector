@@ -26,6 +26,7 @@ ADRs help keep these decisions visible as the codebase grows.
 | 0003 | Safe-fix and reference-safety policy | Accepted |
 | 0004 | Headless apply-fixes policy | Accepted |
 | 0005 | GUI-first product philosophy | Accepted |
+| 0006 | Native Maya plugin (.mll) strategy | Accepted |
 
 ## Status Values
 
