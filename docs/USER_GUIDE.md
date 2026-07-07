@@ -128,12 +128,12 @@ Main needs:
 
 ## Maya UI Layout
 
-The dockable panel uses four tabs. Each tab shows the panel title and version at the top.
+The dockable panel uses five tabs. Each tab shows the panel title and version at the top.
 
 ```text
 +--------------------------------------------------------------------------------+
 | Maya Shader Health Inspector  v0.3.0                                           |
-| [Validate] [Waivers] [Fixes] [Reports]                                         |
+| [Validate] [Waivers] [Fixes] [Reports] [Farm]                                  |
 +--------------------------------------------------------------------------------+
 | Validate tab (default)                                                         |
 | Health: 78/100   Critical: 2   Error: 5   Warning: 17   Info: 8                |
@@ -148,6 +148,8 @@ The dockable panel uses four tabs. Each tab shows the panel title and version at
 | Fixes tab: checkbox column + fix queue table, [Fix Selected] [Apply Safe Fixes]  |
 |            [Export Fix Plan]                                                   |
 | Reports tab: compact export buttons for JSON/HTML/manifest/diff/compare        |
+| Farm tab: Deadline connection, scene readiness, eligibility, last report/job id |
+|           [Refresh Connection] [Run Farm Preflight] [Submit to Farm]          |
 +--------------------------------------------------------------------------------+
 ```
 
@@ -395,13 +397,16 @@ Expected behavior:
 
 Deadline preflight should run validation before render submission.
 
+**From the panel (v0.4):** open the **Farm** tab, run **Validate Scene** on the Validate tab if needed, then **Run Farm Preflight**. When eligibility is `allow`, use **Submit to Farm** to queue a CommandScript utility job on Deadline workers. The tab shows the configured Web Service URL, connection status, last JSON report path, and last submitted job id.
+
+**Headless / pipeline:** use `examples/deadline/submit_preflight.py` or `shader_health.integrations.deadline.run_deadline_preflight()` — see [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md).
+
 Expected behavior:
-1. Artist submits render.
-2. Submit tool runs shader health validation with deadline_critical profile.
-3. If block_deadline is false, submission continues.
-4. If block_deadline is true, submission stops and shows summary.
+1. Artist submits render (or clicks **Submit to Farm** in the panel).
+2. Submit tool runs shader health validation with `deadline_critical` profile.
+3. If `block_deadline` is false, submission continues.
+4. If `block_deadline` is true, submission stops and shows summary.
 5. JSON report is saved for review.
-```
 
 ## Best Practices for Users
 

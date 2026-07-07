@@ -12,6 +12,7 @@ from shader_health.maya.validation_pipeline import (
     list_asset_class_profile_options,
     list_workflow_profile_options,
 )
+from shader_health.ui.farm_tab import FarmActionCallbacks, build_farm_tab
 from shader_health.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
 from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
 from shader_health.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager
@@ -184,6 +185,7 @@ def build_main_widget(
     validation_callbacks: Optional[ValidationActionCallbacks] = None,
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
     waiver_callbacks: Optional[WaiverManagerCallbacks] = None,
+    farm_callbacks: Optional[FarmActionCallbacks] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
@@ -191,6 +193,7 @@ def build_main_widget(
     validation_callbacks = validation_callbacks or ValidationActionCallbacks()
     issue_details_callbacks = issue_details_callbacks or IssueDetailsActionCallbacks()
     waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
+    farm_callbacks = farm_callbacks or FarmActionCallbacks()
 
     widget = qt_widgets.QWidget()
     widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
@@ -208,6 +211,7 @@ def build_main_widget(
     tabs.addTab(_build_waivers_tab(qt_widgets, waiver_callbacks), "Waivers")
     tabs.addTab(_build_fixes_tab(qt_widgets, fix_queue_callbacks), "Fixes")
     tabs.addTab(_build_reports_tab(qt_widgets, export_callbacks), "Reports")
+    tabs.addTab(build_farm_tab(qt_widgets, callbacks=farm_callbacks), "Farm")
     layout.addWidget(tabs)
 
     return widget

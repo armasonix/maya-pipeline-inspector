@@ -25,6 +25,9 @@ class FakeLabel(FakeWidget):
     def setWordWrap(self, enabled: bool) -> None:
         self.word_wrap = enabled
 
+    def setText(self, text: str) -> None:
+        self.text = text
+
     def setStyleSheet(self, style: str) -> None:
         self.style_sheet = style
 
@@ -257,6 +260,7 @@ def test_main_widget_contains_tabbed_shell():
         "Waivers",
         "Fixes",
         "Reports",
+        "Farm",
     ]
 
 

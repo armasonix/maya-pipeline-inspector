@@ -63,7 +63,7 @@ flowchart TD
         FIX[Fixes Tab]
         WAI[Waivers Tab]
         REP[Reports Tab]
-        FARM[Farm Tab planned v0.4]
+        FARM[Farm Tab]
     end
     subgraph integration [Integration_Surfaces]
         CLI[Headless CLI]

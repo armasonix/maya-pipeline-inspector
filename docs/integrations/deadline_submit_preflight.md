@@ -281,6 +281,28 @@ python examples/deadline/submit_to_farm.py D:/show/scene.ma \
   --check-eligibility
 ```
 
+## Farm tab in Maya panel (#101)
+
+The **Farm** tab is the in-panel surface for Deadline 10 on-prem preflight and submit. It delegates to `shader_health.maya.farm_actions` and `shader_health.integrations.deadline` — the same eligibility gate and submit API as the CLI examples.
+
+### Actions
+
+| Button | Behavior |
+|--------|----------|
+| **Refresh Connection** | Pings the configured Deadline Web Service (`SHADER_HEALTH_DEADLINE_API_URL`, default `http://localhost:8081`). |
+| **Run Farm Preflight** | Requires a prior **Validate Scene** run. Evaluates `deadline_critical` summary flags plus scene saved / renderer plug-in readiness. |
+| **Submit to Farm** | Submits a CommandScript utility job when the service is reachable and eligibility allows. Writes aux command script and JSON report paths beside the scene. |
+
+### Configuration
+
+Same env vars and JSON config as the headless integration — see [Configuration](#configuration) above and `DeadlineConfig.from_env()`.
+
+### Validation
+
+```bash
+python -m pytest tests/unit/test_maya_farm_tab.py tests/unit/test_maya_farm_actions.py -v
+```
+
 ## Operational notes
 
 - Keep the generated JSON report as a submit artifact.
@@ -294,5 +316,5 @@ python examples/deadline/submit_to_farm.py D:/show/scene.ma \
 The integration module and example wrapper are covered by unit tests:
 
 ```bash
-python -m pytest tests/unit/test_deadline_integration.py tests/unit/test_deadline_eligibility.py tests/unit/test_deadline_submit.py tests/unit/test_deadline_submit_preflight_example.py -v
+python -m pytest tests/unit/test_deadline_integration.py tests/unit/test_deadline_eligibility.py tests/unit/test_deadline_submit.py tests/unit/test_deadline_submit_preflight_example.py tests/unit/test_maya_farm_tab.py tests/unit/test_maya_farm_actions.py -v
 ```
