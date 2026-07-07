@@ -66,6 +66,14 @@
     "common.texture.duplicates.same_path": {
       "enabled": false
     },
+    "common.shader_network.duplicate.fingerprint": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "common.shader_network.duplicate.scan_cap": {
+      "enabled": true,
+      "severity": "warning"
+    },
     "common.texture.optimized.exists": {
       "enabled": true,
       "severity": "error",

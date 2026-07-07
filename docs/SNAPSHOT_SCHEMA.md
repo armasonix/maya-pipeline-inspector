@@ -184,7 +184,8 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
   "displacement_nodes": [],
   "graph_node_count": 2,
   "graph_depth": 1,
-  "graph_fingerprint": "sha256:demo"
+  "graph_fingerprint": "sha256:demo",
+  "graph_content_fingerprint": "sha256:content_demo"
 }
 ```
 
@@ -201,6 +202,7 @@ Material-level summary used for scoring, reports, graph budget checks, and manif
 | `graph_node_count` | integer | Yes | Number of nodes in material graph. |
 | `graph_depth` | integer | Yes | Approximate upstream graph depth. |
 | `graph_fingerprint` | string | Yes | Stable graph fingerprint if computed, otherwise empty string. |
+| `graph_content_fingerprint` | string | Yes | Content-only fingerprint for duplicate material detection (ignores Maya node names). |
 | `complexity_metadata` | object or null | No | Shader complexity profiler payload computed during enrichment. |
 | `displacement_metadata` | object or null | No | Displacement risk analyzer payload computed during enrichment. |
 | `vray_metadata` | object or null | No | V-Ray enrichment payload when the material is a V-Ray shader type. |

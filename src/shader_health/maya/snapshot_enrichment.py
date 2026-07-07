@@ -27,7 +27,10 @@ from shader_health.core import (
     NodeSnapshot,
     RuleResult,
 )
-from shader_health.core.graph_fingerprint import material_graph_fingerprint
+from shader_health.core.graph_fingerprint import (
+    material_graph_content_fingerprint,
+    material_graph_fingerprint,
+)
 from shader_health.core.image_metadata import read_image_dimensions
 from shader_health.core.models import ImageInfo, MaterialSnapshot
 from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
@@ -305,18 +308,28 @@ def _enrich_material_fingerprint(
     connections: tuple[ConnectionSnapshot, ...],
     file_dependencies: tuple[FileDependencySnapshot, ...],
 ) -> MaterialSnapshot:
-    if material.graph_fingerprint:
+    if material.graph_fingerprint and material.graph_content_fingerprint:
         return material
 
     nodes_by_id = {node.id: node for node in nodes}
     texture_paths = _material_texture_paths(material, file_dependencies)
-    fingerprint = material_graph_fingerprint(
+    fingerprint = material.graph_fingerprint or material_graph_fingerprint(
         material,
         nodes_by_id=nodes_by_id,
         connections=connections,
         texture_paths=texture_paths,
     )
-    return replace(material, graph_fingerprint=fingerprint)
+    content_fingerprint = material.graph_content_fingerprint or material_graph_content_fingerprint(
+        material,
+        nodes_by_id=nodes_by_id,
+        connections=connections,
+        texture_paths=texture_paths,
+    )
+    return replace(
+        material,
+        graph_fingerprint=fingerprint,
+        graph_content_fingerprint=content_fingerprint,
+    )
 
 
 def _material_texture_paths(

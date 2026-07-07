@@ -559,6 +559,7 @@ def test_graph_fingerprint_is_deterministic_for_fixture_snapshot():
     material = enriched.materials[0]
     assert material.graph_fingerprint.startswith("sha256:")
     assert material.graph_fingerprint == enrich_snapshot(snapshot).materials[0].graph_fingerprint
+    assert material.graph_content_fingerprint.startswith("sha256:")
 
 
 def test_material_graph_fingerprint_uses_connection_fields():

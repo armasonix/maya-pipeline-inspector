@@ -508,6 +508,7 @@ class MaterialSnapshot:
     graph_node_count: int = 0
     graph_depth: int = 0
     graph_fingerprint: str = ""
+    graph_content_fingerprint: str = ""
     complexity_metadata: Optional[ShaderComplexityMetadata] = None
     displacement_metadata: Optional[DisplacementRiskMetadata] = None
     vray_metadata: Optional[VrayMaterialMetadata] = None
@@ -526,6 +527,7 @@ class MaterialSnapshot:
             "graph_node_count": self.graph_node_count,
             "graph_depth": self.graph_depth,
             "graph_fingerprint": self.graph_fingerprint,
+            "graph_content_fingerprint": self.graph_content_fingerprint,
         }
         if self.complexity_metadata is not None:
             payload["complexity_metadata"] = self.complexity_metadata.to_dict()
@@ -567,6 +569,7 @@ class MaterialSnapshot:
             graph_node_count=int(data.get("graph_node_count", 0)),
             graph_depth=int(data.get("graph_depth", 0)),
             graph_fingerprint=str(data.get("graph_fingerprint", "")),
+            graph_content_fingerprint=str(data.get("graph_content_fingerprint", "")),
             complexity_metadata=complexity_metadata,
             displacement_metadata=displacement_metadata,
             vray_metadata=vray_metadata,
