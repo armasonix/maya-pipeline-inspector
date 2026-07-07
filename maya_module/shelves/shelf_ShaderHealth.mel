@@ -6,4 +6,11 @@ global proc shelf_ShaderHealth()
         -image1 "commandButton.png"
         -sourceType "mel"
         -command "python(\"import shader_health_inspector_bootstrap; shader_health_inspector_bootstrap.show()\")";
+
+    shelfButton
+        -label "Shader Health Farm Check"
+        -annotation "Open the Farm tab and run deadline_critical preflight"
+        -image1 "commandButton.png"
+        -sourceType "mel"
+        -command "python(\"from shader_health.maya.commands import show_farm_check_ui; show_farm_check_ui()\")";
 }

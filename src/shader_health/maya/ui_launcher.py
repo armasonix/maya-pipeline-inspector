@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import Any, Optional
 
 from shader_health.ui import main_window
+from shader_health.ui.farm_tab import (
+    FARM_STATUS_LABEL_OBJECT_NAME,
+    FARM_TAB_OBJECT_NAME,
+    FarmTabState,
+    update_farm_tab,
+)
 from shader_health.ui.fix_queue import (
     FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
     FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
@@ -61,6 +67,23 @@ def show_panel() -> Any:
     return panel
 
 
+def show_farm_check_panel() -> Any:
+    """Open the panel on the Farm tab and run deadline_critical preflight."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _select_farm_tab(content, qt_widgets)
+    _run_farm_preflight_from_ui(content, qt_widgets)
+    return panel
+
+
+def _panel_content_from_panel(panel: Any) -> Any:
+    return getattr(panel, "_shader_health_content", None)
+
+
 def close_panel(*, delete: bool = True) -> None:
     """Close the dockable panel and optionally delete its Maya workspaceControl."""
 
@@ -102,6 +125,7 @@ def _create_dockable_panel() -> Any:
             validation_callbacks=_validation_action_callbacks(panel_state, qt_widgets),
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
             waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
+            farm_callbacks=_farm_action_callbacks(panel_state, qt_widgets),
         )
         panel_state["content"] = content
         self._shader_health_content = content
@@ -111,6 +135,7 @@ def _create_dockable_panel() -> Any:
         _wire_scene_change_reset(content, qt_widgets)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
+        _refresh_farm_tab(content, qt_widgets)
 
     panel_class = type(
         "ShaderHealthInspectorDock",
@@ -364,6 +389,28 @@ def _issue_details_action_callbacks(
     )
 
 
+def _farm_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> Any:
+    from shader_health.ui.farm_tab import FarmActionCallbacks
+
+    return FarmActionCallbacks(
+        on_refresh_connection=lambda: _refresh_farm_connection_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_run_farm_preflight=lambda: _run_farm_preflight_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_submit_to_farm=lambda: _submit_farm_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
+
+
 def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None:
     try:
         from shader_health.maya.commands import validate_scene_action, validate_selection_action
@@ -436,6 +483,169 @@ def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
     _show_information_dialog(qt_widgets, "Publish Preflight", message)
     print(message)
+
+
+def _refresh_farm_connection_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya.farm_actions import check_deadline_connection
+
+    tab_state = check_deadline_connection()
+    _apply_farm_tab_state(content, qt_widgets, tab_state)
+
+
+def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya.commands import validate_scene_action
+    from shader_health.maya.farm_actions import collect_farm_scene_state, run_farm_preflight_action
+
+    if content is None:
+        _show_information_dialog(
+            qt_widgets,
+            "Farm Preflight",
+            "Open the Shader Health Inspector panel first.",
+        )
+        return
+
+    try:
+        asset_class_id = _selected_asset_class_id(content, qt_widgets)
+        validation = validate_scene_action(
+            profile_id="deadline_critical",
+            asset_class_id=asset_class_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        message = f"Farm preflight failed: {exc}"
+        _set_farm_status(content, qt_widgets, message)
+        print(message)
+        return
+
+    if not getattr(validation, "succeeded", True):
+        _set_farm_status(content, qt_widgets, validation.message)
+        print(validation.message)
+        return
+
+    content._shader_health_scan_scope = "scene"
+    _populate_validation_result(content, qt_widgets, validation)
+    connection_state = getattr(content, "_shader_health_farm_tab_state", None)
+    result = run_farm_preflight_action(
+        summary=getattr(validation, "summary", None),
+        scene_state=collect_farm_scene_state(),
+        connection_state=connection_state,
+        last_job_id=getattr(content, "_shader_health_farm_last_job_id", ""),
+    )
+    _apply_farm_tab_state(content, qt_widgets, result.tab_state)
+    _show_information_dialog(qt_widgets, "Farm Preflight", result.message)
+    print(result.message)
+
+
+def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya.farm_actions import (
+        collect_farm_scene_state,
+        farm_validation_result_from_summary,
+        submit_farm_validation_action,
+    )
+
+    if content is None:
+        _show_information_dialog(
+            qt_widgets,
+            "Submit to Farm",
+            "Open the Shader Health Inspector panel first.",
+        )
+        return
+
+    scene_path = getattr(content, "_shader_health_scene_path", "") or _current_scene_path()
+    summary = getattr(content, "_shader_health_summary", None)
+    validation_result = (
+        farm_validation_result_from_summary(summary) if summary is not None else None
+    )
+    connection_state = getattr(content, "_shader_health_farm_tab_state", None)
+    result = submit_farm_validation_action(
+        scene_path=scene_path,
+        scene_state=collect_farm_scene_state(),
+        validation_result=validation_result,
+        connection_state=connection_state,
+    )
+    _apply_farm_tab_state(content, qt_widgets, result.tab_state)
+    title = "Submit to Farm" if result.succeeded else "Farm Submit Blocked"
+    _show_information_dialog(qt_widgets, title, result.message)
+    print(result.message)
+
+
+def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
+    from shader_health.maya.farm_actions import check_deadline_connection
+
+    if content is None:
+        return
+    stored = getattr(content, "_shader_health_farm_tab_state", None)
+    if isinstance(stored, FarmTabState):
+        _apply_farm_tab_state(content, qt_widgets, stored)
+        return
+    _apply_farm_tab_state(content, qt_widgets, check_deadline_connection())
+
+
+def _apply_farm_tab_state(content: Any, qt_widgets: Any, tab_state: FarmTabState) -> None:
+    if content is not None:
+        content._shader_health_farm_tab_state = tab_state
+        content._shader_health_farm_last_job_id = tab_state.last_job_id
+    farm_tab = _farm_tab_widget(content, qt_widgets)
+    if farm_tab is not None:
+        update_farm_tab(farm_tab, qt_widgets, tab_state)
+
+
+def _set_farm_status(content: Any, qt_widgets: Any, message: str) -> None:
+    stored = getattr(content, "_shader_health_farm_tab_state", None)
+    if isinstance(stored, FarmTabState):
+        _apply_farm_tab_state(
+            content,
+            qt_widgets,
+            FarmTabState(
+                api_url=stored.api_url,
+                connection_status=stored.connection_status,
+                connection_reachable=stored.connection_reachable,
+                scene_saved=stored.scene_saved,
+                renderer_plugin_loaded=stored.renderer_plugin_loaded,
+                eligibility_decision=stored.eligibility_decision,
+                eligibility_allowed=stored.eligibility_allowed,
+                last_report_path=stored.last_report_path,
+                last_job_id=stored.last_job_id,
+                status_message=message,
+            ),
+        )
+        return
+    _set_label_text(content, qt_widgets, FARM_STATUS_LABEL_OBJECT_NAME, message)
+
+
+def _farm_tab_widget(content: Any, qt_widgets: Any) -> Any:
+    tabs = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
+    if tabs is None:
+        return None
+    count = getattr(tabs, "count", lambda: 0)()
+    for index in range(count):
+        widget = getattr(tabs, "widget", lambda _index: None)(index)
+        object_name = getattr(widget, "objectName", lambda: "")()
+        if not object_name:
+            object_name = getattr(widget, "object_name", "")
+        if widget is not None and object_name == FARM_TAB_OBJECT_NAME:
+            return widget
+    return _find_child(content, qt_widgets.QWidget, FARM_TAB_OBJECT_NAME)
+
+
+def _select_farm_tab(content: Any, qt_widgets: Any) -> None:
+    tabs = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
+    if tabs is None:
+        return
+    count = getattr(tabs, "count", lambda: 0)()
+    for index in range(count):
+        widget = getattr(tabs, "widget", lambda _index: None)(index)
+        object_name = getattr(widget, "objectName", lambda: "")()
+        if not object_name:
+            object_name = getattr(widget, "object_name", "")
+        if widget is not None and object_name == FARM_TAB_OBJECT_NAME:
+            set_current = getattr(tabs, "setCurrentIndex", None)
+            if set_current is not None:
+                set_current(index)
+            return
+
+
+def _current_scene_path() -> str:
+    return str(_maya_cmds().file(query=True, sceneName=True) or "")
 
 
 def _manifest_gate_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -838,6 +1048,7 @@ def _store_validation_state(
     content._shader_health_results = getattr(result, "results", ())
     content._shader_health_profile_id = getattr(result, "profile_id", "")
     content._shader_health_asset_class_id = getattr(result, "asset_class_id", "")
+    content._shader_health_summary = getattr(result, "summary", None)
     snapshot = getattr(result, "snapshot", None)
     content._shader_health_scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
     _populate_fix_queue(content, result)

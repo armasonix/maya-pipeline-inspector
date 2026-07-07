@@ -14,7 +14,7 @@ Shader Health Inspector is built for daily use **inside the Maya dockable panel*
 
 Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
 
-1. **Panel first** — Open **Window → Shader Health Inspector** (or the shelf button). Validate Scene, review blocking status, select nodes, and apply safe fixes from the tabs.
+1. **Panel first** — Open **Window → Shader Health Inspector** (or the shelf button). For farm preflight, use **Shader Health → Shader Health Farm Check** or the **Shader Health Farm Check** shelf button.
 2. **Fast paths** — Target three clicks or fewer from an open panel to an actionable result (for example: open panel → **Validate Scene** → double-click an issue to select the node).
 3. **Clear blocking state** — After validation, the summary shows health score, severity counts, and whether the scene **blocks publish** or **blocks Deadline** without opening a report file.
 4. **Low-friction fixes** — Safe auto-fixes use the Fixes tab queue; high-risk or referenced edits still require explicit confirmation per studio policy.
@@ -128,12 +128,12 @@ Main needs:
 
 ## Maya UI Layout
 
-The dockable panel uses four tabs. Each tab shows the panel title and version at the top.
+The dockable panel uses five tabs. Each tab shows the panel title and version at the top.
 
 ```text
 +--------------------------------------------------------------------------------+
 | Maya Shader Health Inspector  v0.3.0                                           |
-| [Validate] [Waivers] [Fixes] [Reports]                                         |
+| [Validate] [Waivers] [Fixes] [Reports] [Farm]                                  |
 +--------------------------------------------------------------------------------+
 | Validate tab (default)                                                         |
 | Health: 78/100   Critical: 2   Error: 5   Warning: 17   Info: 8                |
@@ -148,6 +148,8 @@ The dockable panel uses four tabs. Each tab shows the panel title and version at
 | Fixes tab: checkbox column + fix queue table, [Fix Selected] [Apply Safe Fixes]  |
 |            [Export Fix Plan]                                                   |
 | Reports tab: compact export buttons for JSON/HTML/manifest/diff/compare        |
+| Farm tab: Deadline connection, scene readiness, eligibility, last report/job id |
+|           [Refresh Connection] [Run Farm Preflight] [Submit to Farm]          |
 +--------------------------------------------------------------------------------+
 ```
 
@@ -395,13 +397,29 @@ Expected behavior:
 
 Deadline preflight should run validation before render submission.
 
+**Full studio guide:** [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) — Web Service setup, pool/group routing, headless automation, and deployment checklist.
+
+### Farm Submit
+
+Artist workflow for Deadline 10 on-prem validation from Maya (v0.4):
+
+| Step | Where | Action |
+| --- | --- | --- |
+| 1 | Menu or shelf | **Shader Health Farm Check** — opens **Farm** tab and runs `deadline_critical` preflight in one click |
+| 2 | Farm tab | Confirm **Status: Online** (green lamp). If **Offline**, ask TD to verify Web Service URL / `SHADER_HEALTH_DEADLINE_API_URL` |
+| 3 | Farm tab | Review eligibility after preflight — blocked scenes show reasons (unsaved file, missing renderer plug-in, `block_deadline` issues) |
+| 4 | Validate / Fixes tabs | Fix farm-blocking issues, then re-run **Shader Health Farm Check** or **Run Farm Preflight** |
+| 5 | Farm tab | When eligibility is **allow**, click **Submit to Farm** to queue a CommandScript utility job |
+| 6 | Farm tab | Note **Last farm report** and **Last Deadline job id** for supervisor / wrangler follow-up |
+
+Headless / pipeline submit hooks use the same eligibility gate and profiles — see the [Deadline integration guide](integrations/deadline_submit_preflight.md#headless-automation).
+
 Expected behavior:
-1. Artist submits render.
-2. Submit tool runs shader health validation with deadline_critical profile.
-3. If block_deadline is false, submission continues.
-4. If block_deadline is true, submission stops and shows summary.
+1. Artist submits render (or clicks **Submit to Farm** in the panel).
+2. Submit tool runs shader health validation with `deadline_critical` profile.
+3. If `block_deadline` is false, submission continues.
+4. If `block_deadline` is true, submission stops and shows summary.
 5. JSON report is saved for review.
-```
 
 ## Best Practices for Users
 
@@ -419,6 +437,7 @@ v0.3 is implemented: manifest schema 1.1, manifest gates, headless apply-fixes, 
 See also:
 
 - `docs/MAYA_INSTALL.md`
+- `docs/integrations/deadline_submit_preflight.md`
 - `docs/DEVELOPMENT_PLAN.md`
 - `docs/ARCHITECTURE.md`
 - `docs/RULE_AUTHORING.md`

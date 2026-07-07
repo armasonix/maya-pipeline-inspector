@@ -244,7 +244,7 @@ mayapy -m shader_health validate examples/broken_scene/shader_health_demo_broken
   --report examples/broken_scene/reports/shader_health_demo_broken_deadline.json
 ```
 
-If the packaged `deadline_critical` profile does not exist yet, use the current local profile path or a temporary profile matching the Deadline integration guide.
+If the packaged `deadline_critical` profile does not exist yet, use the current local profile path or a temporary profile matching the [Deadline integration guide](../../docs/integrations/deadline_submit_preflight.md).
 
 ## Commit checklist
 

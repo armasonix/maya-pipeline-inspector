@@ -23,7 +23,7 @@ from shader_health.maya.navigation import (
     reveal_file,
     select_node,
 )
-from shader_health.maya.ui_launcher import close_panel, show_panel
+from shader_health.maya.ui_launcher import close_panel, show_farm_check_panel, show_panel
 from shader_health.maya.validation_pipeline import (
     DEFAULT_PROFILE_ID,
     ValidationRunResult,
@@ -34,19 +34,34 @@ from shader_health.maya.validation_pipeline import (
 MENU_NAME = "shaderHealthInspectorMenu"
 MENU_LABEL = "Shader Health"
 OPEN_MENU_ITEM_LABEL = "Open Shader Health Inspector"
+FARM_CHECK_MENU_ITEM_LABEL = "Shader Health Farm Check"
 CLOSE_MENU_ITEM_LABEL = "Close Shader Health Inspector"
 SHELF_NAME = "ShaderHealth"
 SHELF_BUTTON_NAME = "shaderHealthInspectorShelfButton"
+FARM_CHECK_SHELF_BUTTON_NAME = "shaderHealthInspectorFarmCheckShelfButton"
 SHELF_BUTTON_LABEL = "Shader Health"
+FARM_CHECK_SHELF_BUTTON_LABEL = "Shader Health Farm Check"
 SHELF_BUTTON_ANNOTATION = "Open Maya Shader Health Inspector"
+FARM_CHECK_SHELF_BUTTON_ANNOTATION = (
+    "Open the Farm tab and run deadline_critical preflight."
+)
 MAYA_MAIN_WINDOW = "MayaWindow"
 OPEN_UI_PYTHON_COMMAND = "from shader_health.maya.commands import show_ui\nshow_ui()"
+FARM_CHECK_UI_PYTHON_COMMAND = (
+    "from shader_health.maya.commands import show_farm_check_ui\nshow_farm_check_ui()"
+)
 
 
 def show_ui() -> Any:
     """Open the dockable Maya Shader Health Inspector panel from script/menu/shelf."""
 
     return show_panel()
+
+
+def show_farm_check_ui() -> Any:
+    """Open the Farm tab and run deadline_critical preflight from menu/shelf."""
+
+    return show_farm_check_panel()
 
 
 def close_ui(*, delete: bool = True) -> None:
@@ -261,6 +276,11 @@ def install_menu(parent: Optional[str] = None) -> str:
         cmds.deleteUI(MENU_NAME, menu=True)
     menu_name = cmds.menu(MENU_NAME, label=MENU_LABEL, parent=menu_parent, tearOff=True)
     cmds.menuItem(label=OPEN_MENU_ITEM_LABEL, parent=menu_name, command=lambda *_: show_ui())
+    cmds.menuItem(
+        label=FARM_CHECK_MENU_ITEM_LABEL,
+        parent=menu_name,
+        command=lambda *_: show_farm_check_ui(),
+    )
     cmds.menuItem(divider=True, parent=menu_name)
     cmds.menuItem(label=CLOSE_MENU_ITEM_LABEL, parent=menu_name, command=lambda *_: close_ui())
     return str(menu_name)
@@ -285,6 +305,8 @@ def install_shelf(parent: Optional[str] = None) -> str:
 
     if cmds.shelfButton(SHELF_BUTTON_NAME, query=True, exists=True):
         cmds.deleteUI(SHELF_BUTTON_NAME, control=True)
+    if cmds.shelfButton(FARM_CHECK_SHELF_BUTTON_NAME, query=True, exists=True):
+        cmds.deleteUI(FARM_CHECK_SHELF_BUTTON_NAME, control=True)
 
     cmds.shelfButton(
         SHELF_BUTTON_NAME,
@@ -295,15 +317,26 @@ def install_shelf(parent: Optional[str] = None) -> str:
         sourceType="python",
         command=OPEN_UI_PYTHON_COMMAND,
     )
+    cmds.shelfButton(
+        FARM_CHECK_SHELF_BUTTON_NAME,
+        parent=SHELF_NAME,
+        label=FARM_CHECK_SHELF_BUTTON_LABEL,
+        annotation=FARM_CHECK_SHELF_BUTTON_ANNOTATION,
+        image1="commandButton.png",
+        sourceType="python",
+        command=FARM_CHECK_UI_PYTHON_COMMAND,
+    )
     return SHELF_NAME
 
 
 def uninstall_shelf() -> None:
-    """Remove the Shader Health shelf button if it exists."""
+    """Remove the Shader Health shelf buttons if they exist."""
 
     cmds = _maya_cmds()
     if cmds.shelfButton(SHELF_BUTTON_NAME, query=True, exists=True):
         cmds.deleteUI(SHELF_BUTTON_NAME, control=True)
+    if cmds.shelfButton(FARM_CHECK_SHELF_BUTTON_NAME, query=True, exists=True):
+        cmds.deleteUI(FARM_CHECK_SHELF_BUTTON_NAME, control=True)
 
 
 def uninstall_ui() -> None:

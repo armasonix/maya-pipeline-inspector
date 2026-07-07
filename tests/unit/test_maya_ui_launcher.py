@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, Optional
 
 from shader_health.maya import ui_launcher
@@ -85,6 +86,28 @@ def test_show_panel_recreates_stale_workspace_control(monkeypatch: Any):
     assert result is panel
     assert cmds.deleted == [(ui_launcher.WORKSPACE_CONTROL_NAME, {"control": True})]
     assert panel.show_calls[0]["dockable"] is True
+
+
+def test_show_farm_check_panel_selects_farm_tab_and_runs_preflight(monkeypatch: Any):
+    panel = SimpleNamespace(_shader_health_content=object())
+    calls: list[str] = []
+    monkeypatch.setattr(ui_launcher, "show_panel", lambda: panel)
+    monkeypatch.setattr(ui_launcher, "load_qt_widgets", lambda: object())
+    monkeypatch.setattr(
+        ui_launcher,
+        "_select_farm_tab",
+        lambda _content, _qt: calls.append("select"),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_run_farm_preflight_from_ui",
+        lambda _content, _qt: calls.append("preflight"),
+    )
+
+    result = ui_launcher.show_farm_check_panel()
+
+    assert result is panel
+    assert calls == ["select", "preflight"]
 
 
 def test_close_panel_deletes_workspace_control(monkeypatch: Any):

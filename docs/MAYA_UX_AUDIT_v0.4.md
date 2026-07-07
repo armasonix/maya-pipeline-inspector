@@ -40,8 +40,9 @@ Manual timing (before/after Wave 1) will be recorded in [MAYA_V04_MANUAL_CHECKLI
 | **Waivers** | Panel header, waiver table, Refresh / Make Waive / Revoke | `commands.list_waivers_action` |
 | **Fixes** | Panel header, fix queue table, Apply Selected / Apply Safe / Export Fix Plan | `fix_plan` from last validation |
 | **Reports** | Panel header, 7 export/gate buttons (3×3 grid) | Requires `_shader_health_snapshot` from prior validate |
+| **Farm** | Connection status, scene readiness, eligibility, last report/job id; **Refresh Connection**, **Run Farm Preflight**, **Submit to Farm** | `shader_health.maya.farm_actions` → `integrations.deadline` |
 
-**Not present (v0.4 plan):** Farm tab, Deadline connection status, in-panel job id / last farm preflight.
+**Shipped in v0.4 (#101):** Farm tab with Deadline connection status, in-panel preflight eligibility, and CommandScript submit with last job id.
 
 ---
 
@@ -98,13 +99,16 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | 2 | **Manifest Gate** on Validate **or** Reports | 1 | Same action in two tabs (F-10) |
 | 3 | If no sidecar: dialog → Reports → Export Manifest | 2+ | Cross-tab hop not guided in-panel |
 
-### Flow F — Farm / Deadline preflight (today)
+### Flow F — Farm / Deadline preflight (v0.4 Farm tab)
 
 | Step | Action | Clicks | Notes |
 |------|--------|--------|-------|
-| — | No panel path | — | `examples/deadline/submit_preflight.py` / CLI only (F-04) |
+| 1 | Open panel → **Farm** tab | 2 | Connection status pings `SHADER_HEALTH_DEADLINE_API_URL` (default `http://localhost:8081`) |
+| 2 | **Validate Scene** on Validate tab (if not already run) | 1 | Farm preflight reads last validation summary |
+| 3 | **Run Farm Preflight** | 1 | Evaluates `deadline_critical` eligibility + scene saved / renderer plug-in |
+| 4 | **Submit to Farm** (when allowed) | 1 | Submits CommandScript utility job; shows last job id |
 
-**v0.4:** Farm tab (#101), shelf **Farm Check** (#102).
+**Remaining:** shelf **Farm Check** (#102) — **shipped**: menu + shelf shortcut opens Farm tab and runs preflight.
 
 ---
 
@@ -115,7 +119,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | F-01 | **No unified action bar** — Validate Scene, Validate Selection, Publish Preflight, and Manifest Gate are four equal buttons in one row; pipeline actions not visually grouped | Validate | 5 | 2 | **P0** | #108 |
 | F-02 | **Summary not sticky** — health, severities, block flags, and profile rows scroll away with tab content; ADR 0005 expects persistent blocking chrome | Validate | 5 | 2 | **P0** | #108 |
 | F-03 | **No last-validated timestamp** — artist cannot tell if results are stale after external scene edits (only full reset on SceneOpened) | Validate | 4 | 2 | **P0** | #108 |
-| F-04 | **No Farm / Deadline affordance** — `block_deadline` shown in summary but no preflight/submit path in panel | Global | 5 | 4 | **P0** | M26 #101 (not M28) |
+| F-04 | ~~**No Farm / Deadline affordance**~~ — **Resolved (#101):** Farm tab with connection status, preflight, submit | Global | 5 | 4 | **P0** | M26 #101 ✅ |
 | F-05 | **No double-click triage** — must select row, then click **Select Node** (extra click vs. peer tools) | Validate | 4 | 2 | **P0** | #109 |
 | F-06 | **Issue details below fold** — layout order: header → summary (3 lines) → asset hint → buttons → filters → table → details; details panel often off-screen on default dock height | Validate | 5 | 3 | **P0** | #108 (splitter / compact summary) |
 | F-07 | **No progress feedback during validate** — `_validate_from_ui` runs synchronously on UI thread; Maya appears frozen on large scenes | Validate | 4 | 3 | **P0** | #109 |
@@ -133,7 +137,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | F-19 | **No scene name in chrome** — `DEVELOPMENT_PLAN.md` mockup shows scene + renderer; panel omits scene file name | Validate | 3 | 2 | **P2** | #108 optional |
 | F-20 | **No severity color in table** — text-only severities; harder scan at a glance | Validate | 2 | 2 | **P2** | theme pass deferred |
 | F-21 | **Asset class hint always expanded** — three-line hint under combos consumes vertical space | Validate | 2 | 1 | **P2** | collapsible hint |
-| F-22 | **Shelf single action** — shelf opens panel only; no Quick Validate / Farm Check shortcuts | Shelf | 3 | 2 | **P1** | M26 #102 |
+| F-22 | ~~**Shelf single action**~~ — **Resolved (#102):** **Shader Health Farm Check** menu + shelf; guide in [deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) | Shelf | 3 | 2 | **P1** | M26 #102 ✅ |
 
 ---
 
@@ -146,7 +150,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | F-01 | Unified Validate tab action bar (primary vs pipeline groups) | [#108](https://github.com/armasonix/maya-shader-health-inspector/issues/136) |
 | F-02 | Sticky summary header (health, blocks, profile chips) | #108 |
 | F-03 | Last-validated timestamp in summary | #108 |
-| F-04 | Farm tab + Deadline status (no panel path today) | [#101](https://github.com/armasonix/maya-shader-health-inspector/issues/129) M26 |
+| F-04 | Farm tab + Deadline status — **shipped (#101)** | [#101](https://github.com/armasonix/maya-shader-health-inspector/issues/129) M26 ✅ |
 | F-05 | Double-click issue row → select node | [#109](https://github.com/armasonix/maya-shader-health-inspector/issues/137) |
 | F-06 | Reduce vertical overload (compact summary / splitter so table + details visible) | #108 |
 | F-07 | Non-blocking progress indicator during validate | #109 |
@@ -225,7 +229,7 @@ Implements P0 panel items from this audit. Farm work stays in M26.
 |-------|--------|
 | GUI ↔ CLI validation | **Pass** — same `validation_pipeline` |
 | `block_publish` / `block_deadline` in summary | **Pass** — `_block_status_text` |
-| Deadline farm submit in panel | **Fail** — example script only (F-04) |
+| Deadline farm submit in panel | **Pass** — Farm tab (#101): preflight + CommandScript submit |
 | Manifest gate in UI | **Pass** — but duplicated (F-10) |
 | Profile change revalidate | **Pass** — `_revalidate_with_current_scope` when prior results exist |
 
