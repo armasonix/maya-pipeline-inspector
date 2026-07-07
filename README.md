@@ -4,7 +4,7 @@ Production material QA framework for Maya pipelines.
 
 Built to prevent render-time material failures by detecting missing textures, outdated maps, wrong color space, broken UDIMs, unsafe paths, displacement risk, and renderer-specific shader issues before assets reach publish or the render farm.
 
-**Status:** **v0.2.0 shipped** (2026-07-06) — production hardening: expanded safe fixes, V-Ray/Arnold policy packs, manifest diff, pipeline docs  
+**Status:** **v0.3.0 shipped** (2026-07-07) — pipeline automation: manifest 1.1, graph fingerprint, manifest gates, headless apply-fixes, resolution budgets  
 **Primary DCC:** Autodesk Maya  
 **Initial renderer targets:** Common Maya, V-Ray, Arnold  
 **Future renderer targets:** RenderMan, Redshift, USD / MaterialX
@@ -116,6 +116,17 @@ Intentional issue categories:
 
 Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_scene/README.md)
 
+## Current capabilities (v0.3)
+
+- Everything in v0.2, plus:
+- Manifest schema **1.1** with material graph fingerprints and regression gates (`shader_health gate`, `validate --baseline-manifest`).
+- Headless `shader_health manifest` and `shader_health apply-fixes` (ADR 0004 policy).
+- Texture resolution budgets by asset class (Hero / Prop / Background) in UI and CLI (`--asset-class-id`).
+- Python MPx plugin dual install; **Compare to Approved Manifest**, **Publish Preflight**, and **Manifest Gate** UI shortcuts.
+- Optional Maya CI manifest export + gate smoke (`workflow_dispatch`).
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.3.0 release notes.
+
 ## Current capabilities (v0.2)
 
 - Everything in v0.1, plus:
@@ -138,7 +149,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.2.0 release notes.
 - Dockable Maya panel with issue table, filters, details, and safe fix queue.
 - Headless validation command and Deadline preflight example.
 
-Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.2 plan completed in [`docs/V0_2_DEVELOPMENT_PLAN.md`](docs/V0_2_DEVELOPMENT_PLAN.md)
+Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.3 plan completed in [`docs/V0_3_DEVELOPMENT_PLAN.md`](docs/V0_3_DEVELOPMENT_PLAN.md)
 
 ## Install in Maya
 

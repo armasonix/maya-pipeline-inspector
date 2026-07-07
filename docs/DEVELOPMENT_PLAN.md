@@ -1,6 +1,6 @@
 # Maya Shader Health Inspector — Production Development Plan
 
-> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3+** — see [§27](#27-roadmap). v0.2 detail: [V0_2_DEVELOPMENT_PLAN.md](V0_2_DEVELOPMENT_PLAN.md) (Milestones 10–14, Issues #049–#070).
+> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4+** — see [§27](#27-roadmap). v0.3 detail: [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md) (Milestones 15–21, Issues #071–#090).
 
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
 **Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
@@ -2144,16 +2144,18 @@ Delivered (Milestones 10–14, Issues #049–#070):
 - Publish preflight example, Maya module install guide, studio overrides documentation, optional Maya CI workflow.
 - Waiver manager UI, high-risk fix confirmation, reference-edit apply, reconciled roadmap (#069).
 
-### v0.3 — Pipeline Automation & Manifest Depth
+### v0.3 — Pipeline Automation & Manifest Depth (shipped)
 
-**Theme:** Headless and passport workflows beyond the v0.2 change-review UX.
+**Tag:** `v0.3.0` (2026-07-07)
 
-Deferred from earlier roadmap cycles (partial coverage already in v0.1/v0.2):
+Delivered (Milestones 15–21, Issues #071–#090):
 
-- Headless `--apply-fixes` mode (requires new ADR and strict supervisor policy).
-- Stronger graph fingerprinting and manifest regression gates.
-- Texture resolution budgets by asset class.
-- Remaining passport/diff automation not covered in Milestone 12.
+- Python MPx plugin dual install; manifest schema 1.1 and graph fingerprinting.
+- Manifest regression gates (`shader_health gate`, profile `manifest_diff_policy`, publish preflight gate).
+- Headless `shader_health apply-fixes` (ADR 0004) with fix audit integration.
+- Texture resolution metadata, asset class profiles, and UI/CLI `--asset-class-id` overlay.
+- Compare to Approved Manifest UI shortcut, `shader_health manifest` CLI, Maya CI manifest smoke.
+- Headless CLI hardening: `mayapy` standalone init, `shader_health.util.paths`, `ci_headless` profile fix.
 
 ### v0.4 — Optimization and Render Risk (remaining)
 

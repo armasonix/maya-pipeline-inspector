@@ -1,6 +1,6 @@
 # v0.3 Git workflow (same rhythm as v0.1 / v0.2)
 
-**Baseline:** `main` @ `v0.2.0` (`c51c89b`). All v0.3 work happens on **`dev`**.
+**Baseline:** `main` @ `v0.3.0`. v0.3 cycle complete (Milestones 15–21, Issues #071–#090).
 
 ## Rules
 
