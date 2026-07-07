@@ -3,7 +3,7 @@
 # NOT part of the default public CI gate (see ci.yml). Requires runner labels:
 #   self-hosted, maya
 #
-# Windows self-hosted runners: uses PowerShell (pwsh) — Git Bash is NOT required.
+# Windows self-hosted runners: uses Windows PowerShell (`powershell`) — not Git Bash or pwsh.
 #
 # Setup (maintainers):
 #   1. Register a self-hosted runner with labels `self-hosted` and `maya`.
@@ -48,7 +48,7 @@ concurrency:
 
 defaults:
   run:
-    shell: pwsh
+    shell: powershell
 
 jobs:
   maya-integration:
@@ -62,18 +62,34 @@ jobs:
     env:
       DEMO_SCENE: examples/broken_scene/shader_health_demo_broken_headless.ma
       DEADLINE_PROFILE: src/shader_health/rules/profiles/deadline_critical.json
+      DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
+      DEBUG_RUN_ID: github-${{ github.run_id }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Diagnose runner shell
+        shell: powershell
+        run: |
+          Write-Host "PSVersion:" $PSVersionTable.PSVersion
+          Write-Host "PSEdition:" $PSVersionTable.PSEdition
+          Write-Host "OS:" $PSVersionTable.OS
+          foreach ($cmd in @('python','pwsh','powershell','bash','mayapy')) {
+            $found = Get-Command $cmd -ErrorAction SilentlyContinue
+            if ($found) { Write-Host "FOUND $cmd -> $($found.Source)" } else { Write-Host "MISSING $cmd" }
+          }
+
       - name: Resolve mayapy path
         id: mayapy
+        shell: cmd
         env:
           MAYA_PY_SECRET: ${{ secrets.MAYA_PY }}
           MAYA_PY_VAR: ${{ vars.MAYA_PY }}
           MAYA_PY_INPUT: ${{ inputs.mayapy_path }}
-        run: python tools/ci/resolve_mayapy.py
+          DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
+          DEBUG_RUN_ID: github-${{ github.run_id }}
+        run: python tools\ci\resolve_mayapy.py
 
       - name: Verify demo scene exists
         run: |
