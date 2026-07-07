@@ -33,8 +33,37 @@ def check_manifest(path: Path) -> None:
 def check_gate_report(path: Path) -> None:
     payload = _load(path)
     if payload.get("manifest_regression_blocked"):
+        reasons = payload.get("reasons", [])
+        summary = payload.get("diff_summary", {})
+        # region agent log
+        try:
+            import json
+            import os
+            import time
+
+            log_path = Path(os.environ.get("DEBUG_SESSION_LOG", "debug-ee1eca.log"))
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "sessionId": "ee1eca",
+                            "runId": os.environ.get("DEBUG_RUN_ID", "ci"),
+                            "hypothesisId": "H-GATE",
+                            "location": "tools/ci/maya_integration_checks.py",
+                            "message": "gate_regression_blocked",
+                            "data": {"reasons": reasons, "diff_summary": summary},
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
+                    + "\n"
+                )
+        except OSError:
+            pass
+        # endregion
         print(
-            "::error::Gate smoke expected no regression when baseline matches current export",
+            "::error::Gate smoke expected no regression when baseline matches current export. "
+            f"reasons={reasons!r} diff_summary={summary!r}",
             file=sys.stderr,
         )
         raise SystemExit(1)

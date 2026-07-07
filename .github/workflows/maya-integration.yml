@@ -131,36 +131,27 @@ jobs:
           python tools/ci/maya_integration_checks.py validate $report
           Write-Host "Validate smoke exit_code=$code"
 
-      - name: Manifest export smoke
-        env:
-          OUT_MANIFEST: ${{ runner.temp }}/shader_health_manifest_smoke.json
-        run: |
-          $mayapy = '${{ steps.mayapy.outputs.path }}'
-          $manifest = $env:OUT_MANIFEST
-          & $mayapy -m shader_health manifest $env:DEMO_SCENE `
-            --out $manifest `
-            --profile-id publish_strict
-          if (-not (Test-Path -LiteralPath $manifest)) {
-            Write-Error "Manifest smoke did not write file: $manifest"
-            exit 1
-          }
-          python tools/ci/maya_integration_checks.py manifest $manifest
-
-      - name: Manifest gate smoke
+      - name: Manifest export and gate smoke
         env:
           OUT_MANIFEST: ${{ runner.temp }}/shader_health_manifest_smoke.json
           GATE_REPORT: ${{ runner.temp }}/shader_health_gate_smoke.json
         run: |
           $mayapy = '${{ steps.mayapy.outputs.path }}'
-          $baseline = $env:OUT_MANIFEST
+          $manifest = $env:OUT_MANIFEST
           $gateReport = $env:GATE_REPORT
-          & $mayapy -m shader_health gate $env:DEMO_SCENE $baseline `
+          & $mayapy tools/ci/maya_manifest_gate_smoke.py $env:DEMO_SCENE `
             --profile-id publish_strict `
-            --out $gateReport
+            --manifest-out $manifest `
+            --gate-out $gateReport
+          if (-not (Test-Path -LiteralPath $manifest)) {
+            Write-Error "Manifest smoke did not write file: $manifest"
+            exit 1
+          }
           if (-not (Test-Path -LiteralPath $gateReport)) {
             Write-Error "Gate smoke did not write report: $gateReport"
             exit 1
           }
+          python tools/ci/maya_integration_checks.py manifest $manifest
           python tools/ci/maya_integration_checks.py gate $gateReport
 
       - name: Deadline preflight smoke
