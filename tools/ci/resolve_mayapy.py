@@ -52,7 +52,39 @@ def main() -> int:
     if github_output:
         with open(github_output, "a", encoding="utf-8") as handle:
             handle.write(f"mayapy_path={resolved}\n")
+        # #region agent log
+        _debug_log_ci(
+            "resolve_mayapy_github_output",
+            {"mayapy_path": str(resolved), "output_key": "mayapy_path"},
+            "H1",
+        )
+        # #endregion
     return 0
+
+
+def _debug_log_ci(message: str, data: dict, hypothesis_id: str) -> None:
+    import json
+    import time
+
+    log_path = os.environ.get("DEBUG_SESSION_LOG", "debug-ee1eca.log")
+    try:
+        with open(log_path, "a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "sessionId": "ee1eca",
+                        "runId": os.environ.get("DEBUG_RUN_ID", "ci"),
+                        "hypothesisId": hypothesis_id,
+                        "location": "tools/ci/resolve_mayapy.py",
+                        "message": message,
+                        "data": data,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
