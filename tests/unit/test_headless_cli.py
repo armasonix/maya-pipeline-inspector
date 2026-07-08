@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 from shader_health import cli
-from shader_health.core import GraphSnapshot, MaterialSnapshot, NodeSnapshot
+from shader_health.core import FileDependencySnapshot, GraphSnapshot, MaterialSnapshot, NodeSnapshot
+from shader_health.studio_config import PipelineSettings, StudioConfig, save_studio_config
 
 
 def test_validate_snapshot_writes_report_and_returns_publish_block(tmp_path: Path):
@@ -130,6 +131,169 @@ def test_validate_snapshot_skips_fix_plan_export_without_fixes(tmp_path: Path):
 
     assert code == cli.EXIT_OK
     assert not fix_plan_path.exists()
+
+
+def test_validate_respects_studio_config_flag_disabling_tx_rules(tmp_path: Path, monkeypatch):
+    _isolate_studio_config_discovery(monkeypatch, tmp_path)
+    snapshot_path = _write_optimized_texture_snapshot(tmp_path)
+    report_path = tmp_path / "report.json"
+    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+
+    blocked_code = cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--profile-id",
+            "deadline_critical",
+        ]
+    )
+    save_studio_config(
+        studio_path,
+        StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
+    )
+    cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(tmp_path / "report_allowed.json"),
+            "--profile-id",
+            "deadline_critical",
+            "--studio-config",
+            str(studio_path),
+        ]
+    )
+
+    assert blocked_code == cli.EXIT_DEADLINE_BLOCK
+    blocked_result = _rule_result(report_path, "common.texture.optimized.exists")
+    assert blocked_result["status"] == "failed"
+    assert blocked_result["block_deadline"] is True
+
+    allowed_result = _rule_result(
+        tmp_path / "report_allowed.json",
+        "common.texture.optimized.exists",
+    )
+    assert allowed_result["status"] in {"skipped", "passed"}
+    assert allowed_result["block_deadline"] is False
+
+
+def test_validate_respects_studio_config_env_var(tmp_path: Path, monkeypatch):
+    _isolate_studio_config_discovery(monkeypatch, tmp_path)
+    snapshot_path = _write_optimized_texture_snapshot(tmp_path)
+    report_path = tmp_path / "report.json"
+    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    save_studio_config(
+        studio_path,
+        StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
+    )
+    monkeypatch.setenv("SHADER_HEALTH_STUDIO_CONFIG", str(studio_path))
+
+    cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--profile-id",
+            "deadline_critical",
+        ]
+    )
+
+    result = _rule_result(report_path, "common.texture.optimized.exists")
+    assert result["status"] in {"skipped", "passed"}
+    assert result["block_deadline"] is False
+
+
+def test_validate_missing_studio_config_path_returns_config_error(tmp_path: Path, monkeypatch):
+    _isolate_studio_config_discovery(monkeypatch, tmp_path)
+    snapshot_path = _write_optimized_texture_snapshot(tmp_path)
+    report_path = tmp_path / "report.json"
+
+    code = cli.main(
+        [
+            "validate",
+            str(snapshot_path),
+            "--report",
+            str(report_path),
+            "--profile-id",
+            "deadline_critical",
+            "--studio-config",
+            str(tmp_path / "missing_studio.json"),
+        ]
+    )
+
+    assert code == cli.EXIT_CONFIG_ERROR
+
+
+def test_manifest_accepts_studio_config_flag(tmp_path: Path, monkeypatch):
+    _isolate_studio_config_discovery(monkeypatch, tmp_path)
+    snapshot_path = _write_optimized_texture_snapshot(tmp_path)
+    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    save_studio_config(
+        studio_path,
+        StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
+    )
+    manifest_path = tmp_path / "manifest.json"
+
+    code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--profile-id",
+            "deadline_critical",
+            "--studio-config",
+            str(studio_path),
+            "--out",
+            str(manifest_path),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    assert manifest_path.exists()
+
+
+def test_gate_accepts_studio_config_flag(tmp_path: Path, monkeypatch):
+    _isolate_studio_config_discovery(monkeypatch, tmp_path)
+    snapshot_path = _write_optimized_texture_snapshot(tmp_path)
+    manifest_path = tmp_path / "manifest.json"
+    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    save_studio_config(
+        studio_path,
+        StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
+    )
+    manifest_code = cli.main(
+        [
+            "manifest",
+            str(snapshot_path),
+            "--profile-id",
+            "deadline_critical",
+            "--studio-config",
+            str(studio_path),
+            "--out",
+            str(manifest_path),
+        ]
+    )
+    assert manifest_code == cli.EXIT_OK
+
+    gate_path = tmp_path / "gate.json"
+    gate_code = cli.main(
+        [
+            "gate",
+            str(snapshot_path),
+            str(manifest_path),
+            "--profile-id",
+            "deadline_critical",
+            "--studio-config",
+            str(studio_path),
+            "--out",
+            str(gate_path),
+        ]
+    )
+
+    assert gate_code == cli.EXIT_OK
+    assert gate_path.exists()
 
 
 def test_validate_invalid_rule_root_returns_config_error(tmp_path: Path):
@@ -435,6 +599,48 @@ def _write_snapshot(tmp_path: Path, color_space: str) -> Path:
     path = tmp_path / f"snapshot_{color_space}.json"
     path.write_text(_snapshot(color_space).to_json(), encoding="utf-8")
     return path
+
+
+def _write_optimized_texture_snapshot(tmp_path: Path) -> Path:
+    source = tmp_path / "albedo_v003.exr"
+    source.write_bytes(b"source")
+    resolved = str(source).replace("\\", "/")
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "demo.ma"),
+        renderer="arnold",
+        nodes=[
+            NodeSnapshot(
+                id="node:file_albedo",
+                name="file_albedo",
+                type_name="file",
+                attrs={"fileTextureName": resolved},
+            )
+        ],
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file_albedo",
+                attr="fileTextureName",
+                raw_path=resolved,
+                resolved_path=resolved,
+                exists=True,
+                extension=".exr",
+            )
+        ],
+    )
+    path = tmp_path / "optimized_texture_snapshot.json"
+    path.write_text(snapshot.to_json(), encoding="utf-8")
+    return path
+
+
+def _isolate_studio_config_discovery(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("SHADER_HEALTH_STUDIO_CONFIG", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+
+def _rule_result(report_path: Path, rule_id: str) -> dict:
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    return next(item for item in payload["results"] if item["rule_id"] == rule_id)
 
 
 def _snapshot(color_space: str) -> GraphSnapshot:

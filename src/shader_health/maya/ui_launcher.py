@@ -55,12 +55,19 @@ from shader_health.ui.waiver_manager import (
     waiver_rows_from_records,
     waiver_summary_text,
 )
+from shader_health.user_config import (
+    UserPreferences,
+    default_user_config_path,
+    load_user_config,
+    save_user_config,
+)
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
 
 VALIDATE_SPLITTER_SIZES_ATTR = "_shader_health_validate_splitter_sizes"
 STUDIO_CONFIG_ATTR = "_shader_health_studio_config"
+USER_CONFIG_ATTR = "_shader_health_user_config"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -141,7 +148,7 @@ def _create_dockable_panel() -> Any:
 
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        studio_config = StudioConfig.default()
+        studio_config, user_config = _load_runtime_configs()
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
@@ -153,10 +160,12 @@ def _create_dockable_panel() -> Any:
             settings_callbacks=_settings_action_callbacks(panel_state, qt_widgets),
             navigation_callbacks=_panel_navigation_callbacks(panel_state, qt_widgets),
             studio_config=studio_config,
+            user_config=user_config,
         )
         panel_state["content"] = content
         self._shader_health_content = content
         setattr(content, STUDIO_CONFIG_ATTR, studio_config)
+        setattr(content, USER_CONFIG_ATTR, user_config)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
@@ -210,15 +219,31 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
-        on_save_settings=lambda: _save_studio_settings_from_ui(
+        on_save_studio_settings=lambda: _save_studio_settings_from_ui(
             _panel_content(panel_state),
             qt_widgets,
         ),
-        on_load_settings=lambda: _load_studio_settings_from_ui(
+        on_load_studio_settings=lambda: _load_studio_settings_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_save_user_preferences=lambda: _save_user_preferences_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_load_user_preferences=lambda: _load_user_preferences_from_ui(
             _panel_content(panel_state),
             qt_widgets,
         ),
     )
+
+
+def _load_runtime_configs() -> tuple[StudioConfig, UserPreferences]:
+    """Load studio and user config files for panel startup."""
+
+    studio_config = StudioConfig.default()
+    user_config = UserPreferences.default()
+    return studio_config, user_config
 
 
 def _studio_config_for_content(content: Any) -> StudioConfig:
@@ -226,6 +251,13 @@ def _studio_config_for_content(content: Any) -> StudioConfig:
     if isinstance(config, StudioConfig):
         return config
     return StudioConfig.default()
+
+
+def _user_config_for_content(content: Any) -> UserPreferences:
+    config = getattr(content, USER_CONFIG_ATTR, None)
+    if isinstance(config, UserPreferences):
+        return config
+    return UserPreferences.default()
 
 
 def _deadline_config_for_content(content: Any) -> Any:
@@ -246,9 +278,25 @@ def _disabled_farm_tab_state() -> FarmTabState:
 
 def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> None:
     setattr(content, STUDIO_CONFIG_ATTR, config)
+    _refresh_settings_view(content, qt_widgets)
+
+
+def _set_user_config(content: Any, qt_widgets: Any, config: UserPreferences) -> None:
+    setattr(content, USER_CONFIG_ATTR, config)
+    _refresh_settings_view(content, qt_widgets)
+
+
+def _refresh_settings_view(content: Any, qt_widgets: Any, *, status_message: str = "") -> None:
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
-    if settings_view is not None:
-        update_settings_view(settings_view, qt_widgets, config=config)
+    if settings_view is None:
+        return
+    update_settings_view(
+        settings_view,
+        qt_widgets,
+        config=_studio_config_for_content(content),
+        user_config=_user_config_for_content(content),
+        status_message=status_message,
+    )
 
 
 def _set_panel_view(content: Any, qt_widgets: Any, *, settings: bool) -> None:
@@ -285,7 +333,11 @@ def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
         return
-    connectors = read_connectors_from_settings_view(settings_view, qt_widgets)
+    connectors = read_connectors_from_settings_view(
+        settings_view,
+        qt_widgets,
+        base=current.connectors,
+    )
     updated = current.with_updates(connectors=connectors)
     _set_studio_config(content, qt_widgets, updated)
     _refresh_farm_tab(content, qt_widgets)
@@ -318,9 +370,44 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_settings_status(
         content,
         qt_widgets,
-        f"Studio settings saved to {saved_path}. "
-        "Point other machines at this file via Load Settings or "
-        f"SHADER_HEALTH_STUDIO_CONFIG.",
+        (
+            f"Studio settings saved to {saved_path}. "
+            "Point other machines at this file via Load Studio Config or "
+            "SHADER_HEALTH_STUDIO_CONFIG."
+        ),
+    )
+
+
+def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    config = _user_config_for_content(content)
+    path = config.config_path or default_user_config_path()
+    try:
+        saved_path = save_user_config(path, config.with_updates(config_path=path))
+    except OSError as exc:
+        _set_settings_status(content, qt_widgets, f"User save failed: {exc}")
+        return
+    _set_user_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"User preferences saved to {saved_path}.",
+    )
+
+
+def _load_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    path = _pick_user_config_load_path(qt_widgets)
+    if path is None:
+        return
+    try:
+        loaded = load_user_config(path)
+    except (OSError, ValueError) as exc:
+        _set_settings_status(content, qt_widgets, f"User load failed: {exc}")
+        return
+    _set_user_config(content, qt_widgets, loaded)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Loaded user preferences from {path}.",
     )
 
 
@@ -343,15 +430,7 @@ def _load_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _set_settings_status(content: Any, qt_widgets: Any, message: str) -> None:
-    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
-    if settings_view is None:
-        return
-    update_settings_view(
-        settings_view,
-        qt_widgets,
-        config=_studio_config_for_content(content),
-        status_message=message,
-    )
+    _refresh_settings_view(content, qt_widgets, status_message=message)
 
 
 def _pick_settings_save_path(qt_widgets: Any, current_path: Path | None) -> Path | None:
@@ -392,6 +471,25 @@ def _pick_settings_load_path(qt_widgets: Any) -> Path | None:
         "Load Studio Settings",
         start_dir,
         "Shader Health Studio (*.json);;All Files (*)",
+    )
+    if not selected:
+        return None
+    return Path(selected)
+
+
+def _pick_user_config_load_path(qt_widgets: Any) -> Path | None:
+    file_dialog = getattr(qt_widgets, "QFileDialog", None)
+    default_path = default_user_config_path()
+    if file_dialog is None:
+        return default_path if default_path.is_file() else None
+    get_open = getattr(file_dialog, "getOpenFileName", None)
+    if get_open is None:
+        return default_path if default_path.is_file() else None
+    selected, _filter = get_open(
+        None,
+        "Load User Preferences",
+        str(default_path),
+        "Shader Health User (*.json);;All Files (*)",
     )
     if not selected:
         return None

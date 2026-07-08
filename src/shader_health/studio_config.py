@@ -4,20 +4,26 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
 from shader_health.core.rule_loader import RuleOverride
 
-STUDIO_CONFIG_SCHEMA_VERSION = "1.0"
+STUDIO_CONFIG_SCHEMA_VERSION = "2.0"
+LEGACY_STUDIO_CONFIG_SCHEMA_VERSION = "1.0"
+SUPPORTED_STUDIO_CONFIG_SCHEMA_VERSIONS = (
+    LEGACY_STUDIO_CONFIG_SCHEMA_VERSION,
+    STUDIO_CONFIG_SCHEMA_VERSION,
+)
 STUDIO_CONFIG_ENV_VAR = "SHADER_HEALTH_STUDIO_CONFIG"
 STUDIO_CONFIG_FILENAME = "shader_health_studio.json"
 DEFAULT_DEADLINE_WEB_SERVICE_PORT = 8081
 DEFAULT_DEADLINE_PROFILE_ID = "deadline_critical"
 DEFAULT_DEADLINE_TIMEOUT_SECONDS = 30.0
 DEFAULT_DEADLINE_API_URL = "http://localhost:8081"
+DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY = 5
 
 TX_DERIVATIVE_RULE_IDS = (
     "common.texture.optimized.exists",
@@ -41,6 +47,115 @@ class PipelineSettings:
 
     def to_dict(self) -> dict[str, Any]:
         return {"require_tx_derivatives": self.require_tx_derivatives}
+
+
+@dataclass(frozen=True)
+class StudioEnvironmentSettings:
+    """Studio network path roots and variable aliases for path substitution."""
+
+    texture_root: str = ""
+    asset_root: str = ""
+    cache_root: str = ""
+    render_root: str = ""
+    variable_aliases: Mapping[str, str] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "texture_root": self.texture_root,
+            "asset_root": self.asset_root,
+            "cache_root": self.cache_root,
+            "render_root": self.render_root,
+            "variable_aliases": dict(self.variable_aliases),
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> StudioEnvironmentSettings:
+        if not data:
+            return cls()
+        aliases_raw = data.get("variable_aliases")
+        aliases: dict[str, str] = {}
+        if isinstance(aliases_raw, Mapping):
+            aliases = {str(key): str(value) for key, value in aliases_raw.items()}
+        return cls(
+            texture_root=str(data.get("texture_root", "") or ""),
+            asset_root=str(data.get("asset_root", "") or ""),
+            cache_root=str(data.get("cache_root", "") or ""),
+            render_root=str(data.get("render_root", "") or ""),
+            variable_aliases=aliases,
+        )
+
+
+@dataclass(frozen=True)
+class StudioUiSettings:
+    """Optional studio-level UI defaults deployed with the studio config."""
+
+    documentation_url: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"documentation_url": self.documentation_url}
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> StudioUiSettings:
+        if not data:
+            return cls()
+        return cls(documentation_url=str(data.get("documentation_url", "") or ""))
+
+
+@dataclass(frozen=True)
+class BugReportSettings:
+    """Bug report relay settings controlled by the studio."""
+
+    enabled: bool = False
+    relay_url: str = ""
+    api_key: str = ""
+    allow_screenshot: bool = True
+    max_reports_per_day: int = DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "relay_url": self.relay_url,
+            "api_key": self.api_key,
+            "allow_screenshot": self.allow_screenshot,
+            "max_reports_per_day": int(self.max_reports_per_day),
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> BugReportSettings:
+        if not data:
+            return cls()
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            relay_url=str(data.get("relay_url", "") or ""),
+            api_key=str(data.get("api_key", "") or ""),
+            allow_screenshot=bool(data.get("allow_screenshot", True)),
+            max_reports_per_day=int(
+                data.get("max_reports_per_day", DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY)
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class StudioUpdatesSettings:
+    """Studio policy for in-app update checks."""
+
+    allow_check: bool = True
+    pinned_version: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "allow_check": self.allow_check,
+            "pinned_version": self.pinned_version,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> StudioUpdatesSettings:
+        if not data:
+            return cls()
+        return cls(
+            allow_check=bool(data.get("allow_check", True)),
+            pinned_version=str(data.get("pinned_version", "") or ""),
+        )
 
 
 @dataclass(frozen=True)
@@ -155,9 +270,23 @@ class ConnectorSettings:
     """Third-party integration settings grouped by connector."""
 
     deadline: DeadlineConnectorSettings = DeadlineConnectorSettings()
+    extra: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"deadline": self.deadline.to_dict()}
+        payload: dict[str, Any] = {"deadline": self.deadline.to_dict()}
+        for connector_id in sorted(self.extra):
+            if connector_id == "deadline":
+                continue
+            connector_payload = self.extra[connector_id]
+            payload[connector_id] = dict(connector_payload)
+        return payload
+
+    def connector_settings(self, connector_id: str) -> Mapping[str, Any] | None:
+        """Return raw settings for a connector id, including Deadline."""
+
+        if connector_id == "deadline":
+            return self.deadline.to_dict()
+        return self.extra.get(connector_id)
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> ConnectorSettings:
@@ -169,7 +298,12 @@ class ConnectorSettings:
             if isinstance(deadline_raw, Mapping)
             else DeadlineConnectorSettings()
         )
-        return cls(deadline=deadline)
+        extra: dict[str, dict[str, Any]] = {}
+        for connector_id, connector_raw in data.items():
+            if connector_id == "deadline" or not isinstance(connector_raw, Mapping):
+                continue
+            extra[str(connector_id)] = dict(connector_raw)
+        return cls(deadline=deadline, extra=extra)
 
 
 @dataclass(frozen=True)
@@ -179,24 +313,47 @@ class StudioConfig:
     schema_version: str = STUDIO_CONFIG_SCHEMA_VERSION
     studio_name: str = ""
     pipeline: PipelineSettings = PipelineSettings()
+    studio_environment: StudioEnvironmentSettings = StudioEnvironmentSettings()
+    ui: StudioUiSettings = StudioUiSettings()
+    bug_report: BugReportSettings = BugReportSettings()
+    updates: StudioUpdatesSettings = StudioUpdatesSettings()
     connectors: ConnectorSettings = ConnectorSettings()
     config_path: Optional[Path] = None
 
     def with_updates(
         self,
         *,
+        schema_version: Optional[str] = None,
         studio_name: Optional[str] = None,
         pipeline: Optional[PipelineSettings] = None,
+        studio_environment: Optional[StudioEnvironmentSettings] = None,
+        ui: Optional[StudioUiSettings] = None,
+        bug_report: Optional[BugReportSettings] = None,
+        updates: Optional[StudioUpdatesSettings] = None,
         connectors: Optional[ConnectorSettings] = None,
         config_path: Optional[Path] = None,
     ) -> StudioConfig:
         return replace(
             self,
+            schema_version=self.schema_version if schema_version is None else schema_version,
             studio_name=self.studio_name if studio_name is None else studio_name,
             pipeline=self.pipeline if pipeline is None else pipeline,
+            studio_environment=(
+                self.studio_environment if studio_environment is None else studio_environment
+            ),
+            ui=self.ui if ui is None else ui,
+            bug_report=self.bug_report if bug_report is None else bug_report,
+            updates=self.updates if updates is None else updates,
             connectors=self.connectors if connectors is None else connectors,
             config_path=self.config_path if config_path is None else config_path,
         )
+
+    def normalized(self) -> StudioConfig:
+        """Return a copy with the current schema version for persistence."""
+
+        if self.schema_version == STUDIO_CONFIG_SCHEMA_VERSION:
+            return self
+        return replace(self, schema_version=STUDIO_CONFIG_SCHEMA_VERSION)
 
     def rule_overrides(self) -> dict[str, RuleOverride]:
         """Return profile rule overrides implied by studio pipeline settings."""
@@ -213,18 +370,46 @@ class StudioConfig:
             "schema_version": self.schema_version,
             "studio_name": self.studio_name,
             "pipeline": self.pipeline.to_dict(),
+            "studio_environment": self.studio_environment.to_dict(),
+            "ui": self.ui.to_dict(),
+            "bug_report": self.bug_report.to_dict(),
+            "updates": self.updates.to_dict(),
             "connectors": self.connectors.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, config_path: Path | None = None) -> StudioConfig:
-        schema_version = str(data.get("schema_version", STUDIO_CONFIG_SCHEMA_VERSION))
+        schema_version = _normalize_schema_version(data.get("schema_version"))
         studio_name = str(data.get("studio_name", "") or "")
         pipeline_raw = data.get("pipeline")
         pipeline = (
             PipelineSettings.from_mapping(pipeline_raw)
             if isinstance(pipeline_raw, Mapping)
             else PipelineSettings()
+        )
+        studio_environment_raw = data.get("studio_environment")
+        studio_environment = (
+            StudioEnvironmentSettings.from_mapping(studio_environment_raw)
+            if isinstance(studio_environment_raw, Mapping)
+            else StudioEnvironmentSettings()
+        )
+        ui_raw = data.get("ui")
+        ui = (
+            StudioUiSettings.from_mapping(ui_raw)
+            if isinstance(ui_raw, Mapping)
+            else StudioUiSettings()
+        )
+        bug_report_raw = data.get("bug_report")
+        bug_report = (
+            BugReportSettings.from_mapping(bug_report_raw)
+            if isinstance(bug_report_raw, Mapping)
+            else BugReportSettings()
+        )
+        updates_raw = data.get("updates")
+        updates = (
+            StudioUpdatesSettings.from_mapping(updates_raw)
+            if isinstance(updates_raw, Mapping)
+            else StudioUpdatesSettings()
         )
         connectors_raw = data.get("connectors")
         connectors = (
@@ -236,6 +421,10 @@ class StudioConfig:
             schema_version=schema_version,
             studio_name=studio_name,
             pipeline=pipeline,
+            studio_environment=studio_environment,
+            ui=ui,
+            bug_report=bug_report,
+            updates=updates,
             connectors=connectors,
             config_path=config_path,
         )
@@ -259,6 +448,13 @@ def resolve_deadline_config(config: StudioConfig | None) -> Any:
     if not deadline.enabled:
         return None
     return deadline.to_deadline_config()
+
+
+def _normalize_schema_version(value: Any) -> str:
+    schema_version = str(value or LEGACY_STUDIO_CONFIG_SCHEMA_VERSION)
+    if schema_version in SUPPORTED_STUDIO_CONFIG_SCHEMA_VERSIONS:
+        return schema_version
+    return LEGACY_STUDIO_CONFIG_SCHEMA_VERSION
 
 
 def _parse_api_url(api_url: str) -> tuple[str, int]:
@@ -300,6 +496,29 @@ def discover_studio_config_path() -> Path | None:
     return None
 
 
+def resolve_studio_config_for_headless(
+    *,
+    cli_path: Path | None = None,
+) -> StudioConfig | None:
+    """Resolve studio config for headless CLI entrypoints.
+
+    Precedence:
+    1. Explicit ``--studio-config`` path when provided.
+    2. ``SHADER_HEALTH_STUDIO_CONFIG`` env var.
+    3. Default discovery under ``~/.shader_health/`` and home directory.
+    """
+
+    if cli_path is not None:
+        resolved = cli_path.resolve()
+        if not resolved.is_file():
+            raise ValueError(f"Studio config file does not exist: {resolved}")
+        return load_studio_config(resolved)
+    discovered = discover_studio_config_path()
+    if discovered is None:
+        return None
+    return load_studio_config(discovered)
+
+
 def load_studio_config(path: Path) -> StudioConfig:
     """Load studio settings from a JSON file."""
 
@@ -314,7 +533,7 @@ def save_studio_config(path: Path, config: StudioConfig) -> Path:
 
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = config.to_dict()
+    payload = config.normalized().to_dict()
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 

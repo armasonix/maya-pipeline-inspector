@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from shader_health.studio_config import (
@@ -8,7 +9,16 @@ from shader_health.studio_config import (
     PipelineSettings,
     StudioConfig,
 )
-from shader_health.ui import settings_panel
+from shader_health.ui import deadline_connector_section, settings_panel
+from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
+
+_DEADLINE_ENABLED = deadline_connector_section.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME
+_DEADLINE_DETAILS = deadline_connector_section.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME
+_DEADLINE_HOST = deadline_connector_section.SETTINGS_DEADLINE_HOST_INPUT_OBJECT_NAME
+_DEADLINE_PORT = deadline_connector_section.SETTINGS_DEADLINE_PORT_INPUT_OBJECT_NAME
+_DEADLINE_LEFT = deadline_connector_section.SETTINGS_DEADLINE_LEFT_COLUMN_OBJECT_NAME
+_DEADLINE_RIGHT = deadline_connector_section.SETTINGS_DEADLINE_RIGHT_COLUMN_OBJECT_NAME
+_DEADLINE_MAYAPY = deadline_connector_section.SETTINGS_DEADLINE_MAYAPY_INPUT_OBJECT_NAME
 
 
 class FakeWidget:
@@ -245,11 +255,78 @@ def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
         "Advanced",
         "Connectors",
         "Studio",
+        "Studio Environment",
+        "Bug Report",
     ]
     toggle = _find(view, settings_panel.SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
     assert toggle.checked is True
     assert toggle.text == "ON"
     assert "#2ecc71" in toggle.style_sheet
+
+
+def test_settings_tabs_use_stable_object_names():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+
+    assert [tab.object_name for _title, tab in tabs.tabs] == [
+        spec.object_name for spec in SETTINGS_TAB_SPECS
+    ]
+
+
+def test_studio_environment_and_bug_report_tabs_show_placeholders():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    studio_env_tab = tabs.tabs[4][1]
+    bug_report_tab = tabs.tabs[5][1]
+
+    studio_env_label = studio_env_tab.layout.widgets[0]
+    bug_report_label = bug_report_tab.layout.widgets[0]
+
+    assert "texture_root" in studio_env_label.text
+    assert "relay URL" in bug_report_label.text
+
+
+def test_settings_view_exposes_split_save_and_load_actions():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+
+    assert _find(view, settings_panel.SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME).text == (
+        "Save Studio Config"
+    )
+    assert _find(view, settings_panel.SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME).text == (
+        "Load Studio Config"
+    )
+    assert _find(view, settings_panel.SETTINGS_SAVE_USER_BUTTON_OBJECT_NAME).text == (
+        "Save User Preferences"
+    )
+    assert _find(view, settings_panel.SETTINGS_LOAD_USER_BUTTON_OBJECT_NAME).text == (
+        "Load User Preferences"
+    )
+
+
+def test_settings_view_shows_studio_and_user_config_paths():
+    from shader_health.user_config import UserPreferences
+
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(config_path=Path("C:/studio/shader_health_studio.json")),
+        user_config=UserPreferences(config_path=Path("C:/Users/me/.shader_health/user.json")),
+    )
+
+    studio_label = _find(view, settings_panel.SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME)
+    user_label = _find(view, settings_panel.SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME)
+
+    assert "shader_health_studio.json" in studio_label.text
+    assert "user.json" in user_label.text
+
+
+def test_studio_tab_clarifies_pipeline_policy_scope():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    studio_tab = tabs.tabs[3][1]
+    intro = studio_tab.layout.widgets[0]
+
+    assert "pipeline policy" in intro.text.lower()
+    assert "Studio Environment" in intro.text
 
 
 def test_connectors_tab_includes_deadline_remote_farm_toggle_and_collapsed_details():
@@ -262,8 +339,8 @@ def test_connectors_tab_includes_deadline_remote_farm_toggle_and_collapsed_detai
         ),
     )
     connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
-    toggle = _find(connectors_tab, settings_panel.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME)
-    details = _find(connectors_tab, settings_panel.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME)
+    toggle = _find(connectors_tab, _DEADLINE_ENABLED)
+    details = _find(connectors_tab, _DEADLINE_DETAILS)
 
     assert toggle.checked is False
     assert details.visible is False
@@ -284,8 +361,8 @@ def test_connectors_tab_shows_deadline_details_when_remote_farm_enabled():
         ),
     )
     connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
-    details = _find(connectors_tab, settings_panel.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME)
-    host = _find(connectors_tab, settings_panel.SETTINGS_DEADLINE_HOST_INPUT_OBJECT_NAME)
+    details = _find(connectors_tab, _DEADLINE_DETAILS)
+    host = _find(connectors_tab, _DEADLINE_HOST)
 
     assert details.visible is True
     assert host.text() == "10.0.0.5"
@@ -300,9 +377,9 @@ def test_read_connectors_from_settings_view_reads_deadline_fields():
             )
         ),
     )
-    host = _find(view, settings_panel.SETTINGS_DEADLINE_HOST_INPUT_OBJECT_NAME)
+    host = _find(view, _DEADLINE_HOST)
     host.setText("farm-host")
-    port = _find(view, settings_panel.SETTINGS_DEADLINE_PORT_INPUT_OBJECT_NAME)
+    port = _find(view, _DEADLINE_PORT)
     port.setText("9090")
 
     connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
@@ -321,12 +398,12 @@ def test_connectors_tab_uses_parallel_deadline_columns():
             )
         ),
     )
-    details_row = _find(view, settings_panel.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME)
-    left_column = _find(view, settings_panel.SETTINGS_DEADLINE_LEFT_COLUMN_OBJECT_NAME)
-    right_column = _find(view, settings_panel.SETTINGS_DEADLINE_RIGHT_COLUMN_OBJECT_NAME)
-    host = _find(view, settings_panel.SETTINGS_DEADLINE_HOST_INPUT_OBJECT_NAME)
-    port = _find(view, settings_panel.SETTINGS_DEADLINE_PORT_INPUT_OBJECT_NAME)
-    mayapy = _find(view, settings_panel.SETTINGS_DEADLINE_MAYAPY_INPUT_OBJECT_NAME)
+    details_row = _find(view, _DEADLINE_DETAILS)
+    left_column = _find(view, _DEADLINE_LEFT)
+    right_column = _find(view, _DEADLINE_RIGHT)
+    host = _find(view, _DEADLINE_HOST)
+    port = _find(view, _DEADLINE_PORT)
+    mayapy = _find(view, _DEADLINE_MAYAPY)
     host_label = next(
         child
         for child in left_column.children
@@ -336,9 +413,9 @@ def test_connectors_tab_uses_parallel_deadline_columns():
     assert details_row.visible is True
     assert host in left_column.children
     assert mayapy in right_column.children
-    assert host.fixed_width == settings_panel._DEADLINE_FIELD_HOST_WIDTH
-    assert port.fixed_width == settings_panel._DEADLINE_FIELD_PORT_WIDTH
-    assert host_label.fixed_width == settings_panel._DEADLINE_LABEL_WIDTH
+    assert host.fixed_width == deadline_connector_section._DEADLINE_FIELD_HOST_WIDTH
+    assert port.fixed_width == deadline_connector_section._DEADLINE_FIELD_PORT_WIDTH
+    assert host_label.fixed_width == deadline_connector_section._DEADLINE_LABEL_WIDTH
 
 
 def test_require_tx_toggle_styles_off_state():

@@ -27,6 +27,7 @@ ADRs help keep these decisions visible as the codebase grows.
 | 0004 | Headless apply-fixes policy | Accepted |
 | 0005 | GUI-first product philosophy | Accepted |
 | 0006 | Native Maya plugin (.mll) strategy | Accepted |
+| 0007 | Settings and Connectors architecture | Accepted |
 
 ## Status Values
 
