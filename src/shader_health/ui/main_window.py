@@ -21,6 +21,7 @@ from shader_health.ui.qt import load_qt_core
 from shader_health.ui.settings_panel import SettingsActionCallbacks, build_settings_view
 from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
 from shader_health.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager
+from shader_health.user_config import UserPreferences
 
 PANEL_OBJECT_NAME = "shaderHealthInspectorPanel"
 PANEL_TITLE = "Maya Shader Health Inspector"
@@ -245,6 +246,7 @@ def build_main_widget(
     settings_callbacks: Optional[SettingsActionCallbacks] = None,
     navigation_callbacks: Optional[PanelNavigationCallbacks] = None,
     studio_config: Optional[StudioConfig] = None,
+    user_config: Optional[UserPreferences] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
@@ -256,6 +258,7 @@ def build_main_widget(
     settings_callbacks = settings_callbacks or SettingsActionCallbacks()
     navigation_callbacks = navigation_callbacks or PanelNavigationCallbacks()
     active_studio_config = studio_config or StudioConfig.default()
+    active_user_config = user_config or UserPreferences.default()
 
     widget = qt_widgets.QWidget()
     widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
@@ -291,6 +294,7 @@ def build_main_widget(
     settings_view = build_settings_view(
         qt_widgets,
         config=active_studio_config,
+        user_config=active_user_config,
         callbacks=settings_callbacks,
     )
     stack.addWidget(settings_view)

@@ -27,14 +27,23 @@ from shader_health.ui.settings_widgets import (
     toggle_label,
     wire_button,
 )
+from shader_health.user_config import UserPreferences
 
 SETTINGS_VIEW_OBJECT_NAME = "shaderHealthInspectorSettingsView"
 SETTINGS_TAB_WIDGET_OBJECT_NAME = "shaderHealthInspectorSettingsTabWidget"
 SETTINGS_BACK_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsBackButton"
 SETTINGS_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorSettingsStatusLabel"
-SETTINGS_SAVE_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsSaveButton"
-SETTINGS_LOAD_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsLoadButton"
-SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = "shaderHealthInspectorSettingsConfigPathLabel"
+SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsSaveStudioButton"
+SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsLoadStudioButton"
+SETTINGS_SAVE_USER_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsSaveUserButton"
+SETTINGS_LOAD_USER_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsLoadUserButton"
+SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME = "shaderHealthInspectorSettingsStudioConfigPathLabel"
+SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME = "shaderHealthInspectorSettingsUserConfigPathLabel"
+
+# Backward-compatible aliases for older tests and integrations.
+SETTINGS_SAVE_BUTTON_OBJECT_NAME = SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME
+SETTINGS_LOAD_BUTTON_OBJECT_NAME = SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME
+SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME
 
 SETTINGS_PIPELINE_SECTION_OBJECT_NAME = "shaderHealthInspectorSettingsPipelineSection"
 SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME = "shaderHealthInspectorSettingsRequireTxToggle"
@@ -48,19 +57,23 @@ class SettingsActionCallbacks:
     on_require_tx_changed: Optional[Callable[[bool], None]] = None
     on_deadline_enabled_changed: Optional[Callable[[bool], None]] = None
     on_deadline_settings_changed: Optional[Callable[[], None]] = None
-    on_save_settings: Optional[Callable[[], None]] = None
-    on_load_settings: Optional[Callable[[], None]] = None
+    on_save_studio_settings: Optional[Callable[[], None]] = None
+    on_load_studio_settings: Optional[Callable[[], None]] = None
+    on_save_user_preferences: Optional[Callable[[], None]] = None
+    on_load_user_preferences: Optional[Callable[[], None]] = None
 
 
 def build_settings_view(
     qt_widgets: Any,
     *,
     config: Optional[StudioConfig] = None,
+    user_config: Optional[UserPreferences] = None,
     callbacks: Optional[SettingsActionCallbacks] = None,
 ) -> Any:
     """Build the settings screen with category tabs and studio pipeline controls."""
 
     studio_config = config or StudioConfig.default()
+    active_user_config = user_config or UserPreferences.default()
     settings_callbacks = callbacks or SettingsActionCallbacks()
 
     view = qt_widgets.QWidget()
@@ -90,28 +103,48 @@ def build_settings_view(
         tabs.addTab(tab_widget, spec.title)
     layout.addWidget(tabs)
 
-    config_path_label = qt_widgets.QLabel(_config_path_text(studio_config))
-    config_path_label.setObjectName(SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME)
-    config_path_label.setWordWrap(True)
-    layout.addWidget(config_path_label)
+    studio_path_label = qt_widgets.QLabel(_studio_config_path_text(studio_config))
+    studio_path_label.setObjectName(SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME)
+    studio_path_label.setWordWrap(True)
+    layout.addWidget(studio_path_label)
 
-    status_label = qt_widgets.QLabel("Adjust settings, then save a studio config file for rollout.")
+    user_path_label = qt_widgets.QLabel(_user_config_path_text(active_user_config))
+    user_path_label.setObjectName(SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME)
+    user_path_label.setWordWrap(True)
+    layout.addWidget(user_path_label)
+
+    status_label = qt_widgets.QLabel(
+        "Save studio policy and connectors separately from per-user preferences."
+    )
     status_label.setObjectName(SETTINGS_STATUS_LABEL_OBJECT_NAME)
     status_label.setWordWrap(True)
     layout.addWidget(status_label)
 
-    actions_row = qt_widgets.QHBoxLayout()
-    save_button = qt_widgets.QPushButton("Save Settings")
-    save_button.setObjectName(SETTINGS_SAVE_BUTTON_OBJECT_NAME)
-    wire_button(save_button, settings_callbacks.on_save_settings)
-    actions_row.addWidget(save_button)
+    studio_actions_row = qt_widgets.QHBoxLayout()
+    save_studio_button = qt_widgets.QPushButton("Save Studio Config")
+    save_studio_button.setObjectName(SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME)
+    wire_button(save_studio_button, settings_callbacks.on_save_studio_settings)
+    studio_actions_row.addWidget(save_studio_button)
 
-    load_button = qt_widgets.QPushButton("Load Settings")
-    load_button.setObjectName(SETTINGS_LOAD_BUTTON_OBJECT_NAME)
-    wire_button(load_button, settings_callbacks.on_load_settings)
-    actions_row.addWidget(load_button)
-    actions_row.addStretch(1)
-    layout.addLayout(actions_row)
+    load_studio_button = qt_widgets.QPushButton("Load Studio Config")
+    load_studio_button.setObjectName(SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME)
+    wire_button(load_studio_button, settings_callbacks.on_load_studio_settings)
+    studio_actions_row.addWidget(load_studio_button)
+    studio_actions_row.addStretch(1)
+    layout.addLayout(studio_actions_row)
+
+    user_actions_row = qt_widgets.QHBoxLayout()
+    save_user_button = qt_widgets.QPushButton("Save User Preferences")
+    save_user_button.setObjectName(SETTINGS_SAVE_USER_BUTTON_OBJECT_NAME)
+    wire_button(save_user_button, settings_callbacks.on_save_user_preferences)
+    user_actions_row.addWidget(save_user_button)
+
+    load_user_button = qt_widgets.QPushButton("Load User Preferences")
+    load_user_button.setObjectName(SETTINGS_LOAD_USER_BUTTON_OBJECT_NAME)
+    wire_button(load_user_button, settings_callbacks.on_load_user_preferences)
+    user_actions_row.addWidget(load_user_button)
+    user_actions_row.addStretch(1)
+    layout.addLayout(user_actions_row)
 
     return view
 
@@ -148,9 +181,10 @@ def update_settings_view(
     qt_widgets: Any,
     *,
     config: StudioConfig,
+    user_config: UserPreferences | None = None,
     status_message: str = "",
 ) -> None:
-    """Refresh settings controls from the active studio config."""
+    """Refresh settings controls from the active studio and user config."""
 
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
     if toggle is not None:
@@ -162,9 +196,22 @@ def update_settings_view(
 
     update_connector_views(view, qt_widgets, config.connectors)
 
-    path_label = find_child(view, qt_widgets.QLabel, SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME)
-    if path_label is not None:
-        path_label.setText(_config_path_text(config))
+    studio_path_label = find_child(
+        view,
+        qt_widgets.QLabel,
+        SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME,
+    )
+    if studio_path_label is not None:
+        studio_path_label.setText(_studio_config_path_text(config))
+
+    if user_config is not None:
+        user_path_label = find_child(
+            view,
+            qt_widgets.QLabel,
+            SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME,
+        )
+        if user_path_label is not None:
+            user_path_label.setText(_user_config_path_text(user_config))
 
     if status_message:
         status_label = find_child(view, qt_widgets.QLabel, SETTINGS_STATUS_LABEL_OBJECT_NAME)
@@ -271,7 +318,13 @@ def _build_studio_tab(
     return tab
 
 
-def _config_path_text(config: StudioConfig) -> str:
+def _studio_config_path_text(config: StudioConfig) -> str:
     if config.config_path is None:
-        return "Active config: in-session defaults (no file loaded)."
-    return f"Active config: {config.config_path}"
+        return "Studio config: in-session defaults (no file loaded)."
+    return f"Studio config: {config.config_path}"
+
+
+def _user_config_path_text(config: UserPreferences) -> str:
+    if config.config_path is None:
+        return "User preferences: in-session defaults (no file loaded)."
+    return f"User preferences: {config.config_path}"

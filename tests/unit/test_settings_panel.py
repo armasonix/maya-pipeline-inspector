@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from shader_health.studio_config import (
@@ -283,6 +284,39 @@ def test_studio_environment_and_bug_report_tabs_show_placeholders():
 
     assert "texture_root" in studio_env_label.text
     assert "relay URL" in bug_report_label.text
+
+
+def test_settings_view_exposes_split_save_and_load_actions():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+
+    assert _find(view, settings_panel.SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME).text == (
+        "Save Studio Config"
+    )
+    assert _find(view, settings_panel.SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME).text == (
+        "Load Studio Config"
+    )
+    assert _find(view, settings_panel.SETTINGS_SAVE_USER_BUTTON_OBJECT_NAME).text == (
+        "Save User Preferences"
+    )
+    assert _find(view, settings_panel.SETTINGS_LOAD_USER_BUTTON_OBJECT_NAME).text == (
+        "Load User Preferences"
+    )
+
+
+def test_settings_view_shows_studio_and_user_config_paths():
+    from shader_health.user_config import UserPreferences
+
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(config_path=Path("C:/studio/shader_health_studio.json")),
+        user_config=UserPreferences(config_path=Path("C:/Users/me/.shader_health/user.json")),
+    )
+
+    studio_label = _find(view, settings_panel.SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME)
+    user_label = _find(view, settings_panel.SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME)
+
+    assert "shader_health_studio.json" in studio_label.text
+    assert "user.json" in user_label.text
 
 
 def test_studio_tab_clarifies_pipeline_policy_scope():
