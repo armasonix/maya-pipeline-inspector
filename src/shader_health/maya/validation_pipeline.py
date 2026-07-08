@@ -23,6 +23,7 @@ from shader_health.maya.snapshot_enrichment import (
     enrich_rule_results,
     prepare_snapshot_for_validation,
 )
+from shader_health.studio_config import StudioConfig, merge_studio_rule_overrides
 
 PROFILE_ROOT = DEFAULT_RULE_ROOT / "profiles"
 DEFAULT_PROFILE_ID = "artist_relaxed"
@@ -224,6 +225,7 @@ def run_validation(
     extra_rule_paths: tuple[Path, ...] = (),
     waiver_sidecar_path: Optional[Path] = None,
     scan_scope: str = "scene",
+    studio_config: Optional[StudioConfig] = None,
 ) -> ValidationRunResult:
     """Validate an enriched snapshot using packaged rules, profile, and waivers."""
 
@@ -235,6 +237,11 @@ def run_validation(
     else:
         profile = compose_profiles(profile_id, normalized_asset_class or None)
         effective_profile_id = profile_id
+    if studio_config is not None:
+        profile = replace(
+            profile,
+            rule_overrides=merge_studio_rule_overrides(profile.rule_overrides, studio_config),
+        )
     renderer_ids = (enriched.renderer,) if enriched.renderer else ()
     rules = load_rule_stack(
         rule_root=rule_root or DEFAULT_RULE_ROOT,

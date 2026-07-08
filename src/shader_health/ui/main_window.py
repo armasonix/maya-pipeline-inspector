@@ -14,9 +14,11 @@ from shader_health.maya.validation_pipeline import (
     list_asset_class_profile_options,
     list_workflow_profile_options,
 )
+from shader_health.studio_config import StudioConfig
 from shader_health.ui.farm_tab import FarmActionCallbacks, build_farm_tab
 from shader_health.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
 from shader_health.ui.qt import load_qt_core
+from shader_health.ui.settings_panel import SettingsActionCallbacks, build_settings_view
 from shader_health.ui.table_widgets import configure_read_only_table, make_read_only_item
 from shader_health.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager
 
@@ -25,6 +27,11 @@ PANEL_TITLE = "Maya Shader Health Inspector"
 PANEL_CONTENT_OBJECT_NAME = "shaderHealthInspectorPanelContent"
 TAB_WIDGET_OBJECT_NAME = "shaderHealthInspectorTabWidget"
 PANEL_HEADER_OBJECT_NAME = "shaderHealthInspectorPanelHeader"
+PANEL_HEADER_TITLE_OBJECT_NAME = "shaderHealthInspectorPanelHeaderTitle"
+SETTINGS_GEAR_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsGearButton"
+PANEL_BODY_STACK_OBJECT_NAME = "shaderHealthInspectorPanelBodyStack"
+MAIN_VIEW_OBJECT_NAME = "shaderHealthInspectorMainView"
+SETTINGS_VIEW_INDEX = 1
 SUMMARY_HEADER_OBJECT_NAME = "shaderHealthInspectorSummaryHeader"
 VALIDATE_STICKY_CHROME_OBJECT_NAME = "shaderHealthInspectorValidateStickyChrome"
 VALIDATE_ACTION_BAR_OBJECT_NAME = "shaderHealthInspectorValidateActionBar"
@@ -186,6 +193,13 @@ class IssueDetailsState:
 
 
 @dataclass(frozen=True)
+class PanelNavigationCallbacks:
+    """Callbacks for persistent panel chrome outside the tab bodies."""
+
+    on_open_settings: Optional[Callable[[], None]] = None
+
+
+@dataclass(frozen=True)
 class ExportActionCallbacks:
     """Optional callbacks for report export UI buttons."""
 
@@ -228,6 +242,9 @@ def build_main_widget(
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
     waiver_callbacks: Optional[WaiverManagerCallbacks] = None,
     farm_callbacks: Optional[FarmActionCallbacks] = None,
+    settings_callbacks: Optional[SettingsActionCallbacks] = None,
+    navigation_callbacks: Optional[PanelNavigationCallbacks] = None,
+    studio_config: Optional[StudioConfig] = None,
 ) -> Any:
     """Build the visible UI shell for the dockable Maya panel."""
 
@@ -236,6 +253,9 @@ def build_main_widget(
     issue_details_callbacks = issue_details_callbacks or IssueDetailsActionCallbacks()
     waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
     farm_callbacks = farm_callbacks or FarmActionCallbacks()
+    settings_callbacks = settings_callbacks or SettingsActionCallbacks()
+    navigation_callbacks = navigation_callbacks or PanelNavigationCallbacks()
+    active_studio_config = studio_config or StudioConfig.default()
 
     widget = qt_widgets.QWidget()
     widget.setObjectName(PANEL_CONTENT_OBJECT_NAME)
@@ -244,7 +264,16 @@ def build_main_widget(
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(4)
 
-    layout.addWidget(build_panel_header(qt_widgets))
+    layout.addWidget(build_panel_header(qt_widgets, navigation_callbacks=navigation_callbacks))
+
+    stack = qt_widgets.QStackedWidget()
+    stack.setObjectName(PANEL_BODY_STACK_OBJECT_NAME)
+
+    main_view = qt_widgets.QWidget()
+    main_view.setObjectName(MAIN_VIEW_OBJECT_NAME)
+    main_layout = qt_widgets.QVBoxLayout(main_view)
+    main_layout.setContentsMargins(0, 0, 0, 0)
+    main_layout.setSpacing(4)
 
     tabs = qt_widgets.QTabWidget()
     tabs.setObjectName(TAB_WIDGET_OBJECT_NAME)
@@ -256,20 +285,59 @@ def build_main_widget(
     tabs.addTab(_build_fixes_tab(qt_widgets, fix_queue_callbacks), "Fixes")
     tabs.addTab(_build_reports_tab(qt_widgets, export_callbacks), "Reports")
     tabs.addTab(build_farm_tab(qt_widgets, callbacks=farm_callbacks), "Farm")
-    layout.addWidget(tabs)
+    main_layout.addWidget(tabs)
+    stack.addWidget(main_view)
+
+    settings_view = build_settings_view(
+        qt_widgets,
+        config=active_studio_config,
+        callbacks=settings_callbacks,
+    )
+    stack.addWidget(settings_view)
+
+    layout.addWidget(stack)
 
     return widget
 
 
-def build_panel_header(qt_widgets: Any, *, version: str = __version__) -> Any:
-    """Build the large title + version header shown at the top of each tab."""
+def build_panel_header(
+    qt_widgets: Any,
+    *,
+    version: str = __version__,
+    navigation_callbacks: Optional[PanelNavigationCallbacks] = None,
+) -> Any:
+    """Build the persistent title row with a settings gear on the left."""
 
-    label = qt_widgets.QLabel(f"{PANEL_TITLE}  v{version}")
-    label.setObjectName(PANEL_HEADER_OBJECT_NAME)
-    set_style = getattr(label, "setStyleSheet", None)
+    navigation_callbacks = navigation_callbacks or PanelNavigationCallbacks()
+
+    row = qt_widgets.QWidget()
+    row.setObjectName(PANEL_HEADER_OBJECT_NAME)
+    row_layout = qt_widgets.QHBoxLayout(row)
+    row_layout.setContentsMargins(0, 0, 0, 0)
+    row_layout.setSpacing(8)
+
+    gear_button = qt_widgets.QPushButton("\u2699")
+    gear_button.setObjectName(SETTINGS_GEAR_BUTTON_OBJECT_NAME)
+    set_tooltip = getattr(gear_button, "setToolTip", None)
+    if set_tooltip is not None:
+        set_tooltip("Open settings")
+    set_fixed_width = getattr(gear_button, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(34)
+    clicked = getattr(gear_button, "clicked", None)
+    connect = getattr(clicked, "connect", None)
+    if connect is not None and navigation_callbacks.on_open_settings is not None:
+        connect(navigation_callbacks.on_open_settings)
+    row_layout.addWidget(gear_button)
+
+    title_label = qt_widgets.QLabel(f"{PANEL_TITLE}  v{version}")
+    title_label.setObjectName(PANEL_HEADER_TITLE_OBJECT_NAME)
+    set_style = getattr(title_label, "setStyleSheet", None)
     if set_style is not None:
         set_style("font-size: 14pt; font-weight: bold;")
-    return label
+    row_layout.addWidget(title_label, 1)
+
+    return row
 
 
 def build_validation_actions(

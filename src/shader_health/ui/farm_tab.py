@@ -26,6 +26,7 @@ FARM_SUBMIT_BUTTON_OBJECT_NAME = "shaderHealthInspectorFarmSubmitButton"
 class FarmTabState:
     """Display data for the Farm tab."""
 
+    integration_enabled: bool = True
     api_url: str = "http://localhost:8081"
     connection_status: str = "Unknown"
     connection_reachable: bool = False
@@ -140,6 +141,7 @@ def build_farm_tab(
     status_label.setWordWrap(True)
     layout.addWidget(status_label)
     layout.addStretch(1)
+    _update_farm_action_buttons(tab, qt_widgets, farm_state)
     return tab
 
 
@@ -157,6 +159,7 @@ def update_farm_tab(
     _set_label(tab_root, qt_widgets, FARM_LAST_JOB_LABEL_OBJECT_NAME, _last_job_text(state))
     _set_label(tab_root, qt_widgets, FARM_STATUS_LABEL_OBJECT_NAME, state.status_message)
     _update_connection_indicator(tab_root, qt_widgets, state)
+    _update_farm_action_buttons(tab_root, qt_widgets, state)
 
 
 def _build_connection_status_group(qt_widgets: Any, state: FarmTabState) -> Any:
@@ -215,11 +218,15 @@ def _set_compact_horizontal(qt_widgets: Any, widget: Any) -> None:
 
 
 def _connection_status_value_text(state: FarmTabState) -> str:
+    if not state.integration_enabled:
+        return "Offline"
     return "Online" if state.connection_reachable else "Offline"
 
 
 def _connection_lamp_color(state: FarmTabState) -> str:
-    return "#2ecc71" if state.connection_reachable else "#e74c3c"
+    if state.integration_enabled and state.connection_reachable:
+        return "#2ecc71"
+    return "#e74c3c"
 
 
 def _apply_connection_lamp_style(lamp: Any, state: FarmTabState) -> None:
@@ -243,6 +250,11 @@ def _apply_connection_lamp_style(lamp: Any, state: FarmTabState) -> None:
 
 
 def _connection_text(state: FarmTabState) -> str:
+    if not state.integration_enabled:
+        return (
+            "Thinkbox Deadline: integration disabled "
+            "(enable Remote Farm under Settings → Connectors)"
+        )
     status = "reachable" if state.connection_reachable else "unreachable"
     return f"Deadline Web Service: {state.api_url} ({status}; {state.connection_status})"
 
@@ -278,6 +290,21 @@ def _farm_button(
     from shader_health.ui.main_window import _compact_button
 
     return _compact_button(qt_widgets, label, object_name, tooltip, callback)
+
+
+def _update_farm_action_buttons(tab_root: Any, qt_widgets: Any, state: FarmTabState) -> None:
+    actions_enabled = state.integration_enabled
+    for object_name in (
+        FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME,
+        FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME,
+        FARM_SUBMIT_BUTTON_OBJECT_NAME,
+    ):
+        button = _find_child(tab_root, qt_widgets.QPushButton, object_name)
+        if button is None:
+            continue
+        set_enabled = getattr(button, "setEnabled", None)
+        if set_enabled is not None:
+            set_enabled(actions_enabled)
 
 
 def _set_label(tab_root: Any, qt_widgets: Any, object_name: str, text: str) -> None:

@@ -1,0 +1,22 @@
+{
+  "issues": {
+    "changed": [],
+    "new": [],
+    "resolved": []
+  },
+  "manifest_diff_schema_version": "1.0",
+  "new_manifest_schema_version": "1.1",
+  "new_scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+  "old_manifest_schema_version": "1.1",
+  "old_scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
+  "regression": {
+    "fingerprint_drift_detected": false,
+    "manifest_regression_blocked": false
+  },
+  "summary": {
+    "changed": 0,
+    "fingerprint_changes": 0,
+    "new": 0,
+    "resolved": 0
+  }
+}

@@ -253,29 +253,19 @@ class FakeContent:
         return None
 
 
-def test_validate_splitter_persistence_restores_saved_sizes(monkeypatch: Any):
+def test_validate_splitter_persistence_restores_saved_sizes():
     splitter = FakeSplitter()
     content = FakeContent(splitter)
-    setattr(content, ui_launcher.VALIDATE_SPLITTER_SIZES_ATTR, (700, 200))
-    monkeypatch.setattr(
-        ui_launcher,
-        "_debug_details_layout_log",
-        lambda *_args, **_kwargs: None,
-    )
 
+    setattr(content, ui_launcher.VALIDATE_SPLITTER_SIZES_ATTR, (700, 200))
     ui_launcher._wire_validate_splitter_persistence(content, SimpleNamespace(QWidget=object))
 
     assert splitter.applied_sizes == [[700, 200]]
 
 
-def test_validate_splitter_persistence_saves_sizes_on_move(monkeypatch: Any):
+def test_validate_splitter_persistence_saves_sizes_on_move():
     splitter = FakeSplitter()
     content = FakeContent(splitter)
-    monkeypatch.setattr(
-        ui_launcher,
-        "_debug_details_layout_log",
-        lambda *_args, **_kwargs: None,
-    )
 
     ui_launcher._wire_validate_splitter_persistence(content, SimpleNamespace(QWidget=object))
     splitter._sizes = [650, 210]

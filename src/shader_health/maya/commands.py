@@ -74,6 +74,7 @@ def validate_scene_action(
     *,
     profile_id: str = DEFAULT_PROFILE_ID,
     asset_class_id: str = "",
+    studio_config: Optional[Any] = None,
 ) -> Any:
     """Validate the current Maya scene and return a UI-friendly result object."""
 
@@ -81,6 +82,7 @@ def validate_scene_action(
         scan_scope="scene",
         profile_id=profile_id,
         asset_class_id=asset_class_id,
+        studio_config=studio_config,
     )
 
 
@@ -88,6 +90,7 @@ def validate_selection_action(
     *,
     profile_id: str = DEFAULT_PROFILE_ID,
     asset_class_id: str = "",
+    studio_config: Optional[Any] = None,
 ) -> Any:
     """Validate the current Maya selection and return a UI-friendly result object."""
 
@@ -95,6 +98,7 @@ def validate_selection_action(
         scan_scope="selection",
         profile_id=profile_id,
         asset_class_id=asset_class_id,
+        studio_config=studio_config,
     )
 
 
@@ -373,6 +377,7 @@ def _validate(
     scan_scope: str,
     profile_id: str,
     asset_class_id: str = "",
+    studio_config: Optional[Any] = None,
 ) -> Any:
     from shader_health.maya.scanner import scan_scene, scan_selection, selection_node_names
 
@@ -400,6 +405,7 @@ def _validate(
         profile_id=profile_id,
         asset_class_id=asset_class_id or None,
         scan_scope=scan_scope,
+        studio_config=studio_config,
     )
     return _validation_result(run, action=f"validate_{scan_scope}")
 

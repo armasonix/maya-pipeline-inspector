@@ -262,6 +262,7 @@ def _merge_tab_state(
     status_message: str = "",
 ) -> FarmTabState:
     return FarmTabState(
+        integration_enabled=base.integration_enabled,
         api_url=base.api_url,
         connection_status=base.connection_status,
         connection_reachable=base.connection_reachable,

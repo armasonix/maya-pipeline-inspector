@@ -1,9 +1,18 @@
 """Maya dockable panel launcher."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Optional
 
+from shader_health.studio_config import (
+    STUDIO_CONFIG_FILENAME,
+    PipelineSettings,
+    StudioConfig,
+    load_studio_config,
+    resolve_deadline_config,
+    save_studio_config,
+)
 from shader_health.ui import main_window
 from shader_health.ui.farm_tab import (
     FARM_STATUS_LABEL_OBJECT_NAME,
@@ -33,6 +42,12 @@ from shader_health.ui.issues_triage import (
     read_issue_filter_prefs_from_widgets,
 )
 from shader_health.ui.qt import load_qt_widgets
+from shader_health.ui.settings_panel import (
+    SETTINGS_VIEW_OBJECT_NAME,
+    SettingsActionCallbacks,
+    read_connectors_from_settings_view,
+    update_settings_view,
+)
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
     WAIVER_TABLE_OBJECT_NAME,
@@ -43,9 +58,9 @@ from shader_health.ui.waiver_manager import (
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
-_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-ee1eca.log"
 
 VALIDATE_SPLITTER_SIZES_ATTR = "_shader_health_validate_splitter_sizes"
+STUDIO_CONFIG_ATTR = "_shader_health_studio_config"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -126,6 +141,7 @@ def _create_dockable_panel() -> Any:
 
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        studio_config = StudioConfig.default()
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
@@ -134,9 +150,13 @@ def _create_dockable_panel() -> Any:
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
             waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
             farm_callbacks=_farm_action_callbacks(panel_state, qt_widgets),
+            settings_callbacks=_settings_action_callbacks(panel_state, qt_widgets),
+            navigation_callbacks=_panel_navigation_callbacks(panel_state, qt_widgets),
+            studio_config=studio_config,
         )
         panel_state["content"] = content
         self._shader_health_content = content
+        setattr(content, STUDIO_CONFIG_ATTR, studio_config)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
@@ -144,6 +164,7 @@ def _create_dockable_panel() -> Any:
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
         _wire_validate_splitter_persistence(content, qt_widgets)
+        _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
@@ -154,6 +175,231 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _panel_navigation_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> main_window.PanelNavigationCallbacks:
+    return main_window.PanelNavigationCallbacks(
+        on_open_settings=lambda: _set_panel_view(
+            _panel_content(panel_state),
+            qt_widgets,
+            settings=True,
+        ),
+    )
+
+
+def _settings_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> SettingsActionCallbacks:
+    return SettingsActionCallbacks(
+        on_back=lambda: _set_panel_view(_panel_content(panel_state), qt_widgets, settings=False),
+        on_require_tx_changed=lambda enabled: _set_require_tx_derivatives(
+            _panel_content(panel_state),
+            qt_widgets,
+            enabled,
+        ),
+        on_deadline_enabled_changed=lambda enabled: _set_deadline_connector_enabled(
+            _panel_content(panel_state),
+            qt_widgets,
+            enabled,
+        ),
+        on_deadline_settings_changed=lambda: _sync_deadline_connector_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_save_settings=lambda: _save_studio_settings_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_load_settings=lambda: _load_studio_settings_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
+
+
+def _studio_config_for_content(content: Any) -> StudioConfig:
+    config = getattr(content, STUDIO_CONFIG_ATTR, None)
+    if isinstance(config, StudioConfig):
+        return config
+    return StudioConfig.default()
+
+
+def _deadline_config_for_content(content: Any) -> Any:
+    return resolve_deadline_config(_studio_config_for_content(content))
+
+
+def _disabled_farm_tab_state() -> FarmTabState:
+    return FarmTabState(
+        integration_enabled=False,
+        connection_status="disabled",
+        connection_reachable=False,
+        status_message=(
+            "Remote farm connector is disabled. Enable Thinkbox Deadline under "
+            "Settings → Connectors → Remote Farm."
+        ),
+    )
+
+
+def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> None:
+    setattr(content, STUDIO_CONFIG_ATTR, config)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is not None:
+        update_settings_view(settings_view, qt_widgets, config=config)
+
+
+def _set_panel_view(content: Any, qt_widgets: Any, *, settings: bool) -> None:
+    stack = _find_child(
+        content,
+        qt_widgets.QStackedWidget,
+        main_window.PANEL_BODY_STACK_OBJECT_NAME,
+    )
+    if stack is None:
+        return
+    set_current = getattr(stack, "setCurrentIndex", None)
+    if set_current is not None:
+        set_current(main_window.SETTINGS_VIEW_INDEX if settings else 0)
+
+
+def _set_require_tx_derivatives(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    current = _studio_config_for_content(content)
+    updated = current.with_updates(
+        pipeline=PipelineSettings(require_tx_derivatives=enabled),
+    )
+    _set_studio_config(content, qt_widgets, updated)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        (
+            "Pipeline updated: .tx derivative checks are "
+            f"{'enabled' if enabled else 'disabled'} for this session."
+        ),
+    )
+
+
+def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    connectors = read_connectors_from_settings_view(settings_view, qt_widgets)
+    updated = current.with_updates(connectors=connectors)
+    _set_studio_config(content, qt_widgets, updated)
+    _refresh_farm_tab(content, qt_widgets)
+
+
+def _set_deadline_connector_enabled(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    _sync_deadline_connector_from_ui(content, qt_widgets)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        (
+            "Thinkbox Deadline connector "
+            f"{'enabled' if enabled else 'disabled'} for this session."
+        ),
+    )
+
+
+def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    _sync_deadline_connector_from_ui(content, qt_widgets)
+    config = _studio_config_for_content(content)
+    path = _pick_settings_save_path(qt_widgets, config.config_path)
+    if path is None:
+        return
+    try:
+        saved_path = save_studio_config(path, config.with_updates(config_path=path))
+    except OSError as exc:
+        _set_settings_status(content, qt_widgets, f"Save failed: {exc}")
+        return
+    _set_studio_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Studio settings saved to {saved_path}. "
+        "Point other machines at this file via Load Settings or "
+        f"SHADER_HEALTH_STUDIO_CONFIG.",
+    )
+
+
+def _load_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    path = _pick_settings_load_path(qt_widgets)
+    if path is None:
+        return
+    try:
+        loaded = load_studio_config(path)
+    except (OSError, ValueError) as exc:
+        _set_settings_status(content, qt_widgets, f"Load failed: {exc}")
+        return
+    _set_studio_config(content, qt_widgets, loaded)
+    _refresh_farm_tab(content, qt_widgets)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Loaded studio settings from {path}. Validation now follows this config.",
+    )
+
+
+def _set_settings_status(content: Any, qt_widgets: Any, message: str) -> None:
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    update_settings_view(
+        settings_view,
+        qt_widgets,
+        config=_studio_config_for_content(content),
+        status_message=message,
+    )
+
+
+def _pick_settings_save_path(qt_widgets: Any, current_path: Path | None) -> Path | None:
+    file_dialog = getattr(qt_widgets, "QFileDialog", None)
+    if file_dialog is None:
+        return current_path or _default_studio_config_path()
+    get_save = getattr(file_dialog, "getSaveFileName", None)
+    if get_save is None:
+        return current_path or _default_studio_config_path()
+    default_dir = str(current_path.parent if current_path else _default_studio_config_path().parent)
+    default_name = current_path.name if current_path else STUDIO_CONFIG_FILENAME
+    selected, _filter = get_save(
+        None,
+        "Save Studio Settings",
+        str(Path(default_dir) / default_name),
+        "Shader Health Studio (*.json);;All Files (*)",
+    )
+    if not selected:
+        return None
+    path = Path(selected)
+    if path.suffix.lower() != ".json":
+        path = path.with_suffix(".json")
+    return path
+
+
+def _pick_settings_load_path(qt_widgets: Any) -> Path | None:
+    file_dialog = getattr(qt_widgets, "QFileDialog", None)
+    if file_dialog is None:
+        discovered = StudioConfig.default().config_path
+        return discovered
+    get_open = getattr(file_dialog, "getOpenFileName", None)
+    if get_open is None:
+        return StudioConfig.default().config_path
+    env_path = os.environ.get("SHADER_HEALTH_STUDIO_CONFIG", "").strip()
+    start_dir = env_path or str(_default_studio_config_path().parent)
+    selected, _filter = get_open(
+        None,
+        "Load Studio Settings",
+        start_dir,
+        "Shader Health Studio (*.json);;All Files (*)",
+    )
+    if not selected:
+        return None
+    return Path(selected)
+
+
+def _default_studio_config_path() -> Path:
+    return Path.home() / ".shader_health" / STUDIO_CONFIG_FILENAME
 
 
 def _waiver_manager_callbacks(
@@ -485,15 +731,18 @@ def _run_validation_job(
 
         selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
+        studio_config = _studio_config_for_content(content)
         if scan_scope == "selection":
             result = validate_selection_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
+                studio_config=studio_config,
             )
         else:
             result = validate_scene_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
+                studio_config=studio_config,
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
@@ -585,7 +834,11 @@ def _set_validate_busy_state(
 def _refresh_farm_connection_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya.farm_actions import check_deadline_connection
 
-    tab_state = check_deadline_connection()
+    config = _deadline_config_for_content(content)
+    if config is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
+        return
+    tab_state = check_deadline_connection(config)
     _apply_farm_tab_state(content, qt_widgets, tab_state)
 
 
@@ -601,11 +854,21 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
 
+    if _deadline_config_for_content(content) is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
+        _show_information_dialog(
+            qt_widgets,
+            "Farm Preflight",
+            _disabled_farm_tab_state().status_message,
+        )
+        return
+
     try:
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         validation = validate_scene_action(
             profile_id="deadline_critical",
             asset_class_id=asset_class_id,
+            studio_config=_studio_config_for_content(content),
         )
     except Exception as exc:  # noqa: BLE001
         message = f"Farm preflight failed: {exc}"
@@ -625,6 +888,7 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
     result = run_farm_preflight_action(
         summary=getattr(validation, "summary", None),
         scene_state=collect_farm_scene_state(),
+        config=_deadline_config_for_content(content),
         connection_state=connection_state,
         last_job_id=getattr(content, "_shader_health_farm_last_job_id", ""),
     )
@@ -648,6 +912,15 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
 
+    if _deadline_config_for_content(content) is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
+        _show_information_dialog(
+            qt_widgets,
+            "Submit to Farm",
+            _disabled_farm_tab_state().status_message,
+        )
+        return
+
     scene_path = getattr(content, "_shader_health_scene_path", "") or _current_scene_path()
     summary = getattr(content, "_shader_health_summary", None)
     validation_result = (
@@ -658,6 +931,7 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
         scene_path=scene_path,
         scene_state=collect_farm_scene_state(),
         validation_result=validation_result,
+        config=_deadline_config_for_content(content),
         connection_state=connection_state,
     )
     _apply_farm_tab_state(content, qt_widgets, result.tab_state)
@@ -671,11 +945,11 @@ def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
 
     if content is None:
         return
-    stored = getattr(content, "_shader_health_farm_tab_state", None)
-    if isinstance(stored, FarmTabState):
-        _apply_farm_tab_state(content, qt_widgets, stored)
+    config = _deadline_config_for_content(content)
+    if config is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
         return
-    _apply_farm_tab_state(content, qt_widgets, check_deadline_connection())
+    _apply_farm_tab_state(content, qt_widgets, check_deadline_connection(config))
 
 
 def _apply_farm_tab_state(content: Any, qt_widgets: Any, tab_state: FarmTabState) -> None:
@@ -694,6 +968,7 @@ def _set_farm_status(content: Any, qt_widgets: Any, message: str) -> None:
             content,
             qt_widgets,
             FarmTabState(
+                integration_enabled=stored.integration_enabled,
                 api_url=stored.api_url,
                 connection_status=stored.connection_status,
                 connection_reachable=stored.connection_reachable,
@@ -1333,15 +1608,6 @@ def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
         sizes = tuple(int(size) for size in sizes_fn())
         if len(sizes) >= 2 and sizes[1] >= main_window.DETAILS_PANEL_MIN_WIDTH:
             setattr(content, VALIDATE_SPLITTER_SIZES_ATTR, sizes)
-        # #region agent log
-        _debug_details_layout_log(
-            content,
-            qt_widgets,
-            issue_id="splitter-moved",
-            message_len=0,
-            why_len=0,
-        )
-        # #endregion
 
     splitter_moved = getattr(splitter, "splitterMoved", None)
     connect = getattr(splitter_moved, "connect", None)
@@ -1720,113 +1986,6 @@ def _populate_issue_details(content: Any, qt_widgets: Any, issue: Any) -> None:
         main_window.DETAILS_FIX_LABEL_OBJECT_NAME,
         f"Fix Available: {_yes_no(state.fix_available)}   {state.fix_description}",
     )
-    # #region agent log
-    _debug_details_layout_log(
-        content,
-        qt_widgets,
-        issue_id=str(getattr(issue, "rule_id", "") or getattr(issue, "rule", "")),
-        message_len=len(state.message),
-        why_len=len(state.why),
-    )
-    # #endregion
-
-
-def _debug_details_layout_log(
-    content: Any,
-    qt_widgets: Any,
-    *,
-    issue_id: str,
-    message_len: int,
-    why_len: int,
-) -> None:
-    try:
-        import json
-        import time
-
-        panel = _find_child(content, qt_widgets.QWidget, main_window.DETAILS_PANEL_OBJECT_NAME)
-        scroll_area = _find_child(
-            content,
-            qt_widgets.QWidget,
-            main_window.DETAILS_SCROLL_AREA_OBJECT_NAME,
-        )
-        splitter = _find_child(
-            content,
-            qt_widgets.QWidget,
-            main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME,
-        )
-        payload = {
-            "sessionId": "ee1eca",
-            "hypothesisId": "D6",
-            "location": "ui_launcher.py:_populate_issue_details",
-            "message": "issue details layout geometry",
-            "data": {
-                "issue_id": issue_id,
-                "message_len": message_len,
-                "why_len": why_len,
-                "panel_size": _widget_size(panel),
-                "panel_policy": _widget_size_policy(panel),
-                "scroll_size": _widget_size(scroll_area),
-                "scroll_frame_shape": _scroll_area_frame_shape(scroll_area),
-                "splitter_sizes": _splitter_sizes(splitter),
-                "saved_splitter_sizes": list(
-                    getattr(content, VALIDATE_SPLITTER_SIZES_ATTR, ()) or ()
-                ),
-            },
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except OSError:
-        return
-
-
-def _widget_size(widget: Any) -> dict[str, int] | None:
-    if widget is None:
-        return None
-    size_fn = getattr(widget, "size", None)
-    if size_fn is None:
-        return None
-    size = size_fn()
-    width_fn = getattr(size, "width", None)
-    height_fn = getattr(size, "height", None)
-    if width_fn is None or height_fn is None:
-        return None
-    return {"width": int(width_fn()), "height": int(height_fn())}
-
-
-def _widget_size_policy(widget: Any) -> dict[str, int] | None:
-    if widget is None:
-        return None
-    policy_fn = getattr(widget, "sizePolicy", None)
-    if policy_fn is None:
-        return None
-    policy = policy_fn()
-    horizontal = getattr(policy, "horizontalPolicy", None)
-    vertical = getattr(policy, "verticalPolicy", None)
-    if horizontal is None or vertical is None:
-        return None
-    return {
-        "horizontal": int(horizontal()),
-        "vertical": int(vertical()),
-    }
-
-
-def _splitter_sizes(splitter: Any) -> list[int] | None:
-    if splitter is None:
-        return None
-    sizes_fn = getattr(splitter, "sizes", None)
-    if sizes_fn is None:
-        return None
-    return [int(size) for size in sizes_fn()]
-
-
-def _scroll_area_frame_shape(scroll_area: Any) -> int | None:
-    if scroll_area is None:
-        return None
-    frame_shape_fn = getattr(scroll_area, "frameShape", None)
-    if frame_shape_fn is None:
-        return None
-    return int(frame_shape_fn())
 
 
 def _fix_action_for_issue(content: Any, issue: Any) -> Any:

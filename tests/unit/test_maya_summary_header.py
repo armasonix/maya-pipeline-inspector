@@ -11,12 +11,43 @@ class FakeWidget:
         self.children: list[Any] = []
         self.layout: Optional[FakeVBoxLayout] = None
         self.size_policy: Optional[tuple[Any, Any]] = None
+        self.visible = True
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
 
     def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
         self.size_policy = (horizontal, vertical)
+
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
+
+
+class FakeLineEdit(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.value = text
+
+    def setText(self, text: str) -> None:
+        self.value = text
+
+    def text(self) -> str:
+        return self.value
+
+    def setPlaceholderText(self, text: str) -> None:
+        _ = text
+
+    @property
+    def editingFinished(self) -> FakeSignal:
+        return FakeSignal()
+
+
+class FakeSignal:
+    def __init__(self) -> None:
+        self.handlers: list[Any] = []
+
+    def connect(self, handler: Any) -> None:
+        self.handlers.append(handler)
 
 
 class FakeLabel(FakeWidget):
@@ -112,12 +143,31 @@ class FakePushButton(FakeLabel):
         super().__init__(text)
         self.enabled = True
         self.tooltip = ""
+        self.checkable = False
+        self.checked = False
+        self.style_sheet = ""
+        self.fixed_width: int | None = None
 
     def setEnabled(self, enabled: bool) -> None:
         self.enabled = enabled
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
+
+    def setCheckable(self, enabled: bool) -> None:
+        self.checkable = enabled
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
+    def isChecked(self) -> bool:
+        return self.checked
+
+    def setStyleSheet(self, style: str) -> None:
+        self.style_sheet = style
+
+    def setFixedWidth(self, width: int) -> None:
+        self.fixed_width = width
 
 
 class FakeCheckBox(FakeWidget):
@@ -159,13 +209,15 @@ class FakeTableWidgetItem:
 
 
 class FakeVBoxLayout:
-    def __init__(self, parent: FakeWidget) -> None:
+    def __init__(self, parent: FakeWidget | None = None) -> None:
         self.parent = parent
-        self.parent.layout = self
         self.margins: Optional[tuple[int, int, int, int]] = None
         self.spacing: Optional[int] = None
         self.widgets: list[Any] = []
+        self.layouts: list[Any] = []
         self.stretches: list[int] = []
+        if parent is not None:
+            parent.layout = self
 
     def setContentsMargins(self, left: int, top: int, right: int, bottom: int) -> None:
         self.margins = (left, top, right, bottom)
@@ -175,11 +227,23 @@ class FakeVBoxLayout:
 
     def addWidget(self, widget: Any, stretch: Optional[int] = None) -> None:
         self.widgets.append(widget)
-        self.parent.children.append(widget)
+        self._attach_widget(widget)
         _ = stretch
+
+    def addLayout(self, layout: Any) -> None:
+        self.layouts.append(layout)
+        for widget in getattr(layout, "widgets", []):
+            self._attach_widget(widget)
+        for nested in getattr(layout, "layouts", []):
+            for widget in getattr(nested, "widgets", []):
+                self._attach_widget(widget)
 
     def addStretch(self, stretch: int) -> None:
         self.stretches.append(stretch)
+
+    def _attach_widget(self, widget: Any) -> None:
+        if self.parent is not None and widget not in self.parent.children:
+            self.parent.children.append(widget)
 
 
 class FakeHBoxLayout(FakeVBoxLayout):
@@ -188,8 +252,24 @@ class FakeHBoxLayout(FakeVBoxLayout):
 
 class FakeGridLayout(FakeVBoxLayout):
     def addWidget(self, widget: Any, row: int = 0, column: int = 0, *_args: Any) -> None:
-        self.parent.children.append(widget)
+        self._attach_widget(widget)
         _ = (row, column)
+
+
+class FakeFormLayout:
+    def __init__(self, parent: FakeWidget | None = None) -> None:
+        self.parent = parent
+        self.rows: list[tuple[str, Any]] = []
+        if parent is not None:
+            parent.layout = self
+
+    def setContentsMargins(self, *_args: Any) -> None:
+        return
+
+    def addRow(self, label: str, field: Any) -> None:
+        self.rows.append((label, field))
+        if self.parent is not None and field not in self.parent.children:
+            self.parent.children.append(field)
 
 
 class FakeTabWidget(FakeWidget):
@@ -200,6 +280,20 @@ class FakeTabWidget(FakeWidget):
     def addTab(self, widget: FakeWidget, title: str) -> None:
         self.tabs.append((title, widget))
         self.children.append(widget)
+
+
+class FakeStackedWidget(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.pages: list[Any] = []
+        self.current_index = 0
+
+    def addWidget(self, widget: Any) -> None:
+        self.pages.append(widget)
+        self.children.append(widget)
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.current_index = index
 
 
 class FakeSplitter(FakeWidget):
@@ -296,6 +390,7 @@ class FakeProgressBar(FakeWidget):
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
+    QLineEdit = FakeLineEdit
     QFrame = FakeQFrame
     QScrollArea = FakeQScrollArea
     QProgressBar = FakeProgressBar
@@ -307,7 +402,9 @@ class FakeQtWidgets:
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
     QGridLayout = FakeGridLayout
+    QFormLayout = FakeFormLayout
     QTabWidget = FakeTabWidget
+    QStackedWidget = FakeStackedWidget
     QSplitter = FakeSplitter
     QSizePolicy = FakeSizePolicy
     Qt = FakeQt
@@ -408,6 +505,9 @@ def test_main_widget_contains_tabbed_shell():
     widget = main_window.build_main_widget(FakeQtWidgets)
 
     _find(widget, main_window.PANEL_HEADER_OBJECT_NAME)
+    _find(widget, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
+    stack = _find(widget, main_window.PANEL_BODY_STACK_OBJECT_NAME)
+    assert len(stack.pages) == 2
     tabs = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME)
     assert tabs.object_name == main_window.TAB_WIDGET_OBJECT_NAME
     assert [title for title, _tab in tabs.tabs] == [
@@ -504,11 +604,14 @@ def test_update_severity_count_indicators_sets_colored_summary_labels():
     )
 
 
-def test_panel_header_includes_version():
+def test_panel_header_includes_version_and_settings_gear():
     header = main_window.build_panel_header(FakeQtWidgets, version="0.3.0")
+    title = _find(header, main_window.PANEL_HEADER_TITLE_OBJECT_NAME)
+    gear = _find(header, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
 
-    assert "Maya Shader Health Inspector" in header.text
-    assert "v0.3.0" in header.text
+    assert "Maya Shader Health Inspector" in title.text
+    assert "v0.3.0" in title.text
+    assert gear.tooltip == "Open settings"
 
 
 def _find(widget: Any, object_name: str) -> Any:
