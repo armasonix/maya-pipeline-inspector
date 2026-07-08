@@ -252,8 +252,25 @@ Commit these artifacts when the scene is ready:
 
 ```text
 examples/broken_scene/shader_health_demo_broken.ma
+examples/broken_scene/shader_health_demo_broken_headless.ma
 examples/broken_scene/textures/*
 examples/broken_scene/README.md
 ```
 
-Optional report artifacts can be kept for README screenshots or release documentation, but avoid committing noisy machine-specific absolute paths unless they are sanitized.
+Optional **curated** report artifacts for README screenshots (regenerate after rule-pack changes):
+
+```text
+examples/broken_scene/shader_health_demo_broken_shader_health_report.html
+examples/broken_scene/shader_health_demo_broken_shader_health_report.json
+examples/broken_scene/shader_health_demo_broken_shader_health_manifest.json
+```
+
+Do **not** commit machine-local outputs (covered by `.gitignore`):
+
+```text
+examples/broken_scene/*.shader_health_fix_audit.json
+examples/broken_scene/*_shader_health_manifest_diff.*
+examples/broken_scene/*_shader_health_deadline_command.txt
+examples/broken_scene/*_fixed.ma
+examples/broken_scene/reports/
+```

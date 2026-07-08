@@ -4,7 +4,7 @@ Production material QA framework for Maya pipelines.
 
 Built to prevent render-time material failures by detecting missing textures, outdated maps, wrong color space, broken UDIMs, unsafe paths, displacement risk, and renderer-specific shader issues before assets reach publish or the render farm.
 
-**Status:** **v0.3.0 shipped** (2026-07-07) — pipeline automation: manifest 1.1, graph fingerprint, manifest gates, headless apply-fixes, resolution budgets  
+**Status:** **v0.4.0 shipped** (2026-07-08) — GUI-first Farm tab, Deadline 10 on-prem integration, render-risk depth, studio settings  
 **Primary DCC:** Autodesk Maya  
 **Initial renderer targets:** Common Maya, V-Ray, Arnold  
 **Future renderer targets:** RenderMan, Redshift, USD / MaterialX
@@ -116,6 +116,18 @@ Intentional issue categories:
 
 Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_scene/README.md)
 
+## Current capabilities (v0.4)
+
+- Everything in v0.3, plus:
+- **Deadline 10 on-prem** integration package + **Farm** tab (connection status, preflight, CommandScript submit).
+- **Settings** screen with studio config (`shader_health_studio.json`): **Require .tx** and **Thinkbox Deadline** connector (**Remote Farm** toggle).
+- Expanded render-risk rules: displacement depth, optimized texture / `.tx` policy, duplicate materials/textures.
+- Native `.mll` plugin Phase 1 (CMake + ADR 0006); Python plug-in fallback unchanged.
+- Maya integration CI smoke on self-hosted runners (`workflow_dispatch`).
+- UX Wave 1: double-click issue → select node, Issue Details layout polish, GUI-first philosophy ([ADR 0005](docs/adr/0005-gui-first-product-philosophy.md)).
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.4.0 release notes.
+
 ## Current capabilities (v0.3)
 
 - Everything in v0.2, plus:
@@ -149,7 +161,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.2.0 release notes.
 - Dockable Maya panel with issue table, filters, details, and safe fix queue.
 - Headless validation command and Deadline preflight example.
 
-Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.3 plan completed in [`docs/V0_3_DEVELOPMENT_PLAN.md`](docs/V0_3_DEVELOPMENT_PLAN.md)
+Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.4 shipped · v0.3 plan in [`docs/V0_3_DEVELOPMENT_PLAN.md`](docs/V0_3_DEVELOPMENT_PLAN.md)
 
 ## Install in Maya
 

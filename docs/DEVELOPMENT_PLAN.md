@@ -1,6 +1,6 @@
 # Maya Shader Health Inspector — Production Development Plan
 
-> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4+** — see [§27](#27-roadmap). v0.3 detail: [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md) (Milestones 15–21, Issues #071–#090).
+> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4.0 shipped** (2026-07-08). **v0.5+** — see [§27](#27-roadmap). v0.3 detail: [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md) (Milestones 15–21, Issues #071–#090).
 
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
 **Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
@@ -2157,16 +2157,20 @@ Delivered (Milestones 15–21, Issues #071–#090):
 - Compare to Approved Manifest UI shortcut, `shader_health manifest` CLI, Maya CI manifest smoke.
 - Headless CLI hardening: `mayapy` standalone init, `shader_health.util.paths`, `ci_headless` profile fix.
 
-### v0.4 — Optimization and Render Risk (remaining)
+### v0.4 — GUI-First Farm Integration & Render Risk Depth (shipped)
 
-**Theme:** Cost and farm-risk controls beyond basic v0.1 checks.
+**Tag:** `v0.4.0` (2026-07-08)
 
-- Shader complexity budget profiler expansion.
-- Displacement risk analyzer depth.
-- Optimized texture / TX / tiled-texture policy enforcement.
-- Duplicate material detector at scale.
+Delivered (Milestones 23–28, Issues #119–#145):
 
-v0.1 shipped baseline complexity, displacement, and optimized-texture **rules**; v0.4 focuses on expanded policy depth and budgets.
+- ADR 0005 (GUI-first) and v0.4 UX audit backlog.
+- Maya integration CI activation on self-hosted runners.
+- Native `.mll` plugin Phase 1 (ADR 0006, CMake scaffolding).
+- Deadline 10 on-prem package: config, REST client, eligibility, CommandScript submit.
+- Farm tab, menu/shelf farm check shortcuts, Deadline studio guide.
+- Render-risk depth: displacement enrichment, optimized texture / `.tx` rules, duplicate material/texture detection.
+- Settings screen, `shader_health_studio.json`, Require `.tx` toggle, Thinkbox Deadline connector (Remote Farm ↔ Farm tab).
+- UX Wave 1: Issue Details polish, double-click select node, splitter persistence.
 
 ### v0.5 — Rule Authoring and Incident Workflow
 

@@ -53,6 +53,13 @@ debug-*.log
 *.shader_health_waivers.json
 *.shader_health_fix_audit.json
 
+# Local/generated demo scene outputs (keep committed report/manifest samples only)
+examples/broken_scene/*.shader_health_fix_audit.json
+examples/broken_scene/*_shader_health_manifest_diff.*
+examples/broken_scene/*_shader_health_deadline_command.txt
+examples/broken_scene/*_fixed.ma
+examples/broken_scene/reports/
+
 # Maya runtime / temporary files
 *.mayaSwatches/
 **/.vrayThumbs/

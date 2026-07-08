@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
 
-Status: **v0.3.0 shipped** (2026-07-07). **v0.4 in progress** — see [CHANGELOG.md](../CHANGELOG.md). See [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md) for the shipped v0.3 cycle.
+Status: **v0.4.0 shipped** (2026-07-08). See [CHANGELOG.md](../CHANGELOG.md). v0.3 cycle: [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md).
 
 Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
 
