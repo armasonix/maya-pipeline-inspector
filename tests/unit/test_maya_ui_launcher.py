@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import Any, Optional
 
 from shader_health.maya import ui_launcher
+from shader_health.ui import main_window
 
 
 class FakePanel:
@@ -121,3 +122,153 @@ def test_close_panel_deletes_workspace_control(monkeypatch: Any):
     assert cmds.deleted == [(ui_launcher.WORKSPACE_CONTROL_NAME, {"control": True})]
     assert panel.closed is True
     assert ui_launcher._PANEL is None
+
+
+def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
+    content = SimpleNamespace(_shader_health_validate_running=False)
+    calls: list[str] = []
+
+    class FakeCmds:
+        def __init__(self) -> None:
+            self.deferred: list[Any] = []
+
+        def evalDeferred(self, fn: Any, lowestPriority: bool = True) -> None:
+            _ = lowestPriority
+            self.deferred.append(fn)
+
+    cmds = FakeCmds()
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(
+        ui_launcher,
+        "_set_validate_busy_state",
+        lambda *_args, **_kwargs: calls.append("busy"),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_run_validation_job",
+        lambda *_args, **_kwargs: calls.append("run"),
+    )
+
+    ui_launcher._schedule_ui_validation(content, object(), scan_scope="scene")
+
+    assert len(cmds.deferred) == 1
+    cmds.deferred[0]()
+    assert calls == ["busy", "run", "busy"]
+    assert content._shader_health_validate_running is False
+
+
+def test_update_severity_filter_options_restores_saved_preference(monkeypatch: Any):
+    from shader_health.ui.issues_triage import IssueFilterPrefs, write_issue_filter_prefs
+
+    class FakeCombo:
+        def __init__(self) -> None:
+            self.items: list[str] = []
+            self.current = ""
+
+        def blockSignals(self, _enabled: bool) -> None:
+            return
+
+        def clear(self) -> None:
+            self.items.clear()
+
+        def addItems(self, items: list[str]) -> None:
+            self.items.extend(items)
+
+        def setCurrentText(self, text: str) -> None:
+            self.current = text
+
+    content = SimpleNamespace()
+    write_issue_filter_prefs(
+        content,
+        IssueFilterPrefs(severity="critical"),
+    )
+    combo = FakeCombo()
+    monkeypatch.setattr(
+        ui_launcher,
+        "_find_child",
+        lambda _content, _qt, name: (
+            combo if name == main_window.ISSUES_SEVERITY_FILTER_OBJECT_NAME else None
+        ),
+    )
+
+    class FakeQt:
+        QComboBox = object
+
+    ui_launcher._update_severity_filter_options(
+        content,
+        FakeQt(),
+        (
+            main_window.IssueTableRow(
+                severity="critical",
+                material="Hero",
+                node="file1",
+                issue="Missing",
+                owner="lookdev",
+                rule="missing_texture",
+            ),
+        ),
+    )
+
+    assert combo.current == "critical"
+
+
+class FakeSignal:
+    def __init__(self) -> None:
+        self.handlers: list[Any] = []
+
+    def connect(self, handler: Any) -> None:
+        self.handlers.append(handler)
+
+    def emit(self, *args: Any) -> None:
+        for handler in self.handlers:
+            handler(*args)
+
+
+class FakeSplitter:
+    def __init__(self) -> None:
+        self.object_name = main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME
+        self._sizes = [640, 187]
+        self.applied_sizes: list[list[int]] = []
+        self.splitterMoved = FakeSignal()
+
+    def setObjectName(self, object_name: str) -> None:
+        self.object_name = object_name
+
+    def sizes(self) -> list[int]:
+        return list(self._sizes)
+
+    def setSizes(self, sizes: list[int]) -> None:
+        self.applied_sizes.append([int(size) for size in sizes])
+        self._sizes = [int(size) for size in sizes]
+
+
+class FakeContent:
+    def __init__(self, splitter: FakeSplitter) -> None:
+        self.splitter = splitter
+
+    def findChild(self, widget_type: Any, object_name: str) -> Any:
+        _ = widget_type
+        if object_name == main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME:
+            return self.splitter
+        return None
+
+
+def test_validate_splitter_persistence_restores_saved_sizes():
+    splitter = FakeSplitter()
+    content = FakeContent(splitter)
+
+    setattr(content, ui_launcher.VALIDATE_SPLITTER_SIZES_ATTR, (700, 200))
+    ui_launcher._wire_validate_splitter_persistence(content, SimpleNamespace(QWidget=object))
+
+    assert splitter.applied_sizes == [[700, 200]]
+
+
+def test_validate_splitter_persistence_saves_sizes_on_move():
+    splitter = FakeSplitter()
+    content = FakeContent(splitter)
+
+    ui_launcher._wire_validate_splitter_persistence(content, SimpleNamespace(QWidget=object))
+    splitter._sizes = [650, 210]
+    splitter.splitterMoved.emit()
+
+    assert getattr(content, ui_launcher.VALIDATE_SPLITTER_SIZES_ATTR) == (650, 210)

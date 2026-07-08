@@ -1,9 +1,18 @@
 """Maya dockable panel launcher."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Optional
 
+from shader_health.studio_config import (
+    STUDIO_CONFIG_FILENAME,
+    PipelineSettings,
+    StudioConfig,
+    load_studio_config,
+    resolve_deadline_config,
+    save_studio_config,
+)
 from shader_health.ui import main_window
 from shader_health.ui.farm_tab import (
     FARM_STATUS_LABEL_OBJECT_NAME,
@@ -27,7 +36,18 @@ from shader_health.ui.fix_queue import (
     selected_fix_rows,
     update_risky_confirmation_label,
 )
+from shader_health.ui.issues_triage import (
+    apply_combo_preference,
+    read_issue_filter_prefs,
+    read_issue_filter_prefs_from_widgets,
+)
 from shader_health.ui.qt import load_qt_widgets
+from shader_health.ui.settings_panel import (
+    SETTINGS_VIEW_OBJECT_NAME,
+    SettingsActionCallbacks,
+    read_connectors_from_settings_view,
+    update_settings_view,
+)
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
     WAIVER_TABLE_OBJECT_NAME,
@@ -38,6 +58,9 @@ from shader_health.ui.waiver_manager import (
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 DEFAULT_DOCK_AREA = "right"
+
+VALIDATE_SPLITTER_SIZES_ATTR = "_shader_health_validate_splitter_sizes"
+STUDIO_CONFIG_ATTR = "_shader_health_studio_config"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -118,6 +141,7 @@ def _create_dockable_panel() -> Any:
 
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        studio_config = StudioConfig.default()
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
@@ -126,13 +150,21 @@ def _create_dockable_panel() -> Any:
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
             waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
             farm_callbacks=_farm_action_callbacks(panel_state, qt_widgets),
+            settings_callbacks=_settings_action_callbacks(panel_state, qt_widgets),
+            navigation_callbacks=_panel_navigation_callbacks(panel_state, qt_widgets),
+            studio_config=studio_config,
         )
         panel_state["content"] = content
         self._shader_health_content = content
+        setattr(content, STUDIO_CONFIG_ATTR, studio_config)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
+        _wire_validate_shortcuts(content, qt_widgets, panel_state)
+        _wire_validate_tab_focus(content, qt_widgets)
+        _wire_validate_splitter_persistence(content, qt_widgets)
+        _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
@@ -143,6 +175,231 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _panel_navigation_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> main_window.PanelNavigationCallbacks:
+    return main_window.PanelNavigationCallbacks(
+        on_open_settings=lambda: _set_panel_view(
+            _panel_content(panel_state),
+            qt_widgets,
+            settings=True,
+        ),
+    )
+
+
+def _settings_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> SettingsActionCallbacks:
+    return SettingsActionCallbacks(
+        on_back=lambda: _set_panel_view(_panel_content(panel_state), qt_widgets, settings=False),
+        on_require_tx_changed=lambda enabled: _set_require_tx_derivatives(
+            _panel_content(panel_state),
+            qt_widgets,
+            enabled,
+        ),
+        on_deadline_enabled_changed=lambda enabled: _set_deadline_connector_enabled(
+            _panel_content(panel_state),
+            qt_widgets,
+            enabled,
+        ),
+        on_deadline_settings_changed=lambda: _sync_deadline_connector_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_save_settings=lambda: _save_studio_settings_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_load_settings=lambda: _load_studio_settings_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
+
+
+def _studio_config_for_content(content: Any) -> StudioConfig:
+    config = getattr(content, STUDIO_CONFIG_ATTR, None)
+    if isinstance(config, StudioConfig):
+        return config
+    return StudioConfig.default()
+
+
+def _deadline_config_for_content(content: Any) -> Any:
+    return resolve_deadline_config(_studio_config_for_content(content))
+
+
+def _disabled_farm_tab_state() -> FarmTabState:
+    return FarmTabState(
+        integration_enabled=False,
+        connection_status="disabled",
+        connection_reachable=False,
+        status_message=(
+            "Remote farm connector is disabled. Enable Thinkbox Deadline under "
+            "Settings → Connectors → Remote Farm."
+        ),
+    )
+
+
+def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> None:
+    setattr(content, STUDIO_CONFIG_ATTR, config)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is not None:
+        update_settings_view(settings_view, qt_widgets, config=config)
+
+
+def _set_panel_view(content: Any, qt_widgets: Any, *, settings: bool) -> None:
+    stack = _find_child(
+        content,
+        qt_widgets.QStackedWidget,
+        main_window.PANEL_BODY_STACK_OBJECT_NAME,
+    )
+    if stack is None:
+        return
+    set_current = getattr(stack, "setCurrentIndex", None)
+    if set_current is not None:
+        set_current(main_window.SETTINGS_VIEW_INDEX if settings else 0)
+
+
+def _set_require_tx_derivatives(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    current = _studio_config_for_content(content)
+    updated = current.with_updates(
+        pipeline=PipelineSettings(require_tx_derivatives=enabled),
+    )
+    _set_studio_config(content, qt_widgets, updated)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        (
+            "Pipeline updated: .tx derivative checks are "
+            f"{'enabled' if enabled else 'disabled'} for this session."
+        ),
+    )
+
+
+def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    connectors = read_connectors_from_settings_view(settings_view, qt_widgets)
+    updated = current.with_updates(connectors=connectors)
+    _set_studio_config(content, qt_widgets, updated)
+    _refresh_farm_tab(content, qt_widgets)
+
+
+def _set_deadline_connector_enabled(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    _sync_deadline_connector_from_ui(content, qt_widgets)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        (
+            "Thinkbox Deadline connector "
+            f"{'enabled' if enabled else 'disabled'} for this session."
+        ),
+    )
+
+
+def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    _sync_deadline_connector_from_ui(content, qt_widgets)
+    config = _studio_config_for_content(content)
+    path = _pick_settings_save_path(qt_widgets, config.config_path)
+    if path is None:
+        return
+    try:
+        saved_path = save_studio_config(path, config.with_updates(config_path=path))
+    except OSError as exc:
+        _set_settings_status(content, qt_widgets, f"Save failed: {exc}")
+        return
+    _set_studio_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Studio settings saved to {saved_path}. "
+        "Point other machines at this file via Load Settings or "
+        f"SHADER_HEALTH_STUDIO_CONFIG.",
+    )
+
+
+def _load_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    path = _pick_settings_load_path(qt_widgets)
+    if path is None:
+        return
+    try:
+        loaded = load_studio_config(path)
+    except (OSError, ValueError) as exc:
+        _set_settings_status(content, qt_widgets, f"Load failed: {exc}")
+        return
+    _set_studio_config(content, qt_widgets, loaded)
+    _refresh_farm_tab(content, qt_widgets)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Loaded studio settings from {path}. Validation now follows this config.",
+    )
+
+
+def _set_settings_status(content: Any, qt_widgets: Any, message: str) -> None:
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    update_settings_view(
+        settings_view,
+        qt_widgets,
+        config=_studio_config_for_content(content),
+        status_message=message,
+    )
+
+
+def _pick_settings_save_path(qt_widgets: Any, current_path: Path | None) -> Path | None:
+    file_dialog = getattr(qt_widgets, "QFileDialog", None)
+    if file_dialog is None:
+        return current_path or _default_studio_config_path()
+    get_save = getattr(file_dialog, "getSaveFileName", None)
+    if get_save is None:
+        return current_path or _default_studio_config_path()
+    default_dir = str(current_path.parent if current_path else _default_studio_config_path().parent)
+    default_name = current_path.name if current_path else STUDIO_CONFIG_FILENAME
+    selected, _filter = get_save(
+        None,
+        "Save Studio Settings",
+        str(Path(default_dir) / default_name),
+        "Shader Health Studio (*.json);;All Files (*)",
+    )
+    if not selected:
+        return None
+    path = Path(selected)
+    if path.suffix.lower() != ".json":
+        path = path.with_suffix(".json")
+    return path
+
+
+def _pick_settings_load_path(qt_widgets: Any) -> Path | None:
+    file_dialog = getattr(qt_widgets, "QFileDialog", None)
+    if file_dialog is None:
+        discovered = StudioConfig.default().config_path
+        return discovered
+    get_open = getattr(file_dialog, "getOpenFileName", None)
+    if get_open is None:
+        return StudioConfig.default().config_path
+    env_path = os.environ.get("SHADER_HEALTH_STUDIO_CONFIG", "").strip()
+    start_dir = env_path or str(_default_studio_config_path().parent)
+    selected, _filter = get_open(
+        None,
+        "Load Studio Settings",
+        start_dir,
+        "Shader Health Studio (*.json);;All Files (*)",
+    )
+    if not selected:
+        return None
+    return Path(selected)
+
+
+def _default_studio_config_path() -> Path:
+    return Path.home() / ".shader_health" / STUDIO_CONFIG_FILENAME
 
 
 def _waiver_manager_callbacks(
@@ -193,10 +450,6 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_manifest_diff=_export_manifest_diff_from_ui,
         on_compare_approved_manifest=_compare_approved_manifest_from_ui,
         on_compare_after_fixes=_compare_after_fixes_from_ui,
-        on_manifest_gate=lambda: _manifest_gate_from_ui(
-            _active_panel_content(),
-            load_qt_widgets(),
-        ),
     )
 
 
@@ -412,24 +665,88 @@ def _farm_action_callbacks(
 
 
 def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None:
+    _schedule_ui_validation(content, qt_widgets, scan_scope=scan_scope)
+
+
+def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
+    _schedule_ui_validation(
+        content,
+        qt_widgets,
+        scan_scope="scene",
+        profile_id="publish_strict",
+        post_validate=_finish_publish_preflight,
+    )
+
+
+def _schedule_ui_validation(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    scan_scope: str,
+    profile_id: Optional[str] = None,
+    post_validate: Optional[Any] = None,
+) -> None:
+    if getattr(content, "_shader_health_validate_running", False):
+        return
+
+    content._shader_health_validate_running = True
+    busy_message = (
+        "Validating selection..."
+        if scan_scope == "selection"
+        else "Validating scene..."
+    )
+    _set_validate_busy_state(content, qt_widgets, busy=True, status_message=busy_message)
+
+    def _job() -> None:
+        try:
+            _run_validation_job(
+                content,
+                qt_widgets,
+                scan_scope=scan_scope,
+                profile_id=profile_id,
+                post_validate=post_validate,
+            )
+        finally:
+            content._shader_health_validate_running = False
+            _set_validate_busy_state(content, qt_widgets, busy=False)
+
+    cmds = _maya_cmds()
+    eval_deferred = getattr(cmds, "evalDeferred", None)
+    if eval_deferred is not None:
+        eval_deferred(_job, lowestPriority=True)
+    else:
+        _job()
+
+
+def _run_validation_job(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    scan_scope: str,
+    profile_id: Optional[str] = None,
+    post_validate: Optional[Any] = None,
+) -> None:
     try:
         from shader_health.maya.commands import validate_scene_action, validate_selection_action
 
-        profile_id = _selected_workflow_profile_id(content, qt_widgets)
+        selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
+        studio_config = _studio_config_for_content(content)
         if scan_scope == "selection":
             result = validate_selection_action(
-                profile_id=profile_id,
+                profile_id=selected_profile,
                 asset_class_id=asset_class_id,
+                studio_config=studio_config,
             )
         else:
             result = validate_scene_action(
-                profile_id=profile_id,
+                profile_id=selected_profile,
                 asset_class_id=asset_class_id,
+                studio_config=studio_config,
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
-        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", message)
+        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
         print(message)
         return
 
@@ -440,36 +757,14 @@ def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None
 
     content._shader_health_scan_scope = scan_scope
     _populate_validation_result(content, qt_widgets, result)
-    print(result.message)
-
-
-def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
-    try:
-        from shader_health.maya.commands import validate_scene_action
-
-        asset_class_id = _selected_asset_class_id(content, qt_widgets)
-        result = validate_scene_action(
-            profile_id="publish_strict",
-            asset_class_id=asset_class_id,
-        )
-    except Exception as exc:  # noqa: BLE001
-        message = f"Publish preflight failed: {exc}"
-        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
-        print(message)
-        return
-
-    if not getattr(result, "succeeded", True):
-        _set_label_text(
-            content,
-            qt_widgets,
-            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
-            result.message,
-        )
+    _update_validation_chrome_labels(content, qt_widgets, result)
+    if post_validate is not None:
+        post_validate(content, qt_widgets, result)
+    else:
         print(result.message)
-        return
 
-    content._shader_health_scan_scope = "scene"
-    _populate_validation_result(content, qt_widgets, result)
+
+def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:
     summary = getattr(result, "summary", None)
     block_publish = bool(getattr(summary, "block_publish", False)) if summary else False
     block_deadline = bool(getattr(summary, "block_deadline", False)) if summary else False
@@ -481,14 +776,69 @@ def _publish_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
         f"Publish Block: {_yes_no(block_publish)}. Deadline Block: {_yes_no(block_deadline)}."
     )
     _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
-    _show_information_dialog(qt_widgets, "Publish Preflight", message)
     print(message)
+
+
+def _set_validate_busy_state(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    busy: bool,
+    status_message: str = "",
+) -> None:
+    progress = _find_child(
+        content,
+        qt_widgets.QProgressBar,
+        main_window.VALIDATE_PROGRESS_BAR_OBJECT_NAME,
+    )
+    if progress is not None:
+        set_visible = getattr(progress, "setVisible", None)
+        if set_visible is not None:
+            set_visible(busy)
+
+    if status_message:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            status_message,
+        )
+
+    for object_name in (
+        main_window.VALIDATE_SCENE_BUTTON_OBJECT_NAME,
+        main_window.VALIDATE_SELECTION_BUTTON_OBJECT_NAME,
+        main_window.VALIDATE_PUBLISH_PREFLIGHT_BUTTON_OBJECT_NAME,
+    ):
+        button = _find_child(content, qt_widgets.QPushButton, object_name)
+        if button is not None:
+            set_enabled = getattr(button, "setEnabled", None)
+            if set_enabled is not None:
+                set_enabled(not busy)
+
+    app_class = getattr(qt_widgets, "QApplication", None)
+    if app_class is None:
+        return
+    instance = getattr(app_class, "instance", lambda: None)()
+    if instance is None:
+        return
+    set_override = getattr(instance, "setOverrideCursor", None)
+    restore_override = getattr(instance, "restoreOverrideCursor", None)
+    qt_module = getattr(qt_widgets, "Qt", None)
+    wait_cursor = getattr(qt_module, "WaitCursor", None) if qt_module is not None else None
+    if busy and set_override is not None and wait_cursor is not None:
+        set_override(wait_cursor)
+    elif not busy and restore_override is not None:
+        restore_override()
 
 
 def _refresh_farm_connection_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya.farm_actions import check_deadline_connection
 
-    tab_state = check_deadline_connection()
+    config = _deadline_config_for_content(content)
+    if config is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
+        return
+    tab_state = check_deadline_connection(config)
     _apply_farm_tab_state(content, qt_widgets, tab_state)
 
 
@@ -504,11 +854,21 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
 
+    if _deadline_config_for_content(content) is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
+        _show_information_dialog(
+            qt_widgets,
+            "Farm Preflight",
+            _disabled_farm_tab_state().status_message,
+        )
+        return
+
     try:
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         validation = validate_scene_action(
             profile_id="deadline_critical",
             asset_class_id=asset_class_id,
+            studio_config=_studio_config_for_content(content),
         )
     except Exception as exc:  # noqa: BLE001
         message = f"Farm preflight failed: {exc}"
@@ -523,10 +883,12 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
 
     content._shader_health_scan_scope = "scene"
     _populate_validation_result(content, qt_widgets, validation)
+    _update_validation_chrome_labels(content, qt_widgets, validation)
     connection_state = getattr(content, "_shader_health_farm_tab_state", None)
     result = run_farm_preflight_action(
         summary=getattr(validation, "summary", None),
         scene_state=collect_farm_scene_state(),
+        config=_deadline_config_for_content(content),
         connection_state=connection_state,
         last_job_id=getattr(content, "_shader_health_farm_last_job_id", ""),
     )
@@ -550,6 +912,15 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
 
+    if _deadline_config_for_content(content) is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
+        _show_information_dialog(
+            qt_widgets,
+            "Submit to Farm",
+            _disabled_farm_tab_state().status_message,
+        )
+        return
+
     scene_path = getattr(content, "_shader_health_scene_path", "") or _current_scene_path()
     summary = getattr(content, "_shader_health_summary", None)
     validation_result = (
@@ -560,6 +931,7 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
         scene_path=scene_path,
         scene_state=collect_farm_scene_state(),
         validation_result=validation_result,
+        config=_deadline_config_for_content(content),
         connection_state=connection_state,
     )
     _apply_farm_tab_state(content, qt_widgets, result.tab_state)
@@ -573,11 +945,11 @@ def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
 
     if content is None:
         return
-    stored = getattr(content, "_shader_health_farm_tab_state", None)
-    if isinstance(stored, FarmTabState):
-        _apply_farm_tab_state(content, qt_widgets, stored)
+    config = _deadline_config_for_content(content)
+    if config is None:
+        _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
         return
-    _apply_farm_tab_state(content, qt_widgets, check_deadline_connection())
+    _apply_farm_tab_state(content, qt_widgets, check_deadline_connection(config))
 
 
 def _apply_farm_tab_state(content: Any, qt_widgets: Any, tab_state: FarmTabState) -> None:
@@ -596,6 +968,7 @@ def _set_farm_status(content: Any, qt_widgets: Any, message: str) -> None:
             content,
             qt_widgets,
             FarmTabState(
+                integration_enabled=stored.integration_enabled,
                 api_url=stored.api_url,
                 connection_status=stored.connection_status,
                 connection_reachable=stored.connection_reachable,
@@ -777,9 +1150,19 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
         else:
             return
     except Exception as exc:  # noqa: BLE001
-        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", str(exc))
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            str(exc),
+        )
         return
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        result.message,
+    )
 
 
 def _issue_path(issue: Any) -> str:
@@ -806,9 +1189,19 @@ def _waive_selected_issue_from_ui(content: Any, qt_widgets: Any) -> None:
             reason="Approved from Maya Shader Health Inspector UI.",
         )
     except Exception as exc:  # noqa: BLE001
-        _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", str(exc))
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            str(exc),
+        )
         return
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", result.message)
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        result.message,
+    )
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -919,25 +1312,19 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         main_window.HEALTH_SCORE_LABEL_OBJECT_NAME,
         f"Health: {health.score} / 100",
     )
-    _set_label_text(
+    main_window.update_severity_count_indicators(
         content,
         qt_widgets,
-        main_window.SEVERITY_COUNTS_LABEL_OBJECT_NAME,
-        (
-            f"Critical: {health.critical}   "
-            f"Error: {health.error}   "
-            f"Warning: {health.warning}   "
-            f"Info: {health.info}"
-        ),
+        critical_count=int(health.critical),
+        error_count=int(health.error),
+        warning_count=int(health.warning),
+        info_count=int(health.info),
     )
-    _set_label_text(
+    main_window.update_block_status_indicators(
         content,
         qt_widgets,
-        main_window.BLOCK_STATUS_LABEL_OBJECT_NAME,
-        (
-            f"Publish Block: {_yes_no(health.block_publish)}   "
-            f"Deadline Block: {_yes_no(health.block_deadline)}"
-        ),
+        block_publish=bool(health.block_publish),
+        block_deadline=bool(health.block_deadline),
     )
     description = result.message
     snapshot = (
@@ -947,7 +1334,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
     asset_class_id = _selected_asset_class_id(content, qt_widgets)
     if snapshot is not None:
         description += _resolution_probe_hint(snapshot, asset_class_id)
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", description)
+    _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, description)
 
     failed_results = tuple(item for item in result.results if item.status == "failed")
     rows = tuple(_issue_row_from_result(item) for item in failed_results)
@@ -960,6 +1347,7 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
 
     _update_severity_filter_options(content, qt_widgets, rows)
     _update_owner_filter_options(content, qt_widgets, rows)
+    _restore_issue_filter_controls(content, qt_widgets)
     _refresh_issues_table_view(content, qt_widgets)
 
     display_results = getattr(
@@ -988,6 +1376,7 @@ def _update_severity_filter_options(
     if block_signals is not None:
         block_signals(True)
     try:
+        prefs = read_issue_filter_prefs(content)
         options = list(main_window.severity_filter_options(rows))
         clear = getattr(severity_filter, "clear", None)
         if clear is not None:
@@ -995,9 +1384,12 @@ def _update_severity_filter_options(
         add_items = getattr(severity_filter, "addItems", None)
         if add_items is not None:
             add_items(options)
-        set_current = getattr(severity_filter, "setCurrentText", None)
-        if set_current is not None and options:
-            set_current(options[0])
+        apply_combo_preference(
+            severity_filter,
+            options,
+            prefs.severity,
+            fallback=main_window.ALL_SEVERITIES_LABEL,
+        )
     finally:
         if block_signals is not None:
             block_signals(False)
@@ -1020,6 +1412,7 @@ def _update_owner_filter_options(
     if block_signals is not None:
         block_signals(True)
     try:
+        prefs = read_issue_filter_prefs(content)
         options = list(main_window.owner_filter_options(rows))
         clear = getattr(owner_filter, "clear", None)
         if clear is not None:
@@ -1027,9 +1420,12 @@ def _update_owner_filter_options(
         add_items = getattr(owner_filter, "addItems", None)
         if add_items is not None:
             add_items(options)
-        set_current = getattr(owner_filter, "setCurrentText", None)
-        if set_current is not None and options:
-            set_current(options[0])
+        apply_combo_preference(
+            owner_filter,
+            options,
+            prefs.owner,
+            fallback=main_window.ALL_OWNERS_LABEL,
+        )
     finally:
         if block_signals is not None:
             block_signals(False)
@@ -1101,6 +1497,36 @@ def _refresh_fix_queue_confirmation_label(
         update_risky_confirmation_label(label, rows, selected_rows=selected_rows)
 
 
+def _restore_issue_filter_controls(content: Any, qt_widgets: Any) -> None:
+    prefs = read_issue_filter_prefs(content)
+    view_filter = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_VIEW_FILTER_OBJECT_NAME,
+    )
+    sort_dropdown = _find_child(
+        content,
+        qt_widgets.QComboBox,
+        main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME,
+    )
+    apply_combo_preference(
+        view_filter,
+        (
+            main_window.ALL_ISSUES_LABEL,
+            main_window.BLOCKING_ONLY_LABEL,
+            main_window.AUTO_FIXABLE_LABEL,
+        ),
+        prefs.view,
+        fallback=main_window.ALL_ISSUES_LABEL,
+    )
+    apply_combo_preference(
+        sort_dropdown,
+        main_window.ISSUES_SORT_KEYS,
+        prefs.sort,
+        fallback="severity",
+    )
+
+
 def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
     table = _find_child(content, qt_widgets.QTableWidget, main_window.ISSUES_TABLE_OBJECT_NAME)
     severity_filter = _find_child(
@@ -1129,26 +1555,102 @@ def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
         connect = getattr(selection_changed, "connect", None)
         if connect is not None:
             connect(lambda *_: _on_issue_row_selected(content, qt_widgets))
+        item_double_clicked = getattr(table, "itemDoubleClicked", None)
+        double_connect = getattr(item_double_clicked, "connect", None)
+        if double_connect is not None:
+            double_connect(
+                lambda item: _on_issue_row_double_clicked(
+                    content,
+                    qt_widgets,
+                    int(getattr(item, "row", lambda: -1)()),
+                )
+            )
     if severity_filter is not None:
         current_text_changed = getattr(severity_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
     if sort_dropdown is not None:
         current_text_changed = getattr(sort_dropdown, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
     if owner_filter is not None:
         current_text_changed = getattr(owner_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
     if view_filter is not None:
         current_text_changed = getattr(view_filter, "currentTextChanged", None)
         connect = getattr(current_text_changed, "connect", None)
         if connect is not None:
-            connect(lambda *_: _refresh_issues_table_view(content, qt_widgets))
+            connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
+
+
+def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
+    splitter = _find_child(
+        content,
+        qt_widgets.QWidget,
+        main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME,
+    )
+    if splitter is None:
+        return
+
+    set_sizes = getattr(splitter, "setSizes", None)
+    saved_sizes = getattr(content, VALIDATE_SPLITTER_SIZES_ATTR, None)
+    if set_sizes is not None and saved_sizes:
+        set_sizes([int(size) for size in saved_sizes])
+
+    def _persist_splitter_sizes(*_args: Any) -> None:
+        sizes_fn = getattr(splitter, "sizes", None)
+        if sizes_fn is None:
+            return
+        sizes = tuple(int(size) for size in sizes_fn())
+        if len(sizes) >= 2 and sizes[1] >= main_window.DETAILS_PANEL_MIN_WIDTH:
+            setattr(content, VALIDATE_SPLITTER_SIZES_ATTR, sizes)
+
+    splitter_moved = getattr(splitter, "splitterMoved", None)
+    connect = getattr(splitter_moved, "connect", None)
+    if connect is not None:
+        connect(_persist_splitter_sizes)
+
+
+def _wire_validate_tab_focus(content: Any, qt_widgets: Any) -> None:
+    tab_widget = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
+    if tab_widget is None:
+        return
+    current_changed = getattr(tab_widget, "currentChanged", None)
+    connect = getattr(current_changed, "connect", None)
+    if connect is not None:
+        connect(lambda index: _on_validate_tab_focused(content, qt_widgets, int(index)))
+
+
+def _on_validate_tab_focused(content: Any, qt_widgets: Any, tab_index: int) -> None:
+    if tab_index != 0:
+        return
+    if not getattr(content, "_shader_health_issue_rows", ()):
+        return
+    _restore_issue_filter_controls(content, qt_widgets)
+    _refresh_issues_table_view(content, qt_widgets)
+
+
+def _on_issue_filters_changed(content: Any, qt_widgets: Any) -> None:
+    read_issue_filter_prefs_from_widgets(content, qt_widgets, find_child=_find_child)
+    _refresh_issues_table_view(content, qt_widgets)
+
+
+def _on_issue_row_double_clicked(content: Any, qt_widgets: Any, row_index: int) -> None:
+    display_results = getattr(
+        content,
+        "_shader_health_display_failed_results",
+        getattr(content, "_shader_health_failed_results", ()),
+    )
+    if row_index < 0 or row_index >= len(display_results):
+        return
+    issue = display_results[row_index]
+    content._shader_health_selected_issue = issue
+    _populate_issue_details(content, qt_widgets, issue)
+    _run_navigation_action(content, qt_widgets, "select_node")
 
 
 def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
@@ -1230,7 +1732,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             "No fixes selected. Check rows in the Select column on the Fixes tab first.",
         )
         return
@@ -1239,7 +1741,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             blocked_message
             or "Selected fixes are blocked and were not applied.",
         )
@@ -1254,7 +1756,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             "No matching fix actions found for the selected queue rows.",
         )
         return
@@ -1264,7 +1766,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
             _set_label_text(
                 content,
                 qt_widgets,
-                "shaderHealthInspectorDescription",
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
                 "High-risk fixes were not applied.",
             )
             return
@@ -1278,7 +1780,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_label_text(
         content,
         qt_widgets,
-        "shaderHealthInspectorDescription",
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(selected)),
     )
     _revalidate_with_current_scope(content, qt_widgets)
@@ -1300,7 +1802,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_label_text(
             content,
             qt_widgets,
-            "shaderHealthInspectorDescription",
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             "No safe fixes available. Referenced, locked, medium/high-risk, "
             "or unplannable fixes are skipped.",
         )
@@ -1310,7 +1812,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_label_text(
         content,
         qt_widgets,
-        "shaderHealthInspectorDescription",
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(actions)),
     )
     _revalidate_with_current_scope(content, qt_widgets)
@@ -1635,6 +2137,92 @@ def _populate_first_issue_details(
     content._shader_health_selected_issue = failed_results[0]
 
 
+def _wire_validate_shortcuts(content: Any, qt_widgets: Any, panel_state: dict[str, Any]) -> None:
+    shortcut_class = getattr(qt_widgets, "QShortcut", None)
+    key_sequence = getattr(qt_widgets, "QKeySequence", None)
+    if shortcut_class is None or key_sequence is None:
+        return
+    shortcut = shortcut_class(key_sequence("F5"), content)
+    activated = getattr(shortcut, "activated", None)
+    connect = getattr(activated, "connect", None)
+    if connect is None:
+        return
+    connect(
+        lambda: _validate_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            scan_scope="scene",
+        )
+    )
+
+
+def _update_validation_chrome_labels(content: Any, qt_widgets: Any, result: Any) -> None:
+    snapshot = getattr(result, "snapshot", None)
+    scene_path = getattr(snapshot, "scene_path", "") if snapshot else ""
+    scanned_at_utc = getattr(snapshot, "scanned_at_utc", "") if snapshot else ""
+    scan_scope = getattr(content, "_shader_health_scan_scope", "scene")
+    profile_id = getattr(result, "profile_id", "") or _selected_workflow_profile_id(
+        content,
+        qt_widgets,
+    )
+    asset_class_id = getattr(result, "asset_class_id", "") or _selected_asset_class_id(
+        content,
+        qt_widgets,
+    )
+
+    content._shader_health_last_validated_at = scanned_at_utc
+    content._shader_health_scene_path = scene_path
+
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SCENE_NAME_LABEL_OBJECT_NAME,
+        main_window.format_scene_display_name(scene_path),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.PROFILE_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_profile_chip_text(
+            main_window.profile_display_name(profile_id),
+            profile_id,
+        ),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.ASSET_CLASS_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_asset_class_chip_text(
+            main_window.asset_class_display_name(asset_class_id),
+        ),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.LAST_VALIDATED_LABEL_OBJECT_NAME,
+        main_window.format_last_validated_display(scanned_at_utc),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SCAN_SCOPE_LABEL_OBJECT_NAME,
+        main_window.format_scan_scope_display(scan_scope),
+    )
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(
+            scene_path=scene_path,
+            scanned_at_utc=scanned_at_utc,
+            scan_scope=scan_scope,
+        ),
+    )
+
+
+def _set_reports_status_label(content: Any, qt_widgets: Any, message: str) -> None:
+    _set_label_text(content, qt_widgets, main_window.REPORTS_STATUS_LABEL_OBJECT_NAME, message)
+
+
 def _wire_scene_change_reset(content: Any, qt_widgets: Any) -> None:
     global _SCRIPT_JOBS
     cmds = _maya_cmds()
@@ -1679,6 +2267,7 @@ def _reset_panel_state(
     content._shader_health_results = ()
     content._shader_health_profile_id = ""
     content._shader_health_asset_class_id = ""
+    content._shader_health_last_validated_at = ""
     content._shader_health_last_fix_audit = None
 
     _set_label_text(
@@ -1687,19 +2276,61 @@ def _reset_panel_state(
         main_window.HEALTH_SCORE_LABEL_OBJECT_NAME,
         "Health: 100 / 100",
     )
-    _set_label_text(
+    main_window.update_severity_count_indicators(
         content,
         qt_widgets,
-        main_window.SEVERITY_COUNTS_LABEL_OBJECT_NAME,
-        "Critical: 0   Error: 0   Warning: 0   Info: 0",
+        critical_count=0,
+        error_count=0,
+        warning_count=0,
+        info_count=0,
+    )
+    main_window.update_block_status_indicators(
+        content,
+        qt_widgets,
+        block_publish=False,
+        block_deadline=False,
     )
     _set_label_text(
         content,
         qt_widgets,
-        main_window.BLOCK_STATUS_LABEL_OBJECT_NAME,
-        "Publish Block: NO   Deadline Block: NO",
+        main_window.SCENE_NAME_LABEL_OBJECT_NAME,
+        main_window.format_scene_display_name(""),
     )
-    _set_label_text(content, qt_widgets, "shaderHealthInspectorDescription", status_message)
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.PROFILE_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_profile_chip_text("Artist Relaxed", "artist_relaxed"),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.ASSET_CLASS_CHIP_LABEL_OBJECT_NAME,
+        main_window.format_asset_class_chip_text(main_window.ASSET_CLASS_NONE_LABEL),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.LAST_VALIDATED_LABEL_OBJECT_NAME,
+        main_window.format_last_validated_display(""),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.SCAN_SCOPE_LABEL_OBJECT_NAME,
+        main_window.format_scan_scope_display(""),
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        status_message,
+    )
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(),
+    )
 
     issues_table = _find_child(
         content,
@@ -1751,6 +2382,26 @@ def _yes_no(value: bool) -> str:
 
 def _print_export_result(result: Any) -> None:
     print(f"{result.message} {result.path}")
+    content = _active_panel_content()
+    if content is None:
+        return
+    path = str(getattr(result, "path", "") or "").strip()
+    if not path:
+        return
+    qt_widgets = load_qt_widgets()
+    scanned_at_utc = getattr(content, "_shader_health_last_validated_at", "")
+    scene_path = getattr(content, "_shader_health_scene_path", "")
+    scan_scope = getattr(content, "_shader_health_scan_scope", "")
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(
+            scene_path=scene_path,
+            scanned_at_utc=scanned_at_utc,
+            scan_scope=scan_scope,
+            export_message=f"Exported: {path}",
+        ),
+    )
 
 
 def _workspace_control_exists(cmds: Any) -> bool:

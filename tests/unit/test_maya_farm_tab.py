@@ -27,6 +27,10 @@ class FakeFarmPushButton(FakePushButton):
     def __init__(self, text: str = "") -> None:
         super().__init__(text)
         self.clicked = FakeSignal()
+        self.enabled = True
+
+    def setEnabled(self, enabled: bool) -> None:
+        self.enabled = enabled
 
 
 class FakeFarmQtWidgets(FakeQtWidgets):
@@ -163,3 +167,35 @@ def test_update_farm_tab_refreshes_labels():
     assert "#e74c3c" in lamp.style_sheet
     status_value_label = _find(tab, farm_tab.FARM_CONNECTION_STATUS_VALUE_LABEL_OBJECT_NAME)
     assert status_value_label.text == "Offline"
+
+
+def test_farm_tab_shows_offline_when_integration_disabled():
+    tab = farm_tab.build_farm_tab(
+        FakeQtWidgets,
+        state=farm_tab.FarmTabState(
+            integration_enabled=False,
+            connection_status="disabled",
+            connection_reachable=False,
+        ),
+    )
+    connection_label = _find(tab, farm_tab.FARM_CONNECTION_LABEL_OBJECT_NAME)
+    status_value = _find(tab, farm_tab.FARM_CONNECTION_STATUS_VALUE_LABEL_OBJECT_NAME)
+    lamp = _find(tab, farm_tab.FARM_CONNECTION_LAMP_OBJECT_NAME)
+
+    assert "integration disabled" in connection_label.text
+    assert status_value.text == "Offline"
+    assert "#e74c3c" in lamp.style_sheet
+
+
+def test_farm_tab_disables_actions_when_integration_disabled():
+    tab = farm_tab.build_farm_tab(
+        FakeFarmQtWidgets,
+        state=farm_tab.FarmTabState(integration_enabled=False),
+    )
+    refresh = _find(tab, farm_tab.FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME)
+    preflight = _find(tab, farm_tab.FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME)
+    submit = _find(tab, farm_tab.FARM_SUBMIT_BUTTON_OBJECT_NAME)
+
+    assert refresh.enabled is False
+    assert preflight.enabled is False
+    assert submit.enabled is False
