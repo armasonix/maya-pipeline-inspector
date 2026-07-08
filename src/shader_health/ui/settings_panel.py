@@ -13,6 +13,13 @@ from shader_health.connectors_registry import (
     read_connectors_from_settings_view as _read_connectors_from_registry,
 )
 from shader_health.studio_config import ConnectorSettings, StudioConfig
+from shader_health.ui.settings_tabs import (
+    SETTINGS_CONNECTORS_TAB_OBJECT_NAME,
+    SETTINGS_STUDIO_TAB_OBJECT_NAME,
+    SETTINGS_TAB_SPECS,
+    build_placeholder_tab,
+    get_settings_tab_spec,
+)
 from shader_health.ui.settings_widgets import (
     apply_toggle_style,
     build_settings_toggle,
@@ -73,16 +80,14 @@ def build_settings_view(
 
     tabs = qt_widgets.QTabWidget()
     tabs.setObjectName(SETTINGS_TAB_WIDGET_OBJECT_NAME)
-    tabs.addTab(_build_basic_tab(qt_widgets), "Basic")
-    tabs.addTab(_build_advanced_tab(qt_widgets), "Advanced")
-    tabs.addTab(
-        _build_connectors_tab(qt_widgets, studio_config, settings_callbacks),
-        "Connectors",
-    )
-    tabs.addTab(
-        _build_studio_tab(qt_widgets, studio_config, settings_callbacks),
-        "Studio",
-    )
+    for spec in SETTINGS_TAB_SPECS:
+        tab_widget = _build_settings_tab(
+            qt_widgets,
+            spec.tab_id,
+            studio_config,
+            settings_callbacks,
+        )
+        tabs.addTab(tab_widget, spec.title)
     layout.addWidget(tabs)
 
     config_path_label = qt_widgets.QLabel(_config_path_text(studio_config))
@@ -167,30 +172,29 @@ def update_settings_view(
             status_label.setText(status_message)
 
 
-def _build_basic_tab(qt_widgets: Any) -> Any:
-    tab = qt_widgets.QWidget()
-    layout = qt_widgets.QVBoxLayout(tab)
-    layout.setContentsMargins(8, 8, 8, 8)
-    label = qt_widgets.QLabel(
-        "Basic plugin preferences will live here (default profile, UI density, scan defaults)."
-    )
-    label.setWordWrap(True)
-    layout.addWidget(label)
-    layout.addStretch(1)
-    return tab
+def _build_settings_tab(
+    qt_widgets: Any,
+    tab_id: str,
+    config: StudioConfig,
+    callbacks: SettingsActionCallbacks,
+) -> Any:
+    spec = get_settings_tab_spec(tab_id)
+    if spec is None:
+        raise ValueError(f"Unknown settings tab id: {tab_id}")
 
-
-def _build_advanced_tab(qt_widgets: Any) -> Any:
-    tab = qt_widgets.QWidget()
-    layout = qt_widgets.QVBoxLayout(tab)
-    layout.setContentsMargins(8, 8, 8, 8)
-    label = qt_widgets.QLabel(
-        "Advanced options will live here (extra rule roots, debug logging, performance caps)."
-    )
-    label.setWordWrap(True)
-    layout.addWidget(label)
-    layout.addStretch(1)
-    return tab
+    if tab_id == "connectors":
+        return build_placeholder_tab(
+            qt_widgets,
+            spec,
+            builder=lambda widgets: _build_connectors_tab(widgets, config, callbacks),
+        )
+    if tab_id == "studio":
+        return build_placeholder_tab(
+            qt_widgets,
+            spec,
+            builder=lambda widgets: _build_studio_tab(widgets, config, callbacks),
+        )
+    return build_placeholder_tab(qt_widgets, spec)
 
 
 def _build_connectors_tab(
@@ -199,6 +203,7 @@ def _build_connectors_tab(
     callbacks: SettingsActionCallbacks,
 ) -> Any:
     tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_CONNECTORS_TAB_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
@@ -217,9 +222,17 @@ def _build_studio_tab(
     callbacks: SettingsActionCallbacks,
 ) -> Any:
     tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_STUDIO_TAB_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
+
+    intro = qt_widgets.QLabel(
+        "Studio-wide pipeline policy from shader_health_studio.json. "
+        "Network paths live under Studio Environment; integrations under Connectors."
+    )
+    intro.setWordWrap(True)
+    layout.addWidget(intro)
 
     pipeline_section = qt_widgets.QWidget()
     pipeline_section.setObjectName(SETTINGS_PIPELINE_SECTION_OBJECT_NAME)
@@ -227,7 +240,7 @@ def _build_studio_tab(
     pipeline_layout.setContentsMargins(0, 0, 0, 0)
     pipeline_layout.setSpacing(4)
 
-    title = qt_widgets.QLabel("Pipeline")
+    title = qt_widgets.QLabel("Pipeline Policy")
     set_style = getattr(title, "setStyleSheet", None)
     if set_style is not None:
         set_style("font-weight: bold;")

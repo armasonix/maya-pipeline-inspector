@@ -9,6 +9,7 @@ from shader_health.studio_config import (
     StudioConfig,
 )
 from shader_health.ui import deadline_connector_section, settings_panel
+from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
 
 _DEADLINE_ENABLED = deadline_connector_section.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME
 _DEADLINE_DETAILS = deadline_connector_section.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME
@@ -253,11 +254,45 @@ def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
         "Advanced",
         "Connectors",
         "Studio",
+        "Studio Environment",
+        "Bug Report",
     ]
     toggle = _find(view, settings_panel.SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
     assert toggle.checked is True
     assert toggle.text == "ON"
     assert "#2ecc71" in toggle.style_sheet
+
+
+def test_settings_tabs_use_stable_object_names():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+
+    assert [tab.object_name for _title, tab in tabs.tabs] == [
+        spec.object_name for spec in SETTINGS_TAB_SPECS
+    ]
+
+
+def test_studio_environment_and_bug_report_tabs_show_placeholders():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    studio_env_tab = tabs.tabs[4][1]
+    bug_report_tab = tabs.tabs[5][1]
+
+    studio_env_label = studio_env_tab.layout.widgets[0]
+    bug_report_label = bug_report_tab.layout.widgets[0]
+
+    assert "texture_root" in studio_env_label.text
+    assert "relay URL" in bug_report_label.text
+
+
+def test_studio_tab_clarifies_pipeline_policy_scope():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    studio_tab = tabs.tabs[3][1]
+    intro = studio_tab.layout.widgets[0]
+
+    assert "pipeline policy" in intro.text.lower()
+    assert "Studio Environment" in intro.text
 
 
 def test_connectors_tab_includes_deadline_remote_farm_toggle_and_collapsed_details():
