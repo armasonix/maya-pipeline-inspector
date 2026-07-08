@@ -92,6 +92,19 @@ jobs:
           DEBUG_RUN_ID: github-${{ github.run_id }}
         run: python tools\ci\resolve_mayapy.py
 
+      - name: Verify mayapy output
+        run: |
+          $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
+          if ([string]::IsNullOrWhiteSpace($mayapy)) {
+            Write-Error "Resolve mayapy step did not set output mayapy_path. Configure MAYA_PY secret, MAYA_PY variable, runner env, or workflow input mayapy_path."
+            exit 1
+          }
+          if (-not (Test-Path -LiteralPath $mayapy)) {
+            Write-Error "mayapy not found at: $mayapy"
+            exit 1
+          }
+          Write-Host "Using mayapy: $mayapy"
+
       - name: Verify demo scene exists
         run: |
           if (-not (Test-Path -LiteralPath $env:DEMO_SCENE)) {
@@ -101,20 +114,20 @@ jobs:
 
       - name: Install package into Maya Python
         run: |
-          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           & $mayapy -m pip install --upgrade pip
           & $mayapy -m pip install -e ".[dev]"
 
       - name: Run integration tests with mayapy
         run: |
-          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           & $mayapy -m pytest tests/integration -v
 
       - name: Validate scene smoke (headless demo)
         env:
           REPORT: ${{ runner.temp }}/shader_health_validate_smoke.json
         run: |
-          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           $report = $env:REPORT
           & $mayapy -m shader_health validate $env:DEMO_SCENE `
             --input-kind scene `
@@ -138,7 +151,7 @@ jobs:
           OUT_MANIFEST: ${{ runner.temp }}/shader_health_manifest_smoke.json
           GATE_REPORT: ${{ runner.temp }}/shader_health_gate_smoke.json
         run: |
-          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           $manifest = $env:OUT_MANIFEST
           $gateReport = $env:GATE_REPORT
           & $mayapy tools/ci/maya_manifest_gate_smoke.py $env:DEMO_SCENE `
@@ -161,7 +174,7 @@ jobs:
         env:
           PREFLIGHT_REPORT: ${{ runner.temp }}/shader_health_deadline_preflight_smoke.json
         run: |
-          $mayapy = '${{ steps.mayapy.outputs.path }}'
+          $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           $report = $env:PREFLIGHT_REPORT
           & $mayapy examples/deadline/submit_preflight.py $env:DEMO_SCENE `
             --report $report `

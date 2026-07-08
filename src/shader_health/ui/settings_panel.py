@@ -422,22 +422,6 @@ def _build_connectors_tab(
     if add_columns is not None:
         add_columns(columns_row)
 
-    # #region agent log
-    _debug_log_connectors_layout(
-        message="Deadline connector details built",
-        data={
-            "layout": "two_column",
-            "left_rows": 3,
-            "right_rows": 3,
-            "left_fields": ["host", "port", "repo", "timeout", "profile"],
-            "right_fields": ["mayapy", "queue", "pool", "group", "user"],
-            "columns_gap": _DEADLINE_COLUMNS_GAP,
-        },
-        hypothesis_id="H1",
-        run_id="post-fix",
-    )
-    # #endregion
-
     details_row = qt_widgets.QWidget()
     details_row.setObjectName(SETTINGS_DEADLINE_DETAILS_OBJECT_NAME)
     details_row_layout = qt_widgets.QHBoxLayout(details_row)
@@ -647,34 +631,6 @@ def _create_deadline_grid_layout(qt_widgets: Any, parent: Any) -> Any:
     if set_v_spacing is not None:
         set_v_spacing(2)
     return grid_layout
-
-
-def _debug_log_connectors_layout(
-    *,
-    message: str,
-    data: dict[str, Any],
-    hypothesis_id: str,
-    run_id: str,
-) -> None:
-    import json
-    import time
-    from pathlib import Path
-
-    payload = {
-        "sessionId": "ee1eca",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": "settings_panel.py:_build_connectors_tab",
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    log_path = Path(__file__).resolve().parents[3] / "debug-ee1eca.log"
-    try:
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload) + "\n")
-    except OSError:
-        return
 
 
 def _add_deadline_grid_pair(

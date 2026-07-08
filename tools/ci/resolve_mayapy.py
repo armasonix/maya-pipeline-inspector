@@ -1,49 +1,13 @@
 """Resolve mayapy for Maya integration CI (GitHub Actions + local debug)."""
 from __future__ import annotations
 
-import json
 import os
 import shutil
-import sys
-import time
 from pathlib import Path
-
-
-def _debug_log(message: str, data: dict, hypothesis_id: str) -> None:
-    # region agent log
-    try:
-        payload = {
-            "sessionId": "ee1eca",
-            "runId": os.environ.get("DEBUG_RUN_ID", "ci"),
-            "hypothesisId": hypothesis_id,
-            "location": "tools/ci/resolve_mayapy.py",
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(os.environ.get("DEBUG_SESSION_LOG", "debug-ee1eca.log"))
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload) + "\n")
-    except OSError:
-        pass
-    # endregion
 
 
 def resolve_mayapy_path() -> Path:
     """Return the first usable mayapy path from env, PATH, or common install dirs."""
-
-    _debug_log(
-        "resolve_mayapy_start",
-        {
-            "has_input": bool(os.environ.get("MAYA_PY_INPUT", "").strip()),
-            "has_secret": bool(os.environ.get("MAYA_PY_SECRET", "").strip()),
-            "has_var": bool(os.environ.get("MAYA_PY_VAR", "").strip()),
-            "has_env": bool(os.environ.get("MAYA_PY", "").strip()),
-            "path_entries": (os.environ.get("PATH", "").count(os.pathsep) + 1),
-            "os_name": os.name,
-        },
-        "H1",
-    )
 
     candidates: list[str] = []
     for key in ("MAYA_PY_INPUT", "MAYA_PY_SECRET", "MAYA_PY_VAR", "MAYA_PY"):
@@ -65,27 +29,14 @@ def resolve_mayapy_path() -> Path:
     )
 
     seen: set[str] = set()
-    checked: list[str] = []
     for raw in candidates:
         if not raw or raw in seen:
             continue
         seen.add(raw)
         path = Path(raw)
-        checked.append(str(path))
         if path.is_file():
-            resolved = path.resolve()
-            _debug_log(
-                "resolve_mayapy_found",
-                {"path": str(resolved), "candidate_index": len(checked) - 1},
-                "H2",
-            )
-            return resolved
+            return path.resolve()
 
-    _debug_log(
-        "resolve_mayapy_not_found",
-        {"checked": checked[:12], "checked_count": len(checked)},
-        "H3",
-    )
     raise FileNotFoundError(
         "Maya integration requires mayapy on the self-hosted runner. "
         "Set repository secret MAYA_PY, variable MAYA_PY, runner env MAYA_PY, "
@@ -100,14 +51,41 @@ def main() -> int:
     github_output = os.environ.get("GITHUB_OUTPUT", "").strip()
     if github_output:
         with open(github_output, "a", encoding="utf-8") as handle:
-            handle.write(f"path={resolved}\n")
-        _debug_log("resolve_mayapy_github_output", {"path": str(resolved)}, "H4")
+            handle.write(f"mayapy_path={resolved}\n")
+        # #region agent log
+        _debug_log_ci(
+            "resolve_mayapy_github_output",
+            {"mayapy_path": str(resolved), "output_key": "mayapy_path"},
+            "H1",
+        )
+        # #endregion
     return 0
 
 
-if __name__ == "__main__":
+def _debug_log_ci(message: str, data: dict, hypothesis_id: str) -> None:
+    import json
+    import time
+
+    log_path = os.environ.get("DEBUG_SESSION_LOG", "debug-ee1eca.log")
     try:
-        raise SystemExit(main())
-    except FileNotFoundError as exc:
-        print(f"::error::{exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
+        with open(log_path, "a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "sessionId": "ee1eca",
+                        "runId": os.environ.get("DEBUG_RUN_ID", "ci"),
+                        "hypothesisId": hypothesis_id,
+                        "location": "tools/ci/resolve_mayapy.py",
+                        "message": message,
+                        "data": data,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

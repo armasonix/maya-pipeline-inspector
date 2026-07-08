@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-08
+
+**Maya Shader Health Inspector v0.4 — GUI-First Farm Integration & Render Risk Depth**
+
+Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), native `.mll` plugin Phase 1, Maya integration CI activation, expanded render-risk rules, and UX Wave 1 (settings screen, studio config, Connectors).
+
+### Added
+
+#### Product philosophy and UX audit (M22)
+
+- [ADR 0005](docs/adr/0005-gui-first-product-philosophy.md) — GUI-first product philosophy for artist-facing workflows.
+- [`docs/MAYA_UX_AUDIT_v0.4.md`](docs/MAYA_UX_AUDIT_v0.4.md) — friction inventory and prioritized Wave 1 backlog.
+
+#### Maya integration CI (M23)
+
+- Self-hosted Maya CI smoke path: `tools/ci/resolve_mayapy.py`, `tools/ci/maya_integration_checks.py`.
+- GitHub Actions `workflow_dispatch` job validates scene export, manifest 1.1, gate, and Deadline preflight smoke steps.
+
+#### Native Maya plugin Phase 1 (M24)
+
+- [ADR 0006](docs/adr/0006-native-mll-plugin-strategy.md) — thin C++ `.mll` delegates to Python; `.py` plug-in fallback retained.
+- CMake scaffolding under `native/`; versioned plug-in output paths in `.gitignore`.
+
+#### Deadline 10 integration core (M25)
+
+- Package `shader_health.integrations.deadline`: `DeadlineConfig`, `DeadlineClient`, preflight, eligibility gate, CommandScript submit API.
+- [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — studio guide (Web Service, pool/group, GUI + headless).
+- Example scripts: `examples/deadline/submit_preflight.py`, `submit_to_farm.py`, `shader_health_deadline_validate.py`.
+
+#### Deadline GUI & Farm tab (M26)
+
+- **Farm** tab: connection lamp (Online/Offline), scene readiness, eligibility, preflight and submit actions.
+- Menu + shelf **Shader Health Farm Check** — opens Farm tab and runs `deadline_critical` preflight.
+
+#### Render risk & optimization depth (M27)
+
+- Displacement enrichment and expanded displacement-risk rules with fixture coverage.
+- Optimized texture / `.tx` derivative rules (`common.texture.optimized.*`) with snapshot enrichment.
+- Duplicate material / duplicate texture detection rules and integration fixtures.
+
+#### UX Wave 1 & studio settings (M28)
+
+- Settings screen (gear icon): **Basic / Advanced / Connectors / Studio** tabs with persistent panel header.
+- Studio config file `shader_health_studio.json`: **Require .tx** pipeline toggle; **Thinkbox Deadline** connector with **Remote Farm** ON/OFF.
+- Connectors ↔ Farm tab linkage: disabled connector forces Farm **Offline** and disables farm actions.
+- Issue Details layout polish (splitter persistence, borderless scroll, stable panel width).
+- Issue triage: double-click row selects node; fix queue and export action wiring tests expanded.
+
+### Changed
+
+- Demo scene report/manifest samples refreshed for v0.4 rule packs (committed HTML/JSON/manifest only).
+- Farm tab status messaging distinguishes integration disabled vs Web Service unreachable.
+
+### Fixed
+
+- Removed accidental commit of local demo artifacts (fix audit sidecar, `*_fixed.ma`, manifest diff exports, Deadline command aux files).
+- Removed temporary debug-session logging from settings UI and CI helper scripts.
+
+### Known limitations (v0.4)
+
+- Native `.mll` binaries are built locally or attached to releases; repository ships CMake scaffolding and Python fallback only.
+- Deadline connector settings are Maya UI / studio JSON today — headless `shader_health validate` does not yet accept `--studio-config`.
+- Public CI still requires a self-hosted runner with `mayapy` for Maya integration smoke.
+- Rule authoring remains JSON-only (no rule editor UI).
+
+### Install
+
+Same as v0.3 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
+**Planning for v0.5+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md).
+
 ## [0.3.0] - 2026-07-07
 
 **Maya Shader Health Inspector v0.3 — Pipeline Automation & Manifest Depth**
@@ -245,6 +316,7 @@ python -m shader_health validate examples/broken_scene/shader_health_demo_broken
 - Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Deadline preflight: [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md)
 
+[0.4.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.4.0
 [0.3.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.3.0
 [0.2.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.2.0
 [0.1.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.1.0
