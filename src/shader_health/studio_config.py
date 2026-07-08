@@ -496,6 +496,29 @@ def discover_studio_config_path() -> Path | None:
     return None
 
 
+def resolve_studio_config_for_headless(
+    *,
+    cli_path: Path | None = None,
+) -> StudioConfig | None:
+    """Resolve studio config for headless CLI entrypoints.
+
+    Precedence:
+    1. Explicit ``--studio-config`` path when provided.
+    2. ``SHADER_HEALTH_STUDIO_CONFIG`` env var.
+    3. Default discovery under ``~/.shader_health/`` and home directory.
+    """
+
+    if cli_path is not None:
+        resolved = cli_path.resolve()
+        if not resolved.is_file():
+            raise ValueError(f"Studio config file does not exist: {resolved}")
+        return load_studio_config(resolved)
+    discovered = discover_studio_config_path()
+    if discovered is None:
+        return None
+    return load_studio_config(discovered)
+
+
 def load_studio_config(path: Path) -> StudioConfig:
     """Load studio settings from a JSON file."""
 

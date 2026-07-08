@@ -29,6 +29,7 @@ from shader_health.reports.manifest_diff_cli import (
     execute_manifest_diff,
     load_manifest_json,
 )
+from shader_health.studio_config import resolve_studio_config_for_headless
 from shader_health.util.paths import normalize_cli_path
 
 _MAYA_STANDALONE_INITIALIZED = False
@@ -49,6 +50,16 @@ ASSET_CLASS_ID_HELP = (
 
 def _add_asset_class_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--asset-class-id", default="", help=ASSET_CLASS_ID_HELP)
+
+
+def _add_studio_config_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--studio-config",
+        help=(
+            "Studio config JSON path. When omitted, uses SHADER_HEALTH_STUDIO_CONFIG "
+            "or discovered shader_health_studio.json paths."
+        ),
+    )
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -114,6 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional approved manifest JSON path for regression gate evaluation.",
     )
     _add_asset_class_argument(validate)
+    _add_studio_config_argument(validate)
     diff = subparsers.add_parser(
         "diff",
         help="Compare two shader manifest JSON files.",
@@ -147,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gate.add_argument("--out", help="Optional gate result JSON output path.")
     _add_asset_class_argument(gate)
+    _add_studio_config_argument(gate)
     manifest = subparsers.add_parser(
         "manifest",
         help="Export a shader manifest from a Maya scene or snapshot.",
@@ -165,6 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Packaged profile id when --profile is omitted.",
     )
     _add_asset_class_argument(manifest)
+    _add_studio_config_argument(manifest)
     apply_fixes = subparsers.add_parser(
         "apply-fixes",
         help="Apply planned fixes to a Maya scene (requires mayapy).",
@@ -222,6 +236,7 @@ def validate_command(args: argparse.Namespace) -> int:
             extra_rule_paths=tuple(_cli_path(path) for path in args.extra_rules),
             waiver_sidecar_path=_optional_path(args.waiver_sidecar),
             scan_scope="scene",
+            studio_config=_studio_config_from_args(args),
         )
         write_json_report(report_path, run.snapshot, run.results)
         if args.export_fix_plan and run.fix_plan.total:
@@ -241,6 +256,7 @@ def validate_command(args: argparse.Namespace) -> int:
                 profile_path=_optional_path(args.profile),
                 profile_id=str(args.profile_id),
                 asset_class_id=_asset_class_id_from_args(args),
+                studio_config=_studio_config_from_args(args),
             )
         return EXIT_OK
     except RuleLoadError as exc:
@@ -261,6 +277,7 @@ def gate_command(args: argparse.Namespace) -> int:
             profile_id=str(args.profile_id),
             asset_class_id=_asset_class_id_from_args(args),
             out_path=_optional_path(args.out),
+            studio_config=_studio_config_from_args(args),
         )
     except RuleLoadError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
@@ -279,6 +296,7 @@ def manifest_command(args: argparse.Namespace) -> int:
             asset_class_id=_asset_class_id_from_args(args),
             profile_path=_optional_path(args.profile),
             scan_scope="scene",
+            studio_config=_studio_config_from_args(args),
         )
         write_shader_manifest(
             _cli_path(args.out),
@@ -362,6 +380,7 @@ def _manifest_gate_exit(
     profile_id: str,
     asset_class_id: Optional[str] = None,
     out_path: Optional[Path] = None,
+    studio_config: Optional[Any] = None,
 ) -> int:
     baseline_manifest = load_manifest_json(baseline_path)
     run = run_validation(
@@ -370,6 +389,7 @@ def _manifest_gate_exit(
         asset_class_id=asset_class_id,
         profile_path=profile_path,
         scan_scope=snapshot.scan_scope or "scene",
+        studio_config=studio_config,
     )
     current_manifest = build_shader_manifest(
         run.snapshot,
@@ -501,6 +521,15 @@ def _cli_path(value: str | Path) -> Path:
 def _asset_class_id_from_args(args: argparse.Namespace) -> Optional[str]:
     normalized = str(getattr(args, "asset_class_id", "") or "").strip()
     return normalized or None
+
+
+def _studio_config_from_args(args: argparse.Namespace) -> Optional[Any]:
+    try:
+        return resolve_studio_config_for_headless(
+            cli_path=_optional_path(getattr(args, "studio_config", None)),
+        )
+    except ValueError as exc:
+        raise RuleLoadError(str(exc)) from exc
 
 
 def _ensure_maya_standalone() -> None:

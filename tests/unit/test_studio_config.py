@@ -20,6 +20,7 @@ from shader_health.studio_config import (
     load_studio_config,
     merge_studio_rule_overrides,
     resolve_deadline_config,
+    resolve_studio_config_for_headless,
     save_studio_config,
 )
 
@@ -277,3 +278,44 @@ def test_deadline_connector_from_deadline_config_round_trip():
     assert connector.web_service_port == 8081
     assert connector.repo_root.rstrip("\\/") == "\\\\farm\\repo"
     assert connector.queue == "shader"
+
+
+def test_resolve_studio_config_for_headless_prefers_explicit_cli_path(tmp_path: Path):
+    path = tmp_path / STUDIO_CONFIG_FILENAME
+    save_studio_config(
+        path,
+        StudioConfig(
+            studio_name="CLI Studio",
+            pipeline=PipelineSettings(require_tx_derivatives=False),
+        ),
+    )
+
+    resolved = resolve_studio_config_for_headless(cli_path=path)
+
+    assert resolved is not None
+    assert resolved.studio_name == "CLI Studio"
+    assert resolved.pipeline.require_tx_derivatives is False
+
+
+def test_resolve_studio_config_for_headless_raises_when_cli_path_missing(tmp_path: Path):
+    missing = tmp_path / "missing_studio.json"
+
+    try:
+        resolve_studio_config_for_headless(cli_path=missing)
+    except ValueError as exc:
+        assert "does not exist" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for missing studio config path")
+
+
+def test_resolve_studio_config_for_headless_discovers_env_path(tmp_path: Path, monkeypatch):
+    path = tmp_path / "env_studio.json"
+    save_studio_config(path, StudioConfig(studio_name="Env Studio"))
+    monkeypatch.setenv("SHADER_HEALTH_STUDIO_CONFIG", str(path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    resolved = resolve_studio_config_for_headless()
+
+    assert resolved is not None
+    assert resolved.studio_name == "Env Studio"
