@@ -285,7 +285,11 @@ def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
         return
-    connectors = read_connectors_from_settings_view(settings_view, qt_widgets)
+    connectors = read_connectors_from_settings_view(
+        settings_view,
+        qt_widgets,
+        base=current.connectors,
+    )
     updated = current.with_updates(connectors=connectors)
     _set_studio_config(content, qt_widgets, updated)
     _refresh_farm_tab(content, qt_widgets)
