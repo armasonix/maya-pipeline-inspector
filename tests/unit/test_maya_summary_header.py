@@ -545,6 +545,7 @@ def test_main_widget_contains_tabbed_shell():
     _find(widget, main_window.PANEL_HEADER_OBJECT_NAME)
     _find(widget, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
     _find(widget, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    _find(widget, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
     stack = _find(widget, main_window.PANEL_BODY_STACK_OBJECT_NAME)
     assert len(stack.pages) == 2
     tabs = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME)
@@ -643,7 +644,7 @@ def test_update_severity_count_indicators_sets_colored_summary_labels():
     )
 
 
-def test_panel_header_includes_version_settings_gear_and_documentation_button():
+def test_panel_header_includes_version_settings_gear_documentation_and_updates_buttons():
     opened: list[str] = []
 
     header = main_window.build_panel_header(
@@ -651,19 +652,24 @@ def test_panel_header_includes_version_settings_gear_and_documentation_button():
         version="0.3.0",
         navigation_callbacks=main_window.PanelNavigationCallbacks(
             on_open_documentation=lambda: opened.append("docs"),
+            on_check_for_updates=lambda: opened.append("updates"),
         ),
     )
     title = _find(header, main_window.PANEL_HEADER_TITLE_OBJECT_NAME)
     gear = _find(header, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
     assert "Maya Shader Health Inspector" in title.text
     assert "v0.3.0" in title.text
     assert gear.tooltip == "Open settings"
     assert docs.text == "Documentation"
     assert docs.tooltip == "Open shader health documentation in your browser."
+    assert updates.text == "Check for Updates"
+    assert updates.tooltip == "Open the update wizard shell and preview staged progress steps."
     docs.clicked.emit()
-    assert opened == ["docs"]
+    updates.clicked.emit()
+    assert opened == ["docs", "updates"]
 
 
 def _find(widget: Any, object_name: str) -> Any:

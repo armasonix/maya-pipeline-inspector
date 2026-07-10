@@ -31,6 +31,7 @@ PANEL_HEADER_OBJECT_NAME = "shaderHealthInspectorPanelHeader"
 PANEL_HEADER_TITLE_OBJECT_NAME = "shaderHealthInspectorPanelHeaderTitle"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsGearButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "shaderHealthInspectorDocumentationButton"
+CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "shaderHealthInspectorCheckForUpdatesButton"
 PANEL_BODY_STACK_OBJECT_NAME = "shaderHealthInspectorPanelBodyStack"
 MAIN_VIEW_OBJECT_NAME = "shaderHealthInspectorMainView"
 SETTINGS_VIEW_INDEX = 1
@@ -200,6 +201,7 @@ class PanelNavigationCallbacks:
 
     on_open_settings: Optional[Callable[[], None]] = None
     on_open_documentation: Optional[Callable[[], None]] = None
+    on_check_for_updates: Optional[Callable[[], None]] = None
 
 
 @dataclass(frozen=True)
@@ -360,6 +362,15 @@ def build_panel_header(
         navigation_callbacks.on_open_documentation,
     )
     row_layout.addWidget(docs_button)
+
+    updates_button = _compact_button(
+        qt_widgets,
+        "Check for Updates",
+        CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME,
+        "Open the update wizard shell and preview staged progress steps.",
+        navigation_callbacks.on_check_for_updates,
+    )
+    row_layout.addWidget(updates_button)
 
     return row
 
