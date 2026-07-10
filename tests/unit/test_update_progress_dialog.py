@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 from shader_health import __version__
-from shader_health.ui.update_modal import (
-    UPDATE_MODAL_CLOSE_BUTTON_OBJECT_NAME,
-    UPDATE_MODAL_PROGRESS_BAR_OBJECT_NAME,
-    UPDATE_MODAL_SHELL_STATUS,
-    UPDATE_MODAL_STAGES_WIDGET_OBJECT_NAME,
-    UPDATE_MODAL_STATUS_LABEL_OBJECT_NAME,
-    UPDATE_MODAL_VERSION_LABEL_OBJECT_NAME,
-    UPDATE_STAGE_LABELS,
-    build_update_modal_shell,
-    build_update_stage_rows,
-    format_update_stage_text,
-    show_update_modal_shell,
-    update_stage_object_name,
-)
 from shader_health.ui.update_progress_dialog import (
+    UPDATE_PROGRESS_CLOSE_BUTTON_OBJECT_NAME,
+    UPDATE_PROGRESS_SHELL_STATUS,
+    UPDATE_PROGRESS_SPINNER_OBJECT_NAME,
+    UPDATE_PROGRESS_STEPS_WIDGET_OBJECT_NAME,
+    UPDATE_PROGRESS_VERSION_LABEL_OBJECT_NAME,
+    UPDATE_STAGE_LABELS,
+    UpdateProgressDialog,
+    UpdateProgressStep,
+    build_update_progress_stages,
+    default_update_progress_steps,
+    show_update_progress_dialog,
     update_progress_step_description_object_name,
 )
 
@@ -28,7 +25,8 @@ class FakeWidget:
         self.window_title = ""
         self.parent: object | None = None
         self.modality: object | None = None
-        self.visible = False
+        self.visible = True
+        self.enabled = True
         self.rejected = False
 
     def setObjectName(self, object_name: str) -> None:
@@ -43,11 +41,14 @@ class FakeWidget:
     def setWindowModality(self, modality: object) -> None:
         self.modality = modality
 
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
+
+    def setEnabled(self, enabled: bool) -> None:
+        self.enabled = enabled
+
     def reject(self) -> None:
         self.rejected = True
-
-    def exec_(self) -> int:
-        return 0
 
 
 class FakeLabel(FakeWidget):
@@ -169,60 +170,97 @@ def _find(root: FakeWidget, object_name: str) -> FakeWidget:
     raise AssertionError(f"Widget not found: {object_name}")
 
 
-def test_build_update_stage_rows_marks_first_stage_active_by_default():
-    rows = build_update_stage_rows()
+def test_default_update_progress_steps_align_labels_and_descriptions():
+    steps = default_update_progress_steps()
 
-    assert len(rows) == len(UPDATE_STAGE_LABELS)
-    assert rows[0].state == "active"
-    assert rows[1].state == "pending"
-    assert format_update_stage_text(rows[0]).startswith("[current] 1.")
+    assert len(steps) == len(UPDATE_STAGE_LABELS)
+    assert steps[0].label == UPDATE_STAGE_LABELS[0]
+    assert steps[0].description
 
 
-def test_build_update_modal_shell_exposes_staged_progress_labels():
-    dialog = build_update_modal_shell(FakeQtWidgets, installed_version="0.4.0")
+def test_build_update_progress_stages_supports_description_overrides():
+    steps = (
+        UpdateProgressStep("Check release", "Default detail"),
+        UpdateProgressStep("Download package", "Default download detail"),
+    )
+    stages = build_update_progress_stages(
+        steps,
+        active_index=1,
+        step_descriptions=("Custom check detail", "Custom download detail"),
+    )
 
-    assert dialog.window_title == "Check for Updates"
-    assert _find(dialog, UPDATE_MODAL_VERSION_LABEL_OBJECT_NAME).text == (
+    assert stages[0].state == "complete"
+    assert stages[1].state == "active"
+    assert stages[0].description == "Custom check detail"
+    assert stages[1].description == "Custom download detail"
+
+
+def test_update_progress_dialog_build_exposes_spinner_and_step_descriptions():
+    controller = UpdateProgressDialog.build(
+        FakeQtWidgets,
+        installed_version="0.4.0",
+        status_message=UPDATE_PROGRESS_SHELL_STATUS,
+        active_stage_index=0,
+    )
+
+    assert controller.dialog.window_title == "Check for Updates"
+    assert _find(controller.dialog, UPDATE_PROGRESS_VERSION_LABEL_OBJECT_NAME).text == (
         "Installed version: v0.4.0"
     )
-    assert _find(dialog, UPDATE_MODAL_STATUS_LABEL_OBJECT_NAME).text == (
-        UPDATE_MODAL_SHELL_STATUS
-    )
-    stages = _find(dialog, UPDATE_MODAL_STAGES_WIDGET_OBJECT_NAME)
-    stage_labels = [
-        _find(stages, update_stage_object_name(index))
-        for index in range(len(UPDATE_STAGE_LABELS))
-    ]
-    assert len(stage_labels) == len(UPDATE_STAGE_LABELS)
-    assert "[current] 1." in stage_labels[0].text
-    assert UPDATE_STAGE_LABELS[1] in stage_labels[1].text
+    assert controller.status_label.text == UPDATE_PROGRESS_SHELL_STATUS
+    stages = _find(controller.dialog, UPDATE_PROGRESS_STEPS_WIDGET_OBJECT_NAME)
     assert (
         _find(stages, update_progress_step_description_object_name(0)).text
-        != ""
+        == default_update_progress_steps()[0].description
     )
-    progress = _find(dialog, UPDATE_MODAL_PROGRESS_BAR_OBJECT_NAME)
-    assert progress.minimum == 0
-    assert progress.maximum == 0
-    assert progress.text_visible is False
+    spinner = _find(controller.dialog, UPDATE_PROGRESS_SPINNER_OBJECT_NAME)
+    assert spinner.minimum == 0
+    assert spinner.maximum == 0
+    assert spinner.visible is True
 
 
-def test_show_update_modal_shell_uses_modal_exec_and_parent():
+def test_update_progress_dialog_set_active_stage_updates_labels_and_status():
+    controller = UpdateProgressDialog.build(FakeQtWidgets, status_message="Starting")
+
+    controller.set_active_stage(
+        2,
+        status_message="Downloading release package...",
+        step_descriptions=("Done checking", "Done comparing", "Fetching zip asset"),
+    )
+
+    assert controller.status_label.text == "Downloading release package..."
+    assert controller.step_labels[2].text.startswith("[current] 3.")
+    assert controller.step_descriptions[2].text == "Fetching zip asset"
+    assert controller.step_labels[0].text.startswith("[done]")
+
+
+def test_update_progress_dialog_set_close_enabled_and_spinner_running():
+    controller = UpdateProgressDialog.build(FakeQtWidgets)
+
+    controller.set_close_enabled(False)
+    controller.set_spinner_running(False)
+
+    assert controller.close_button.enabled is False
+    assert controller.spinner.visible is False
+
+
+def test_show_update_progress_dialog_uses_modal_exec_and_parent():
     parent = FakeWidget()
-    dialog = show_update_modal_shell(
+    controller = show_update_progress_dialog(
         FakeQtWidgets,
         parent=parent,
         installed_version=__version__,
     )
 
-    assert dialog.exec_called is True
-    assert dialog.parent is parent
-    assert dialog.modality == FakeQt.ApplicationModal
+    assert controller.dialog.exec_called is True
+    assert controller.dialog.parent is parent
+    assert controller.dialog.modality == FakeQt.ApplicationModal
 
 
-def test_update_modal_close_button_rejects_dialog():
-    dialog = build_update_modal_shell(FakeQtWidgets)
-    close_button = _find(dialog, UPDATE_MODAL_CLOSE_BUTTON_OBJECT_NAME)
+def test_update_progress_close_button_rejects_dialog():
+    controller = UpdateProgressDialog.build(FakeQtWidgets)
+    close_button = _find(controller.dialog, UPDATE_PROGRESS_CLOSE_BUTTON_OBJECT_NAME)
 
     close_button.clicked.emit()
 
-    assert dialog.rejected is True
+    assert controller.dialog.rejected is True
