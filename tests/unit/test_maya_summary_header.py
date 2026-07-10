@@ -208,12 +208,20 @@ class FakePushButton(FakeLabel):
 
 
 class FakeCheckBox(FakeWidget):
-    def __init__(self) -> None:
+    def __init__(self, text: str = "") -> None:
         super().__init__()
+        self.text = text
         self.checked = False
+        self.stateChanged = FakeSignal()
+
+    def setText(self, text: str) -> None:
+        self.text = text
 
     def setChecked(self, checked: bool) -> None:
         self.checked = checked
+
+    def isChecked(self) -> bool:
+        return self.checked
 
     def setToolTip(self, _text: str) -> None:
         return

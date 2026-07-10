@@ -9,7 +9,9 @@ from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
     StudioConfig,
+    TelegramConnectorSettings,
     resolve_deadline_config,
+    resolve_telegram_config,
 )
 from shader_health.ui.deadline_connector_section import (
     apply_deadline_settings,
@@ -17,6 +19,13 @@ from shader_health.ui.deadline_connector_section import (
     get_deadline_settings,
     read_deadline_connector_from_view,
     update_deadline_connector_view,
+)
+from shader_health.ui.telegram_connector_section import (
+    apply_telegram_settings,
+    build_telegram_connector_section,
+    get_telegram_settings,
+    read_telegram_connector_from_view,
+    update_telegram_connector_view,
 )
 
 ConnectorSettingsValue = Any
@@ -55,6 +64,23 @@ def _resolve_deadline(config: StudioConfig) -> Any | None:
     return resolve_deadline_config(config)
 
 
+def _build_telegram_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_telegram_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_telegram_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_telegram_settings_changed", None),
+    )
+
+
+def _resolve_telegram(config: StudioConfig) -> Any | None:
+    return resolve_telegram_config(config)
+
+
 CONNECTORS: tuple[ConnectorDefinition, ...] = (
     ConnectorDefinition(
         id="deadline",
@@ -67,6 +93,18 @@ CONNECTORS: tuple[ConnectorDefinition, ...] = (
         get_settings=get_deadline_settings,
         apply_settings=apply_deadline_settings,
         secret_field_names=frozenset(),
+    ),
+    ConnectorDefinition(
+        id="telegram",
+        display_name="Telegram",
+        settings_dataclass=TelegramConnectorSettings,
+        resolve_fn=_resolve_telegram,
+        build_section=_build_telegram_section,
+        read_from_view=read_telegram_connector_from_view,
+        update_view=update_telegram_connector_view,
+        get_settings=get_telegram_settings,
+        apply_settings=apply_telegram_settings,
+        secret_field_names=frozenset({"bot_token"}),
     ),
 )
 
