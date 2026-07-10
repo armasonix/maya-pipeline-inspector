@@ -80,6 +80,7 @@ def format_validation_blocks(
     *,
     matched_events: tuple[str, ...],
     report_link: str | None = None,
+    thread_ts: str | None = None,
 ) -> dict[str, Any]:
     """Format a Slack Block Kit payload for a validation summary."""
 
@@ -126,4 +127,7 @@ def format_validation_blocks(
                 },
             }
         )
-    return {"blocks": blocks}
+    payload: dict[str, Any] = {"blocks": blocks}
+    if thread_ts:
+        payload["thread_ts"] = thread_ts
+    return payload

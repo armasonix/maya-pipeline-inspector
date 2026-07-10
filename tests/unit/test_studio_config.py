@@ -232,6 +232,7 @@ def test_connector_settings_preserves_extensible_connectors():
                 "publish_webhook_url": "https://hooks.slack.com/publish",
             },
             "ftrack": {"enabled": False},
+            "custom_tracker": {"enabled": True, "server_url": "https://custom.example"},
         }
     )
 
@@ -241,7 +242,50 @@ def test_connector_settings_preserves_extensible_connectors():
     assert connectors.deadline.web_service_host == "farm.local"
     assert connectors.slack.enabled is True
     assert connectors.slack.publish_webhook_url.startswith("https://hooks.slack.com/")
-    assert connectors.extra["ftrack"]["enabled"] is False
+    assert connectors.ftrack.enabled is False
+    assert connectors.extra["custom_tracker"]["server_url"] == "https://custom.example"
+    assert restored.to_dict() == connectors.to_dict()
+
+
+def test_connector_settings_round_trips_tracker_connectors():
+    connectors = ConnectorSettings.from_mapping(
+        {
+            "ftrack": {
+                "enabled": True,
+                "api_url": "https://studio.ftrackapp.com",
+                "api_user": "pipeline.bot",
+                "api_key": "secret",
+                "project": "Demo Project",
+            },
+            "shotgrid": {
+                "enabled": True,
+                "site_url": "https://studio.shotgrid.autodesk.com",
+                "script_name": "shader_health",
+                "api_key": "secret",
+                "project": "Demo Project",
+                "entity_type": "Shot",
+            },
+            "cerebro": {
+                "enabled": True,
+                "server_url": "cerebrohq.com:45432",
+                "api_user": "pipeline.bot",
+                "api_password": "secret",
+                "project": "Demo Project",
+            },
+        }
+    )
+
+    restored = ConnectorSettings.from_mapping(connectors.to_dict())
+
+    assert connectors.ftrack.enabled is True
+    assert connectors.ftrack.api_url == "https://studio.ftrackapp.com"
+    assert connectors.ftrack.project == "Demo Project"
+    assert connectors.shotgrid.enabled is True
+    assert connectors.shotgrid.site_url == "https://studio.shotgrid.autodesk.com"
+    assert connectors.shotgrid.entity_type == "Shot"
+    assert connectors.cerebro.enabled is True
+    assert connectors.cerebro.server_url == "cerebrohq.com:45432"
+    assert connectors.cerebro.project == "Demo Project"
     assert restored.to_dict() == connectors.to_dict()
 
 

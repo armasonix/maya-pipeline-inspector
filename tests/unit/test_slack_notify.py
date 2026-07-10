@@ -224,6 +224,39 @@ def test_maybe_send_slack_validation_notification_accepts_validation_run_result(
     assert len(captured) == 1
 
 
+def test_maybe_send_slack_validation_notification_propagates_thread_ts_from_tracker_metadata():
+    captured: list[HttpRequest] = []
+
+    def transport(request: HttpRequest, timeout: float) -> SlackResponse:
+        captured.append(request)
+        _ = timeout
+        return SlackResponse(status_code=200, body="ok", json_data=None)
+
+    run_result = SimpleNamespace(
+        snapshot=SimpleNamespace(scene_path="/tmp/hero.ma"),
+        scan_scope="scene",
+        profile_id="publish_strict",
+        asset_class_id="",
+        tracker_metadata={"thread_ts": "1710000000.000100"},
+        health_score=HealthScore(
+            score=40,
+            raw_score=40,
+            critical=1,
+            block_publish=True,
+        ),
+    )
+
+    result = maybe_send_slack_validation_notification(
+        _studio_config(_slack_settings()),
+        run_result,
+        client_factory=lambda: SlackClient(transport=transport),
+    )
+
+    assert result.sent is True
+    payload = json.loads(captured[0].body.decode("utf-8"))
+    assert payload["thread_ts"] == "1710000000.000100"
+
+
 def test_matched_notify_events_returns_publish_and_deadline_flags():
     settings = _slack_settings(notify_on=("block_publish", "block_deadline"))
 

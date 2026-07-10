@@ -13,6 +13,13 @@ from shader_health.connectors_registry import (
     read_connectors_from_settings_view as _read_connectors_from_registry,
 )
 from shader_health.studio_config import ConnectorSettings, StudioConfig
+from shader_health.trackers_registry import (
+    iter_trackers,
+    update_tracker_views,
+)
+from shader_health.trackers_registry import (
+    read_trackers_from_settings_view as _read_trackers_from_registry,
+)
 from shader_health.ui.advanced_settings_section import (
     build_advanced_settings_section,
     read_advanced_user_preferences_from_view,
@@ -206,7 +213,11 @@ def read_connectors_from_settings_view(
 ) -> ConnectorSettings:
     """Read connector settings currently shown in the settings UI."""
 
-    return _read_connectors_from_registry(view, qt_widgets, base=base)
+    return _read_trackers_from_registry(
+        view,
+        qt_widgets,
+        base=_read_connectors_from_registry(view, qt_widgets, base=base),
+    )
 
 
 def update_settings_view(
@@ -222,6 +233,7 @@ def update_settings_view(
 
     update_studio_policy_view(view, qt_widgets, config)
     update_connector_views(view, qt_widgets, config.connectors)
+    update_tracker_views(view, qt_widgets, config.connectors)
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
 
     if user_config is not None:
@@ -364,6 +376,12 @@ def _build_connectors_tab(
 
     for connector in iter_connectors():
         section = connector.build_section(qt_widgets, config, callbacks)
+        layout.addWidget(section)
+
+    for tracker in iter_trackers():
+        if tracker.build_section is None:
+            continue
+        section = tracker.build_section(qt_widgets, config, callbacks)
         layout.addWidget(section)
 
     layout.addStretch(1)

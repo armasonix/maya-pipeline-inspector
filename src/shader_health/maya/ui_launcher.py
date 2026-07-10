@@ -706,6 +706,7 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_export_manifest_diff=_export_manifest_diff_from_ui,
         on_compare_approved_manifest=_compare_approved_manifest_from_ui,
         on_compare_after_fixes=_compare_after_fixes_from_ui,
+        on_send_to_tracker=_send_to_tracker_from_ui,
     )
 
 
@@ -821,6 +822,46 @@ def _export_fix_plan_from_ui() -> None:
     from shader_health.maya.commands import export_fix_plan_action
 
     _print_export_result(export_fix_plan_action())
+
+
+def _send_to_tracker_from_ui() -> None:
+    content = _active_panel_content()
+    if content is None:
+        return
+
+    validation_result = getattr(content, "_shader_health_last_validation_result", None)
+    if validation_result is None:
+        qt_widgets = load_qt_widgets()
+        message = "Send to Tracker skipped — run Validate Scene first."
+        print(message)
+        _set_reports_status_label(content, qt_widgets, message)
+        return
+
+    from shader_health.integrations.trackers.publish_dispatcher import (
+        format_tracker_publish_status,
+        publish_validation_to_first_tracker,
+    )
+
+    outcome = publish_validation_to_first_tracker(
+        _studio_config_for_content(content),
+        validation_result,
+    )
+    message = format_tracker_publish_status(outcome)
+    print(message)
+    qt_widgets = load_qt_widgets()
+    scanned_at_utc = getattr(content, "_shader_health_last_validated_at", "")
+    scene_path = getattr(content, "_shader_health_scene_path", "")
+    scan_scope = getattr(content, "_shader_health_scan_scope", "")
+    _set_reports_status_label(
+        content,
+        qt_widgets,
+        main_window.build_reports_status_text(
+            scene_path=scene_path,
+            scanned_at_utc=scanned_at_utc,
+            scan_scope=scan_scope,
+            export_message=message,
+        ),
+    )
 
 
 def _panel_content(panel_state: dict[str, Any]) -> Any:
@@ -2457,6 +2498,7 @@ def _update_validation_chrome_labels(content: Any, qt_widgets: Any, result: Any)
 
     content._shader_health_last_validated_at = scanned_at_utc
     content._shader_health_scene_path = scene_path
+    content._shader_health_last_validation_result = result
 
     _set_label_text(
         content,
@@ -2553,6 +2595,7 @@ def _reset_panel_state(
     content._shader_health_profile_id = ""
     content._shader_health_asset_class_id = ""
     content._shader_health_last_validated_at = ""
+    content._shader_health_last_validation_result = None
     content._shader_health_last_fix_audit = None
 
     _set_label_text(

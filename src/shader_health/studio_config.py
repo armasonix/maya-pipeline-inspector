@@ -392,6 +392,161 @@ class SlackConnectorSettings:
         )
 
 
+@dataclass(frozen=True)
+class FtrackConnectorSettings:
+    """Ftrack task tracker connector settings stored in the studio config."""
+
+    enabled: bool = False
+    api_url: str = ""
+    api_user: str = ""
+    api_key: str = ""
+    project: str = ""
+
+    def to_ftrack_config(self) -> Any | None:
+        """Convert connector settings into an Ftrack runtime config object."""
+
+        from shader_health.integrations.ftrack.config import FtrackConfig
+
+        api_url = self.api_url.strip()
+        api_user = self.api_user.strip()
+        api_key = self.api_key.strip()
+        project = self.project.strip()
+        if not api_url or not api_user or not api_key or not project:
+            return None
+        return FtrackConfig(
+            api_url=api_url,
+            api_user=api_user,
+            api_key=api_key,
+            project=project,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "api_url": self.api_url,
+            "api_user": self.api_user,
+            "api_key": self.api_key,
+            "project": self.project,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> FtrackConnectorSettings:
+        if not data:
+            return cls()
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            api_url=str(data.get("api_url", "") or ""),
+            api_user=str(data.get("api_user", "") or ""),
+            api_key=str(data.get("api_key", "") or ""),
+            project=str(data.get("project", "") or ""),
+        )
+
+
+@dataclass(frozen=True)
+class ShotGridConnectorSettings:
+    """ShotGrid task tracker connector settings stored in the studio config."""
+
+    enabled: bool = False
+    site_url: str = ""
+    script_name: str = ""
+    api_key: str = ""
+    project: str = ""
+    entity_type: str = "Shot"
+
+    def to_shotgrid_config(self) -> Any | None:
+        """Convert connector settings into a ShotGrid runtime config object."""
+
+        from shader_health.integrations.shotgrid.config import ShotGridConfig
+
+        site_url = self.site_url.strip()
+        script_name = self.script_name.strip()
+        api_key = self.api_key.strip()
+        project = self.project.strip()
+        entity_type = self.entity_type.strip() or "Shot"
+        if not site_url or not script_name or not api_key or not project:
+            return None
+        return ShotGridConfig(
+            site_url=site_url,
+            script_name=script_name,
+            api_key=api_key,
+            project=project,
+            entity_type=entity_type,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "site_url": self.site_url,
+            "script_name": self.script_name,
+            "api_key": self.api_key,
+            "project": self.project,
+            "entity_type": self.entity_type,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> ShotGridConnectorSettings:
+        if not data:
+            return cls()
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            site_url=str(data.get("site_url", "") or ""),
+            script_name=str(data.get("script_name", "") or ""),
+            api_key=str(data.get("api_key", "") or ""),
+            project=str(data.get("project", "") or ""),
+            entity_type=str(data.get("entity_type", "Shot") or "Shot"),
+        )
+
+
+@dataclass(frozen=True)
+class CerebroConnectorSettings:
+    """Cerebro task tracker connector settings stored in the studio config."""
+
+    enabled: bool = False
+    server_url: str = ""
+    api_user: str = ""
+    api_password: str = ""
+    project: str = ""
+
+    def to_cerebro_config(self) -> Any | None:
+        """Convert connector settings into a Cerebro runtime config object."""
+
+        from shader_health.integrations.cerebro.config import CerebroConfig
+
+        server_url = self.server_url.strip()
+        api_user = self.api_user.strip()
+        api_password = self.api_password.strip()
+        project = self.project.strip()
+        if not server_url or not api_user or not api_password or not project:
+            return None
+        return CerebroConfig(
+            server_url=server_url,
+            api_user=api_user,
+            api_password=api_password,
+            project=project,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "server_url": self.server_url,
+            "api_user": self.api_user,
+            "api_password": self.api_password,
+            "project": self.project,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> CerebroConnectorSettings:
+        if not data:
+            return cls()
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            server_url=str(data.get("server_url", "") or ""),
+            api_user=str(data.get("api_user", "") or ""),
+            api_password=str(data.get("api_password", "") or ""),
+            project=str(data.get("project", "") or ""),
+        )
+
+
 DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
 DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
 DISCORD_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
@@ -508,7 +663,22 @@ class ConnectorSettings:
     telegram: TelegramConnectorSettings = TelegramConnectorSettings()
     discord: DiscordConnectorSettings = DiscordConnectorSettings()
     slack: SlackConnectorSettings = SlackConnectorSettings()
+    ftrack: FtrackConnectorSettings = FtrackConnectorSettings()
+    shotgrid: ShotGridConnectorSettings = ShotGridConnectorSettings()
+    cerebro: CerebroConnectorSettings = CerebroConnectorSettings()
     extra: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+
+    _TYPED_CONNECTOR_IDS = frozenset(
+        {
+            "deadline",
+            "telegram",
+            "discord",
+            "slack",
+            "ftrack",
+            "shotgrid",
+            "cerebro",
+        }
+    )
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -516,9 +686,12 @@ class ConnectorSettings:
             "telegram": self.telegram.to_dict(),
             "discord": self.discord.to_dict(),
             "slack": self.slack.to_dict(),
+            "ftrack": self.ftrack.to_dict(),
+            "shotgrid": self.shotgrid.to_dict(),
+            "cerebro": self.cerebro.to_dict(),
         }
         for connector_id in sorted(self.extra):
-            if connector_id in ("deadline", "telegram", "discord", "slack"):
+            if connector_id in self._TYPED_CONNECTOR_IDS:
                 continue
             connector_payload = self.extra[connector_id]
             payload[connector_id] = dict(connector_payload)
@@ -535,6 +708,12 @@ class ConnectorSettings:
             return self.discord.to_dict()
         if connector_id == "slack":
             return self.slack.to_dict()
+        if connector_id == "ftrack":
+            return self.ftrack.to_dict()
+        if connector_id == "shotgrid":
+            return self.shotgrid.to_dict()
+        if connector_id == "cerebro":
+            return self.cerebro.to_dict()
         return self.extra.get(connector_id)
 
     @classmethod
@@ -565,9 +744,27 @@ class ConnectorSettings:
             if isinstance(slack_raw, Mapping)
             else SlackConnectorSettings()
         )
+        ftrack_raw = data.get("ftrack")
+        ftrack = (
+            FtrackConnectorSettings.from_mapping(ftrack_raw)
+            if isinstance(ftrack_raw, Mapping)
+            else FtrackConnectorSettings()
+        )
+        shotgrid_raw = data.get("shotgrid")
+        shotgrid = (
+            ShotGridConnectorSettings.from_mapping(shotgrid_raw)
+            if isinstance(shotgrid_raw, Mapping)
+            else ShotGridConnectorSettings()
+        )
+        cerebro_raw = data.get("cerebro")
+        cerebro = (
+            CerebroConnectorSettings.from_mapping(cerebro_raw)
+            if isinstance(cerebro_raw, Mapping)
+            else CerebroConnectorSettings()
+        )
         extra: dict[str, dict[str, Any]] = {}
         for connector_id, connector_raw in data.items():
-            if connector_id in ("deadline", "telegram", "discord", "slack"):
+            if connector_id in ConnectorSettings._TYPED_CONNECTOR_IDS:
                 continue
             if not isinstance(connector_raw, Mapping):
                 continue
@@ -577,6 +774,9 @@ class ConnectorSettings:
             telegram=telegram,
             discord=discord,
             slack=slack,
+            ftrack=ftrack,
+            shotgrid=shotgrid,
+            cerebro=cerebro,
             extra=extra,
         )
 
@@ -756,6 +956,39 @@ def resolve_slack_config(config: StudioConfig | None) -> Any | None:
     if not slack.enabled:
         return None
     return slack.to_slack_config()
+
+
+def resolve_ftrack_config(config: StudioConfig | None) -> Any | None:
+    """Return Ftrack runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    ftrack = config.connectors.ftrack
+    if not ftrack.enabled:
+        return None
+    return ftrack.to_ftrack_config()
+
+
+def resolve_shotgrid_config(config: StudioConfig | None) -> Any | None:
+    """Return ShotGrid runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    shotgrid = config.connectors.shotgrid
+    if not shotgrid.enabled:
+        return None
+    return shotgrid.to_shotgrid_config()
+
+
+def resolve_cerebro_config(config: StudioConfig | None) -> Any | None:
+    """Return Cerebro runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    cerebro = config.connectors.cerebro
+    if not cerebro.enabled:
+        return None
+    return cerebro.to_cerebro_config()
 
 
 def _normalize_schema_version(value: Any) -> str:

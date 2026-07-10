@@ -477,6 +477,7 @@ def test_export_buttons_connect_to_callbacks():
         on_export_manifest=lambda: calls.append("manifest"),
         on_export_manifest_diff=lambda: calls.append("manifest_diff"),
         on_compare_approved_manifest=lambda: calls.append("compare_approved_manifest"),
+        on_send_to_tracker=lambda: calls.append("send_to_tracker"),
     )
 
     widget = main_window.build_export_actions(FakeQtWidgets, callbacks=callbacks)
@@ -489,13 +490,22 @@ def test_export_buttons_connect_to_callbacks():
         widget,
         main_window.EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
     ).clicked.emit()
+    _find(widget, main_window.EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME).clicked.emit()
     assert calls == [
         "json",
         "html",
         "manifest",
         "manifest_diff",
         "compare_approved_manifest",
+        "send_to_tracker",
     ]
+
+
+def test_reports_export_grid_includes_send_to_tracker_button():
+    widget = main_window.build_export_actions(FakeQtWidgets)
+
+    button = _find(widget, main_window.EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME)
+    assert button.text == "Send to Tracker"
 
 
 def test_reports_export_grid_omits_manifest_gate_button():

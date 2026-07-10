@@ -100,6 +100,7 @@ VALIDATE_SELECTION_BUTTON_OBJECT_NAME = "shaderHealthInspectorValidateSelectionB
 VALIDATE_PUBLISH_PREFLIGHT_BUTTON_OBJECT_NAME = "shaderHealthInspectorPublishPreflightButton"
 VALIDATE_MANIFEST_GATE_BUTTON_OBJECT_NAME = "shaderHealthInspectorManifestGateButton"
 EXPORT_COMPARE_AFTER_FIXES_BUTTON_OBJECT_NAME = "shaderHealthInspectorCompareAfterFixesButton"
+EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME = "shaderHealthInspectorSendToTrackerButton"
 ASSET_CLASS_HINT_LABEL_OBJECT_NAME = "shaderHealthInspectorAssetClassHintLabel"
 ISSUES_OWNER_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesOwnerFilter"
 ISSUES_VIEW_FILTER_OBJECT_NAME = "shaderHealthInspectorIssuesViewFilter"
@@ -220,6 +221,7 @@ class ExportActionCallbacks:
     on_compare_approved_manifest: Optional[Callable[[], None]] = None
     on_compare_after_fixes: Optional[Callable[[], None]] = None
     on_manifest_gate: Optional[Callable[[], None]] = None
+    on_send_to_tracker: Optional[Callable[[], None]] = None
 
 
 @dataclass(frozen=True)
@@ -821,6 +823,12 @@ def build_export_actions(
             EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
             "Diff against the approved manifest sidecar next to the scene when available.",
             export_callbacks.on_compare_approved_manifest,
+        ),
+        (
+            "Send to Tracker",
+            EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME,
+            "Publish the last validation summary to the first enabled task tracker.",
+            export_callbacks.on_send_to_tracker,
         ),
     )
     for index, (label, object_name, tooltip, callback) in enumerate(buttons):
