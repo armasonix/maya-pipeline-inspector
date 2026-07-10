@@ -212,6 +212,40 @@ def _panel_navigation_callbacks(
             qt_widgets,
             settings=True,
         ),
+        on_open_documentation=lambda: _open_documentation_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_check_for_updates=lambda: _show_check_for_updates_modal_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
+
+
+def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health import __version__
+    from shader_health.ui.update_modal import show_update_modal_shell
+
+    show_update_modal_shell(
+        qt_widgets,
+        parent=content,
+        installed_version=__version__,
+    )
+
+
+def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.ui.documentation_actions import open_documentation_url
+
+    user_config = _user_config_for_content(content)
+    opened = open_documentation_url(user_config.docs_url)
+    if opened:
+        return
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        "Could not open documentation URL. Check Settings → Basic → Documentation URL.",
     )
 
 

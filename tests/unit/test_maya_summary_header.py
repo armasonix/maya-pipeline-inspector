@@ -81,6 +81,10 @@ class FakeSignal:
     def connect(self, handler: Any) -> None:
         self.handlers.append(handler)
 
+    def emit(self, *_args: Any) -> None:
+        for handler in self.handlers:
+            handler()
+
 
 class FakeLabel(FakeWidget):
     def __init__(self, text: str = "") -> None:
@@ -179,6 +183,7 @@ class FakePushButton(FakeLabel):
         self.checked = False
         self.style_sheet = ""
         self.fixed_width: int | None = None
+        self.clicked = FakeSignal()
 
     def setEnabled(self, enabled: bool) -> None:
         self.enabled = enabled
@@ -246,6 +251,7 @@ class FakeVBoxLayout:
         self.margins: Optional[tuple[int, int, int, int]] = None
         self.spacing: Optional[int] = None
         self.widgets: list[Any] = []
+        self.widget_stretches: list[int | None] = []
         self.layouts: list[Any] = []
         self.stretches: list[int] = []
         if parent is not None:
@@ -259,8 +265,8 @@ class FakeVBoxLayout:
 
     def addWidget(self, widget: Any, stretch: Optional[int] = None) -> None:
         self.widgets.append(widget)
+        self.widget_stretches.append(stretch)
         self._attach_widget(widget)
-        _ = stretch
 
     def addLayout(self, layout: Any) -> None:
         self.layouts.append(layout)
@@ -539,6 +545,8 @@ def test_main_widget_contains_tabbed_shell():
 
     _find(widget, main_window.PANEL_HEADER_OBJECT_NAME)
     _find(widget, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
+    _find(widget, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    _find(widget, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
     stack = _find(widget, main_window.PANEL_BODY_STACK_OBJECT_NAME)
     assert len(stack.pages) == 2
     tabs = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME)
@@ -637,14 +645,32 @@ def test_update_severity_count_indicators_sets_colored_summary_labels():
     )
 
 
-def test_panel_header_includes_version_and_settings_gear():
-    header = main_window.build_panel_header(FakeQtWidgets, version="0.3.0")
+def test_panel_header_includes_version_settings_gear_documentation_and_updates_buttons():
+    opened: list[str] = []
+
+    header = main_window.build_panel_header(
+        FakeQtWidgets,
+        version="0.3.0",
+        navigation_callbacks=main_window.PanelNavigationCallbacks(
+            on_open_documentation=lambda: opened.append("docs"),
+            on_check_for_updates=lambda: opened.append("updates"),
+        ),
+    )
     title = _find(header, main_window.PANEL_HEADER_TITLE_OBJECT_NAME)
     gear = _find(header, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
+    docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
     assert "Maya Shader Health Inspector" in title.text
     assert "v0.3.0" in title.text
-    assert gear.tooltip == "Open settings"
+    assert gear.tooltip == main_window.SETTINGS_GEAR_TOOLTIP
+    assert docs.text == "Documentation"
+    assert docs.tooltip == main_window.DOCUMENTATION_BUTTON_TOOLTIP
+    assert updates.text == "Check for Updates"
+    assert updates.tooltip == main_window.CHECK_FOR_UPDATES_BUTTON_TOOLTIP
+    docs.clicked.emit()
+    updates.clicked.emit()
+    assert opened == ["docs", "updates"]
 
 
 def _find(widget: Any, object_name: str) -> Any:

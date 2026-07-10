@@ -10,8 +10,13 @@ from shader_health.maya.validation_pipeline import (
     list_asset_class_profile_options,
     list_workflow_profile_options,
 )
-from shader_health.ui.settings_widgets import find_child, wire_combo_changed
+from shader_health.ui.settings_widgets import (
+    find_child,
+    wire_combo_changed,
+    wire_line_edit_finished,
+)
 from shader_health.user_config import (
+    DEFAULT_USER_DOCS_URL,
     SUPPORTED_SCAN_SCOPES,
     SUPPORTED_UI_DENSITIES,
     SUPPORTED_USER_THEMES,
@@ -28,6 +33,7 @@ SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME = (
 )
 SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME = "shaderHealthInspectorSettingsUiDensityCombo"
 SETTINGS_THEME_COMBO_OBJECT_NAME = "shaderHealthInspectorSettingsThemeCombo"
+SETTINGS_DOCS_URL_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsDocsUrlInput"
 
 _DEFAULT_WORKFLOW_PROFILE_ID = "artist_relaxed"
 _SCAN_SCOPE_OPTIONS = (
@@ -122,6 +128,15 @@ def build_basic_settings_section(
     wire_combo_changed(theme_combo, on_preferences_changed)
     form.addRow("UI theme", theme_combo)
 
+    docs_url_input = qt_widgets.QLineEdit(user_config.docs_url)
+    docs_url_input.setObjectName(SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
+    docs_url_input.setPlaceholderText(DEFAULT_USER_DOCS_URL)
+    docs_url_input.setToolTip(
+        "Documentation opened by the panel header Documentation button."
+    )
+    wire_line_edit_finished(docs_url_input, on_preferences_changed)
+    form.addRow("Documentation URL", docs_url_input)
+
     layout.addLayout(form)
     layout.addStretch(1)
     return section
@@ -153,6 +168,7 @@ def read_basic_user_preferences_from_view(
     )
     density_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME)
     theme_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME)
+    docs_url_input = find_child(view, qt_widgets.QLineEdit, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
 
     default_profile_id = _combo_data(profile_combo)
     default_asset_class_id = _combo_data(asset_class_combo)
@@ -166,6 +182,7 @@ def read_basic_user_preferences_from_view(
         ui_density = "comfortable"
     if theme not in SUPPORTED_USER_THEMES:
         theme = "classic"
+    docs_url = _line_edit_text(docs_url_input) or DEFAULT_USER_DOCS_URL
 
     return current.with_updates(
         default_profile_id=default_profile_id,
@@ -173,6 +190,7 @@ def read_basic_user_preferences_from_view(
         default_scan_scope=default_scan_scope,
         ui_density=ui_density,
         theme=theme,
+        docs_url=docs_url,
     )
 
 
@@ -209,6 +227,11 @@ def update_basic_settings_view(
         _THEME_OPTIONS,
         user_config.theme,
     )
+    docs_url_input = find_child(view, qt_widgets.QLineEdit, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
+    if docs_url_input is not None:
+        set_text = getattr(docs_url_input, "setText", None)
+        if set_text is not None:
+            set_text(user_config.docs_url)
 
 
 def _workflow_profile_options() -> tuple[ProfileOption, ...]:
@@ -356,3 +379,12 @@ def _combo_data(combo: Any | None) -> str:
             return str(data)
     current_text = getattr(combo, "currentText", lambda: "")()
     return str(current_text or "")
+
+
+def _line_edit_text(field: Any | None) -> str:
+    if field is None:
+        return ""
+    text_fn = getattr(field, "text", None)
+    if text_fn is None:
+        return ""
+    return str(text_fn() or "").strip()
