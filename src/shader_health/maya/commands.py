@@ -28,8 +28,10 @@ from shader_health.maya.validation_pipeline import (
     DEFAULT_PROFILE_ID,
     ValidationRunResult,
     run_validation,
+    run_validation_for_user,
     waiver_sidecar_path_for_scene,
 )
+from shader_health.user_config import UserPreferences
 
 MENU_NAME = "shaderHealthInspectorMenu"
 MENU_LABEL = "Shader Health"
@@ -75,6 +77,8 @@ def validate_scene_action(
     profile_id: str = DEFAULT_PROFILE_ID,
     asset_class_id: str = "",
     studio_config: Optional[Any] = None,
+    extra_rule_paths: tuple[Path, ...] = (),
+    user_config: Optional[UserPreferences] = None,
 ) -> Any:
     """Validate the current Maya scene and return a UI-friendly result object."""
 
@@ -83,6 +87,8 @@ def validate_scene_action(
         profile_id=profile_id,
         asset_class_id=asset_class_id,
         studio_config=studio_config,
+        extra_rule_paths=extra_rule_paths,
+        user_config=user_config,
     )
 
 
@@ -91,6 +97,8 @@ def validate_selection_action(
     profile_id: str = DEFAULT_PROFILE_ID,
     asset_class_id: str = "",
     studio_config: Optional[Any] = None,
+    extra_rule_paths: tuple[Path, ...] = (),
+    user_config: Optional[UserPreferences] = None,
 ) -> Any:
     """Validate the current Maya selection and return a UI-friendly result object."""
 
@@ -99,6 +107,8 @@ def validate_selection_action(
         profile_id=profile_id,
         asset_class_id=asset_class_id,
         studio_config=studio_config,
+        extra_rule_paths=extra_rule_paths,
+        user_config=user_config,
     )
 
 
@@ -378,6 +388,8 @@ def _validate(
     profile_id: str,
     asset_class_id: str = "",
     studio_config: Optional[Any] = None,
+    extra_rule_paths: tuple[Path, ...] = (),
+    user_config: Optional[UserPreferences] = None,
 ) -> Any:
     from shader_health.maya.scanner import scan_scene, scan_selection, selection_node_names
 
@@ -400,13 +412,24 @@ def _validate(
             )
     else:
         raw_snapshot = scan_scene()
-    run = run_validation(
-        raw_snapshot,
-        profile_id=profile_id,
-        asset_class_id=asset_class_id or None,
-        scan_scope=scan_scope,
-        studio_config=studio_config,
-    )
+    if user_config is not None:
+        run = run_validation_for_user(
+            raw_snapshot,
+            user_config=user_config,
+            scan_scope=scan_scope,
+            profile_id=profile_id or None,
+            asset_class_id=asset_class_id or None,
+            studio_config=studio_config,
+        )
+    else:
+        run = run_validation(
+            raw_snapshot,
+            profile_id=profile_id,
+            asset_class_id=asset_class_id or None,
+            scan_scope=scan_scope,
+            studio_config=studio_config,
+            extra_rule_paths=extra_rule_paths,
+        )
     return _validation_result(run, action=f"validate_{scan_scope}")
 
 

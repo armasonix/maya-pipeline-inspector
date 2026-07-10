@@ -55,7 +55,7 @@ where = ["src"]
 include = ["shader_health*"]
 
 [tool.setuptools.package-data]
-shader_health = ["rules/**/*.json"]
+shader_health = ["rules/**/*.json", "ui/themes/*.qss"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

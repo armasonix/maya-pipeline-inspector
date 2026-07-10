@@ -42,11 +42,18 @@ from shader_health.ui.issues_triage import (
     read_issue_filter_prefs_from_widgets,
 )
 from shader_health.ui.qt import load_qt_widgets
+from shader_health.ui.settings_dirty_state import (
+    evaluate_settings_dirty_state_from_view,
+)
 from shader_health.ui.settings_panel import (
     SETTINGS_VIEW_OBJECT_NAME,
     SettingsActionCallbacks,
     read_connectors_from_settings_view,
+    read_user_preferences_from_settings_view,
     update_settings_view,
+)
+from shader_health.ui.user_preferences_ui import (
+    apply_user_preferences_to_panel,
 )
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
@@ -59,6 +66,7 @@ from shader_health.user_config import (
     UserPreferences,
     default_user_config_path,
     load_user_config,
+    merge_runtime_config,
     save_user_config,
 )
 
@@ -68,6 +76,9 @@ DEFAULT_DOCK_AREA = "right"
 VALIDATE_SPLITTER_SIZES_ATTR = "_shader_health_validate_splitter_sizes"
 STUDIO_CONFIG_ATTR = "_shader_health_studio_config"
 USER_CONFIG_ATTR = "_shader_health_user_config"
+MERGED_RUNTIME_CONFIG_ATTR = "_shader_health_merged_runtime_config"
+SAVED_STUDIO_CONFIG_ATTR = "_shader_health_saved_studio_config"
+SAVED_USER_CONFIG_ATTR = "_shader_health_saved_user_config"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -149,6 +160,7 @@ def _create_dockable_panel() -> Any:
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         studio_config, user_config = _load_runtime_configs()
+        merged_runtime = merge_runtime_config(studio_config, user_config)
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
@@ -166,6 +178,8 @@ def _create_dockable_panel() -> Any:
         self._shader_health_content = content
         setattr(content, STUDIO_CONFIG_ATTR, studio_config)
         setattr(content, USER_CONFIG_ATTR, user_config)
+        setattr(content, MERGED_RUNTIME_CONFIG_ATTR, merged_runtime)
+        _set_saved_settings_baselines(content, studio_config, user_config)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
@@ -235,6 +249,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_user_preferences_changed=lambda: _sync_user_preferences_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
 
 
@@ -276,6 +294,40 @@ def _disabled_farm_tab_state() -> FarmTabState:
     )
 
 
+def _set_saved_settings_baselines(
+    content: Any,
+    studio_config: StudioConfig,
+    user_config: UserPreferences,
+) -> None:
+    setattr(content, SAVED_STUDIO_CONFIG_ATTR, studio_config)
+    setattr(content, SAVED_USER_CONFIG_ATTR, user_config.normalized())
+
+
+def _saved_studio_config_for_content(content: Any) -> StudioConfig:
+    config = getattr(content, SAVED_STUDIO_CONFIG_ATTR, None)
+    if isinstance(config, StudioConfig):
+        return config
+    return _studio_config_for_content(content)
+
+
+def _saved_user_config_for_content(content: Any) -> UserPreferences:
+    config = getattr(content, SAVED_USER_CONFIG_ATTR, None)
+    if isinstance(config, UserPreferences):
+        return config
+    return _user_config_for_content(content).normalized()
+
+
+def _settings_dirty_state(content: Any, settings_view: Any, qt_widgets: Any):
+    return evaluate_settings_dirty_state_from_view(
+        settings_view,
+        qt_widgets,
+        current_studio=_studio_config_for_content(content),
+        saved_studio=_saved_studio_config_for_content(content),
+        current_user=_user_config_for_content(content).normalized(),
+        saved_user=_saved_user_config_for_content(content),
+    )
+
+
 def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> None:
     setattr(content, STUDIO_CONFIG_ATTR, config)
     _refresh_settings_view(content, qt_widgets)
@@ -283,7 +335,30 @@ def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> N
 
 def _set_user_config(content: Any, qt_widgets: Any, config: UserPreferences) -> None:
     setattr(content, USER_CONFIG_ATTR, config)
+    apply_user_preferences_to_panel(content, qt_widgets, config)
     _refresh_settings_view(content, qt_widgets)
+
+
+def _sync_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    updated = read_user_preferences_from_settings_view(
+        settings_view,
+        qt_widgets,
+        base=_user_config_for_content(content),
+    )
+    setattr(content, USER_CONFIG_ATTR, updated)
+    apply_user_preferences_to_panel(content, qt_widgets, updated)
+    _refresh_settings_view(content, qt_widgets)
+
+
+def _apply_user_preferences_to_panel(
+    content: Any,
+    qt_widgets: Any,
+    user_config: UserPreferences,
+) -> None:
+    apply_user_preferences_to_panel(content, qt_widgets, user_config)
 
 
 def _refresh_settings_view(content: Any, qt_widgets: Any, *, status_message: str = "") -> None:
@@ -296,6 +371,7 @@ def _refresh_settings_view(content: Any, qt_widgets: Any, *, status_message: str
         config=_studio_config_for_content(content),
         user_config=_user_config_for_content(content),
         status_message=status_message,
+        dirty_state=_settings_dirty_state(content, settings_view, qt_widgets),
     )
 
 
@@ -355,6 +431,14 @@ def _set_deadline_connector_enabled(content: Any, qt_widgets: Any, enabled: bool
     )
 
 
+def _commit_saved_settings_baselines(content: Any) -> None:
+    _set_saved_settings_baselines(
+        content,
+        _studio_config_for_content(content),
+        _user_config_for_content(content),
+    )
+
+
 def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_deadline_connector_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
@@ -367,6 +451,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_settings_status(content, qt_widgets, f"Save failed: {exc}")
         return
     _set_studio_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    _commit_saved_settings_baselines(content)
     _set_settings_status(
         content,
         qt_widgets,
@@ -379,6 +464,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    _sync_user_preferences_from_ui(content, qt_widgets)
     config = _user_config_for_content(content)
     path = config.config_path or default_user_config_path()
     try:
@@ -387,6 +473,7 @@ def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_settings_status(content, qt_widgets, f"User save failed: {exc}")
         return
     _set_user_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    _commit_saved_settings_baselines(content)
     _set_settings_status(
         content,
         qt_widgets,
@@ -404,6 +491,7 @@ def _load_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_settings_status(content, qt_widgets, f"User load failed: {exc}")
         return
     _set_user_config(content, qt_widgets, loaded)
+    _commit_saved_settings_baselines(content)
     _set_settings_status(
         content,
         qt_widgets,
@@ -422,6 +510,7 @@ def _load_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
         return
     _set_studio_config(content, qt_widgets, loaded)
     _refresh_farm_tab(content, qt_widgets)
+    _commit_saved_settings_baselines(content)
     _set_settings_status(
         content,
         qt_widgets,
@@ -830,17 +919,20 @@ def _run_validation_job(
         selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         studio_config = _studio_config_for_content(content)
+        user_config = _user_config_for_content(content)
         if scan_scope == "selection":
             result = validate_selection_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
+                user_config=user_config,
             )
         else:
             result = validate_scene_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
+                user_config=user_config,
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
@@ -2024,6 +2116,12 @@ def _refresh_issues_table_view(content: Any, qt_widgets: Any) -> None:
             if getattr(result, "auto_fix_available", False)
         ]
     pairs.sort(key=lambda pair: main_window._issue_sort_value(pair[0], str(sort_key)))
+    from shader_health.user_config import DEFAULT_MAX_ISSUES_DISPLAYED
+
+    max_issues = int(
+        getattr(content, "_shader_health_max_issues_displayed", DEFAULT_MAX_ISSUES_DISPLAYED)
+    )
+    pairs = pairs[: max(max_issues, 1)]
     display_rows = tuple(row for row, _ in pairs)
     display_results = tuple(result for _, result in pairs)
 

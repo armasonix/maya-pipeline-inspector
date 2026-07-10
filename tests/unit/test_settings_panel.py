@@ -9,8 +9,26 @@ from shader_health.studio_config import (
     PipelineSettings,
     StudioConfig,
 )
-from shader_health.ui import deadline_connector_section, settings_panel
+from shader_health.ui import deadline_connector_section, main_window, settings_panel
+from shader_health.ui.advanced_settings_section import (
+    SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
+    SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
+    SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
+    SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME,
+)
+from shader_health.ui.basic_settings_section import (
+    SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
+    SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
+    SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+    SETTINGS_THEME_COMBO_OBJECT_NAME,
+    SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
+)
+from shader_health.ui.settings_dirty_state import (
+    SETTINGS_DIRTY_BANNER_OBJECT_NAME,
+    SettingsDirtyState,
+)
 from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
+from shader_health.user_config import UserPreferences
 
 _DEADLINE_ENABLED = deadline_connector_section.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME
 _DEADLINE_DETAILS = deadline_connector_section.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME
@@ -37,6 +55,12 @@ class FakeWidget:
 
     def setMaximumWidth(self, width: int) -> None:
         self.maximum_width = width
+
+    def setLayout(self, layout: Any) -> None:
+        self.layout = layout
+        for widget in getattr(layout, "widgets", []):
+            if widget not in self.children:
+                self.children.append(widget)
 
 
 class FakeLabel(FakeWidget):
@@ -71,6 +95,7 @@ class FakeLineEdit(FakeWidget):
         self.fixed_width: int | None = None
         self.maximum_width: int | None = None
         self.size_policy: tuple[Any, Any] | None = None
+        self.tooltip = ""
 
     def setText(self, text: str) -> None:
         self.value = text
@@ -80,6 +105,9 @@ class FakeLineEdit(FakeWidget):
 
     def setPlaceholderText(self, text: str) -> None:
         self.placeholder = text
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
 
     def setFixedWidth(self, width: int) -> None:
         self.fixed_width = width
@@ -93,6 +121,67 @@ class FakeLineEdit(FakeWidget):
     @property
     def editingFinished(self) -> FakeSignal:
         return FakeSignal()
+
+
+class FakePlainTextEdit(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.value = text
+        self.placeholder = ""
+        self.tooltip = ""
+        self.plainTextChanged = FakeSignal()
+
+    def setPlainText(self, text: str) -> None:
+        self.value = text
+
+    def toPlainText(self) -> str:
+        return self.value
+
+    def setPlaceholderText(self, text: str) -> None:
+        self.placeholder = text
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
+
+
+class FakeComboBox(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.items: list[tuple[str, str]] = []
+        self.current_index = 0
+        self.tooltip = ""
+        self.currentIndexChanged = FakeSignal()
+
+    def addItem(self, text: str, user_data: str = "") -> None:
+        self.items.append((text, user_data or text))
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.current_index = index
+
+    def setCurrentText(self, text: str) -> None:
+        for index, (label, _data) in enumerate(self.items):
+            if label == text:
+                self.current_index = index
+                return
+
+    def currentText(self) -> str:
+        if not self.items:
+            return ""
+        return self.items[self.current_index][0]
+
+    def currentData(self):
+        if not self.items:
+            return None
+        return self.items[self.current_index][1]
+
+    def findData(self, data: str) -> int:
+        for index, (_label, item_data) in enumerate(self.items):
+            if item_data == data:
+                return index
+        return -1
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
 
 
 class FakeSignal:
@@ -151,6 +240,10 @@ class FakeVBoxLayout:
 
     def addLayout(self, layout: Any) -> None:
         self.layouts.append(layout)
+        parent_widget = self.parent
+        for _label, field in getattr(layout, "rows", []):
+            if parent_widget is not None and field not in parent_widget.children:
+                parent_widget.children.append(field)
         for widget in getattr(layout, "widgets", []):
             self._attach_widget(widget)
         for nested in getattr(layout, "layouts", []):
@@ -233,7 +326,9 @@ class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QLineEdit = FakeLineEdit
+    QPlainTextEdit = FakePlainTextEdit
     QPushButton = FakePushButton
+    QComboBox = FakeComboBox
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
     QFormLayout = FakeFormLayout
@@ -241,6 +336,245 @@ class FakeQtWidgets:
     QSizePolicy = FakeSizePolicy
     Qt = FakeQt
     QTabWidget = FakeTabWidget
+
+
+def test_basic_tab_exposes_user_preference_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(
+            default_profile_id="publish_strict",
+            default_scan_scope="selection",
+            ui_density="compact",
+            theme="dark",
+        ),
+    )
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    basic_tab = tabs.tabs[0][1]
+
+    assert _find(basic_tab, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME).currentData() == (
+        "publish_strict"
+    )
+    assert _find(basic_tab, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
+        "selection"
+    )
+    assert _find(basic_tab, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData() == "compact"
+    assert _find(basic_tab, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
+
+
+def test_advanced_tab_exposes_user_preference_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(
+            extra_rule_paths=("/show/rules",),
+            debug_logging=True,
+            max_issues_displayed=75,
+            mayapy_path="C:/mayapy.exe",
+        ),
+    )
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    advanced_tab = tabs.tabs[1][1]
+
+    assert _find(advanced_tab, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).toPlainText() == (
+        "/show/rules"
+    )
+    assert _find(advanced_tab, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).checked is True
+    assert _find(advanced_tab, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).text() == "75"
+    assert _find(advanced_tab, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == "C:/mayapy.exe"
+
+
+def test_read_user_preferences_from_settings_view_reads_basic_tab():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+    profile_combo = _find(view, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME)
+    profile_combo.setCurrentIndex(profile_combo.findData("supervisor_full"))
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(mayapy_path="C:/mayapy.exe"),
+    )
+
+    assert loaded.default_profile_id == "supervisor_full"
+    assert loaded.mayapy_path == ""
+
+
+def test_read_user_preferences_from_settings_view_merges_advanced_tab():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+    _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).setPlainText("/custom/rules")
+    _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).setChecked(True)
+    _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).setText("99")
+    _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).setText("D:/mayapy.exe")
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(view, FakeQtWidgets)
+
+    assert loaded.default_profile_id == "artist_relaxed"
+    assert loaded.extra_rule_paths == ("/custom/rules",)
+    assert loaded.debug_logging is True
+    assert loaded.max_issues_displayed == 99
+    assert loaded.mayapy_path == "D:/mayapy.exe"
+
+
+def test_update_settings_view_refreshes_basic_tab_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(
+            default_profile_id="deadline_critical",
+            default_scan_scope="selection",
+            ui_density="compact",
+            theme="dark",
+        ),
+    )
+
+    assert _find(view, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME).currentData() == (
+        "deadline_critical"
+    )
+    assert _find(view, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
+        "selection"
+    )
+    assert _find(view, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
+
+
+def test_update_settings_view_refreshes_advanced_tab_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(debug_logging=False),
+    )
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(
+            extra_rule_paths=("//farm/rules",),
+            debug_logging=True,
+            max_issues_displayed=200,
+            mayapy_path="C:/Maya/bin/mayapy.exe",
+        ),
+    )
+
+    assert _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).toPlainText() == "//farm/rules"
+    assert _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).checked is True
+    assert _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).text() == "200"
+    assert _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == "C:/Maya/bin/mayapy.exe"
+
+
+def test_read_user_preferences_from_settings_view_round_trips_all_basic_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+    expected = UserPreferences(
+        default_profile_id="supervisor_full",
+        default_asset_class_id="asset_class_background",
+        default_scan_scope="selection",
+        ui_density="compact",
+        theme="dark",
+        docs_url="https://example.test/docs",
+    )
+    _set_basic_tab_values(view, expected)
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(docs_url=expected.docs_url),
+    )
+
+    assert loaded.default_profile_id == expected.default_profile_id
+    assert loaded.default_asset_class_id == expected.default_asset_class_id
+    assert loaded.default_scan_scope == expected.default_scan_scope
+    assert loaded.ui_density == expected.ui_density
+    assert loaded.theme == expected.theme
+    assert loaded.docs_url == expected.docs_url
+
+
+def test_read_user_preferences_from_settings_view_round_trips_all_advanced_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed", debug_logging=False),
+    )
+    expected = UserPreferences(
+        extra_rule_paths=("/studio/rules", "//farm/share/td"),
+        debug_logging=True,
+        max_issues_displayed=180,
+        mayapy_path="C:/Program Files/Autodesk/Maya2025/bin/mayapy.exe",
+    )
+    _set_advanced_tab_values(view, expected)
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    assert loaded.default_profile_id == "artist_relaxed"
+    assert loaded.extra_rule_paths == expected.extra_rule_paths
+    assert loaded.debug_logging is expected.debug_logging
+    assert loaded.max_issues_displayed == expected.max_issues_displayed
+    assert loaded.mayapy_path == expected.mayapy_path
+
+
+def test_settings_panel_round_trips_basic_and_advanced_through_read_and_update():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(
+            default_profile_id="artist_relaxed",
+            debug_logging=False,
+            max_issues_displayed=500,
+        ),
+    )
+    expected = UserPreferences(
+        default_profile_id="deadline_critical",
+        default_asset_class_id="asset_class_prop",
+        default_scan_scope="selection",
+        ui_density="compact",
+        theme="dark",
+        extra_rule_paths=("D:/show/rules",),
+        debug_logging=True,
+        max_issues_displayed=64,
+        mayapy_path="D:/tools/mayapy.exe",
+        docs_url="https://example.test/docs",
+    )
+    _set_basic_tab_values(view, expected)
+    _set_advanced_tab_values(view, expected)
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(docs_url=expected.docs_url),
+    )
+
+    assert loaded.default_profile_id == expected.default_profile_id
+    assert loaded.default_asset_class_id == expected.default_asset_class_id
+    assert loaded.default_scan_scope == expected.default_scan_scope
+    assert loaded.ui_density == expected.ui_density
+    assert loaded.theme == expected.theme
+    assert loaded.extra_rule_paths == expected.extra_rule_paths
+    assert loaded.debug_logging is expected.debug_logging
+    assert loaded.max_issues_displayed == expected.max_issues_displayed
+    assert loaded.mayapy_path == expected.mayapy_path
+    assert loaded.docs_url == expected.docs_url
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=loaded,
+    )
+
+    _assert_basic_tab_values(view, expected)
+    _assert_advanced_tab_values(view, expected)
 
 
 def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
@@ -426,6 +760,167 @@ def test_require_tx_toggle_styles_off_state():
 
     assert toggle.text == "OFF"
     assert "#4a4a4a" in toggle.style_sheet
+
+
+def test_update_settings_view_shows_dirty_banner_for_unsaved_user_preferences():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+        dirty_state=SettingsDirtyState(user_dirty=True),
+    )
+
+    dirty_banner = _find(view, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
+    status_label = _find(view, settings_panel.SETTINGS_STATUS_LABEL_OBJECT_NAME)
+
+    assert dirty_banner.visible is True
+    assert dirty_banner.text == "Unsaved changes: user preferences."
+    assert "Save studio policy" in status_label.text
+
+
+def test_update_settings_view_hides_dirty_banner_after_save_message():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(),
+        dirty_state=SettingsDirtyState(),
+        status_message="User preferences saved to C:/Users/me/.shader_health/user.json.",
+    )
+
+    dirty_banner = _find(view, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
+    status_label = _find(view, settings_panel.SETTINGS_STATUS_LABEL_OBJECT_NAME)
+
+    assert dirty_banner.visible is False
+    assert "saved to" in status_label.text
+
+
+def test_build_main_widget_applies_user_defaults_to_validate_tab():
+    from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
+
+    widget = main_window.build_main_widget(
+        MainWindowFakeQtWidgets,
+        user_config=UserPreferences(
+            default_profile_id="deadline_critical",
+            default_asset_class_id="asset_class_hero",
+            default_scan_scope="selection",
+            theme="dark",
+        ),
+    )
+
+    profile_dropdown = _find(widget, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
+    asset_class_dropdown = _find(widget, main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME)
+
+    assert profile_dropdown.currentData() == "deadline_critical"
+    assert asset_class_dropdown.currentData() == "asset_class_hero"
+    assert widget._shader_health_scan_scope == "selection"
+    assert widget._shader_health_theme == "dark"
+
+
+def test_apply_user_preferences_to_panel_sets_validate_dropdowns_and_scan_scope():
+    from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
+
+    from shader_health.ui import main_window
+    from shader_health.ui.user_preferences_ui import apply_user_preferences_to_panel
+
+    widget = main_window.build_main_widget(
+        MainWindowFakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    apply_user_preferences_to_panel(
+        widget,
+        MainWindowFakeQtWidgets,
+        UserPreferences(
+            default_profile_id="deadline_critical",
+            default_asset_class_id="asset_class_hero",
+            default_scan_scope="selection",
+            ui_density="compact",
+        ),
+    )
+
+    profile_dropdown = _find(widget, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
+    asset_class_dropdown = _find(widget, main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME)
+
+    assert profile_dropdown.currentData() == "deadline_critical"
+    assert asset_class_dropdown.currentData() == "asset_class_hero"
+    assert widget._shader_health_scan_scope == "selection"
+    assert widget._shader_health_ui_density == "compact"
+
+
+def _set_combo_data(view: Any, object_name: str, data: str) -> None:
+    combo = _find(view, object_name)
+    combo.setCurrentIndex(combo.findData(data))
+
+
+def _set_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
+    _set_combo_data(
+        view,
+        SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
+        user_config.default_profile_id,
+    )
+    _set_combo_data(
+        view,
+        SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
+        user_config.default_asset_class_id,
+    )
+    _set_combo_data(
+        view,
+        SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+        user_config.default_scan_scope,
+    )
+    _set_combo_data(view, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME, user_config.ui_density)
+    _set_combo_data(view, SETTINGS_THEME_COMBO_OBJECT_NAME, user_config.theme)
+
+
+def _assert_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
+    assert _find(view, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME).currentData() == (
+        user_config.default_profile_id
+    )
+    assert _find(view, SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME).currentData() == (
+        user_config.default_asset_class_id
+    )
+    assert _find(view, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
+        user_config.default_scan_scope
+    )
+    assert (
+        _find(view, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData()
+        == user_config.ui_density
+    )
+    assert _find(view, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == user_config.theme
+
+
+def _set_advanced_tab_values(view: Any, user_config: UserPreferences) -> None:
+    _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).setPlainText(
+        "\n".join(user_config.extra_rule_paths)
+    )
+    _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).setChecked(user_config.debug_logging)
+    _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).setText(
+        str(user_config.max_issues_displayed)
+    )
+    _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).setText(user_config.mayapy_path)
+
+
+def _assert_advanced_tab_values(view: Any, user_config: UserPreferences) -> None:
+    assert _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).toPlainText() == (
+        "\n".join(user_config.extra_rule_paths)
+    )
+    assert (
+        _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).checked
+        is user_config.debug_logging
+    )
+    assert _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).text() == str(
+        user_config.max_issues_displayed
+    )
+    assert _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == user_config.mayapy_path
 
 
 def _find(widget: Any, object_name: str) -> Any:

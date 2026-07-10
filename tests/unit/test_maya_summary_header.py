@@ -12,15 +12,44 @@ class FakeWidget:
         self.layout: Optional[FakeVBoxLayout] = None
         self.size_policy: Optional[tuple[Any, Any]] = None
         self.visible = True
+        self.style_sheet = ""
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
+
+    def setStyleSheet(self, style: str) -> None:
+        self.style_sheet = style
 
     def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
         self.size_policy = (horizontal, vertical)
 
     def setVisible(self, visible: bool) -> None:
         self.visible = visible
+
+    def setLayout(self, layout: Any) -> None:
+        self.layout = layout
+        for widget in getattr(layout, "widgets", []):
+            if widget not in self.children:
+                self.children.append(widget)
+
+
+class FakePlainTextEdit(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.value = text
+        self.plainTextChanged = FakeSignal()
+
+    def setPlainText(self, text: str) -> None:
+        self.value = text
+
+    def toPlainText(self) -> str:
+        return self.value
+
+    def setPlaceholderText(self, text: str) -> None:
+        _ = text
+
+    def setToolTip(self, text: str) -> None:
+        _ = text
 
 
 class FakeLineEdit(FakeWidget):
@@ -35,6 +64,9 @@ class FakeLineEdit(FakeWidget):
         return self.value
 
     def setPlaceholderText(self, text: str) -> None:
+        _ = text
+
+    def setToolTip(self, text: str) -> None:
         _ = text
 
     @property
@@ -391,6 +423,7 @@ class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QLineEdit = FakeLineEdit
+    QPlainTextEdit = FakePlainTextEdit
     QFrame = FakeQFrame
     QScrollArea = FakeQScrollArea
     QProgressBar = FakeProgressBar

@@ -22,6 +22,31 @@ class FakeWidget:
     def setVisible(self, visible: bool) -> None:
         self.visible = visible
 
+    def setLayout(self, layout: Any) -> None:
+        self.layout = layout
+        for widget in getattr(layout, "widgets", []):
+            if widget not in self.children:
+                self.children.append(widget)
+
+
+class FakePlainTextEdit(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.value = text
+        self.plainTextChanged = FakeSignal()
+
+    def setPlainText(self, text: str) -> None:
+        self.value = text
+
+    def toPlainText(self) -> str:
+        return self.value
+
+    def setPlaceholderText(self, text: str) -> None:
+        _ = text
+
+    def setToolTip(self, text: str) -> None:
+        _ = text
+
 
 class FakeLineEdit(FakeWidget):
     def __init__(self, text: str = "") -> None:
@@ -35,6 +60,9 @@ class FakeLineEdit(FakeWidget):
         return self.value
 
     def setPlaceholderText(self, text: str) -> None:
+        _ = text
+
+    def setToolTip(self, text: str) -> None:
         _ = text
 
     @property
@@ -101,15 +129,44 @@ class FakePushButton(FakeLabel):
 class FakeComboBox(FakeWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.items: list[str] = []
+        self.items: list[tuple[str, str]] = []
+        self.current_index = 0
         self.current_text = ""
         self.tooltip = ""
+        self.currentIndexChanged = FakeSignal()
+
+    def addItem(self, text: str, user_data: str = "") -> None:
+        self.items.append((text, user_data or text))
 
     def addItems(self, items: list[str]) -> None:
-        self.items.extend(items)
+        for item in items:
+            self.addItem(item)
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.current_index = index
 
     def setCurrentText(self, text: str) -> None:
+        for index, (label, _data) in enumerate(self.items):
+            if label == text:
+                self.current_index = index
+                return
         self.current_text = text
+
+    def currentText(self) -> str:
+        if not self.items:
+            return self.current_text
+        return self.items[self.current_index][0]
+
+    def currentData(self):
+        if not self.items:
+            return None
+        return self.items[self.current_index][1]
+
+    def findData(self, data: str) -> int:
+        for index, (_label, item_data) in enumerate(self.items):
+            if item_data == data:
+                return index
+        return -1
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
@@ -175,6 +232,8 @@ class FakeVBoxLayout:
 
     def addLayout(self, layout: Any) -> None:
         self.layouts.append(layout)
+        for _label, field in getattr(layout, "rows", []):
+            self._attach_widget(field)
         for widget in getattr(layout, "widgets", []):
             self._attach_widget(widget)
         for nested in getattr(layout, "layouts", []):
@@ -361,6 +420,7 @@ class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QLineEdit = FakeLineEdit
+    QPlainTextEdit = FakePlainTextEdit
     QFrame = FakeQFrame
     QScrollArea = FakeQScrollArea
     QProgressBar = FakeProgressBar
@@ -408,14 +468,14 @@ def test_issues_table_builds_filter_and_sort_controls():
     assert filters_row.layout is not None
     assert widget.layout.widgets[0] is filters_row
     assert "Severity:" in severity_filter.tooltip
-    assert severity_filter.items == [
+    assert [label for label, _data in severity_filter.items] == [
         main_window.ALL_SEVERITIES_LABEL,
         "critical",
         "error",
         "warning",
     ]
-    assert sort_dropdown.items == list(main_window.ISSUES_SORT_KEYS)
-    assert sort_dropdown.current_text == "severity"
+    assert [label for label, _data in sort_dropdown.items] == list(main_window.ISSUES_SORT_KEYS)
+    assert sort_dropdown.currentText() == "severity"
     assert table.sorting_enabled is True
 
 
