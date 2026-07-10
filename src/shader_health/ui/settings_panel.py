@@ -23,6 +23,12 @@ from shader_health.ui.basic_settings_section import (
     read_basic_user_preferences_from_view,
     update_basic_settings_view,
 )
+from shader_health.ui.settings_dirty_state import (
+    DEFAULT_SETTINGS_STATUS_MESSAGE,
+    SETTINGS_DIRTY_BANNER_OBJECT_NAME,
+    SettingsDirtyState,
+    dirty_indicator_text,
+)
 from shader_health.ui.settings_tabs import (
     SETTINGS_ADVANCED_TAB_OBJECT_NAME,
     SETTINGS_BASIC_TAB_OBJECT_NAME,
@@ -127,9 +133,15 @@ def build_settings_view(
     user_path_label.setWordWrap(True)
     layout.addWidget(user_path_label)
 
-    status_label = qt_widgets.QLabel(
-        "Save studio policy and connectors separately from per-user preferences."
-    )
+    dirty_banner = qt_widgets.QLabel("")
+    dirty_banner.setObjectName(SETTINGS_DIRTY_BANNER_OBJECT_NAME)
+    dirty_banner.setWordWrap(True)
+    set_visible = getattr(dirty_banner, "setVisible", None)
+    if set_visible is not None:
+        set_visible(False)
+    layout.addWidget(dirty_banner)
+
+    status_label = qt_widgets.QLabel(DEFAULT_SETTINGS_STATUS_MESSAGE)
     status_label.setObjectName(SETTINGS_STATUS_LABEL_OBJECT_NAME)
     status_label.setWordWrap(True)
     layout.addWidget(status_label)
@@ -197,6 +209,7 @@ def update_settings_view(
     config: StudioConfig,
     user_config: UserPreferences | None = None,
     status_message: str = "",
+    dirty_state: SettingsDirtyState | None = None,
 ) -> None:
     """Refresh settings controls from the active studio and user config."""
 
@@ -235,6 +248,19 @@ def update_settings_view(
         status_label = find_child(view, qt_widgets.QLabel, SETTINGS_STATUS_LABEL_OBJECT_NAME)
         if status_label is not None:
             status_label.setText(status_message)
+    else:
+        status_label = find_child(view, qt_widgets.QLabel, SETTINGS_STATUS_LABEL_OBJECT_NAME)
+        if status_label is not None:
+            status_label.setText(DEFAULT_SETTINGS_STATUS_MESSAGE)
+
+    if dirty_state is not None:
+        dirty_banner = find_child(view, qt_widgets.QLabel, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
+        if dirty_banner is not None:
+            banner_text = dirty_indicator_text(dirty_state)
+            dirty_banner.setText(banner_text)
+            set_visible = getattr(dirty_banner, "setVisible", None)
+            if set_visible is not None:
+                set_visible(bool(banner_text))
 
 
 def read_user_preferences_from_settings_view(

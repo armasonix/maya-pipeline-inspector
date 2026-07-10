@@ -22,6 +22,10 @@ from shader_health.ui.basic_settings_section import (
     SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
 )
+from shader_health.ui.settings_dirty_state import (
+    SETTINGS_DIRTY_BANNER_OBJECT_NAME,
+    SettingsDirtyState,
+)
 from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
 from shader_health.user_config import UserPreferences
 
@@ -648,6 +652,47 @@ def test_require_tx_toggle_styles_off_state():
 
     assert toggle.text == "OFF"
     assert "#4a4a4a" in toggle.style_sheet
+
+
+def test_update_settings_view_shows_dirty_banner_for_unsaved_user_preferences():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+        dirty_state=SettingsDirtyState(user_dirty=True),
+    )
+
+    dirty_banner = _find(view, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
+    status_label = _find(view, settings_panel.SETTINGS_STATUS_LABEL_OBJECT_NAME)
+
+    assert dirty_banner.visible is True
+    assert dirty_banner.text == "Unsaved changes: user preferences."
+    assert "Save studio policy" in status_label.text
+
+
+def test_update_settings_view_hides_dirty_banner_after_save_message():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(),
+        dirty_state=SettingsDirtyState(),
+        status_message="User preferences saved to C:/Users/me/.shader_health/user.json.",
+    )
+
+    dirty_banner = _find(view, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
+    status_label = _find(view, settings_panel.SETTINGS_STATUS_LABEL_OBJECT_NAME)
+
+    assert dirty_banner.visible is False
+    assert "saved to" in status_label.text
 
 
 def test_build_main_widget_applies_user_defaults_to_validate_tab():
