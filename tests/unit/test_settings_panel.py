@@ -9,6 +9,7 @@ from shader_health.studio_config import (
     PipelineSettings,
     StudioConfig,
     StudioEnvironmentSettings,
+    WaiverDefaultsSettings,
 )
 from shader_health.ui import deadline_connector_section, main_window, settings_panel
 from shader_health.ui.advanced_settings_section import (
@@ -38,6 +39,11 @@ from shader_health.ui.studio_environment_section import (
     SETTINGS_STUDIO_ENVIRONMENT_RIGHT_COLUMN_OBJECT_NAME,
     SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME,
     SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME,
+)
+from shader_health.ui.studio_policy_section import (
+    SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
+    SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME,
+    SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME,
 )
 from shader_health.user_config import UserPreferences
 
@@ -746,13 +752,51 @@ def test_settings_view_shows_studio_and_user_config_paths():
     assert "user.json" in user_label.text
 
 
+def test_studio_tab_exposes_policy_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            studio_name="Demo Studio",
+            pipeline=PipelineSettings(
+                waiver_defaults=WaiverDefaultsSettings(default_approved_by="pipeline_td"),
+                pinned_workflow_profile_ids=("artist_relaxed",),
+            ),
+        ),
+    )
+    assert _find(view, SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME).text() == "Demo Studio"
+    assert _find(view, SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME).text() == "pipeline_td"
+    assert _find(view, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).toPlainText() == (
+        "artist_relaxed"
+    )
+
+
+def test_studio_config_from_settings_view_reads_studio_policy_fields():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    _find(view, SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME).setText("Network Studio")
+    _find(view, SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME).setText("lead_td")
+    _find(view, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).setPlainText(
+        "publish_strict"
+    )
+
+    studio = studio_config_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=StudioConfig(),
+    )
+
+    assert studio.studio_name == "Network Studio"
+    assert studio.pipeline.waiver_defaults.default_approved_by == "lead_td"
+    assert studio.pipeline.pinned_workflow_profile_ids == ("publish_strict",)
+
+
 def test_studio_tab_clarifies_pipeline_policy_scope():
     view = settings_panel.build_settings_view(FakeQtWidgets)
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
     studio_tab = tabs.tabs[3][1]
-    intro = studio_tab.layout.widgets[0]
+    policy_section = studio_tab.layout.widgets[0]
+    intro = policy_section.layout.widgets[0]
 
-    assert "pipeline policy" in intro.text.lower()
+    assert "shader_health_studio.json" in intro.text
     assert "Studio Environment" in intro.text
 
 

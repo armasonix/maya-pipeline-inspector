@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+from shader_health.core.manifest_gate import ManifestGatePolicy
 from shader_health.core.rule_loader import RuleOverride
 
 STUDIO_CONFIG_SCHEMA_VERSION = "2.0"
@@ -30,6 +31,33 @@ TX_DERIVATIVE_RULE_IDS = (
     "common.texture.optimized.fresh",
     "common.texture.optimized.udim_tx.missing",
 )
+DEFAULT_WAIVER_EXPIRY_DAYS = 30
+
+
+@dataclass(frozen=True)
+class WaiverDefaultsSettings:
+    """Studio defaults applied when artists create waiver sidecar entries."""
+
+    default_approved_by: str = ""
+    default_expiry_days: int = DEFAULT_WAIVER_EXPIRY_DAYS
+    allow_critical_waivers: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "default_approved_by": self.default_approved_by,
+            "default_expiry_days": int(self.default_expiry_days),
+            "allow_critical_waivers": self.allow_critical_waivers,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> WaiverDefaultsSettings:
+        if not data:
+            return cls()
+        return cls(
+            default_approved_by=str(data.get("default_approved_by", "") or ""),
+            default_expiry_days=int(data.get("default_expiry_days", DEFAULT_WAIVER_EXPIRY_DAYS)),
+            allow_critical_waivers=bool(data.get("allow_critical_waivers", False)),
+        )
 
 
 @dataclass(frozen=True)
@@ -37,16 +65,53 @@ class PipelineSettings:
     """Pipeline policy toggles controlled by studio configuration."""
 
     require_tx_derivatives: bool = True
+    waiver_defaults: WaiverDefaultsSettings = WaiverDefaultsSettings()
+    manifest_gate_defaults: ManifestGatePolicy = ManifestGatePolicy()
+    pinned_workflow_profile_ids: tuple[str, ...] = ()
+    pinned_asset_class_profile_ids: tuple[str, ...] = ()
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> PipelineSettings:
         if not data:
             return cls()
-        value = data.get("require_tx_derivatives", True)
-        return cls(require_tx_derivatives=bool(value))
+        waiver_raw = data.get("waiver_defaults")
+        waiver_defaults = (
+            WaiverDefaultsSettings.from_mapping(waiver_raw)
+            if isinstance(waiver_raw, Mapping)
+            else WaiverDefaultsSettings()
+        )
+        manifest_raw = data.get("manifest_gate_defaults")
+        manifest_gate_defaults = ManifestGatePolicy.from_mapping(
+            manifest_raw if isinstance(manifest_raw, Mapping) else None
+        )
+        return cls(
+            require_tx_derivatives=bool(data.get("require_tx_derivatives", True)),
+            waiver_defaults=waiver_defaults,
+            manifest_gate_defaults=manifest_gate_defaults,
+            pinned_workflow_profile_ids=_profile_ids_from_value(
+                data.get("pinned_workflow_profile_ids")
+            ),
+            pinned_asset_class_profile_ids=_profile_ids_from_value(
+                data.get("pinned_asset_class_profile_ids")
+            ),
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"require_tx_derivatives": self.require_tx_derivatives}
+        return {
+            "require_tx_derivatives": self.require_tx_derivatives,
+            "waiver_defaults": self.waiver_defaults.to_dict(),
+            "manifest_gate_defaults": {
+                "max_new_changes": int(self.manifest_gate_defaults.max_new_changes),
+                "max_fingerprint_changes": int(
+                    self.manifest_gate_defaults.max_fingerprint_changes
+                ),
+                "block_on_new_textures": bool(
+                    self.manifest_gate_defaults.block_on_new_textures
+                ),
+            },
+            "pinned_workflow_profile_ids": list(self.pinned_workflow_profile_ids),
+            "pinned_asset_class_profile_ids": list(self.pinned_asset_class_profile_ids),
+        }
 
 
 @dataclass(frozen=True)
@@ -475,6 +540,12 @@ def _optional_str(value: str) -> str | None:
 def _optional_path(value: str) -> Path | None:
     text = _optional_str(value)
     return Path(text) if text else None
+
+
+def _profile_ids_from_value(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(str(item).strip() for item in value if str(item).strip())
 
 
 def discover_studio_config_path() -> Path | None:

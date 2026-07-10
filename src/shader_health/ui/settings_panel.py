@@ -39,16 +39,15 @@ from shader_health.ui.settings_tabs import (
     build_placeholder_tab,
     get_settings_tab_spec,
 )
-from shader_health.ui.settings_widgets import (
-    apply_toggle_style,
-    build_settings_toggle,
-    find_child,
-    toggle_label,
-    wire_button,
-)
+from shader_health.ui.settings_widgets import find_child, wire_button
 from shader_health.ui.studio_environment_section import (
     build_studio_environment_section,
     update_studio_environment_view,
+)
+from shader_health.ui.studio_policy_section import (
+    SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME,
+    build_studio_policy_section,
+    update_studio_policy_view,
 )
 from shader_health.user_config import UserPreferences
 
@@ -69,7 +68,6 @@ SETTINGS_LOAD_BUTTON_OBJECT_NAME = SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME
 SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME
 
 SETTINGS_PIPELINE_SECTION_OBJECT_NAME = "shaderHealthInspectorSettingsPipelineSection"
-SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME = "shaderHealthInspectorSettingsRequireTxToggle"
 
 
 @dataclass(frozen=True)
@@ -81,6 +79,7 @@ class SettingsActionCallbacks:
     on_deadline_enabled_changed: Optional[Callable[[bool], None]] = None
     on_deadline_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
+    on_studio_policy_changed: Optional[Callable[[], None]] = None
     on_save_studio_settings: Optional[Callable[[], None]] = None
     on_load_studio_settings: Optional[Callable[[], None]] = None
     on_save_user_preferences: Optional[Callable[[], None]] = None
@@ -189,6 +188,8 @@ def build_require_tx_toggle(
 ) -> Any:
     """Build a green/gray toggle button for the .tx pipeline policy."""
 
+    from shader_health.ui.settings_widgets import build_settings_toggle
+
     return build_settings_toggle(
         qt_widgets,
         object_name=SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME,
@@ -219,14 +220,7 @@ def update_settings_view(
 ) -> None:
     """Refresh settings controls from the active studio and user config."""
 
-    toggle = find_child(view, qt_widgets.QWidget, SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
-    if toggle is not None:
-        set_checked = getattr(toggle, "setChecked", None)
-        if set_checked is not None:
-            set_checked(config.pipeline.require_tx_derivatives)
-        toggle.setText(toggle_label(config.pipeline.require_tx_derivatives))
-        apply_toggle_style(toggle, config.pipeline.require_tx_derivatives)
-
+    update_studio_policy_view(view, qt_widgets, config)
     update_connector_views(view, qt_widgets, config.connectors)
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
 
@@ -407,47 +401,14 @@ def _build_studio_tab(
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
-
-    intro = qt_widgets.QLabel(
-        "Studio-wide pipeline policy from shader_health_studio.json. "
-        "Network paths live under Studio Environment; integrations under Connectors."
-    )
-    intro.setWordWrap(True)
-    layout.addWidget(intro)
-
-    pipeline_section = qt_widgets.QWidget()
-    pipeline_section.setObjectName(SETTINGS_PIPELINE_SECTION_OBJECT_NAME)
-    pipeline_layout = qt_widgets.QVBoxLayout(pipeline_section)
-    pipeline_layout.setContentsMargins(0, 0, 0, 0)
-    pipeline_layout.setSpacing(4)
-
-    title = qt_widgets.QLabel("Pipeline Policy")
-    set_style = getattr(title, "setStyleSheet", None)
-    if set_style is not None:
-        set_style("font-weight: bold;")
-    pipeline_layout.addWidget(title)
-
-    row = qt_widgets.QHBoxLayout()
-    row.addWidget(
-        qt_widgets.QLabel("Require .tx optimized texture derivatives")
-    )
-    row.addStretch(1)
-    row.addWidget(
-        build_require_tx_toggle(
+    layout.addWidget(
+        build_studio_policy_section(
             qt_widgets,
-            enabled=config.pipeline.require_tx_derivatives,
-            on_changed=callbacks.on_require_tx_changed,
+            config,
+            on_require_tx_changed=callbacks.on_require_tx_changed,
+            on_settings_changed=callbacks.on_studio_policy_changed,
         )
     )
-    pipeline_layout.addLayout(row)
-
-    hint = qt_widgets.QLabel(
-        "When enabled, validation checks that raster textures have matching .tx files. "
-        "Disable for studios that do not bake or use OpenImageIO derivatives."
-    )
-    hint.setWordWrap(True)
-    pipeline_layout.addWidget(hint)
-    layout.addWidget(pipeline_section)
     layout.addStretch(1)
     return tab
 

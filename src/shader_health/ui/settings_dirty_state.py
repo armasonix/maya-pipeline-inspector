@@ -9,6 +9,7 @@ from shader_health.connectors_registry import (
 )
 from shader_health.studio_config import ConnectorSettings, StudioConfig
 from shader_health.ui.studio_environment_section import read_studio_environment_from_view
+from shader_health.ui.studio_policy_section import read_studio_policy_from_view
 from shader_health.user_config import UserPreferences
 
 SETTINGS_DIRTY_BANNER_OBJECT_NAME = "shaderHealthInspectorSettingsDirtyBanner"
@@ -74,9 +75,13 @@ def studio_config_from_settings_view(
         qt_widgets,
         base=base.studio_environment,
     )
-    return base.with_updates(
-        connectors=connectors,
-        studio_environment=studio_environment,
+    return read_studio_policy_from_view(
+        view,
+        qt_widgets,
+        base=base.with_updates(
+            connectors=connectors,
+            studio_environment=studio_environment,
+        ),
     )
 
 
