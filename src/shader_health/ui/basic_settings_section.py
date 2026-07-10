@@ -14,6 +14,7 @@ from shader_health.ui.settings_widgets import find_child, wire_combo_changed
 from shader_health.user_config import (
     SUPPORTED_SCAN_SCOPES,
     SUPPORTED_UI_DENSITIES,
+    SUPPORTED_USER_THEMES,
     UserPreferences,
 )
 
@@ -26,6 +27,7 @@ SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME = (
     "shaderHealthInspectorSettingsDefaultScanScopeCombo"
 )
 SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME = "shaderHealthInspectorSettingsUiDensityCombo"
+SETTINGS_THEME_COMBO_OBJECT_NAME = "shaderHealthInspectorSettingsThemeCombo"
 
 _DEFAULT_WORKFLOW_PROFILE_ID = "artist_relaxed"
 _SCAN_SCOPE_OPTIONS = (
@@ -35,6 +37,10 @@ _SCAN_SCOPE_OPTIONS = (
 _UI_DENSITY_OPTIONS = (
     ("Comfortable", "comfortable"),
     ("Compact", "compact"),
+)
+_THEME_OPTIONS = (
+    ("Classic", "classic"),
+    ("Dark", "dark"),
 )
 
 
@@ -106,6 +112,16 @@ def build_basic_settings_section(
     wire_combo_changed(density_combo, on_preferences_changed)
     form.addRow("UI density", density_combo)
 
+    theme_combo = _build_value_combo(
+        qt_widgets,
+        object_name=SETTINGS_THEME_COMBO_OBJECT_NAME,
+        options=_THEME_OPTIONS,
+        selected_value=user_config.theme,
+        tooltip="Panel color theme. Changes apply immediately for live preview.",
+    )
+    wire_combo_changed(theme_combo, on_preferences_changed)
+    form.addRow("UI theme", theme_combo)
+
     layout.addLayout(form)
     layout.addStretch(1)
     return section
@@ -136,22 +152,27 @@ def read_basic_user_preferences_from_view(
         SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
     )
     density_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME)
+    theme_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME)
 
     default_profile_id = _combo_data(profile_combo)
     default_asset_class_id = _combo_data(asset_class_combo)
     default_scan_scope = _combo_data(scan_scope_combo) or "scene"
     ui_density = _combo_data(density_combo) or "comfortable"
+    theme = _combo_data(theme_combo) or "classic"
 
     if default_scan_scope not in SUPPORTED_SCAN_SCOPES:
         default_scan_scope = "scene"
     if ui_density not in SUPPORTED_UI_DENSITIES:
         ui_density = "comfortable"
+    if theme not in SUPPORTED_USER_THEMES:
+        theme = "classic"
 
     return current.with_updates(
         default_profile_id=default_profile_id,
         default_asset_class_id=default_asset_class_id,
         default_scan_scope=default_scan_scope,
         ui_density=ui_density,
+        theme=theme,
     )
 
 
@@ -182,6 +203,11 @@ def update_basic_settings_view(
         find_child(view, qt_widgets.QComboBox, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME),
         _UI_DENSITY_OPTIONS,
         user_config.ui_density,
+    )
+    _set_value_combo_selection(
+        find_child(view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME),
+        _THEME_OPTIONS,
+        user_config.theme,
     )
 
 

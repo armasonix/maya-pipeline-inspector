@@ -5,6 +5,7 @@ from typing import Any
 
 from shader_health.ui import main_window
 from shader_health.ui.settings_widgets import find_child
+from shader_health.ui.theme_loader import apply_panel_theme
 from shader_health.user_config import UserPreferences
 
 _UI_DENSITY_MARGINS = {
@@ -47,6 +48,7 @@ def apply_user_preferences_to_panel(
     content._shader_health_scan_scope = user_config.default_scan_scope
     content._shader_health_ui_density = user_config.ui_density
     _apply_ui_density(content, qt_widgets, user_config.ui_density)
+    apply_panel_theme(content, user_config.theme)
 
 
 def _widget_layout(widget: Any) -> Any | None:

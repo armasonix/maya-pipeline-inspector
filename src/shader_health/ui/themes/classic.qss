@@ -1,0 +1,107 @@
+/* Classic theme — neutral light panel chrome for Maya docked UI. */
+
+QWidget#shaderHealthInspectorPanelContent,
+QWidget#shaderHealthInspectorPanelContent QWidget {
+    background-color: #ececec;
+    color: #1f1f1f;
+}
+
+QLabel {
+    color: #1f1f1f;
+}
+
+QPushButton {
+    background-color: #d8d8d8;
+    color: #1f1f1f;
+    border: 1px solid #a8a8a8;
+    border-radius: 4px;
+    padding: 4px 10px;
+}
+
+QPushButton:hover {
+    background-color: #c8c8c8;
+}
+
+QPushButton:pressed {
+    background-color: #b0b0b0;
+}
+
+QComboBox {
+    background-color: #f5f5f5;
+    color: #1f1f1f;
+    border: 1px solid #a8a8a8;
+    border-radius: 3px;
+    padding: 2px 6px;
+}
+
+QLineEdit,
+QTextEdit,
+QPlainTextEdit {
+    background-color: #ffffff;
+    color: #1f1f1f;
+    border: 1px solid #a8a8a8;
+    border-radius: 3px;
+    selection-background-color: #4a90d9;
+    selection-color: #ffffff;
+}
+
+QTabWidget::pane {
+    border: 1px solid #b8b8b8;
+    background-color: #ececec;
+}
+
+QTabBar::tab {
+    background-color: #d4d4d4;
+    color: #1f1f1f;
+    border: 1px solid #b8b8b8;
+    border-bottom: none;
+    padding: 4px 10px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #ececec;
+}
+
+QTableWidget {
+    background-color: #ffffff;
+    color: #1f1f1f;
+    gridline-color: #c8c8c8;
+    border: 1px solid #b8b8b8;
+    selection-background-color: #4a90d9;
+    selection-color: #ffffff;
+}
+
+QHeaderView::section {
+    background-color: #d8d8d8;
+    color: #1f1f1f;
+    border: 1px solid #b8b8b8;
+    padding: 3px 6px;
+}
+
+QGroupBox {
+    color: #1f1f1f;
+    border: 1px solid #b8b8b8;
+    border-radius: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+}
+
+QScrollArea {
+    background-color: #ececec;
+    border: none;
+}
+
+QCheckBox {
+    color: #1f1f1f;
+}
+
+QSplitter::handle {
+    background-color: #b8b8b8;
+}

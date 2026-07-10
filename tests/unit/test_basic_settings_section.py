@@ -4,6 +4,7 @@ from shader_health.ui.basic_settings_section import (
     SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+    SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
     build_basic_settings_section,
     read_basic_user_preferences_from_view,
@@ -151,6 +152,7 @@ def test_basic_settings_section_exposes_profile_asset_scan_scope_and_density_con
             default_asset_class_id="asset_class_hero",
             default_scan_scope="selection",
             ui_density="compact",
+            theme="dark",
         ),
     )
 
@@ -158,11 +160,13 @@ def test_basic_settings_section_exposes_profile_asset_scan_scope_and_density_con
     asset_class_combo = _find(section, SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME)
     scan_scope_combo = _find(section, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME)
     density_combo = _find(section, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME)
+    theme_combo = _find(section, SETTINGS_THEME_COMBO_OBJECT_NAME)
 
     assert profile_combo.currentData() == "publish_strict"
     assert asset_class_combo.currentData() == "asset_class_hero"
     assert scan_scope_combo.currentData() == "selection"
     assert density_combo.currentData() == "compact"
+    assert theme_combo.currentData() == "dark"
 
 
 def test_read_basic_user_preferences_from_view_round_trips_combo_values():
@@ -178,6 +182,7 @@ def test_read_basic_user_preferences_from_view_round_trips_combo_values():
     )
     _find(section, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).setCurrentIndex(1)
     _find(section, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).setCurrentIndex(1)
+    _find(section, SETTINGS_THEME_COMBO_OBJECT_NAME).setCurrentIndex(1)
 
     loaded = read_basic_user_preferences_from_view(
         section,
@@ -189,6 +194,7 @@ def test_read_basic_user_preferences_from_view_round_trips_combo_values():
     assert loaded.default_asset_class_id == "asset_class_prop"
     assert loaded.default_scan_scope == "selection"
     assert loaded.ui_density == "compact"
+    assert loaded.theme == "dark"
     assert loaded.docs_url == "https://example.test/docs"
 
 
@@ -206,6 +212,7 @@ def test_update_basic_settings_view_refreshes_controls():
             default_asset_class_id="asset_class_background",
             default_scan_scope="selection",
             ui_density="compact",
+            theme="dark",
         ),
     )
 
@@ -219,6 +226,7 @@ def test_update_basic_settings_view_refreshes_controls():
         "selection"
     )
     assert _find(section, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData() == "compact"
+    assert _find(section, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
 
 
 def _find(widget: object, object_name: str) -> object:

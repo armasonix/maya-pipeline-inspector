@@ -12,9 +12,13 @@ class FakeWidget:
         self.layout: Optional[FakeVBoxLayout] = None
         self.size_policy: Optional[tuple[Any, Any]] = None
         self.visible = True
+        self.style_sheet = ""
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
+
+    def setStyleSheet(self, style: str) -> None:
+        self.style_sheet = style
 
     def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
         self.size_policy = (horizontal, vertical)

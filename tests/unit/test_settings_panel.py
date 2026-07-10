@@ -13,6 +13,7 @@ from shader_health.ui import deadline_connector_section, settings_panel
 from shader_health.ui.basic_settings_section import (
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+    SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
 )
 from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
@@ -301,6 +302,7 @@ def test_basic_tab_exposes_user_preference_controls():
             default_profile_id="publish_strict",
             default_scan_scope="selection",
             ui_density="compact",
+            theme="dark",
         ),
     )
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
@@ -313,6 +315,7 @@ def test_basic_tab_exposes_user_preference_controls():
         "selection"
     )
     assert _find(basic_tab, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData() == "compact"
+    assert _find(basic_tab, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
 
 
 def test_read_user_preferences_from_settings_view_reads_basic_tab():
@@ -347,6 +350,7 @@ def test_update_settings_view_refreshes_basic_tab_controls():
             default_profile_id="deadline_critical",
             default_scan_scope="selection",
             ui_density="compact",
+            theme="dark",
         ),
     )
 
@@ -356,6 +360,7 @@ def test_update_settings_view_refreshes_basic_tab_controls():
     assert _find(view, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
         "selection"
     )
+    assert _find(view, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
 
 
 def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
