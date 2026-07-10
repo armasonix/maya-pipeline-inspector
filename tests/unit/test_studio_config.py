@@ -250,7 +250,13 @@ def test_connector_settings_preserves_extensible_connectors():
 def test_connector_settings_round_trips_tracker_connectors():
     connectors = ConnectorSettings.from_mapping(
         {
-            "ftrack": {"enabled": True},
+            "ftrack": {
+                "enabled": True,
+                "api_url": "https://studio.ftrackapp.com",
+                "api_user": "pipeline.bot",
+                "api_key": "secret",
+                "project": "Demo Project",
+            },
             "shotgrid": {"enabled": False},
             "cerebro": {"enabled": True},
         }
@@ -259,6 +265,8 @@ def test_connector_settings_round_trips_tracker_connectors():
     restored = ConnectorSettings.from_mapping(connectors.to_dict())
 
     assert connectors.ftrack.enabled is True
+    assert connectors.ftrack.api_url == "https://studio.ftrackapp.com"
+    assert connectors.ftrack.project == "Demo Project"
     assert connectors.shotgrid.enabled is False
     assert connectors.cerebro.enabled is True
     assert restored.to_dict() == connectors.to_dict()

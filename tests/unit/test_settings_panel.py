@@ -7,6 +7,7 @@ from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
+    FtrackConnectorSettings,
     PipelineSettings,
     SlackConnectorSettings,
     StudioConfig,
@@ -17,6 +18,7 @@ from shader_health.studio_config import (
 from shader_health.ui import (
     deadline_connector_section,
     discord_connector_section,
+    ftrack_connector_section,
     main_window,
     settings_panel,
     slack_connector_section,
@@ -85,6 +87,11 @@ _SLACK_DEADLINE_WEBHOOK = slack_connector_section.SETTINGS_SLACK_DEADLINE_WEBHOO
 _SLACK_NOTIFY_PUBLISH = (
     slack_connector_section.SETTINGS_SLACK_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME
 )
+_FTRACK_ENABLED = ftrack_connector_section.SETTINGS_FTRACK_ENABLED_TOGGLE_OBJECT_NAME
+_FTRACK_DETAILS = ftrack_connector_section.SETTINGS_FTRACK_DETAILS_OBJECT_NAME
+_FTRACK_API_URL = ftrack_connector_section.SETTINGS_FTRACK_API_URL_INPUT_OBJECT_NAME
+_FTRACK_API_KEY = ftrack_connector_section.SETTINGS_FTRACK_API_KEY_INPUT_OBJECT_NAME
+_FTRACK_PROJECT = ftrack_connector_section.SETTINGS_FTRACK_PROJECT_INPUT_OBJECT_NAME
 
 
 class FakeWidget:
@@ -1138,6 +1145,75 @@ def test_read_connectors_from_settings_view_reads_slack_fields():
     assert connectors.slack.publish_webhook_url == "https://hooks.slack.com/publish"
     assert connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
     assert connectors.slack.notify_on == ("block_publish",)
+
+
+def test_connectors_tab_includes_ftrack_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                ftrack=FtrackConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _FTRACK_ENABLED)
+    details = _find(connectors_tab, _FTRACK_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_connectors_tab_shows_ftrack_fields_when_task_tracker_enabled():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                ftrack=FtrackConnectorSettings(
+                    enabled=True,
+                    api_url="https://studio.ftrackapp.com",
+                    api_user="pipeline.bot",
+                    api_key="secret",
+                    project="Demo Project",
+                )
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    details = _find(connectors_tab, _FTRACK_DETAILS)
+    api_url = _find(connectors_tab, _FTRACK_API_URL)
+    api_key = _find(connectors_tab, _FTRACK_API_KEY)
+    project = _find(connectors_tab, _FTRACK_PROJECT)
+
+    assert details.visible is True
+    assert api_url.value == "https://studio.ftrackapp.com"
+    assert api_key.value == "secret"
+    assert api_key.echo_mode == FakeLineEdit.Password
+    assert project.value == "Demo Project"
+
+
+def test_read_connectors_from_settings_view_reads_ftrack_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                ftrack=FtrackConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    api_url = _find(view, _FTRACK_API_URL)
+    api_url.setText("https://studio.ftrackapp.com")
+    api_key = _find(view, _FTRACK_API_KEY)
+    api_key.setText("secret")
+    project = _find(view, _FTRACK_PROJECT)
+    project.setText("Demo Project")
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.ftrack.enabled is True
+    assert connectors.ftrack.api_url == "https://studio.ftrackapp.com"
+    assert connectors.ftrack.api_key == "secret"
+    assert connectors.ftrack.project == "Demo Project"
 
 
 def test_require_tx_toggle_styles_off_state():

@@ -15,6 +15,11 @@ from shader_health.studio_config import (
     resolve_ftrack_config,
     resolve_shotgrid_config,
 )
+from shader_health.ui.ftrack_connector_section import (
+    build_ftrack_connector_section,
+    read_ftrack_connector_from_view,
+    update_ftrack_connector_view,
+)
 
 TrackerSettingsValue = Any
 
@@ -29,6 +34,9 @@ class TrackerConnectorDefinition:
     resolve_fn: Callable[[StudioConfig], Any | None]
     get_settings: Callable[[ConnectorSettings], TrackerSettingsValue]
     apply_settings: Callable[[ConnectorSettings, TrackerSettingsValue], ConnectorSettings]
+    build_section: Callable[..., Any] | None = None
+    read_from_view: Callable[[Any, Any], TrackerSettingsValue] | None = None
+    update_view: Callable[[Any, Any, TrackerSettingsValue], None] | None = None
     secret_field_names: frozenset[str] = frozenset()
 
 
@@ -65,6 +73,19 @@ def _apply_cerebro_settings(
     return replace(connectors, cerebro=settings)
 
 
+def _build_ftrack_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_ftrack_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_ftrack_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_ftrack_settings_changed", None),
+    )
+
+
 TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
     TrackerConnectorDefinition(
         id="ftrack",
@@ -73,6 +94,10 @@ TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
         resolve_fn=resolve_ftrack_config,
         get_settings=_get_ftrack_settings,
         apply_settings=_apply_ftrack_settings,
+        build_section=_build_ftrack_section,
+        read_from_view=read_ftrack_connector_from_view,
+        update_view=update_ftrack_connector_view,
+        secret_field_names=frozenset({"api_key"}),
     ),
     TrackerConnectorDefinition(
         id="shotgrid",
@@ -134,3 +159,33 @@ def first_enabled_tracker(config: StudioConfig) -> TrackerConnectorDefinition | 
         if tracker_is_enabled(config, tracker.id):
             return tracker
     return None
+
+
+def read_trackers_from_settings_view(
+    view: Any,
+    qt_widgets: Any,
+    *,
+    base: ConnectorSettings | None = None,
+) -> ConnectorSettings:
+    """Read all registered tracker settings from the settings UI."""
+
+    connectors = base or ConnectorSettings()
+    for tracker in iter_trackers():
+        if tracker.read_from_view is None:
+            continue
+        settings = tracker.read_from_view(view, qt_widgets)
+        connectors = tracker.apply_settings(connectors, settings)
+    return connectors
+
+
+def update_tracker_views(
+    view: Any,
+    qt_widgets: Any,
+    connectors: ConnectorSettings,
+) -> None:
+    """Refresh all registered tracker sections from connector settings."""
+
+    for tracker in iter_trackers():
+        if tracker.update_view is None:
+            continue
+        tracker.update_view(view, qt_widgets, tracker.get_settings(connectors))

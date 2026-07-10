@@ -397,15 +397,49 @@ class FtrackConnectorSettings:
     """Ftrack task tracker connector settings stored in the studio config."""
 
     enabled: bool = False
+    api_url: str = ""
+    api_user: str = ""
+    api_key: str = ""
+    project: str = ""
+
+    def to_ftrack_config(self) -> Any | None:
+        """Convert connector settings into an Ftrack runtime config object."""
+
+        from shader_health.integrations.ftrack.config import FtrackConfig
+
+        api_url = self.api_url.strip()
+        api_user = self.api_user.strip()
+        api_key = self.api_key.strip()
+        project = self.project.strip()
+        if not api_url or not api_user or not api_key or not project:
+            return None
+        return FtrackConfig(
+            api_url=api_url,
+            api_user=api_user,
+            api_key=api_key,
+            project=project,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"enabled": self.enabled}
+        return {
+            "enabled": self.enabled,
+            "api_url": self.api_url,
+            "api_user": self.api_user,
+            "api_key": self.api_key,
+            "project": self.project,
+        }
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> FtrackConnectorSettings:
         if not data:
             return cls()
-        return cls(enabled=bool(data.get("enabled", False)))
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            api_url=str(data.get("api_url", "") or ""),
+            api_user=str(data.get("api_user", "") or ""),
+            api_key=str(data.get("api_key", "") or ""),
+            project=str(data.get("project", "") or ""),
+        )
 
 
 @dataclass(frozen=True)
@@ -851,15 +885,15 @@ def resolve_slack_config(config: StudioConfig | None) -> Any | None:
     return slack.to_slack_config()
 
 
-def resolve_ftrack_config(config: StudioConfig | None) -> FtrackConnectorSettings | None:
-    """Return Ftrack connector settings when the tracker is enabled."""
+def resolve_ftrack_config(config: StudioConfig | None) -> Any | None:
+    """Return Ftrack runtime config from studio settings when enabled."""
 
     if config is None:
         return None
     ftrack = config.connectors.ftrack
     if not ftrack.enabled:
         return None
-    return ftrack
+    return ftrack.to_ftrack_config()
 
 
 def resolve_shotgrid_config(config: StudioConfig | None) -> ShotGridConnectorSettings | None:
