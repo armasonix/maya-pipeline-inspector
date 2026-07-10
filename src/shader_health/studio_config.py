@@ -447,15 +447,54 @@ class ShotGridConnectorSettings:
     """ShotGrid task tracker connector settings stored in the studio config."""
 
     enabled: bool = False
+    site_url: str = ""
+    script_name: str = ""
+    api_key: str = ""
+    project: str = ""
+    entity_type: str = "Shot"
+
+    def to_shotgrid_config(self) -> Any | None:
+        """Convert connector settings into a ShotGrid runtime config object."""
+
+        from shader_health.integrations.shotgrid.config import ShotGridConfig
+
+        site_url = self.site_url.strip()
+        script_name = self.script_name.strip()
+        api_key = self.api_key.strip()
+        project = self.project.strip()
+        entity_type = self.entity_type.strip() or "Shot"
+        if not site_url or not script_name or not api_key or not project:
+            return None
+        return ShotGridConfig(
+            site_url=site_url,
+            script_name=script_name,
+            api_key=api_key,
+            project=project,
+            entity_type=entity_type,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"enabled": self.enabled}
+        return {
+            "enabled": self.enabled,
+            "site_url": self.site_url,
+            "script_name": self.script_name,
+            "api_key": self.api_key,
+            "project": self.project,
+            "entity_type": self.entity_type,
+        }
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> ShotGridConnectorSettings:
         if not data:
             return cls()
-        return cls(enabled=bool(data.get("enabled", False)))
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            site_url=str(data.get("site_url", "") or ""),
+            script_name=str(data.get("script_name", "") or ""),
+            api_key=str(data.get("api_key", "") or ""),
+            project=str(data.get("project", "") or ""),
+            entity_type=str(data.get("entity_type", "Shot") or "Shot"),
+        )
 
 
 @dataclass(frozen=True)
@@ -896,15 +935,15 @@ def resolve_ftrack_config(config: StudioConfig | None) -> Any | None:
     return ftrack.to_ftrack_config()
 
 
-def resolve_shotgrid_config(config: StudioConfig | None) -> ShotGridConnectorSettings | None:
-    """Return ShotGrid connector settings when the tracker is enabled."""
+def resolve_shotgrid_config(config: StudioConfig | None) -> Any | None:
+    """Return ShotGrid runtime config from studio settings when enabled."""
 
     if config is None:
         return None
     shotgrid = config.connectors.shotgrid
     if not shotgrid.enabled:
         return None
-    return shotgrid
+    return shotgrid.to_shotgrid_config()
 
 
 def resolve_cerebro_config(config: StudioConfig | None) -> CerebroConnectorSettings | None:

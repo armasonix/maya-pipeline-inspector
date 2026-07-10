@@ -30,6 +30,7 @@ def test_iter_trackers_includes_ftrack_shotgrid_and_cerebro():
     assert "api_key" in trackers[0].secret_field_names
     assert trackers[1].id == "shotgrid"
     assert trackers[1].settings_dataclass is ShotGridConnectorSettings
+    assert "api_key" in trackers[1].secret_field_names
     assert trackers[2].id == "cerebro"
     assert trackers[2].settings_dataclass is CerebroConnectorSettings
 
@@ -49,7 +50,13 @@ def test_resolve_tracker_returns_settings_only_when_enabled():
                 api_key="secret",
                 project="Demo Project",
             ),
-            shotgrid=ShotGridConnectorSettings(enabled=False),
+            shotgrid=ShotGridConnectorSettings(
+                enabled=True,
+                site_url="https://studio.shotgrid.autodesk.com",
+                script_name="shader_health",
+                api_key="secret",
+                project="Demo Project",
+            ),
         )
     )
 
@@ -57,9 +64,11 @@ def test_resolve_tracker_returns_settings_only_when_enabled():
 
     assert resolved is not None
     assert resolved.api_url == "https://studio.ftrackapp.com"
-    assert resolve_tracker(enabled, "shotgrid") is None
+    shotgrid_resolved = resolve_tracker(enabled, "shotgrid")
+    assert shotgrid_resolved is not None
+    assert shotgrid_resolved.project == "Demo Project"
     assert resolve_ftrack_config(enabled) is not None
-    assert resolve_shotgrid_config(enabled) is None
+    assert resolve_shotgrid_config(enabled) is not None
     assert resolve_cerebro_config(enabled) is None
 
 

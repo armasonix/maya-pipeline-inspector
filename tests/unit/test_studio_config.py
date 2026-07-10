@@ -257,7 +257,14 @@ def test_connector_settings_round_trips_tracker_connectors():
                 "api_key": "secret",
                 "project": "Demo Project",
             },
-            "shotgrid": {"enabled": False},
+            "shotgrid": {
+                "enabled": True,
+                "site_url": "https://studio.shotgrid.autodesk.com",
+                "script_name": "shader_health",
+                "api_key": "secret",
+                "project": "Demo Project",
+                "entity_type": "Shot",
+            },
             "cerebro": {"enabled": True},
         }
     )
@@ -267,7 +274,9 @@ def test_connector_settings_round_trips_tracker_connectors():
     assert connectors.ftrack.enabled is True
     assert connectors.ftrack.api_url == "https://studio.ftrackapp.com"
     assert connectors.ftrack.project == "Demo Project"
-    assert connectors.shotgrid.enabled is False
+    assert connectors.shotgrid.enabled is True
+    assert connectors.shotgrid.site_url == "https://studio.shotgrid.autodesk.com"
+    assert connectors.shotgrid.entity_type == "Shot"
     assert connectors.cerebro.enabled is True
     assert restored.to_dict() == connectors.to_dict()
 

@@ -9,6 +9,7 @@ from shader_health.studio_config import (
     DiscordConnectorSettings,
     FtrackConnectorSettings,
     PipelineSettings,
+    ShotGridConnectorSettings,
     SlackConnectorSettings,
     StudioConfig,
     StudioEnvironmentSettings,
@@ -21,6 +22,7 @@ from shader_health.ui import (
     ftrack_connector_section,
     main_window,
     settings_panel,
+    shotgrid_connector_section,
     slack_connector_section,
     telegram_connector_section,
 )
@@ -92,6 +94,11 @@ _FTRACK_DETAILS = ftrack_connector_section.SETTINGS_FTRACK_DETAILS_OBJECT_NAME
 _FTRACK_API_URL = ftrack_connector_section.SETTINGS_FTRACK_API_URL_INPUT_OBJECT_NAME
 _FTRACK_API_KEY = ftrack_connector_section.SETTINGS_FTRACK_API_KEY_INPUT_OBJECT_NAME
 _FTRACK_PROJECT = ftrack_connector_section.SETTINGS_FTRACK_PROJECT_INPUT_OBJECT_NAME
+_SHOTGRID_ENABLED = shotgrid_connector_section.SETTINGS_SHOTGRID_ENABLED_TOGGLE_OBJECT_NAME
+_SHOTGRID_DETAILS = shotgrid_connector_section.SETTINGS_SHOTGRID_DETAILS_OBJECT_NAME
+_SHOTGRID_SITE_URL = shotgrid_connector_section.SETTINGS_SHOTGRID_SITE_URL_INPUT_OBJECT_NAME
+_SHOTGRID_API_KEY = shotgrid_connector_section.SETTINGS_SHOTGRID_API_KEY_INPUT_OBJECT_NAME
+_SHOTGRID_PROJECT = shotgrid_connector_section.SETTINGS_SHOTGRID_PROJECT_INPUT_OBJECT_NAME
 
 
 class FakeWidget:
@@ -1214,6 +1221,47 @@ def test_read_connectors_from_settings_view_reads_ftrack_fields():
     assert connectors.ftrack.api_url == "https://studio.ftrackapp.com"
     assert connectors.ftrack.api_key == "secret"
     assert connectors.ftrack.project == "Demo Project"
+
+
+def test_connectors_tab_includes_shotgrid_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                shotgrid=ShotGridConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _SHOTGRID_ENABLED)
+    details = _find(connectors_tab, _SHOTGRID_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_read_connectors_from_settings_view_reads_shotgrid_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                shotgrid=ShotGridConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    site_url = _find(view, _SHOTGRID_SITE_URL)
+    site_url.setText("https://studio.shotgrid.autodesk.com")
+    api_key = _find(view, _SHOTGRID_API_KEY)
+    api_key.setText("secret")
+    project = _find(view, _SHOTGRID_PROJECT)
+    project.setText("Demo Project")
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.shotgrid.enabled is True
+    assert connectors.shotgrid.site_url == "https://studio.shotgrid.autodesk.com"
+    assert connectors.shotgrid.api_key == "secret"
+    assert connectors.shotgrid.project == "Demo Project"
 
 
 def test_require_tx_toggle_styles_off_state():
