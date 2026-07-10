@@ -49,7 +49,10 @@ from shader_health.ui.settings_panel import (
     read_user_preferences_from_settings_view,
     update_settings_view,
 )
-from shader_health.ui.user_preferences_ui import apply_user_preferences_to_panel
+from shader_health.ui.user_preferences_ui import (
+    apply_user_preferences_to_panel,
+    user_extra_rule_paths,
+)
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
     WAIVER_TABLE_OBJECT_NAME,
@@ -860,17 +863,21 @@ def _run_validation_job(
         selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         studio_config = _studio_config_for_content(content)
+        user_config = _user_config_for_content(content)
+        extra_rule_paths = user_extra_rule_paths(user_config)
         if scan_scope == "selection":
             result = validate_selection_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
+                extra_rule_paths=extra_rule_paths,
             )
         else:
             result = validate_scene_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
+                extra_rule_paths=extra_rule_paths,
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"
@@ -2054,6 +2061,12 @@ def _refresh_issues_table_view(content: Any, qt_widgets: Any) -> None:
             if getattr(result, "auto_fix_available", False)
         ]
     pairs.sort(key=lambda pair: main_window._issue_sort_value(pair[0], str(sort_key)))
+    from shader_health.user_config import DEFAULT_MAX_ISSUES_DISPLAYED
+
+    max_issues = int(
+        getattr(content, "_shader_health_max_issues_displayed", DEFAULT_MAX_ISSUES_DISPLAYED)
+    )
+    pairs = pairs[: max(max_issues, 1)]
     display_rows = tuple(row for row, _ in pairs)
     display_results = tuple(result for _, result in pairs)
 

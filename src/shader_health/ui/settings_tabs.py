@@ -34,9 +34,7 @@ SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
         tab_id="advanced",
         title="Advanced",
         object_name=SETTINGS_ADVANCED_TAB_OBJECT_NAME,
-        placeholder_text=(
-            "Advanced options will live here (extra rule roots, debug logging, performance caps)."
-        ),
+        placeholder_text="",
     ),
     SettingsTabSpec(
         tab_id="connectors",

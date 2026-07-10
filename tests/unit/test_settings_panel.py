@@ -10,6 +10,12 @@ from shader_health.studio_config import (
     StudioConfig,
 )
 from shader_health.ui import deadline_connector_section, settings_panel
+from shader_health.ui.advanced_settings_section import (
+    SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
+    SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
+    SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
+    SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME,
+)
 from shader_health.ui.basic_settings_section import (
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
@@ -45,6 +51,12 @@ class FakeWidget:
     def setMaximumWidth(self, width: int) -> None:
         self.maximum_width = width
 
+    def setLayout(self, layout: Any) -> None:
+        self.layout = layout
+        for widget in getattr(layout, "widgets", []):
+            if widget not in self.children:
+                self.children.append(widget)
+
 
 class FakeLabel(FakeWidget):
     def __init__(self, text: str = "") -> None:
@@ -78,6 +90,7 @@ class FakeLineEdit(FakeWidget):
         self.fixed_width: int | None = None
         self.maximum_width: int | None = None
         self.size_policy: tuple[Any, Any] | None = None
+        self.tooltip = ""
 
     def setText(self, text: str) -> None:
         self.value = text
@@ -87,6 +100,9 @@ class FakeLineEdit(FakeWidget):
 
     def setPlaceholderText(self, text: str) -> None:
         self.placeholder = text
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
 
     def setFixedWidth(self, width: int) -> None:
         self.fixed_width = width
@@ -100,6 +116,27 @@ class FakeLineEdit(FakeWidget):
     @property
     def editingFinished(self) -> FakeSignal:
         return FakeSignal()
+
+
+class FakePlainTextEdit(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.value = text
+        self.placeholder = ""
+        self.tooltip = ""
+        self.plainTextChanged = FakeSignal()
+
+    def setPlainText(self, text: str) -> None:
+        self.value = text
+
+    def toPlainText(self) -> str:
+        return self.value
+
+    def setPlaceholderText(self, text: str) -> None:
+        self.placeholder = text
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
 
 
 class FakeComboBox(FakeWidget):
@@ -284,6 +321,7 @@ class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
     QLineEdit = FakeLineEdit
+    QPlainTextEdit = FakePlainTextEdit
     QPushButton = FakePushButton
     QComboBox = FakeComboBox
     QVBoxLayout = FakeVBoxLayout
@@ -318,6 +356,27 @@ def test_basic_tab_exposes_user_preference_controls():
     assert _find(basic_tab, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
 
 
+def test_advanced_tab_exposes_user_preference_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(
+            extra_rule_paths=("/show/rules",),
+            debug_logging=True,
+            max_issues_displayed=75,
+            mayapy_path="C:/mayapy.exe",
+        ),
+    )
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    advanced_tab = tabs.tabs[1][1]
+
+    assert _find(advanced_tab, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).toPlainText() == (
+        "/show/rules"
+    )
+    assert _find(advanced_tab, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).checked is True
+    assert _find(advanced_tab, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).text() == "75"
+    assert _find(advanced_tab, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == "C:/mayapy.exe"
+
+
 def test_read_user_preferences_from_settings_view_reads_basic_tab():
     view = settings_panel.build_settings_view(
         FakeQtWidgets,
@@ -333,7 +392,26 @@ def test_read_user_preferences_from_settings_view_reads_basic_tab():
     )
 
     assert loaded.default_profile_id == "supervisor_full"
-    assert loaded.mayapy_path == "C:/mayapy.exe"
+    assert loaded.mayapy_path == ""
+
+
+def test_read_user_preferences_from_settings_view_merges_advanced_tab():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+    _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).setPlainText("/custom/rules")
+    _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).setChecked(True)
+    _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).setText("99")
+    _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).setText("D:/mayapy.exe")
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(view, FakeQtWidgets)
+
+    assert loaded.default_profile_id == "artist_relaxed"
+    assert loaded.extra_rule_paths == ("/custom/rules",)
+    assert loaded.debug_logging is True
+    assert loaded.max_issues_displayed == 99
+    assert loaded.mayapy_path == "D:/mayapy.exe"
 
 
 def test_update_settings_view_refreshes_basic_tab_controls():
@@ -361,6 +439,30 @@ def test_update_settings_view_refreshes_basic_tab_controls():
         "selection"
     )
     assert _find(view, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
+
+
+def test_update_settings_view_refreshes_advanced_tab_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(debug_logging=False),
+    )
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(
+            extra_rule_paths=("//farm/rules",),
+            debug_logging=True,
+            max_issues_displayed=200,
+            mayapy_path="C:/Maya/bin/mayapy.exe",
+        ),
+    )
+
+    assert _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).toPlainText() == "//farm/rules"
+    assert _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).checked is True
+    assert _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).text() == "200"
+    assert _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == "C:/Maya/bin/mayapy.exe"
 
 
 def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():

@@ -13,12 +13,18 @@ from shader_health.connectors_registry import (
     read_connectors_from_settings_view as _read_connectors_from_registry,
 )
 from shader_health.studio_config import ConnectorSettings, StudioConfig
+from shader_health.ui.advanced_settings_section import (
+    build_advanced_settings_section,
+    read_advanced_user_preferences_from_view,
+    update_advanced_settings_view,
+)
 from shader_health.ui.basic_settings_section import (
     build_basic_settings_section,
     read_basic_user_preferences_from_view,
     update_basic_settings_view,
 )
 from shader_health.ui.settings_tabs import (
+    SETTINGS_ADVANCED_TAB_OBJECT_NAME,
     SETTINGS_BASIC_TAB_OBJECT_NAME,
     SETTINGS_CONNECTORS_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_TAB_OBJECT_NAME,
@@ -206,6 +212,7 @@ def update_settings_view(
 
     if user_config is not None:
         update_basic_settings_view(view, qt_widgets, user_config)
+        update_advanced_settings_view(view, qt_widgets, user_config)
 
     studio_path_label = find_child(
         view,
@@ -238,7 +245,9 @@ def read_user_preferences_from_settings_view(
 ) -> UserPreferences:
     """Read user preference fields currently shown in the settings UI."""
 
-    return read_basic_user_preferences_from_view(view, qt_widgets, base=base)
+    base = base or UserPreferences.default()
+    merged = read_basic_user_preferences_from_view(view, qt_widgets, base=base)
+    return read_advanced_user_preferences_from_view(view, qt_widgets, base=merged)
 
 
 def _build_settings_tab(
@@ -254,6 +263,8 @@ def _build_settings_tab(
 
     if tab_id == "basic":
         return _build_basic_tab(qt_widgets, user_config, callbacks)
+    if tab_id == "advanced":
+        return _build_advanced_tab(qt_widgets, user_config, callbacks)
     if tab_id == "connectors":
         return build_placeholder_tab(
             qt_widgets,
@@ -281,6 +292,27 @@ def _build_basic_tab(
     layout.setSpacing(8)
     layout.addWidget(
         build_basic_settings_section(
+            qt_widgets,
+            user_config,
+            on_preferences_changed=callbacks.on_user_preferences_changed,
+        )
+    )
+    layout.addStretch(1)
+    return tab
+
+
+def _build_advanced_tab(
+    qt_widgets: Any,
+    user_config: UserPreferences,
+    callbacks: SettingsActionCallbacks,
+) -> Any:
+    tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_ADVANCED_TAB_OBJECT_NAME)
+    layout = qt_widgets.QVBoxLayout(tab)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+    layout.addWidget(
+        build_advanced_settings_section(
             qt_widgets,
             user_config,
             on_preferences_changed=callbacks.on_user_preferences_changed,

@@ -1,12 +1,16 @@
 """Apply persisted user preferences to the Maya panel shell."""
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import Any
 
 from shader_health.ui import main_window
 from shader_health.ui.settings_widgets import find_child
 from shader_health.ui.theme_loader import apply_panel_theme
 from shader_health.user_config import UserPreferences
+
+_SHADER_HEALTH_LOGGER = logging.getLogger("shader_health")
 
 _UI_DENSITY_MARGINS = {
     "comfortable": (8, 8, 8, 8),
@@ -47,8 +51,34 @@ def apply_user_preferences_to_panel(
 
     content._shader_health_scan_scope = user_config.default_scan_scope
     content._shader_health_ui_density = user_config.ui_density
+    content._shader_health_extra_rule_paths = user_config.extra_rule_paths
+    content._shader_health_max_issues_displayed = user_config.max_issues_displayed
+    content._shader_health_mayapy_path = user_config.mayapy_path
     _apply_ui_density(content, qt_widgets, user_config.ui_density)
     apply_panel_theme(content, user_config.theme)
+    _apply_debug_logging(user_config.debug_logging)
+
+
+def _apply_debug_logging(enabled: bool) -> None:
+    level = logging.DEBUG if enabled else logging.INFO
+    _SHADER_HEALTH_LOGGER.setLevel(level)
+    if enabled:
+        if not logging.getLogger().handlers:
+            logging.basicConfig(level=logging.DEBUG)
+        return
+    root = logging.getLogger()
+    if root.level == logging.DEBUG:
+        root.setLevel(logging.INFO)
+
+
+def user_extra_rule_paths(user_config: UserPreferences) -> tuple[Path, ...]:
+    """Return resolved extra rule path entries from user preferences."""
+
+    return tuple(
+        Path(path)
+        for path in user_config.extra_rule_paths
+        if str(path).strip()
+    )
 
 
 def _widget_layout(widget: Any) -> Any | None:

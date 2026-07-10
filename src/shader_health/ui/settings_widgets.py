@@ -73,6 +73,26 @@ def wire_combo_changed(combo: Any, callback: Optional[Callable[[], None]]) -> No
         connect(lambda _index: callback())
 
 
+def wire_line_edit_finished(field: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        return
+    finished = getattr(field, "editingFinished", None)
+    connect = getattr(finished, "connect", None)
+    if connect is not None:
+        connect(callback)
+
+
+def wire_plain_text_changed(field: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        return
+    for signal_name in ("textChanged", "plainTextChanged"):
+        changed = getattr(field, signal_name, None)
+        connect = getattr(changed, "connect", None)
+        if connect is not None:
+            connect(lambda *_args: callback())
+            return
+
+
 def find_child(root: Any, widget_type: Any, object_name: str) -> Any | None:
     finder = getattr(root, "findChild", None)
     if finder is not None:
