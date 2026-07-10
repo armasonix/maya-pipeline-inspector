@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from shader_health.core.manifest_gate import ManifestGatePolicy
 from shader_health.core.rule_loader import RuleOverride
 from shader_health.integrations.deadline.config import DeadlineConfig
 from shader_health.studio_config import (
@@ -17,6 +18,7 @@ from shader_health.studio_config import (
     StudioEnvironmentSettings,
     StudioUiSettings,
     StudioUpdatesSettings,
+    WaiverDefaultsSettings,
     load_studio_config,
     merge_studio_rule_overrides,
     resolve_deadline_config,
@@ -58,7 +60,21 @@ def test_studio_config_round_trips_through_json_file(tmp_path: Path):
     path = tmp_path / STUDIO_CONFIG_FILENAME
     original = StudioConfig(
         studio_name="Demo Studio",
-        pipeline=PipelineSettings(require_tx_derivatives=False),
+        pipeline=PipelineSettings(
+            require_tx_derivatives=False,
+            waiver_defaults=WaiverDefaultsSettings(
+                default_approved_by="pipeline_td",
+                default_expiry_days=14,
+                allow_critical_waivers=True,
+            ),
+            manifest_gate_defaults=ManifestGatePolicy(
+                max_new_changes=1,
+                max_fingerprint_changes=2,
+                block_on_new_textures=False,
+            ),
+            pinned_workflow_profile_ids=("artist_relaxed",),
+            pinned_asset_class_profile_ids=("asset_class_hero",),
+        ),
     )
 
     save_studio_config(path, original)
@@ -66,10 +82,19 @@ def test_studio_config_round_trips_through_json_file(tmp_path: Path):
 
     assert loaded.studio_name == "Demo Studio"
     assert loaded.pipeline.require_tx_derivatives is False
+    assert loaded.pipeline.waiver_defaults.default_approved_by == "pipeline_td"
+    assert loaded.pipeline.waiver_defaults.default_expiry_days == 14
+    assert loaded.pipeline.waiver_defaults.allow_critical_waivers is True
+    assert loaded.pipeline.manifest_gate_defaults.max_new_changes == 1
+    assert loaded.pipeline.manifest_gate_defaults.max_fingerprint_changes == 2
+    assert loaded.pipeline.manifest_gate_defaults.block_on_new_textures is False
+    assert loaded.pipeline.pinned_workflow_profile_ids == ("artist_relaxed",)
+    assert loaded.pipeline.pinned_asset_class_profile_ids == ("asset_class_hero",)
     assert loaded.config_path == path.resolve()
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == STUDIO_CONFIG_SCHEMA_VERSION
     assert payload["pipeline"]["require_tx_derivatives"] is False
+    assert payload["pipeline"]["waiver_defaults"]["default_approved_by"] == "pipeline_td"
     assert payload["studio_environment"]["texture_root"] == ""
     assert payload["bug_report"]["enabled"] is False
 
@@ -94,7 +119,9 @@ def test_studio_config_loads_legacy_schema_1_0_with_defaults(tmp_path: Path):
 
     assert loaded.schema_version == LEGACY_STUDIO_CONFIG_SCHEMA_VERSION
     assert loaded.studio_name == "Legacy Studio"
-    assert loaded.studio_environment.texture_root == ""
+    assert loaded.pipeline.waiver_defaults.default_expiry_days == 30
+    assert loaded.pipeline.manifest_gate_defaults.block_on_new_textures is True
+    assert loaded.pipeline.pinned_workflow_profile_ids == ()
     assert loaded.ui.documentation_url == ""
     assert loaded.bug_report.enabled is False
     assert loaded.updates.allow_check is True

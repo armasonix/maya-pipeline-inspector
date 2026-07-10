@@ -20,6 +20,7 @@ from shader_health.core.rule_schema import (
     RulePolicy,
     RuleResult,
 )
+from shader_health.studio_config import StudioEnvironmentSettings
 
 
 def test_fix_planner_builds_action_for_failed_result_with_rule_fix():
@@ -230,6 +231,65 @@ def test_resolve_normalize_path_value_maps_user_home_path_to_asset_root_textures
         {"replace_to": "${ASSET_ROOT}"},
         scene_path="D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/demo.ma",
     ) == "${ASSET_ROOT}/textures/local_only_texture.exr"
+
+
+def test_resolve_normalize_path_value_maps_studio_texture_root_to_token():
+    environment = StudioEnvironmentSettings(texture_root="\\\\farm\\textures")
+
+    assert resolve_normalize_path_value(
+        "\\\\farm\\textures/hero/albedo.exr",
+        {"replace_to": "${ASSET_ROOT}"},
+        studio_environment=environment,
+    ) == "${STUDIO_TEXTURE_ROOT}/hero/albedo.exr"
+
+
+def test_resolve_normalize_path_value_uses_studio_asset_root_for_local_paths():
+    environment = StudioEnvironmentSettings(asset_root="\\\\farm\\assets")
+
+    assert resolve_normalize_path_value(
+        "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+        {"replace_to": "${ASSET_ROOT}"},
+        scene_path="D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/demo.ma",
+        studio_environment=environment,
+    ) == "${STUDIO_ASSET_ROOT}/textures/local_only_texture.exr"
+
+
+def test_build_fix_plan_embeds_studio_environment_in_normalize_path_params():
+    environment = StudioEnvironmentSettings(texture_root="\\\\farm\\textures")
+    rule = _rule(
+        fix=RuleFix(
+            type="normalize_path",
+            risk="medium",
+            params={"attribute": "fileTextureName", "replace_to": "${ASSET_ROOT}"},
+        ),
+    )
+    from shader_health.core.models import FileDependencySnapshot
+
+    snapshot = GraphSnapshot(
+        scene_path="D:/show/scenes/demo.ma",
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file1",
+                attr="fileTextureName",
+                raw_path="D:/local/albedo.exr",
+                resolved_path="D:/local/albedo.exr",
+            )
+        ],
+    )
+    result = _failed_result(
+        target_kind="file_dependency",
+        target_id="node:file1",
+        current_value="D:/local/albedo.exr",
+    )
+
+    plan = build_fix_plan(
+        [result],
+        [rule],
+        snapshot,
+        studio_environment=environment,
+    )
+
+    assert plan.actions[0].params["studio_environment"]["texture_root"] == "\\\\farm\\textures"
 
 
 def test_project_root_from_scene_detects_shader_health_repo(tmp_path: Path):

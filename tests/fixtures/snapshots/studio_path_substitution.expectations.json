@@ -1,0 +1,60 @@
+{
+  "studio_roots": {
+    "texture_root": "textures",
+    "asset_root": "assets",
+    "cache_root": "cache",
+    "render_root": "render",
+    "variable_aliases": {
+      "SHOW_TEXTURE_ROOT": "${STUDIO_TEXTURE_ROOT}"
+    }
+  },
+  "materialize": [
+    {
+      "relative": "textures/hero/albedo.exr",
+      "node_id": "node:tex_root"
+    },
+    {
+      "relative": "assets/props/chair.exr",
+      "node_id": "node:asset_root"
+    },
+    {
+      "relative": "cache/sim/blast.exr",
+      "node_id": "node:cache_root"
+    },
+    {
+      "relative": "render/comp/beauty.exr",
+      "node_id": "node:render_root"
+    },
+    {
+      "relative": "textures/look/dev.exr",
+      "node_id": "node:alias_root"
+    }
+  ],
+  "scenarios": {
+    "with_studio_environment": {
+      "profiles": {
+        "publish_strict": {
+          "passed_rule_ids": [
+            "common.texture.missing"
+          ],
+          "resolved_suffixes": {
+            "node:tex_root": "/hero/albedo.exr",
+            "node:asset_root": "/props/chair.exr",
+            "node:cache_root": "/sim/blast.exr",
+            "node:render_root": "/comp/beauty.exr",
+            "node:alias_root": "/look/dev.exr"
+          }
+        }
+      }
+    },
+    "without_studio_environment": {
+      "profiles": {
+        "publish_strict": {
+          "failed_rule_ids": [
+            "common.texture.missing"
+          ]
+        }
+      }
+    }
+  }
+}

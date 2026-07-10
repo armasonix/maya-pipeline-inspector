@@ -63,7 +63,7 @@ export MAYA_MODULE_PATH="/tools/maya-shader-health-inspector/maya_module"
 maya
 ```
 
-For a persistent studio setup, set `MAYA_MODULE_PATH` in the facility launcher, shell profile, or render wrangler environment the same way you manage other Maya modules.
+For a persistent studio setup, set `MAYA_MODULE_PATH` in the facility launcher, shell profile, or render wrangler environment the same way you manage other Maya modules. Roll out `shader_health_studio.json` the same way via `SHADER_HEALTH_STUDIO_CONFIG` (see [Studio config rollout](#studio-config-rollout-shader_health_studiojson) below).
 
 ### 3. What the module file does
 
@@ -218,6 +218,66 @@ mayapy -m shader_health validate scene.ma --profile-id publish_strict --report r
 
 Scene validation requires `mayapy`; regular system Python can validate snapshot JSON inputs only.
 
+## Studio config rollout (`shader_health_studio.json`)
+
+Pipeline TDs deploy one JSON file for studio-wide policy: pipeline toggles, network path roots, connector credentials, bug-report relay URL, and waiver/manifest defaults. Per-machine artist preferences stay in `~/.shader_health/user.json` (see [ADR 0007](adr/0007-settings-and-connectors-architecture.md)).
+
+### Discovery order
+
+The Maya panel and headless CLI (`validate`, `manifest`, `gate`) resolve the same file:
+
+| Priority | Source |
+| --- | --- |
+| 1 | `SHADER_HEALTH_STUDIO_CONFIG` environment variable (absolute path to a JSON file) |
+| 2 | `~/.shader_health/shader_health_studio.json` |
+| 3 | `~/shader_health_studio.json` |
+
+Headless CLI also accepts `--studio-config /path/to/shader_health_studio.json`, which overrides env and default discovery.
+
+### Recommended facility rollout
+
+1. Place `shader_health_studio.json` on a network share (for example `\\pipeline\config\shader_health\shader_health_studio.json`).
+2. Set `SHADER_HEALTH_STUDIO_CONFIG` in the facility Maya launcher, farm wrangler environment, and Deadline worker setup so interactive and headless sessions load the same file.
+3. Keep files with connector tokens and relay API keys out of git — see [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md).
+
+Windows launcher (PowerShell):
+
+```powershell
+$env:SHADER_HEALTH_STUDIO_CONFIG = "\\pipeline\config\shader_health\shader_health_studio.json"
+& "C:\Program Files\Autodesk\Maya2025\bin\maya.exe"
+```
+
+Linux/macOS:
+
+```bash
+export SHADER_HEALTH_STUDIO_CONFIG="/pipeline/config/shader_health/shader_health_studio.json"
+maya
+```
+
+Headless validation with the same studio policy:
+
+```bash
+export SHADER_HEALTH_STUDIO_CONFIG="/pipeline/config/shader_health/shader_health_studio.json"
+mayapy -m shader_health validate scene.ma --profile-id publish_strict --report report.json
+```
+
+Or pass the path explicitly:
+
+```bash
+mayapy -m shader_health validate scene.ma \
+  --studio-config /pipeline/config/shader_health/shader_health_studio.json \
+  --profile-id publish_strict \
+  --report report.json
+```
+
+### Edit in the Maya Settings screen
+
+TDs with write access to the deployed file can use **Settings → Studio** / **Studio Environment** / **Connectors** and **Save Studio Config**. The status banner shows which path is loaded. First save without discovery prompts for a target path.
+
+Schema **2.0** sections include `studio_name`, `pipeline`, `studio_environment`, `connectors`, and `bug_report`, plus optional `ui` and `updates`. Legacy **1.0** files load with defaults for missing sections and migrate to **2.0** on save.
+
+Full rollout templates, secret handling, and how studio policy relates to custom rule packs: [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md).
+
 ## Optional MEL shelf helper
 
 [`maya_module/shelves/shelf_ShaderHealth.mel`](../maya_module/shelves/shelf_ShaderHealth.mel) defines two shelf buttons:
@@ -285,6 +345,8 @@ When using Plug-in Manager, unloading `shader_health_inspector` runs the same cl
 ## Related docs
 
 - [`USER_GUIDE.md`](USER_GUIDE.md) — artist and TD workflow inside the panel
+- [`STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md) — rolling `shader_health_studio.json` and custom rule packs
+- [`adr/0007-settings-and-connectors-architecture.md`](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
 - [`integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) — publish gate example
 - [`integrations/deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
 

@@ -17,6 +17,7 @@ from shader_health.maya.snapshot_enrichment import (
     enrich_rule_results,
     prepare_snapshot_for_validation,
 )
+from shader_health.studio_config import StudioEnvironmentSettings
 
 ROOT = Path(__file__).resolve().parents[2]
 COLOR_SPACE_RULE = ROOT / "src" / "shader_health" / "rules" / "common" / "color_space.json"
@@ -224,3 +225,27 @@ def test_build_material_index_maps_texture_nodes(tmp_path: Path):
     index = build_material_index(_broken_scene_like_snapshot(tmp_path))
 
     assert index["node:demo_roughness_v001_1"] == "demo_wrong_colorspace_MTL"
+
+
+def test_prepare_snapshot_for_validation_resolves_studio_texture_root_tokens(tmp_path: Path):
+    texture = tmp_path / "demo.exr"
+    texture.write_bytes(b"demo")
+    environment = StudioEnvironmentSettings(
+        texture_root=str(tmp_path).replace("\\", "/"),
+    )
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "demo.ma"),
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file1",
+                attr="fileTextureName",
+                raw_path="${STUDIO_TEXTURE_ROOT}/demo.exr",
+            )
+        ],
+    )
+
+    enriched = prepare_snapshot_for_validation(snapshot, studio_environment=environment)
+    dependency = enriched.file_dependencies[0]
+
+    assert dependency.resolved_path.endswith("/demo.exr")
+    assert dependency.exists is True

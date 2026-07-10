@@ -8,6 +8,8 @@ from shader_health.studio_config import (
     DeadlineConnectorSettings,
     PipelineSettings,
     StudioConfig,
+    StudioEnvironmentSettings,
+    WaiverDefaultsSettings,
 )
 from shader_health.ui import deadline_connector_section, main_window, settings_panel
 from shader_health.ui.advanced_settings_section import (
@@ -26,8 +28,23 @@ from shader_health.ui.basic_settings_section import (
 from shader_health.ui.settings_dirty_state import (
     SETTINGS_DIRTY_BANNER_OBJECT_NAME,
     SettingsDirtyState,
+    studio_config_from_settings_view,
 )
 from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
+from shader_health.ui.studio_environment_section import (
+    SETTINGS_ASSET_ROOT_INPUT_OBJECT_NAME,
+    SETTINGS_CACHE_ROOT_INPUT_OBJECT_NAME,
+    SETTINGS_RENDER_ROOT_INPUT_OBJECT_NAME,
+    SETTINGS_STUDIO_ENVIRONMENT_LEFT_COLUMN_OBJECT_NAME,
+    SETTINGS_STUDIO_ENVIRONMENT_RIGHT_COLUMN_OBJECT_NAME,
+    SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME,
+    SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME,
+)
+from shader_health.ui.studio_policy_section import (
+    SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
+    SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME,
+    SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME,
+)
 from shader_health.user_config import UserPreferences
 
 _DEADLINE_ENABLED = deadline_connector_section.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME
@@ -607,17 +624,99 @@ def test_settings_tabs_use_stable_object_names():
     ]
 
 
-def test_studio_environment_and_bug_report_tabs_show_placeholders():
+def test_bug_report_tab_shows_placeholder():
     view = settings_panel.build_settings_view(FakeQtWidgets)
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
-    studio_env_tab = tabs.tabs[4][1]
     bug_report_tab = tabs.tabs[5][1]
-
-    studio_env_label = studio_env_tab.layout.widgets[0]
     bug_report_label = bug_report_tab.layout.widgets[0]
 
-    assert "texture_root" in studio_env_label.text
     assert "relay URL" in bug_report_label.text
+
+
+def test_studio_environment_tab_exposes_network_path_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            studio_environment=StudioEnvironmentSettings(
+                texture_root="\\\\farm\\textures",
+                asset_root="\\\\farm\\assets",
+                cache_root="\\\\farm\\cache",
+                render_root="\\\\farm\\render",
+                variable_aliases={"STUDIO_TEXTURE_ROOT": "\\\\farm\\textures"},
+            )
+        ),
+    )
+    texture = _find(view, SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME)
+    aliases = _find(view, SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME)
+
+    assert texture.text() == "\\\\farm\\textures"
+    assert aliases.toPlainText() == "STUDIO_TEXTURE_ROOT=\\\\farm\\textures"
+
+
+def test_studio_environment_tab_uses_parallel_root_columns():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            studio_environment=StudioEnvironmentSettings(
+                texture_root="\\\\farm\\textures",
+            )
+        ),
+    )
+    left_column = _find(view, SETTINGS_STUDIO_ENVIRONMENT_LEFT_COLUMN_OBJECT_NAME)
+    right_column = _find(view, SETTINGS_STUDIO_ENVIRONMENT_RIGHT_COLUMN_OBJECT_NAME)
+    texture = _find(view, SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME)
+    asset = _find(view, SETTINGS_ASSET_ROOT_INPUT_OBJECT_NAME)
+    cache = _find(view, SETTINGS_CACHE_ROOT_INPUT_OBJECT_NAME)
+    render = _find(view, SETTINGS_RENDER_ROOT_INPUT_OBJECT_NAME)
+
+    assert texture in left_column.children
+    assert cache in left_column.children
+    assert asset in right_column.children
+    assert render in right_column.children
+
+
+def test_studio_config_from_settings_view_reads_studio_environment_fields():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    _find(view, SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME).setText("\\\\farm\\textures")
+    _find(view, SETTINGS_ASSET_ROOT_INPUT_OBJECT_NAME).setText("\\\\farm\\assets")
+    _find(view, SETTINGS_CACHE_ROOT_INPUT_OBJECT_NAME).setText("\\\\farm\\cache")
+    _find(view, SETTINGS_RENDER_ROOT_INPUT_OBJECT_NAME).setText("\\\\farm\\render")
+    _find(view, SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME).setPlainText(
+        "STUDIO_TEXTURE_ROOT=\\\\farm\\textures"
+    )
+
+    studio = studio_config_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=StudioConfig(),
+    )
+
+    assert studio.studio_environment.texture_root == "\\\\farm\\textures"
+    assert studio.studio_environment.asset_root == "\\\\farm\\assets"
+    assert studio.studio_environment.cache_root == "\\\\farm\\cache"
+    assert studio.studio_environment.render_root == "\\\\farm\\render"
+    assert studio.studio_environment.variable_aliases["STUDIO_TEXTURE_ROOT"] == (
+        "\\\\farm\\textures"
+    )
+
+
+def test_update_settings_view_refreshes_studio_environment_fields():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(
+            studio_environment=StudioEnvironmentSettings(
+                texture_root="\\\\farm\\textures",
+                variable_aliases={"CUSTOM_ROOT": "\\\\farm\\custom"},
+            )
+        ),
+    )
+
+    assert _find(view, SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME).text() == "\\\\farm\\textures"
+    assert _find(view, SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME).toPlainText() == (
+        "CUSTOM_ROOT=\\\\farm\\custom"
+    )
 
 
 def test_settings_view_exposes_split_save_and_load_actions():
@@ -653,13 +752,51 @@ def test_settings_view_shows_studio_and_user_config_paths():
     assert "user.json" in user_label.text
 
 
+def test_studio_tab_exposes_policy_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            studio_name="Demo Studio",
+            pipeline=PipelineSettings(
+                waiver_defaults=WaiverDefaultsSettings(default_approved_by="pipeline_td"),
+                pinned_workflow_profile_ids=("artist_relaxed",),
+            ),
+        ),
+    )
+    assert _find(view, SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME).text() == "Demo Studio"
+    assert _find(view, SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME).text() == "pipeline_td"
+    assert _find(view, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).toPlainText() == (
+        "artist_relaxed"
+    )
+
+
+def test_studio_config_from_settings_view_reads_studio_policy_fields():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    _find(view, SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME).setText("Network Studio")
+    _find(view, SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME).setText("lead_td")
+    _find(view, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).setPlainText(
+        "publish_strict"
+    )
+
+    studio = studio_config_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=StudioConfig(),
+    )
+
+    assert studio.studio_name == "Network Studio"
+    assert studio.pipeline.waiver_defaults.default_approved_by == "lead_td"
+    assert studio.pipeline.pinned_workflow_profile_ids == ("publish_strict",)
+
+
 def test_studio_tab_clarifies_pipeline_policy_scope():
     view = settings_panel.build_settings_view(FakeQtWidgets)
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
     studio_tab = tabs.tabs[3][1]
-    intro = studio_tab.layout.widgets[0]
+    policy_section = studio_tab.layout.widgets[0]
+    intro = policy_section.layout.widgets[0]
 
-    assert "pipeline policy" in intro.text.lower()
+    assert "shader_health_studio.json" in intro.text
     assert "Studio Environment" in intro.text
 
 

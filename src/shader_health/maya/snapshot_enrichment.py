@@ -38,16 +38,22 @@ from shader_health.maya.complexity_profiler import profile_material_complexity
 from shader_health.maya.displacement_enrichment import enrich_displacement_metadata
 from shader_health.maya.optimized_texture_enrichment import enrich_optimized_texture_metadata
 from shader_health.maya.vray_enrichment import enrich_vray_metadata
+from shader_health.studio_config import StudioEnvironmentSettings
+from shader_health.util.paths import resolve_studio_path
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
 _DISPLACEMENT_NODE_TYPES = {"displacementShader", "VRayDisplacement", "VRayDisplacementTex"}
 
 
-def prepare_snapshot_for_validation(snapshot: GraphSnapshot) -> GraphSnapshot:
+def prepare_snapshot_for_validation(
+    snapshot: GraphSnapshot,
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
+) -> GraphSnapshot:
     """Return a validation-ready snapshot with runtime semantics and UDIM metadata."""
 
-    enriched = enrich_snapshot(snapshot)
+    enriched = enrich_snapshot(snapshot, studio_environment=studio_environment)
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
     resolved = resolver.apply_to_snapshot(enriched)
     propagated = _with_propagated_semantic_slots(resolved)
@@ -129,7 +135,11 @@ def _upstream_texture_nodes(
     return found
 
 
-def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
+def enrich_snapshot(
+    snapshot: GraphSnapshot,
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
+) -> GraphSnapshot:
     """Return a validation-ready snapshot enriched with runtime semantics."""
 
     base_nodes = tuple(_enrich_node(node) for node in snapshot.nodes)
@@ -143,7 +153,12 @@ def enrich_snapshot(snapshot: GraphSnapshot) -> GraphSnapshot:
     nodes_by_id = {node.id: node for node in nodes}
     scene_dir = Path(snapshot.scene_path).parent if snapshot.scene_path else Path.cwd()
     file_dependencies = tuple(
-        _enrich_file_dependency(dependency, nodes_by_id.get(dependency.node_id), scene_dir)
+        _enrich_file_dependency(
+            dependency,
+            nodes_by_id.get(dependency.node_id),
+            scene_dir,
+            studio_environment,
+        )
         for dependency in snapshot.file_dependencies
     )
     materials = tuple(
@@ -242,9 +257,14 @@ def _enrich_file_dependency(
     dependency: FileDependencySnapshot,
     node: Optional[NodeSnapshot],
     scene_dir: Path,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> FileDependencySnapshot:
     udim_pattern = _udim_pattern(dependency.raw_path, node)
-    resolved_path = _resolve_path(udim_pattern or dependency.raw_path, scene_dir)
+    resolved_path = _resolve_path(
+        udim_pattern or dependency.raw_path,
+        scene_dir,
+        studio_environment,
+    )
     is_udim = bool(udim_pattern) or dependency.is_udim
     if not is_udim:
         enriched = replace(
@@ -372,8 +392,15 @@ def _is_displacement_node(node: NodeSnapshot) -> bool:
     return node.type_name in _DISPLACEMENT_NODE_TYPES or "displacement" in node.type_name.lower()
 
 
-def _resolve_path(raw_path: str, scene_dir: Path) -> str:
-    expanded = os.path.expanduser(os.path.expandvars(raw_path)).replace("\\", "/")
+def _resolve_path(
+    raw_path: str,
+    scene_dir: Path,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
+) -> str:
+    path_text = raw_path
+    if studio_environment is not None:
+        path_text = resolve_studio_path(path_text, studio_environment)
+    expanded = os.path.expanduser(os.path.expandvars(path_text)).replace("\\", "/")
     path = Path(expanded)
     if path.is_absolute():
         return str(path).replace("\\", "/")
