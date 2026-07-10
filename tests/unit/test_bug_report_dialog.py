@@ -88,7 +88,7 @@ def test_bug_report_dialog_shows_issue_url_on_success():
 
     assert form.visible is False
     assert success.visible is True
-    assert "GitHub issue" in status.text
+    assert "maintainers" in status.text.lower()
     assert issue_url.text == "https://github.com/org/repo/issues/42"
     assert submit.enabled is False
     assert submit.text == "Submitted"

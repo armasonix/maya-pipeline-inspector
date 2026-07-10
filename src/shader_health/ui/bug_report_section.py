@@ -48,7 +48,8 @@ _BUG_REPORT_LABEL_WIDTH = 132
 _BUG_REPORT_FIELD_WIDTH = 292
 
 BUG_REPORT_PRIVACY_NOTICE = (
-    "Reports route through your studio's HTTPS relay — not directly to GitHub from Maya. "
+    "Artists report bugs in Shader Health Inspector itself — not general scene shading issues. "
+    "Reports route through your studio HTTPS relay to plugin maintainers on GitHub. "
     "Submissions include validation summary, plugin version, and scene basename only. "
     "Optional screenshots are controlled by the allow-screenshot policy below. "
     "Full scene paths and environment dumps are not sent."
@@ -71,8 +72,9 @@ def build_bug_report_section(
     section_layout.setSpacing(6)
 
     intro = qt_widgets.QLabel(
-        "Studio-hosted bug report relay settings from shader_health_studio.json. "
-        "Artists submit reports through the relay; credentials stay in the studio config."
+        "Enable artist reports when Shader Health Inspector itself misbehaves. "
+        "The studio relay forwards submissions to plugin maintainers as GitHub issues. "
+        "Configure relay URL and API key in shader_health_studio.json."
     )
     intro.setWordWrap(True)
     section_layout.addWidget(intro)

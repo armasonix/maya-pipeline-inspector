@@ -7,7 +7,10 @@ from shader_health.integrations.bug_report.relay_client import BugReportRelayRes
 def format_bug_report_success_headline() -> str:
     """Return the success headline shown after a relay accepts a report."""
 
-    return "Bug report submitted. GitHub issue created."
+    return (
+        "Plugin bug report sent to Shader Health maintainers. "
+        "Track the fix on GitHub:"
+    )
 
 
 def format_bug_report_issue_url_text(issue_url: str) -> str:
@@ -20,11 +23,11 @@ def format_bug_report_failure_status(result: BugReportRelayResult) -> str:
     """Return a user-visible failure message for a relay submission outcome."""
 
     if result.skipped_reason == "disabled":
-        return "Bug report is disabled. Enable it in Settings → Bug Report."
+        return "Plugin bug reports are disabled. Enable them in Settings → Bug Report."
     if result.skipped_reason == "incomplete_config":
         return (
-            "Bug report relay is not configured. "
-            "Set relay URL and API key in Settings → Bug Report."
+            "Plugin bug report relay is not configured. "
+            "Ask your TD to set relay URL and API key in Settings → Bug Report."
         )
     if result.skipped_reason == "rate_limited":
         if result.error_message:

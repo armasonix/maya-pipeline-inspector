@@ -1,6 +1,10 @@
 # Bug report relay server specification
 
-Shader Health Inspector ships a **client-only** bug report integration. Each studio deploys its own **HTTPS relay** that accepts artist submissions from Maya, creates a GitHub Issue, and returns the issue URL to the panel.
+Shader Health Inspector ships a **client-only** bug report path for **plugin defects** — crashes, wrong validation results, panel freezes, and other issues in the tool itself. Artists and TDs use it to notify **plugin maintainers** (open-source developers and contributors) so the problem can be triaged, patched, and released.
+
+This is **not** a general pipeline bug tracker for scene shading or asset issues. It is specifically: *something is wrong with Shader Health Inspector → report to the people who ship the plugin*.
+
+Each studio deploys an **HTTPS relay** that accepts submissions from Maya, creates a GitHub Issue in the plugin repository, optionally emails maintainers, and returns the issue URL to the panel.
 
 The open-source plugin never stores a GitHub PAT on artist workstations. Relay credentials (`relay_url`, `api_key`) live in `shader_health_studio.json` and are managed by pipeline TDs.
 
@@ -108,7 +112,7 @@ Optional relay observability fields (ignored by the Maya client):
 }
 ```
 
-The Maya panel shows `issue_url` to the artist after a successful submission (header **Report Bug** dialog).
+The Maya panel shows `issue_url` to the artist after a successful submission (header **Report Plugin Bug** dialog).
 
 ## Maintainer email notification
 
@@ -468,7 +472,7 @@ Entry point for UI and automation: `maybe_submit_bug_report(studio_config, paylo
 
 Open **Settings → Bug Report** in the Maya panel to configure relay URL, API key (password echo), screenshot policy, daily cap, and the privacy notice shown to artists.
 
-Artists submit reports from the panel header **Report Bug** button (`ui/bug_report_dialog.py`). On success the dialog shows the created GitHub `issue_url` returned by the relay.
+Artists submit plugin bug reports from the panel header **Report Plugin Bug** button (`ui/bug_report_dialog.py`). On success the dialog shows the GitHub `issue_url` where maintainers track the fix.
 
 ## Testing notes
 

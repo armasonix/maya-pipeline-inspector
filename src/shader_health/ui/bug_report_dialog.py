@@ -22,13 +22,19 @@ BUG_REPORT_FORM_WIDGET_OBJECT_NAME = "shaderHealthInspectorBugReportFormWidget"
 BUG_REPORT_SUCCESS_WIDGET_OBJECT_NAME = "shaderHealthInspectorBugReportSuccessWidget"
 BUG_REPORT_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorBugReportStatusLabel"
 BUG_REPORT_ISSUE_URL_LABEL_OBJECT_NAME = "shaderHealthInspectorBugReportIssueUrlLabel"
+BUG_REPORT_ISSUE_URL_CAPTION_LABEL_OBJECT_NAME = (
+    "shaderHealthInspectorBugReportIssueUrlCaptionLabel"
+)
 BUG_REPORT_SUBMIT_BUTTON_OBJECT_NAME = "shaderHealthInspectorBugReportSubmitButton"
 BUG_REPORT_CLOSE_BUTTON_OBJECT_NAME = "shaderHealthInspectorBugReportCloseButton"
 
 BUG_REPORT_DIALOG_INTRO = (
-    "Submit a bug report through your studio HTTPS relay. "
-    "Reports include plugin version, scene basename, and optional validation summary."
+    "Report a bug in Maya Shader Health Inspector to the plugin maintainers. "
+    "Your studio relay creates a GitHub issue and notifies the development team so "
+    "the problem can be triaged and patched. "
+    "Include plugin version, scene basename, and optional validation context."
 )
+BUG_REPORT_ISSUE_URL_CAPTION = "GitHub issue for maintainers to track the fix:"
 
 
 @dataclass(frozen=True)
@@ -51,6 +57,7 @@ class BugReportDialog:
     description_input: Any
     steps_input: Any
     status_label: Any
+    issue_url_caption: Any
     issue_url_label: Any
     submit_button: Any
     close_button: Any
@@ -61,7 +68,7 @@ class BugReportDialog:
         qt_widgets: Any,
         *,
         on_submit: Callable[[BugReportFormValues], BugReportRelayResult] | None = None,
-        window_title: str = "Report Bug",
+        window_title: str = "Report Plugin Bug",
     ) -> BugReportDialog:
         dialog = qt_widgets.QDialog()
         dialog.setObjectName(BUG_REPORT_DIALOG_OBJECT_NAME)
@@ -90,7 +97,7 @@ class BugReportDialog:
         title_input = _build_line_edit(
             qt_widgets,
             object_name=BUG_REPORT_TITLE_INPUT_OBJECT_NAME,
-            placeholder="Short summary of the issue",
+            placeholder="What went wrong in Shader Health Inspector?",
         )
         form_layout.addWidget(qt_widgets.QLabel("Title"))
         form_layout.addWidget(title_input)
@@ -98,7 +105,7 @@ class BugReportDialog:
         description_input = _build_text_edit(
             qt_widgets,
             object_name=BUG_REPORT_DESCRIPTION_INPUT_OBJECT_NAME,
-            placeholder="What happened? Include expected vs actual behavior.",
+            placeholder="Describe the plugin bug: expected behavior vs what happened in the panel.",
         )
         form_layout.addWidget(qt_widgets.QLabel("Description"))
         form_layout.addWidget(description_input)
@@ -125,6 +132,13 @@ class BugReportDialog:
         if set_status_word_wrap is not None:
             set_status_word_wrap(True)
         success_layout.addWidget(status_label)
+
+        issue_url_caption = qt_widgets.QLabel(BUG_REPORT_ISSUE_URL_CAPTION)
+        issue_url_caption.setObjectName(BUG_REPORT_ISSUE_URL_CAPTION_LABEL_OBJECT_NAME)
+        set_caption_word_wrap = getattr(issue_url_caption, "setWordWrap", None)
+        if set_caption_word_wrap is not None:
+            set_caption_word_wrap(True)
+        success_layout.addWidget(issue_url_caption)
 
         issue_url_label = qt_widgets.QLabel("")
         issue_url_label.setObjectName(BUG_REPORT_ISSUE_URL_LABEL_OBJECT_NAME)
@@ -164,6 +178,7 @@ class BugReportDialog:
             description_input=description_input,
             steps_input=steps_input,
             status_label=status_label,
+            issue_url_caption=issue_url_caption,
             issue_url_label=issue_url_label,
             submit_button=submit_button,
             close_button=close_button,
@@ -200,6 +215,7 @@ class BugReportDialog:
         _set_widget_visible(self.form_widget, False)
         _set_widget_visible(self.success_widget, True)
         _set_label_text(self.status_label, format_bug_report_success_headline())
+        _set_widget_visible(self.issue_url_caption, True)
         _set_label_text(self.issue_url_label, format_bug_report_issue_url_text(issue_url))
         _set_button_enabled(self.submit_button, False)
         _set_button_text(self.submit_button, "Submitted")
@@ -209,6 +225,7 @@ class BugReportDialog:
         _set_widget_visible(self.success_widget, True)
         _set_label_text(self.status_label, message)
         _set_label_text(self.issue_url_label, "")
+        _set_widget_visible(self.issue_url_caption, False)
 
 
 def show_bug_report_dialog(

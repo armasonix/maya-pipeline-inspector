@@ -677,7 +677,7 @@ def test_panel_header_includes_version_settings_gear_documentation_and_updates_b
     assert gear.tooltip == main_window.SETTINGS_GEAR_TOOLTIP
     assert docs.text == "Documentation"
     assert docs.tooltip == main_window.DOCUMENTATION_BUTTON_TOOLTIP
-    assert report_bug.text == "Report Bug"
+    assert report_bug.text == "Report Plugin Bug"
     assert report_bug.tooltip == main_window.REPORT_BUG_BUTTON_TOOLTIP
     assert updates.text == "Check for Updates"
     assert updates.tooltip == main_window.CHECK_FOR_UPDATES_BUTTON_TOOLTIP

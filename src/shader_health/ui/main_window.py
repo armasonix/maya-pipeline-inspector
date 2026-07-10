@@ -36,7 +36,8 @@ CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "shaderHealthInspectorCheckForUpdatesButt
 SETTINGS_GEAR_TOOLTIP = "Open settings"
 DOCUMENTATION_BUTTON_TOOLTIP = "Open shader health documentation in your browser."
 REPORT_BUG_BUTTON_TOOLTIP = (
-    "Submit a bug report through your studio HTTPS relay and open the created GitHub issue."
+    "Report a bug in Shader Health Inspector to the plugin maintainers. "
+    "Creates a GitHub issue via your studio relay."
 )
 CHECK_FOR_UPDATES_BUTTON_TOOLTIP = (
     "Open the update wizard shell and preview staged progress steps."
@@ -377,7 +378,7 @@ def build_panel_header(
 
     report_bug_button = _compact_button(
         qt_widgets,
-        "Report Bug",
+        "Report Plugin Bug",
         REPORT_BUG_BUTTON_OBJECT_NAME,
         REPORT_BUG_BUTTON_TOOLTIP,
         navigation_callbacks.on_report_bug,

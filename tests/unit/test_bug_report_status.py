@@ -9,7 +9,9 @@ from shader_health.integrations.bug_report.status import (
 
 
 def test_format_bug_report_success_headline():
-    assert "GitHub issue" in format_bug_report_success_headline()
+    headline = format_bug_report_success_headline()
+    assert "maintainers" in headline.lower()
+    assert "github" in headline.lower()
 
 
 def test_format_bug_report_issue_url_text_trims_whitespace():
@@ -25,7 +27,7 @@ def test_format_bug_report_failure_status_maps_disabled_reason():
     message = format_bug_report_failure_status(result)
 
     assert "disabled" in message.lower()
-    assert "settings" in message.lower()
+    assert "plugin" in message.lower()
 
 
 def test_format_bug_report_failure_status_prefers_rate_limit_message():
