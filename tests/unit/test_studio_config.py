@@ -15,6 +15,7 @@ from shader_health.studio_config import (
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
     PipelineSettings,
+    SlackConnectorSettings,
     StudioConfig,
     StudioEnvironmentSettings,
     StudioUiSettings,
@@ -25,6 +26,7 @@ from shader_health.studio_config import (
     merge_studio_rule_overrides,
     resolve_deadline_config,
     resolve_discord_config,
+    resolve_slack_config,
     resolve_studio_config_for_headless,
     resolve_telegram_config,
     save_studio_config,
@@ -183,6 +185,13 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
                 webhook_url="https://discord.com/api/webhooks/1/secret",
                 notify_on=("block_deadline",),
             ),
+            slack=SlackConnectorSettings(
+                enabled=True,
+                publish_webhook_url="https://hooks.slack.com/publish",
+                deadline_webhook_url="https://hooks.slack.com/deadline",
+                notify_on=("block_publish",),
+                include_report_link=False,
+            ),
         ),
     )
 
@@ -207,13 +216,21 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.connectors.discord.enabled is True
     assert loaded.connectors.discord.webhook_url == "https://discord.com/api/webhooks/1/secret"
     assert loaded.connectors.discord.notify_on == ("block_deadline",)
+    assert loaded.connectors.slack.enabled is True
+    assert loaded.connectors.slack.publish_webhook_url == "https://hooks.slack.com/publish"
+    assert loaded.connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
+    assert loaded.connectors.slack.notify_on == ("block_publish",)
+    assert loaded.connectors.slack.include_report_link is False
 
 
 def test_connector_settings_preserves_extensible_connectors():
     connectors = ConnectorSettings.from_mapping(
         {
             "deadline": {"enabled": True, "web_service_host": "farm.local"},
-            "slack": {"enabled": True, "webhook_url": "https://hooks.slack.com/example"},
+            "slack": {
+                "enabled": True,
+                "publish_webhook_url": "https://hooks.slack.com/publish",
+            },
             "ftrack": {"enabled": False},
         }
     )
@@ -222,7 +239,8 @@ def test_connector_settings_preserves_extensible_connectors():
 
     assert connectors.deadline.enabled is True
     assert connectors.deadline.web_service_host == "farm.local"
-    assert connectors.extra["slack"]["webhook_url"].startswith("https://hooks.slack.com/")
+    assert connectors.slack.enabled is True
+    assert connectors.slack.publish_webhook_url.startswith("https://hooks.slack.com/")
     assert connectors.extra["ftrack"]["enabled"] is False
     assert restored.to_dict() == connectors.to_dict()
 
@@ -376,6 +394,47 @@ def test_resolve_discord_config_returns_none_when_disabled_or_incomplete():
 
     assert resolve_discord_config(disabled) is None
     assert resolve_discord_config(incomplete) is None
+
+
+def test_resolve_slack_config_uses_connector_when_enabled():
+    config = StudioConfig(
+        connectors=ConnectorSettings(
+            slack=SlackConnectorSettings(
+                enabled=True,
+                publish_webhook_url="https://hooks.slack.com/publish",
+                deadline_webhook_url="https://hooks.slack.com/deadline",
+            )
+        ),
+    )
+
+    resolved = resolve_slack_config(config)
+
+    assert resolved is not None
+    assert resolved.publish_webhook_url == "https://hooks.slack.com/publish"
+    assert resolved.deadline_webhook_url == "https://hooks.slack.com/deadline"
+
+
+def test_resolve_slack_config_returns_none_when_disabled_or_incomplete():
+    disabled = StudioConfig(
+        connectors=ConnectorSettings(
+            slack=SlackConnectorSettings(
+                enabled=False,
+                publish_webhook_url="https://hooks.slack.com/publish",
+            )
+        ),
+    )
+    incomplete = StudioConfig(
+        connectors=ConnectorSettings(
+            slack=SlackConnectorSettings(
+                enabled=True,
+                publish_webhook_url="",
+                deadline_webhook_url="",
+            ),
+        ),
+    )
+
+    assert resolve_slack_config(disabled) is None
+    assert resolve_slack_config(incomplete) is None
 
 
 def test_deadline_connector_from_deadline_config_round_trip():

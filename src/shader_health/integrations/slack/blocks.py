@@ -1,0 +1,129 @@
+"""Slack Block Kit formatter and webhook routing for validation summaries."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from shader_health.studio_config import (
+    SLACK_NOTIFY_EVENT_BLOCK_DEADLINE,
+    SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,
+    SlackConnectorSettings,
+)
+
+_EVENT_LABELS = {
+    SLACK_NOTIFY_EVENT_BLOCK_PUBLISH: "Publish block",
+    SLACK_NOTIFY_EVENT_BLOCK_DEADLINE: "Deadline block",
+}
+
+
+@dataclass(frozen=True)
+class ValidationBlocksContext:
+    """Normalized validation payload for Slack Block Kit messages."""
+
+    scene_name: str
+    scene_path: str
+    scan_scope: str
+    profile_id: str
+    asset_class_id: str
+    health_score: int
+    critical_count: int
+    error_count: int
+    warning_count: int
+    info_count: int
+    block_publish: bool
+    block_deadline: bool
+
+
+def build_optional_report_link(*, scene_path: str, render_root: str) -> str | None:
+    """Build an optional report path under ``studio_environment.render_root``."""
+
+    root = render_root.strip()
+    if not root or not scene_path.strip():
+        return None
+    normalized_scene = scene_path.replace("\\", "/").rstrip("/")
+    scene_stem = Path(normalized_scene).stem
+    if not scene_stem:
+        return None
+    report_name = f"{scene_stem}_shader_health_report.json"
+    return str(Path(root.replace("\\", "/")) / report_name)
+
+
+def webhook_url_for_event(settings: SlackConnectorSettings, event_id: str) -> str | None:
+    """Return the routed webhook URL for a configured block event."""
+
+    if event_id == SLACK_NOTIFY_EVENT_BLOCK_PUBLISH:
+        url = settings.publish_webhook_url.strip()
+    elif event_id == SLACK_NOTIFY_EVENT_BLOCK_DEADLINE:
+        url = settings.deadline_webhook_url.strip()
+    else:
+        return None
+    return url or None
+
+
+def route_matched_events(
+    settings: SlackConnectorSettings,
+    matched_events: tuple[str, ...],
+) -> tuple[tuple[str, str], ...]:
+    """Return routed webhook targets for matched block events."""
+
+    routes: list[tuple[str, str]] = []
+    for event_id in matched_events:
+        webhook_url = webhook_url_for_event(settings, event_id)
+        if webhook_url:
+            routes.append((event_id, webhook_url))
+    return tuple(routes)
+
+
+def format_validation_blocks(
+    context: ValidationBlocksContext,
+    *,
+    matched_events: tuple[str, ...],
+    report_link: str | None = None,
+) -> dict[str, Any]:
+    """Format a Slack Block Kit payload for a validation summary."""
+
+    event_labels = ", ".join(_EVENT_LABELS.get(event, event) for event in matched_events)
+    profile_label = context.profile_id or "unknown"
+    if context.asset_class_id:
+        profile_label = f"{profile_label}+{context.asset_class_id}"
+    scope_label = context.scan_scope.title() if context.scan_scope else "Scene"
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"Shader Health: {event_labels}"},
+        },
+        {
+            "type": "section",
+            "fields": [
+                {"type": "mrkdwn", "text": f"*Scene:*\n{context.scene_name}"},
+                {"type": "mrkdwn", "text": f"*Profile:*\n{profile_label}"},
+                {"type": "mrkdwn", "text": f"*Scope:*\n{scope_label}"},
+                {"type": "mrkdwn", "text": f"*Health:*\n{context.health_score}/100"},
+            ],
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    "*Issues:* "
+                    f"{context.critical_count} critical, "
+                    f"{context.error_count} error, "
+                    f"{context.warning_count} warning, "
+                    f"{context.info_count} info"
+                ),
+            },
+        },
+    ]
+    if report_link:
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Report:*\n`{report_link}`",
+                },
+            }
+        )
+    return {"blocks": blocks}

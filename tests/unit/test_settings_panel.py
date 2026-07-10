@@ -8,6 +8,7 @@ from shader_health.studio_config import (
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
     PipelineSettings,
+    SlackConnectorSettings,
     StudioConfig,
     StudioEnvironmentSettings,
     TelegramConnectorSettings,
@@ -18,6 +19,7 @@ from shader_health.ui import (
     discord_connector_section,
     main_window,
     settings_panel,
+    slack_connector_section,
     telegram_connector_section,
 )
 from shader_health.ui.advanced_settings_section import (
@@ -75,6 +77,13 @@ _DISCORD_DETAILS = discord_connector_section.SETTINGS_DISCORD_DETAILS_OBJECT_NAM
 _DISCORD_WEBHOOK = discord_connector_section.SETTINGS_DISCORD_WEBHOOK_URL_INPUT_OBJECT_NAME
 _DISCORD_NOTIFY_DEADLINE = (
     discord_connector_section.SETTINGS_DISCORD_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME
+)
+_SLACK_ENABLED = slack_connector_section.SETTINGS_SLACK_ENABLED_TOGGLE_OBJECT_NAME
+_SLACK_DETAILS = slack_connector_section.SETTINGS_SLACK_DETAILS_OBJECT_NAME
+_SLACK_PUBLISH_WEBHOOK = slack_connector_section.SETTINGS_SLACK_PUBLISH_WEBHOOK_INPUT_OBJECT_NAME
+_SLACK_DEADLINE_WEBHOOK = slack_connector_section.SETTINGS_SLACK_DEADLINE_WEBHOOK_INPUT_OBJECT_NAME
+_SLACK_NOTIFY_PUBLISH = (
+    slack_connector_section.SETTINGS_SLACK_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME
 )
 
 
@@ -1061,6 +1070,74 @@ def test_read_connectors_from_settings_view_reads_discord_fields():
     assert connectors.discord.enabled is True
     assert connectors.discord.webhook_url == "https://discord.com/api/webhooks/42/abc"
     assert connectors.discord.notify_on == ("block_deadline",)
+
+
+def test_connectors_tab_includes_slack_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                slack=SlackConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _SLACK_ENABLED)
+    details = _find(connectors_tab, _SLACK_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_connectors_tab_shows_slack_routing_fields_when_notifications_enabled():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                slack=SlackConnectorSettings(
+                    enabled=True,
+                    publish_webhook_url="https://hooks.slack.com/publish",
+                    deadline_webhook_url="https://hooks.slack.com/deadline",
+                    notify_on=("block_publish",),
+                )
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    details = _find(connectors_tab, _SLACK_DETAILS)
+    publish = _find(connectors_tab, _SLACK_PUBLISH_WEBHOOK)
+    deadline = _find(connectors_tab, _SLACK_DEADLINE_WEBHOOK)
+    publish_notify = _find(connectors_tab, _SLACK_NOTIFY_PUBLISH)
+
+    assert details.visible is True
+    assert publish.value == "https://hooks.slack.com/publish"
+    assert publish.echo_mode == FakeLineEdit.Password
+    assert deadline.value == "https://hooks.slack.com/deadline"
+    assert publish_notify.checked is True
+
+
+def test_read_connectors_from_settings_view_reads_slack_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                slack=SlackConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    publish = _find(view, _SLACK_PUBLISH_WEBHOOK)
+    publish.setText("https://hooks.slack.com/publish")
+    deadline = _find(view, _SLACK_DEADLINE_WEBHOOK)
+    deadline.setText("https://hooks.slack.com/deadline")
+    publish_notify = _find(view, _SLACK_NOTIFY_PUBLISH)
+    publish_notify.setChecked(True)
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.slack.enabled is True
+    assert connectors.slack.publish_webhook_url == "https://hooks.slack.com/publish"
+    assert connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
+    assert connectors.slack.notify_on == ("block_publish",)
 
 
 def test_require_tx_toggle_styles_off_state():
