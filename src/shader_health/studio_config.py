@@ -185,6 +185,22 @@ class BugReportSettings:
             "max_reports_per_day": int(self.max_reports_per_day),
         }
 
+    def to_bug_report_config(self) -> Any | None:
+        """Convert connector settings into a bug report relay runtime config object."""
+
+        from shader_health.integrations.bug_report.config import BugReportRelayConfig
+
+        relay_url = self.relay_url.strip()
+        api_key = self.api_key.strip()
+        if not relay_url or not api_key:
+            return None
+        return BugReportRelayConfig(
+            relay_url=relay_url,
+            api_key=api_key,
+            allow_screenshot=self.allow_screenshot,
+            max_reports_per_day=int(self.max_reports_per_day),
+        )
+
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> BugReportSettings:
         if not data:
@@ -989,6 +1005,17 @@ def resolve_cerebro_config(config: StudioConfig | None) -> Any | None:
     if not cerebro.enabled:
         return None
     return cerebro.to_cerebro_config()
+
+
+def resolve_bug_report_config(config: StudioConfig | None) -> Any | None:
+    """Return bug report relay runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    bug_report = config.bug_report
+    if not bug_report.enabled:
+        return None
+    return bug_report.to_bug_report_config()
 
 
 def _normalize_schema_version(value: Any) -> str:
