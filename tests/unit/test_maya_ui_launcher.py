@@ -275,7 +275,7 @@ def test_validate_splitter_persistence_saves_sizes_on_move():
     assert getattr(content, ui_launcher.VALIDATE_SPLITTER_SIZES_ATTR) == (650, 210)
 
 
-def test_run_validation_job_notifies_telegram_after_successful_validation(monkeypatch: Any):
+def test_run_validation_job_notifies_connectors_after_successful_validation(monkeypatch: Any):
     from shader_health.core.scoring import HealthScore
 
     content = SimpleNamespace(
@@ -301,7 +301,7 @@ def test_run_validation_job_notifies_telegram_after_successful_validation(monkey
     monkeypatch.setattr(ui_launcher, "_update_validation_chrome_labels", lambda *_args: None)
     monkeypatch.setattr(
         ui_launcher,
-        "_maybe_notify_telegram_validation",
+        "_maybe_notify_validation",
         lambda content_arg, result_arg: calls.append((content_arg, result_arg)),
     )
 
@@ -313,3 +313,24 @@ def test_run_validation_job_notifies_telegram_after_successful_validation(monkey
     )
 
     assert calls == [(content, result)]
+
+
+def test_maybe_notify_validation_delegates_to_telegram_and_discord(monkeypatch: Any):
+    content = SimpleNamespace()
+    result = SimpleNamespace()
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        ui_launcher,
+        "_maybe_notify_telegram_validation",
+        lambda *_args: calls.append("telegram"),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_maybe_notify_discord_validation",
+        lambda *_args: calls.append("discord"),
+    )
+
+    ui_launcher._maybe_notify_validation(content, result)
+
+    assert calls == ["telegram", "discord"]
