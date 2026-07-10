@@ -108,3 +108,31 @@ def test_resolve_studio_path_supports_nested_substitution():
 
 def test_resolve_studio_path_returns_empty_string_for_blank_input():
     assert paths.resolve_studio_path("", _sample_environment()) == ""
+
+
+def test_normalize_path_to_studio_tokens_maps_configured_roots():
+    environment = _sample_environment()
+
+    assert paths.normalize_path_to_studio_tokens(
+        "\\\\farm\\textures/hero/albedo.exr",
+        environment,
+    ) == "${STUDIO_TEXTURE_ROOT}/hero/albedo.exr"
+    assert paths.normalize_path_to_studio_tokens(
+        "\\\\farm\\assets/props/chair.ma",
+        environment,
+    ) == "${STUDIO_ASSET_ROOT}/props/chair.ma"
+
+
+def test_effective_studio_normalize_target_prefers_studio_tokens_when_roots_exist():
+    environment = _sample_environment()
+
+    assert paths.effective_studio_normalize_target("${ASSET_ROOT}", environment) == (
+        "${STUDIO_ASSET_ROOT}"
+    )
+    assert paths.effective_studio_normalize_target("${TEXTURE_ROOT}", environment) == (
+        "${STUDIO_TEXTURE_ROOT}"
+    )
+    assert (
+        paths.effective_studio_normalize_target("${ASSET_ROOT}", StudioEnvironmentSettings())
+        == "${ASSET_ROOT}"
+    )

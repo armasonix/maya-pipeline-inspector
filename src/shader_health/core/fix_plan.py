@@ -9,6 +9,14 @@ from typing import Any, Optional
 
 from shader_health.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
 from shader_health.core.rule_schema import RuleDefinition, RuleResult
+from shader_health.studio_config import StudioEnvironmentSettings
+from shader_health.util.paths import (
+    effective_studio_normalize_target,
+    normalize_path_to_studio_tokens,
+    replace_path_prefix,
+    studio_environment_is_configured,
+    studio_normalize_prefixes,
+)
 
 JsonDict = dict[str, Any]
 JsonValue = Any
@@ -161,11 +169,13 @@ def build_fix_plan(
     results: Iterable[RuleResult],
     rules: Iterable[RuleDefinition],
     snapshot: GraphSnapshot,
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> FixPlan:
     """Build a non-mutating fix plan from failed validation results."""
 
     rules_by_id = {rule.id: rule for rule in rules}
-    node_index = _NodeIndex(snapshot)
+    node_index = _NodeIndex(snapshot, studio_environment=studio_environment)
     actions: list[FixAction] = []
 
     for result in results:
@@ -208,6 +218,11 @@ def _build_action(
     params = dict(rule.fix.to_dict())
     if node_index.scene_path:
         params["scene_path"] = node_index.scene_path
+    if (
+        node_index.studio_environment is not None
+        and studio_environment_is_configured(node_index.studio_environment)
+    ):
+        params["studio_environment"] = node_index.studio_environment.to_dict()
 
     return FixAction(
         fix_id=_fix_id(result, rule.fix.type),
@@ -284,6 +299,9 @@ def _after_value(
             before_path,
             fix_params,
             scene_path=node_index.scene_path if node_index is not None else "",
+            studio_environment=(
+                node_index.studio_environment if node_index is not None else None
+            ),
         )
         if normalized is not None:
             return normalized
@@ -346,31 +364,13 @@ def _fix_id(result: RuleResult, fix_type: str) -> str:
     return f"{result.rule_id}:{target}:{fix_type}"
 
 
-def replace_path_prefix(path: str, old_prefix: str, new_prefix: str) -> Optional[str]:
-    """Replace a path prefix, preserving the remainder of the path."""
-
-    path_norm = path.replace("\\", "/")
-    old_norm = old_prefix.replace("\\", "/").rstrip("/")
-    new_norm = new_prefix.replace("\\", "/").rstrip("/")
-    if not path_norm or not old_norm or not new_norm:
-        return None
-
-    if path_norm.lower() == old_norm.lower():
-        return new_norm
-
-    old_with_sep = f"{old_norm}/"
-    if path_norm.lower().startswith(old_with_sep.lower()):
-        suffix = path_norm[len(old_norm) :]
-        return new_norm + suffix
-    return None
-
-
 def resolve_normalize_path_value(
     before_path: str,
     fix_params: Mapping[str, Any],
     *,
     planned_after: JsonValue = None,
     scene_path: str = "",
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> Optional[str]:
     """Resolve the target path for a normalize_path fix."""
 
@@ -378,22 +378,42 @@ def resolve_normalize_path_value(
     if isinstance(explicit_path, str) and explicit_path.strip():
         return explicit_path.strip()
 
+    if studio_environment is not None:
+        tokenized = normalize_path_to_studio_tokens(before_path, studio_environment)
+        if tokenized is not None:
+            return tokenized
+
     replace_from = fix_params.get("replace_from")
     replace_to = fix_params.get("replace_to")
+    effective_replace_to = (
+        effective_studio_normalize_target(str(replace_to), studio_environment)
+        if replace_to
+        else ""
+    )
     if replace_from and replace_to:
-        normalized = replace_path_prefix(before_path, str(replace_from), str(replace_to))
+        normalized = replace_path_prefix(
+            before_path,
+            str(replace_from),
+            effective_replace_to or str(replace_to),
+        )
         if normalized is not None:
             return normalized
 
-    if replace_to:
+    if effective_replace_to or replace_to:
+        target_replace_to = effective_replace_to or str(replace_to)
+        if studio_environment is not None:
+            for root, token in studio_normalize_prefixes(studio_environment):
+                normalized = replace_path_prefix(before_path, root, token)
+                if normalized is not None:
+                    return normalized
         project_root = project_root_from_scene(
             str(fix_params.get("scene_path") or scene_path or "")
         )
         if project_root:
-            normalized = replace_path_prefix(before_path, project_root, str(replace_to))
+            normalized = replace_path_prefix(before_path, project_root, target_replace_to)
             if normalized is not None:
                 return normalized
-        basename_target = _normalize_to_asset_root_basename(before_path, str(replace_to))
+        basename_target = _normalize_to_asset_root_basename(before_path, target_replace_to)
         if basename_target is not None:
             return basename_target
 
@@ -445,8 +465,14 @@ def _is_plannable_normalize(before_value: JsonValue, after_value: JsonValue) -> 
 
 
 class _NodeIndex:
-    def __init__(self, snapshot: GraphSnapshot) -> None:
+    def __init__(
+        self,
+        snapshot: GraphSnapshot,
+        *,
+        studio_environment: Optional[StudioEnvironmentSettings] = None,
+    ) -> None:
         self.scene_path = snapshot.scene_path or ""
+        self.studio_environment = studio_environment
         self._by_key: dict[str, NodeSnapshot] = {}
         self._dependency_paths: dict[str, str] = {}
         for node in snapshot.nodes:

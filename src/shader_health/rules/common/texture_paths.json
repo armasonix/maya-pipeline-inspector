@@ -100,7 +100,11 @@
           "$ASSET_ROOT",
           "${ASSET_ROOT}",
           "$TEXTURE_ROOT",
-          "${TEXTURE_ROOT}"
+          "${TEXTURE_ROOT}",
+          "${STUDIO_TEXTURE_ROOT}",
+          "${STUDIO_ASSET_ROOT}",
+          "${STUDIO_CACHE_ROOT}",
+          "${STUDIO_RENDER_ROOT}"
         ]
       },
       "policy": {

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import importlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from shader_health.core.fix_plan import FixAction
 
 from shader_health.core.fix_plan import HIGH_RISK_BLOCK_REASON, resolve_normalize_path_value
+from shader_health.studio_config import StudioEnvironmentSettings
 
 SUPPORTED_FIX_TYPES = frozenset({"set_attr", "relink_path", "normalize_path", "disable_feature"})
 DEFAULT_UNDO_CHUNK_NAME = "Shader Health Apply Fixes"
@@ -191,6 +192,7 @@ def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
         before_value,
         action.params,
         scene_path=str(action.params.get("scene_path") or ""),
+        studio_environment=_studio_environment_from_params(action.params),
     )
     if not _is_path_string_value(normalized_path) or normalized_path == before_value:
         return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
@@ -277,6 +279,15 @@ def _reasons(
     if action.locked and not allow_locked:
         _append_unique(reasons, LOCKED_BLOCK_REASON)
     return reasons
+
+
+def _studio_environment_from_params(
+    params: Mapping[str, Any],
+) -> Optional[StudioEnvironmentSettings]:
+    raw = params.get("studio_environment")
+    if isinstance(raw, Mapping):
+        return StudioEnvironmentSettings.from_mapping(raw)
+    return None
 
 
 def _append_unique(items: list[str], item: str) -> None:

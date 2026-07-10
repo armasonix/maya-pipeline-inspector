@@ -23,7 +23,11 @@ from shader_health.maya.snapshot_enrichment import (
     enrich_rule_results,
     prepare_snapshot_for_validation,
 )
-from shader_health.studio_config import StudioConfig, merge_studio_rule_overrides
+from shader_health.studio_config import (
+    StudioConfig,
+    StudioEnvironmentSettings,
+    merge_studio_rule_overrides,
+)
 from shader_health.user_config import UserPreferences
 
 PROFILE_ROOT = DEFAULT_RULE_ROOT / "profiles"
@@ -45,6 +49,14 @@ ASSET_CLASS_PROFILE_IDS = frozenset(
         "asset_class_background",
     }
 )
+
+
+def _studio_environment_for_validation(
+    studio_config: Optional[StudioConfig],
+) -> Optional[StudioEnvironmentSettings]:
+    if studio_config is None:
+        return None
+    return studio_config.studio_environment
 
 
 @dataclass(frozen=True)
@@ -230,7 +242,10 @@ def run_validation(
 ) -> ValidationRunResult:
     """Validate an enriched snapshot using packaged rules, profile, and waivers."""
 
-    enriched = prepare_snapshot_for_validation(snapshot)
+    enriched = prepare_snapshot_for_validation(
+        snapshot,
+        studio_environment=_studio_environment_for_validation(studio_config),
+    )
     normalized_asset_class = (asset_class_id or "").strip()
     if profile_path is not None:
         profile = load_profile(profile_path)
@@ -255,7 +270,12 @@ def run_validation(
     if sidecar_path is not None and sidecar_path.is_file():
         results = list(apply_waivers(results, load_waiver_sidecar(sidecar_path)))
     results = enrich_rule_results(enriched, results)
-    fix_plan = build_fix_plan(results, rules, enriched)
+    fix_plan = build_fix_plan(
+        results,
+        rules,
+        enriched,
+        studio_environment=_studio_environment_for_validation(studio_config),
+    )
     summary = summarize_results(results)
     health_score = compute_health_score(results)
     failed_count = sum(1 for item in results if item.status == "failed")
