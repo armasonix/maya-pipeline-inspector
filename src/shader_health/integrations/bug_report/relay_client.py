@@ -7,10 +7,17 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from shader_health.integrations.bug_report.config import BugReportRelayConfig
 from shader_health.integrations.bug_report.payload import BugReportPayload
+from shader_health.integrations.bug_report.throttle import (
+    RATE_LIMITED_SKIPPED_REASON,
+    evaluate_bug_report_throttle,
+    format_rate_limit_message,
+    record_bug_report_submission,
+)
 from shader_health.studio_config import StudioConfig, resolve_bug_report_config
 
 HttpTransport = Callable[["HttpRequest", float], "RelayResponse"]
@@ -123,6 +130,13 @@ class BugReportRelayClient:
                 issue_url=issue_url,
                 status_code=response.status_code,
             )
+        if response.status_code == 429:
+            return BugReportRelayResult(
+                submitted=False,
+                skipped_reason=RATE_LIMITED_SKIPPED_REASON,
+                error_message=_relay_error_message(response),
+                status_code=response.status_code,
+            )
         if response.status_code in (200, 201):
             return BugReportRelayResult(
                 submitted=False,
@@ -142,6 +156,7 @@ def maybe_submit_bug_report(
     *,
     screenshot_jpeg: bytes | None = None,
     transport: HttpTransport | None = None,
+    throttle_state_path: Path | None = None,
 ) -> BugReportRelayResult:
     """Submit a bug report when studio relay settings are enabled and complete."""
 
@@ -156,8 +171,28 @@ def maybe_submit_bug_report(
             return BugReportRelayResult(submitted=False, skipped_reason="disabled")
         return BugReportRelayResult(submitted=False, skipped_reason="incomplete_config")
 
+    throttle_decision = evaluate_bug_report_throttle(
+        config,
+        machine_id=payload.machine_id,
+        os_user=payload.os_user,
+        state_path=throttle_state_path,
+    )
+    if not throttle_decision.allowed:
+        return BugReportRelayResult(
+            submitted=False,
+            skipped_reason=throttle_decision.skipped_reason,
+            error_message=format_rate_limit_message(throttle_decision),
+        )
+
     client = BugReportRelayClient(config, transport=transport)
-    return client.submit(payload, screenshot_jpeg=screenshot_jpeg)
+    result = client.submit(payload, screenshot_jpeg=screenshot_jpeg)
+    if result.submitted:
+        record_bug_report_submission(
+            machine_id=payload.machine_id,
+            os_user=payload.os_user,
+            state_path=throttle_state_path,
+        )
+    return result
 
 
 def build_multipart_body(

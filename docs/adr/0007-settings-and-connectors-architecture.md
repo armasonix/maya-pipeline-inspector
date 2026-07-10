@@ -179,13 +179,13 @@ Maya panel (Bug Report form)
 |---|---|
 | Transport | HTTPS only; reject plain HTTP |
 | Authentication | API key in header (`Authorization: Bearer <key>` or `X-Shader-Health-Key`); rotatable per studio |
-| Rate limiting | Per API key + machine fingerprint; configurable `max_reports_per_day` enforced server-side |
+| Rate limiting | Per API key + `machine_id`/`os_user` from payload; enforce studio `bug_report.max_reports_per_day` server-side; return **HTTP 429** with optional `Retry-After` and JSON error body when exceeded |
 | Payload size | Total body cap (e.g. 3 MB); screenshot max 2 MB |
 | Image types | Whitelist JPEG/PNG; reject SVG/HTML |
 | SSRF | No arbitrary URL fields in payload; relay does not fetch user-supplied URLs |
 | Privacy | Scene path sent as basename only; no env dump |
 | GitHub scope | Optional allowlist of target repo, labels, milestones on relay |
-| Abuse | Client-side throttle (issue #149) plus relay 429 responses |
+| Abuse | Client-side throttle in `integrations/bug_report/throttle.py` mirrors `max_reports_per_day` per machine/user in `~/.shader_health/bug_report_throttle.json` before calling the relay; relay 429 responses surface as `rate_limited` in the Maya panel |
 
 Bug Report is **disabled by default** until `bug_report.relay_url` and `api_key` are set in studio config.
 
