@@ -59,7 +59,7 @@ def default_database_port_factory(config: CerebroConfig) -> PyCerebroDatabaseAda
 
 def _import_py_cerebro_database() -> Any:
     try:
-        from py_cerebro import database  # type: ignore[import-untyped]
+        from py_cerebro import database
     except ImportError as exc:
         raise RuntimeError(
             "py_cerebro is required for the Cerebro connector. "
