@@ -7,6 +7,7 @@ from shader_health.integrations.bug_report.config import (
 from shader_health.integrations.bug_report.payload import (
     BUG_REPORT_PAYLOAD_SCHEMA_VERSION,
     BugReportPayload,
+    build_bug_report_payload,
     scene_basename,
 )
 from shader_health.integrations.bug_report.relay_client import (
@@ -48,6 +49,7 @@ __all__ = [
     "HttpTransport",
     "RATE_LIMITED_SKIPPED_REASON",
     "RelayResponse",
+    "build_bug_report_payload",
     "build_multipart_body",
     "default_http_transport",
     "default_throttle_state_path",

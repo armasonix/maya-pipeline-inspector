@@ -99,6 +99,78 @@ Example:
 }
 ```
 
+Optional relay observability fields (ignored by the Maya client):
+
+```json
+{
+  "issue_url": "https://github.com/org/maya-shader-health-inspector/issues/184",
+  "email_notified": true
+}
+```
+
+The Maya panel shows `issue_url` to the artist after a successful submission (header **Report Bug** dialog).
+
+## Maintainer email notification
+
+After the GitHub issue is created, the relay may send a **best-effort email** to the project maintainer. Email is **relay-side only** — the open-source plugin does not send SMTP mail.
+
+### Delivery semantics
+
+| Rule | Detail |
+| --- | --- |
+| Trigger | Send only after GitHub issue creation succeeds |
+| Failure handling | SMTP or provider errors must **not** change the HTTP success response; log server-side and optionally set `email_notified: false` |
+| Privacy | Email body uses the same privacy-safe fields as the GitHub issue template — no full scene path |
+| Retry | Relay may retry transient SMTP failures asynchronously; do not block the HTTP response |
+
+### Relay configuration (environment)
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SHADER_HEALTH_MAINTAINER_EMAIL` | When email notify is enabled | Primary maintainer recipient |
+| `SHADER_HEALTH_EMAIL_FROM` | When email notify is enabled | SMTP `From` address |
+| `SHADER_HEALTH_EMAIL_NOTIFY_ENABLED` | No | Default `true` when maintainer email is set |
+| `SMTP_HOST` | When email notify is enabled | Outbound SMTP host |
+| `SMTP_PORT` | No | SMTP port (default `587`) |
+| `SMTP_USER` / `SMTP_PASSWORD` | Depends on provider | SMTP authentication when required |
+| `SMTP_USE_TLS` | No | StartTLS for submission port (default `true`) |
+
+Studios may substitute an internal mail API (SendGrid, SES, Microsoft Graph) behind the same contract: send after issue creation, never fail the artist HTTP response on mail errors.
+
+### Email template
+
+**Subject**
+
+```text
+[Shader Health] User bug report: {title}
+```
+
+**Body (plain text)**
+
+```text
+A new Shader Health bug report was filed from Maya.
+
+Reporter: {os_user}@{machine_id}
+Plugin: {plugin_version}
+Maya: {maya_version}
+Scene: {scene_basename}
+Profile: {profile_id}
+Health score: {health_score}
+
+GitHub issue: {issue_url}
+
+Description:
+{description}
+
+Steps to reproduce:
+{steps_to_reproduce}
+
+Validation summary:
+{validation_summary}
+```
+
+When a screenshot was attached, mention it in the email body (for example, "Screenshot attached to the GitHub issue.") rather than embedding large binary data in SMTP.
+
 ### Error responses
 
 | Status | When | JSON body (recommended) |
@@ -366,6 +438,9 @@ components:
         url:
           type: string
           format: uri
+        email_notified:
+          type: boolean
+          description: Optional relay observability flag for maintainer email delivery
     BugReportRelayError:
       type: object
       properties:
@@ -393,7 +468,7 @@ Entry point for UI and automation: `maybe_submit_bug_report(studio_config, paylo
 
 Open **Settings → Bug Report** in the Maya panel to configure relay URL, API key (password echo), screenshot policy, daily cap, and the privacy notice shown to artists.
 
-Submissions from the Bug Report dialog (issue #151) call the same client path documented here.
+Artists submit reports from the panel header **Report Bug** button (`ui/bug_report_dialog.py`). On success the dialog shows the created GitHub `issue_url` returned by the relay.
 
 ## Testing notes
 

@@ -31,9 +31,13 @@ PANEL_HEADER_OBJECT_NAME = "shaderHealthInspectorPanelHeader"
 PANEL_HEADER_TITLE_OBJECT_NAME = "shaderHealthInspectorPanelHeaderTitle"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsGearButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "shaderHealthInspectorDocumentationButton"
+REPORT_BUG_BUTTON_OBJECT_NAME = "shaderHealthInspectorReportBugButton"
 CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "shaderHealthInspectorCheckForUpdatesButton"
 SETTINGS_GEAR_TOOLTIP = "Open settings"
 DOCUMENTATION_BUTTON_TOOLTIP = "Open shader health documentation in your browser."
+REPORT_BUG_BUTTON_TOOLTIP = (
+    "Submit a bug report through your studio HTTPS relay and open the created GitHub issue."
+)
 CHECK_FOR_UPDATES_BUTTON_TOOLTIP = (
     "Open the update wizard shell and preview staged progress steps."
 )
@@ -207,6 +211,7 @@ class PanelNavigationCallbacks:
 
     on_open_settings: Optional[Callable[[], None]] = None
     on_open_documentation: Optional[Callable[[], None]] = None
+    on_report_bug: Optional[Callable[[], None]] = None
     on_check_for_updates: Optional[Callable[[], None]] = None
 
 
@@ -369,6 +374,15 @@ def build_panel_header(
         navigation_callbacks.on_open_documentation,
     )
     row_layout.addWidget(docs_button)
+
+    report_bug_button = _compact_button(
+        qt_widgets,
+        "Report Bug",
+        REPORT_BUG_BUTTON_OBJECT_NAME,
+        REPORT_BUG_BUTTON_TOOLTIP,
+        navigation_callbacks.on_report_bug,
+    )
+    row_layout.addWidget(report_bug_button)
 
     updates_button = _compact_button(
         qt_widgets,

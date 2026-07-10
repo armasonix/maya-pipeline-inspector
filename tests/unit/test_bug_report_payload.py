@@ -5,6 +5,7 @@ import json
 from shader_health.integrations.bug_report.payload import (
     BUG_REPORT_PAYLOAD_SCHEMA_VERSION,
     BugReportPayload,
+    build_bug_report_payload,
     scene_basename,
 )
 from shader_health.integrations.bug_report.relay_client import build_multipart_body
@@ -64,3 +65,23 @@ def test_build_multipart_body_includes_payload_json_and_jpeg_file():
     assert 'name="screenshot"; filename="screenshot.jpg"' in text
     assert "Content-Type: image/jpeg" in text
     assert b"fake-jpeg-bytes" in body
+
+
+def test_build_bug_report_payload_uses_scene_basename_and_session_fields():
+    payload = build_bug_report_payload(
+        title="Missing textures",
+        description="False positives on UDIM tiles.",
+        plugin_version="0.5.0",
+        scene_path=r"\\farm\assets\hero\hero.ma",
+        profile_id="publish_strict",
+        validation_summary="Health 40/100; 2 failed issue(s).",
+        health_score=40,
+        machine_id="workstation-01",
+        os_user="artist",
+    )
+
+    assert payload.scene_basename == "hero.ma"
+    assert payload.profile_id == "publish_strict"
+    assert payload.health_score == 40
+    assert payload.machine_id == "workstation-01"
+    assert payload.os_user == "artist"
