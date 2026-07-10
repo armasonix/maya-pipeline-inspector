@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "studio_path_substitution.ma",
+  "renderer": "arnold",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-10T12:00:00Z",
+  "nodes": [
+    {
+      "id": "node:tex_root",
+      "name": "tex_root",
+      "type_name": "file",
+      "attrs": {
+        "fileTextureName": "${STUDIO_TEXTURE_ROOT}/hero/albedo.exr"
+      }
+    },
+    {
+      "id": "node:asset_root",
+      "name": "asset_root",
+      "type_name": "file",
+      "attrs": {
+        "fileTextureName": "${STUDIO_ASSET_ROOT}/props/chair.exr"
+      }
+    },
+    {
+      "id": "node:cache_root",
+      "name": "cache_root",
+      "type_name": "file",
+      "attrs": {
+        "fileTextureName": "${STUDIO_CACHE_ROOT}/sim/blast.exr"
+      }
+    },
+    {
+      "id": "node:render_root",
+      "name": "render_root",
+      "type_name": "file",
+      "attrs": {
+        "fileTextureName": "${STUDIO_RENDER_ROOT}/comp/beauty.exr"
+      }
+    },
+    {
+      "id": "node:alias_root",
+      "name": "alias_root",
+      "type_name": "file",
+      "attrs": {
+        "fileTextureName": "${SHOW_TEXTURE_ROOT}/look/dev.exr"
+      }
+    }
+  ],
+  "connections": [],
+  "materials": [],
+  "file_dependencies": [
+    {
+      "node_id": "node:tex_root",
+      "attr": "fileTextureName",
+      "raw_path": "${STUDIO_TEXTURE_ROOT}/hero/albedo.exr"
+    },
+    {
+      "node_id": "node:asset_root",
+      "attr": "fileTextureName",
+      "raw_path": "${STUDIO_ASSET_ROOT}/props/chair.exr"
+    },
+    {
+      "node_id": "node:cache_root",
+      "attr": "fileTextureName",
+      "raw_path": "${STUDIO_CACHE_ROOT}/sim/blast.exr"
+    },
+    {
+      "node_id": "node:render_root",
+      "attr": "fileTextureName",
+      "raw_path": "${STUDIO_RENDER_ROOT}/comp/beauty.exr"
+    },
+    {
+      "node_id": "node:alias_root",
+      "attr": "fileTextureName",
+      "raw_path": "${SHOW_TEXTURE_ROOT}/look/dev.exr"
+    }
+  ]
+}

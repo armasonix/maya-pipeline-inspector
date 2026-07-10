@@ -18,6 +18,7 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `displacement_risk_high_vray.json` | `displacement_risk_high_vray.expectations.json` | V-Ray | Displacement amount, bounds, subdivision, and risk-score failures |
 | `texture_optimized_missing.json` | `texture_optimized_missing.expectations.json` | Arnold | Missing .tx derivative; deadline_critical farm block |
 | `duplicate_material_twins.json` | `duplicate_material_twins.expectations.json` | V-Ray | Twin material graphs + duplicate texture path detection |
+| `studio_path_substitution.json` | `studio_path_substitution.expectations.json` | Arnold | `${STUDIO_*_ROOT}` token resolution and custom alias substitution |
 
 ## Adding a renderer fixture case
 
@@ -61,6 +62,17 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 
 ```bash
 python -m pytest tests/integration/test_renderer_policy_fixtures.py -q
+python -m pytest tests/integration/test_studio_path_substitution.py -q
 ```
 
 Integration tests load the snapshot, run `run_validation()` with each profile listed in the expectations file, and assert rule id, status, severity, block flags, and optional `material` name.
+
+### Studio path substitution fixtures
+
+`studio_path_substitution` uses an expectations file with:
+
+- `studio_roots` — relative folders materialized under `tmp_path` during the test
+- `materialize` — texture files created before validation
+- `scenarios.with_studio_environment` / `without_studio_environment` — expected pass/fail behavior
+
+See `tests/integration/test_studio_path_substitution.py`.
