@@ -251,6 +251,7 @@ class FakeVBoxLayout:
         self.margins: Optional[tuple[int, int, int, int]] = None
         self.spacing: Optional[int] = None
         self.widgets: list[Any] = []
+        self.widget_stretches: list[int | None] = []
         self.layouts: list[Any] = []
         self.stretches: list[int] = []
         if parent is not None:
@@ -264,8 +265,8 @@ class FakeVBoxLayout:
 
     def addWidget(self, widget: Any, stretch: Optional[int] = None) -> None:
         self.widgets.append(widget)
+        self.widget_stretches.append(stretch)
         self._attach_widget(widget)
-        _ = stretch
 
     def addLayout(self, layout: Any) -> None:
         self.layouts.append(layout)
@@ -662,11 +663,11 @@ def test_panel_header_includes_version_settings_gear_documentation_and_updates_b
 
     assert "Maya Shader Health Inspector" in title.text
     assert "v0.3.0" in title.text
-    assert gear.tooltip == "Open settings"
+    assert gear.tooltip == main_window.SETTINGS_GEAR_TOOLTIP
     assert docs.text == "Documentation"
-    assert docs.tooltip == "Open shader health documentation in your browser."
+    assert docs.tooltip == main_window.DOCUMENTATION_BUTTON_TOOLTIP
     assert updates.text == "Check for Updates"
-    assert updates.tooltip == "Open the update wizard shell and preview staged progress steps."
+    assert updates.tooltip == main_window.CHECK_FOR_UPDATES_BUTTON_TOOLTIP
     docs.clicked.emit()
     updates.clicked.emit()
     assert opened == ["docs", "updates"]

@@ -32,6 +32,11 @@ PANEL_HEADER_TITLE_OBJECT_NAME = "shaderHealthInspectorPanelHeaderTitle"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsGearButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "shaderHealthInspectorDocumentationButton"
 CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "shaderHealthInspectorCheckForUpdatesButton"
+SETTINGS_GEAR_TOOLTIP = "Open settings"
+DOCUMENTATION_BUTTON_TOOLTIP = "Open shader health documentation in your browser."
+CHECK_FOR_UPDATES_BUTTON_TOOLTIP = (
+    "Open the update wizard shell and preview staged progress steps."
+)
 PANEL_BODY_STACK_OBJECT_NAME = "shaderHealthInspectorPanelBodyStack"
 MAIN_VIEW_OBJECT_NAME = "shaderHealthInspectorMainView"
 SETTINGS_VIEW_INDEX = 1
@@ -337,7 +342,7 @@ def build_panel_header(
     gear_button.setObjectName(SETTINGS_GEAR_BUTTON_OBJECT_NAME)
     set_tooltip = getattr(gear_button, "setToolTip", None)
     if set_tooltip is not None:
-        set_tooltip("Open settings")
+        set_tooltip(SETTINGS_GEAR_TOOLTIP)
     set_fixed_width = getattr(gear_button, "setFixedWidth", None)
     if set_fixed_width is not None:
         set_fixed_width(34)
@@ -358,7 +363,7 @@ def build_panel_header(
         qt_widgets,
         "Documentation",
         DOCUMENTATION_BUTTON_OBJECT_NAME,
-        "Open shader health documentation in your browser.",
+        DOCUMENTATION_BUTTON_TOOLTIP,
         navigation_callbacks.on_open_documentation,
     )
     row_layout.addWidget(docs_button)
@@ -367,7 +372,7 @@ def build_panel_header(
         qt_widgets,
         "Check for Updates",
         CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME,
-        "Open the update wizard shell and preview staged progress steps.",
+        CHECK_FOR_UPDATES_BUTTON_TOOLTIP,
         navigation_callbacks.on_check_for_updates,
     )
     row_layout.addWidget(updates_button)
