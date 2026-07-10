@@ -17,6 +17,7 @@ from shader_health.ui.advanced_settings_section import (
     SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME,
 )
 from shader_health.ui.basic_settings_section import (
+    SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
     SETTINGS_THEME_COMBO_OBJECT_NAME,
@@ -469,6 +470,113 @@ def test_update_settings_view_refreshes_advanced_tab_controls():
     assert _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == "C:/Maya/bin/mayapy.exe"
 
 
+def test_read_user_preferences_from_settings_view_round_trips_all_basic_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+    expected = UserPreferences(
+        default_profile_id="supervisor_full",
+        default_asset_class_id="asset_class_background",
+        default_scan_scope="selection",
+        ui_density="compact",
+        theme="dark",
+        docs_url="https://example.test/docs",
+    )
+    _set_basic_tab_values(view, expected)
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(docs_url=expected.docs_url),
+    )
+
+    assert loaded.default_profile_id == expected.default_profile_id
+    assert loaded.default_asset_class_id == expected.default_asset_class_id
+    assert loaded.default_scan_scope == expected.default_scan_scope
+    assert loaded.ui_density == expected.ui_density
+    assert loaded.theme == expected.theme
+    assert loaded.docs_url == expected.docs_url
+
+
+def test_read_user_preferences_from_settings_view_round_trips_all_advanced_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed", debug_logging=False),
+    )
+    expected = UserPreferences(
+        extra_rule_paths=("/studio/rules", "//farm/share/td"),
+        debug_logging=True,
+        max_issues_displayed=180,
+        mayapy_path="C:/Program Files/Autodesk/Maya2025/bin/mayapy.exe",
+    )
+    _set_advanced_tab_values(view, expected)
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    assert loaded.default_profile_id == "artist_relaxed"
+    assert loaded.extra_rule_paths == expected.extra_rule_paths
+    assert loaded.debug_logging is expected.debug_logging
+    assert loaded.max_issues_displayed == expected.max_issues_displayed
+    assert loaded.mayapy_path == expected.mayapy_path
+
+
+def test_settings_panel_round_trips_basic_and_advanced_through_read_and_update():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(
+            default_profile_id="artist_relaxed",
+            debug_logging=False,
+            max_issues_displayed=500,
+        ),
+    )
+    expected = UserPreferences(
+        default_profile_id="deadline_critical",
+        default_asset_class_id="asset_class_prop",
+        default_scan_scope="selection",
+        ui_density="compact",
+        theme="dark",
+        extra_rule_paths=("D:/show/rules",),
+        debug_logging=True,
+        max_issues_displayed=64,
+        mayapy_path="D:/tools/mayapy.exe",
+        docs_url="https://example.test/docs",
+    )
+    _set_basic_tab_values(view, expected)
+    _set_advanced_tab_values(view, expected)
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(docs_url=expected.docs_url),
+    )
+
+    assert loaded.default_profile_id == expected.default_profile_id
+    assert loaded.default_asset_class_id == expected.default_asset_class_id
+    assert loaded.default_scan_scope == expected.default_scan_scope
+    assert loaded.ui_density == expected.ui_density
+    assert loaded.theme == expected.theme
+    assert loaded.extra_rule_paths == expected.extra_rule_paths
+    assert loaded.debug_logging is expected.debug_logging
+    assert loaded.max_issues_displayed == expected.max_issues_displayed
+    assert loaded.mayapy_path == expected.mayapy_path
+    assert loaded.docs_url == expected.docs_url
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=loaded,
+    )
+
+    _assert_basic_tab_values(view, expected)
+    _assert_advanced_tab_values(view, expected)
+
+
 def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
     view = settings_panel.build_settings_view(
         FakeQtWidgets,
@@ -746,6 +854,73 @@ def test_apply_user_preferences_to_panel_sets_validate_dropdowns_and_scan_scope(
     assert asset_class_dropdown.currentData() == "asset_class_hero"
     assert widget._shader_health_scan_scope == "selection"
     assert widget._shader_health_ui_density == "compact"
+
+
+def _set_combo_data(view: Any, object_name: str, data: str) -> None:
+    combo = _find(view, object_name)
+    combo.setCurrentIndex(combo.findData(data))
+
+
+def _set_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
+    _set_combo_data(
+        view,
+        SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
+        user_config.default_profile_id,
+    )
+    _set_combo_data(
+        view,
+        SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
+        user_config.default_asset_class_id,
+    )
+    _set_combo_data(
+        view,
+        SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+        user_config.default_scan_scope,
+    )
+    _set_combo_data(view, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME, user_config.ui_density)
+    _set_combo_data(view, SETTINGS_THEME_COMBO_OBJECT_NAME, user_config.theme)
+
+
+def _assert_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
+    assert _find(view, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME).currentData() == (
+        user_config.default_profile_id
+    )
+    assert _find(view, SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME).currentData() == (
+        user_config.default_asset_class_id
+    )
+    assert _find(view, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
+        user_config.default_scan_scope
+    )
+    assert (
+        _find(view, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData()
+        == user_config.ui_density
+    )
+    assert _find(view, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == user_config.theme
+
+
+def _set_advanced_tab_values(view: Any, user_config: UserPreferences) -> None:
+    _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).setPlainText(
+        "\n".join(user_config.extra_rule_paths)
+    )
+    _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).setChecked(user_config.debug_logging)
+    _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).setText(
+        str(user_config.max_issues_displayed)
+    )
+    _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).setText(user_config.mayapy_path)
+
+
+def _assert_advanced_tab_values(view: Any, user_config: UserPreferences) -> None:
+    assert _find(view, SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME).toPlainText() == (
+        "\n".join(user_config.extra_rule_paths)
+    )
+    assert (
+        _find(view, SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME).checked
+        is user_config.debug_logging
+    )
+    assert _find(view, SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME).text() == str(
+        user_config.max_issues_displayed
+    )
+    assert _find(view, SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME).text() == user_config.mayapy_path
 
 
 def _find(widget: Any, object_name: str) -> Any:
