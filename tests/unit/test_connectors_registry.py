@@ -50,19 +50,19 @@ def test_read_connectors_preserves_extra_connectors_from_base():
         config=StudioConfig(
             connectors=ConnectorSettings(
                 deadline=DeadlineConnectorSettings(enabled=True),
-                extra={"ftrack": {"enabled": True, "server_url": "https://ftrack.example"}},
+                extra={"custom_tracker": {"enabled": True, "server_url": "https://custom.example"}},
             )
         ),
     )
     base = ConnectorSettings(
         deadline=DeadlineConnectorSettings(enabled=False),
-        extra={"ftrack": {"enabled": True, "server_url": "https://ftrack.example"}},
+        extra={"custom_tracker": {"enabled": True, "server_url": "https://custom.example"}},
     )
 
     connectors = read_connectors_from_settings_view(view, FakeQtWidgets, base=base)
 
     assert connectors.deadline.enabled is True
-    assert connectors.extra["ftrack"]["server_url"] == "https://ftrack.example"
+    assert connectors.extra["custom_tracker"]["server_url"] == "https://custom.example"
 
 
 def test_resolve_connector_delegates_to_telegram_resolver():

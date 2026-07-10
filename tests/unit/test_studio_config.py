@@ -232,6 +232,7 @@ def test_connector_settings_preserves_extensible_connectors():
                 "publish_webhook_url": "https://hooks.slack.com/publish",
             },
             "ftrack": {"enabled": False},
+            "custom_tracker": {"enabled": True, "server_url": "https://custom.example"},
         }
     )
 
@@ -241,7 +242,25 @@ def test_connector_settings_preserves_extensible_connectors():
     assert connectors.deadline.web_service_host == "farm.local"
     assert connectors.slack.enabled is True
     assert connectors.slack.publish_webhook_url.startswith("https://hooks.slack.com/")
-    assert connectors.extra["ftrack"]["enabled"] is False
+    assert connectors.ftrack.enabled is False
+    assert connectors.extra["custom_tracker"]["server_url"] == "https://custom.example"
+    assert restored.to_dict() == connectors.to_dict()
+
+
+def test_connector_settings_round_trips_tracker_connectors():
+    connectors = ConnectorSettings.from_mapping(
+        {
+            "ftrack": {"enabled": True},
+            "shotgrid": {"enabled": False},
+            "cerebro": {"enabled": True},
+        }
+    )
+
+    restored = ConnectorSettings.from_mapping(connectors.to_dict())
+
+    assert connectors.ftrack.enabled is True
+    assert connectors.shotgrid.enabled is False
+    assert connectors.cerebro.enabled is True
     assert restored.to_dict() == connectors.to_dict()
 
 
