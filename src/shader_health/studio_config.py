@@ -502,15 +502,49 @@ class CerebroConnectorSettings:
     """Cerebro task tracker connector settings stored in the studio config."""
 
     enabled: bool = False
+    server_url: str = ""
+    api_user: str = ""
+    api_password: str = ""
+    project: str = ""
+
+    def to_cerebro_config(self) -> Any | None:
+        """Convert connector settings into a Cerebro runtime config object."""
+
+        from shader_health.integrations.cerebro.config import CerebroConfig
+
+        server_url = self.server_url.strip()
+        api_user = self.api_user.strip()
+        api_password = self.api_password.strip()
+        project = self.project.strip()
+        if not server_url or not api_user or not api_password or not project:
+            return None
+        return CerebroConfig(
+            server_url=server_url,
+            api_user=api_user,
+            api_password=api_password,
+            project=project,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"enabled": self.enabled}
+        return {
+            "enabled": self.enabled,
+            "server_url": self.server_url,
+            "api_user": self.api_user,
+            "api_password": self.api_password,
+            "project": self.project,
+        }
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> CerebroConnectorSettings:
         if not data:
             return cls()
-        return cls(enabled=bool(data.get("enabled", False)))
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            server_url=str(data.get("server_url", "") or ""),
+            api_user=str(data.get("api_user", "") or ""),
+            api_password=str(data.get("api_password", "") or ""),
+            project=str(data.get("project", "") or ""),
+        )
 
 
 DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
@@ -946,15 +980,15 @@ def resolve_shotgrid_config(config: StudioConfig | None) -> Any | None:
     return shotgrid.to_shotgrid_config()
 
 
-def resolve_cerebro_config(config: StudioConfig | None) -> CerebroConnectorSettings | None:
-    """Return Cerebro connector settings when the tracker is enabled."""
+def resolve_cerebro_config(config: StudioConfig | None) -> Any | None:
+    """Return Cerebro runtime config from studio settings when enabled."""
 
     if config is None:
         return None
     cerebro = config.connectors.cerebro
     if not cerebro.enabled:
         return None
-    return cerebro
+    return cerebro.to_cerebro_config()
 
 
 def _normalize_schema_version(value: Any) -> str:

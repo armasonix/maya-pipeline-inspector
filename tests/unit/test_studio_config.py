@@ -265,7 +265,13 @@ def test_connector_settings_round_trips_tracker_connectors():
                 "project": "Demo Project",
                 "entity_type": "Shot",
             },
-            "cerebro": {"enabled": True},
+            "cerebro": {
+                "enabled": True,
+                "server_url": "cerebrohq.com:45432",
+                "api_user": "pipeline.bot",
+                "api_password": "secret",
+                "project": "Demo Project",
+            },
         }
     )
 
@@ -278,6 +284,8 @@ def test_connector_settings_round_trips_tracker_connectors():
     assert connectors.shotgrid.site_url == "https://studio.shotgrid.autodesk.com"
     assert connectors.shotgrid.entity_type == "Shot"
     assert connectors.cerebro.enabled is True
+    assert connectors.cerebro.server_url == "cerebrohq.com:45432"
+    assert connectors.cerebro.project == "Demo Project"
     assert restored.to_dict() == connectors.to_dict()
 
 

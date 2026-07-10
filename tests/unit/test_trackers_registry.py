@@ -33,6 +33,7 @@ def test_iter_trackers_includes_ftrack_shotgrid_and_cerebro():
     assert "api_key" in trackers[1].secret_field_names
     assert trackers[2].id == "cerebro"
     assert trackers[2].settings_dataclass is CerebroConnectorSettings
+    assert "api_password" in trackers[2].secret_field_names
 
 
 def test_get_tracker_returns_none_for_unknown_id():
@@ -77,7 +78,13 @@ def test_first_enabled_tracker_returns_registry_order_match():
         connectors=ConnectorSettings(
             ftrack=FtrackConnectorSettings(enabled=False),
             shotgrid=ShotGridConnectorSettings(enabled=True),
-            cerebro=CerebroConnectorSettings(enabled=True),
+            cerebro=CerebroConnectorSettings(
+                enabled=True,
+                server_url="cerebrohq.com:45432",
+                api_user="pipeline.bot",
+                api_password="secret",
+                project="Demo Project",
+            ),
         )
     )
 
@@ -90,7 +97,13 @@ def test_first_enabled_tracker_returns_registry_order_match():
 def test_tracker_is_enabled_reflects_connector_settings():
     config = StudioConfig(
         connectors=ConnectorSettings(
-            cerebro=CerebroConnectorSettings(enabled=True),
+            cerebro=CerebroConnectorSettings(
+                enabled=True,
+                server_url="cerebrohq.com:45432",
+                api_user="pipeline.bot",
+                api_password="secret",
+                project="Demo Project",
+            ),
         )
     )
 

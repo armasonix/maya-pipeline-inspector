@@ -15,6 +15,11 @@ from shader_health.studio_config import (
     resolve_ftrack_config,
     resolve_shotgrid_config,
 )
+from shader_health.ui.cerebro_connector_section import (
+    build_cerebro_connector_section,
+    read_cerebro_connector_from_view,
+    update_cerebro_connector_view,
+)
 from shader_health.ui.ftrack_connector_section import (
     build_ftrack_connector_section,
     read_ftrack_connector_from_view,
@@ -104,6 +109,19 @@ def _build_shotgrid_section(
     )
 
 
+def _build_cerebro_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_cerebro_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_cerebro_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_cerebro_settings_changed", None),
+    )
+
+
 TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
     TrackerConnectorDefinition(
         id="ftrack",
@@ -136,6 +154,10 @@ TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
         resolve_fn=resolve_cerebro_config,
         get_settings=_get_cerebro_settings,
         apply_settings=_apply_cerebro_settings,
+        build_section=_build_cerebro_section,
+        read_from_view=read_cerebro_connector_from_view,
+        update_view=update_cerebro_connector_view,
+        secret_field_names=frozenset({"api_password"}),
     ),
 )
 
