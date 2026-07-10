@@ -52,10 +52,7 @@ SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
         tab_id="studio_environment",
         title="Studio Environment",
         object_name=SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME,
-        placeholder_text=(
-            "Studio network path roots and variable aliases will live here "
-            "(texture_root, asset_root, cache_root, render_root, ${STUDIO_TEXTURE_ROOT})."
-        ),
+        placeholder_text="",
     ),
     SettingsTabSpec(
         tab_id="bug_report",

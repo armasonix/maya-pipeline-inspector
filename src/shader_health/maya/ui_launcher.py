@@ -52,6 +52,7 @@ from shader_health.ui.settings_panel import (
     read_user_preferences_from_settings_view,
     update_settings_view,
 )
+from shader_health.ui.studio_environment_section import read_studio_environment_from_view
 from shader_health.ui.user_preferences_ui import (
     apply_user_preferences_to_panel,
 )
@@ -233,6 +234,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_studio_environment_changed=lambda: _sync_studio_environment_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_save_studio_settings=lambda: _save_studio_settings_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -404,6 +409,20 @@ def _set_require_tx_derivatives(content: Any, qt_widgets: Any, enabled: bool) ->
     )
 
 
+def _sync_studio_environment_from_ui(content: Any, qt_widgets: Any) -> None:
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    studio_environment = read_studio_environment_from_view(
+        settings_view,
+        qt_widgets,
+        base=current.studio_environment,
+    )
+    updated = current.with_updates(studio_environment=studio_environment)
+    _set_studio_config(content, qt_widgets, updated)
+
+
 def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
@@ -441,6 +460,7 @@ def _commit_saved_settings_baselines(content: Any) -> None:
 
 def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_deadline_connector_from_ui(content, qt_widgets)
+    _sync_studio_environment_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
     path = _pick_settings_save_path(qt_widgets, config.config_path)
     if path is None:

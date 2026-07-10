@@ -33,6 +33,7 @@ from shader_health.ui.settings_tabs import (
     SETTINGS_ADVANCED_TAB_OBJECT_NAME,
     SETTINGS_BASIC_TAB_OBJECT_NAME,
     SETTINGS_CONNECTORS_TAB_OBJECT_NAME,
+    SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_TAB_OBJECT_NAME,
     SETTINGS_TAB_SPECS,
     build_placeholder_tab,
@@ -44,6 +45,10 @@ from shader_health.ui.settings_widgets import (
     find_child,
     toggle_label,
     wire_button,
+)
+from shader_health.ui.studio_environment_section import (
+    build_studio_environment_section,
+    update_studio_environment_view,
 )
 from shader_health.user_config import UserPreferences
 
@@ -75,6 +80,7 @@ class SettingsActionCallbacks:
     on_require_tx_changed: Optional[Callable[[bool], None]] = None
     on_deadline_enabled_changed: Optional[Callable[[bool], None]] = None
     on_deadline_settings_changed: Optional[Callable[[], None]] = None
+    on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_save_studio_settings: Optional[Callable[[], None]] = None
     on_load_studio_settings: Optional[Callable[[], None]] = None
     on_save_user_preferences: Optional[Callable[[], None]] = None
@@ -222,6 +228,7 @@ def update_settings_view(
         apply_toggle_style(toggle, config.pipeline.require_tx_derivatives)
 
     update_connector_views(view, qt_widgets, config.connectors)
+    update_studio_environment_view(view, qt_widgets, config.studio_environment)
 
     if user_config is not None:
         update_basic_settings_view(view, qt_widgets, user_config)
@@ -303,6 +310,8 @@ def _build_settings_tab(
             spec,
             builder=lambda widgets: _build_studio_tab(widgets, config, callbacks),
         )
+    if tab_id == "studio_environment":
+        return _build_studio_environment_tab(qt_widgets, config, callbacks)
     return build_placeholder_tab(qt_widgets, spec)
 
 
@@ -363,6 +372,27 @@ def _build_connectors_tab(
         section = connector.build_section(qt_widgets, config, callbacks)
         layout.addWidget(section)
 
+    layout.addStretch(1)
+    return tab
+
+
+def _build_studio_environment_tab(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: SettingsActionCallbacks,
+) -> Any:
+    tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME)
+    layout = qt_widgets.QVBoxLayout(tab)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+    layout.addWidget(
+        build_studio_environment_section(
+            qt_widgets,
+            config,
+            on_settings_changed=callbacks.on_studio_environment_changed,
+        )
+    )
     layout.addStretch(1)
     return tab
 
