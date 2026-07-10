@@ -58,10 +58,7 @@ SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
         tab_id="bug_report",
         title="Bug Report",
         object_name=SETTINGS_BUG_REPORT_TAB_OBJECT_NAME,
-        placeholder_text=(
-            "Bug report relay settings will live here (relay URL, API key, screenshot policy, "
-            "privacy notice). Submissions route through a studio-hosted HTTPS relay."
-        ),
+        placeholder_text="",
     ),
 )
 

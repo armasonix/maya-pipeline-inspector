@@ -14,6 +14,7 @@ from shader_health.studio_config import (
     save_studio_config,
 )
 from shader_health.ui import main_window
+from shader_health.ui.bug_report_section import read_bug_report_from_view
 from shader_health.ui.farm_tab import (
     FARM_STATUS_LABEL_OBJECT_NAME,
     FARM_TAB_OBJECT_NAME,
@@ -277,6 +278,15 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_bug_report_settings_changed=lambda: _sync_bug_report_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_bug_report_enabled_changed=lambda enabled: _set_bug_report_enabled(
+            _panel_content(panel_state),
+            qt_widgets,
+            enabled,
+        ),
         on_save_studio_settings=lambda: _save_studio_settings_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -457,6 +467,24 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_studio_config(content, qt_widgets, updated)
 
 
+def _sync_bug_report_from_ui(content: Any, qt_widgets: Any) -> None:
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    updated = read_bug_report_from_view(settings_view, qt_widgets, base=current)
+    _set_studio_config(content, qt_widgets, updated)
+
+
+def _set_bug_report_enabled(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    _sync_bug_report_from_ui(content, qt_widgets)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Bug Report relay {'enabled' if enabled else 'disabled'} for this session.",
+    )
+
+
 def _sync_studio_environment_from_ui(content: Any, qt_widgets: Any) -> None:
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
@@ -510,6 +538,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_deadline_connector_from_ui(content, qt_widgets)
     _sync_studio_environment_from_ui(content, qt_widgets)
     _sync_studio_policy_from_ui(content, qt_widgets)
+    _sync_bug_report_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
     path = _pick_settings_save_path(qt_widgets, config.config_path)
     if path is None:
