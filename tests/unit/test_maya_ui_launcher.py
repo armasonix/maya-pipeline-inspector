@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, Optional
 
+from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
 from shader_health.maya import ui_launcher
 from shader_health.ui import main_window
 
@@ -272,3 +273,43 @@ def test_validate_splitter_persistence_saves_sizes_on_move():
     splitter.splitterMoved.emit()
 
     assert getattr(content, ui_launcher.VALIDATE_SPLITTER_SIZES_ATTR) == (650, 210)
+
+
+def test_run_validation_job_notifies_telegram_after_successful_validation(monkeypatch: Any):
+    from shader_health.core.scoring import HealthScore
+
+    content = SimpleNamespace(
+        _shader_health_studio_config=ui_launcher.StudioConfig.default(),
+    )
+    result = SimpleNamespace(
+        succeeded=True,
+        message="Scene validated.",
+        snapshot=SimpleNamespace(scene_path="hero.ma"),
+        scan_scope="scene",
+        profile_id="lookdev",
+        asset_class_id="",
+        health_score=HealthScore(score=80, raw_score=80, block_publish=True),
+    )
+    calls: list[tuple[Any, Any]] = []
+
+    monkeypatch.setattr(
+        "shader_health.maya.commands.validate_scene_action",
+        lambda **_kwargs: result,
+    )
+    monkeypatch.setattr(ui_launcher, "_selected_asset_class_id", lambda *_args: "")
+    monkeypatch.setattr(ui_launcher, "_populate_validation_result", lambda *_args: None)
+    monkeypatch.setattr(ui_launcher, "_update_validation_chrome_labels", lambda *_args: None)
+    monkeypatch.setattr(
+        ui_launcher,
+        "_maybe_notify_telegram_validation",
+        lambda content_arg, result_arg: calls.append((content_arg, result_arg)),
+    )
+
+    ui_launcher._run_validation_job(
+        content,
+        object(),
+        scan_scope="scene",
+        profile_id="lookdev",
+    )
+
+    assert calls == [(content, result)]

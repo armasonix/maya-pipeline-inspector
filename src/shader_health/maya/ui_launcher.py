@@ -1017,10 +1017,31 @@ def _run_validation_job(
     content._shader_health_scan_scope = scan_scope
     _populate_validation_result(content, qt_widgets, result)
     _update_validation_chrome_labels(content, qt_widgets, result)
+    _maybe_notify_telegram_validation(content, result)
     if post_validate is not None:
         post_validate(content, qt_widgets, result)
     else:
         print(result.message)
+
+
+def _maybe_notify_telegram_validation(content: Any, result: Any) -> None:
+    """Send a Telegram validation summary without interrupting the Maya UI flow."""
+
+    try:
+        from shader_health.integrations.telegram.notify import (
+            maybe_send_telegram_validation_notification,
+        )
+
+        notify_result = maybe_send_telegram_validation_notification(
+            _studio_config_for_content(content),
+            result,
+        )
+        if notify_result.sent:
+            print("Telegram notification sent.")
+        elif notify_result.error_message:
+            print(f"Telegram notification failed: {notify_result.error_message}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Telegram notification failed: {exc}")
 
 
 def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:
