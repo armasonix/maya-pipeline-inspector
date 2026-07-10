@@ -22,6 +22,7 @@ from shader_health.ui.basic_settings_section import (
     SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+    SETTINGS_DOCS_URL_INPUT_OBJECT_NAME,
     SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
 )
@@ -1016,6 +1017,7 @@ def _set_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
     )
     _set_combo_data(view, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME, user_config.ui_density)
     _set_combo_data(view, SETTINGS_THEME_COMBO_OBJECT_NAME, user_config.theme)
+    _find(view, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME).setText(user_config.docs_url)
 
 
 def _assert_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
@@ -1033,6 +1035,7 @@ def _assert_basic_tab_values(view: Any, user_config: UserPreferences) -> None:
         == user_config.ui_density
     )
     assert _find(view, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == user_config.theme
+    assert _find(view, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME).text() == user_config.docs_url
 
 
 def _set_advanced_tab_values(view: Any, user_config: UserPreferences) -> None:

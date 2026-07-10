@@ -4,13 +4,14 @@ from shader_health.ui.basic_settings_section import (
     SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+    SETTINGS_DOCS_URL_INPUT_OBJECT_NAME,
     SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
     build_basic_settings_section,
     read_basic_user_preferences_from_view,
     update_basic_settings_view,
 )
-from shader_health.user_config import UserPreferences
+from shader_health.user_config import DEFAULT_USER_DOCS_URL, UserPreferences
 
 
 class FakeWidget:
@@ -42,6 +43,27 @@ class FakeSignal:
 
     def connect(self, handler: object) -> None:
         self.handlers.append(handler)
+
+
+class FakeLineEdit(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.value = text
+        self.placeholder = ""
+        self.tooltip = ""
+        self.editingFinished = FakeSignal()
+
+    def setText(self, text: str) -> None:
+        self.value = text
+
+    def text(self) -> str:
+        return self.value
+
+    def setPlaceholderText(self, text: str) -> None:
+        self.placeholder = text
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
 
 
 class FakeComboBox(FakeWidget):
@@ -138,6 +160,7 @@ class FakeTabWidget(FakeWidget):
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
+    QLineEdit = FakeLineEdit
     QComboBox = FakeComboBox
     QVBoxLayout = FakeVBoxLayout
     QFormLayout = FakeFormLayout
@@ -167,6 +190,9 @@ def test_basic_settings_section_exposes_profile_asset_scan_scope_and_density_con
     assert scan_scope_combo.currentData() == "selection"
     assert density_combo.currentData() == "compact"
     assert theme_combo.currentData() == "dark"
+    docs_input = _find(section, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
+    assert docs_input.value == DEFAULT_USER_DOCS_URL
+    assert docs_input.placeholder == DEFAULT_USER_DOCS_URL
 
 
 def test_read_basic_user_preferences_from_view_round_trips_combo_values():
@@ -183,11 +209,12 @@ def test_read_basic_user_preferences_from_view_round_trips_combo_values():
     _find(section, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).setCurrentIndex(1)
     _find(section, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).setCurrentIndex(1)
     _find(section, SETTINGS_THEME_COMBO_OBJECT_NAME).setCurrentIndex(1)
+    _find(section, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME).setText("https://example.test/docs")
 
     loaded = read_basic_user_preferences_from_view(
         section,
         FakeQtWidgets,
-        base=UserPreferences(docs_url="https://example.test/docs"),
+        base=UserPreferences(),
     )
 
     assert loaded.default_profile_id == "deadline_critical"
@@ -213,6 +240,7 @@ def test_update_basic_settings_view_refreshes_controls():
             default_scan_scope="selection",
             ui_density="compact",
             theme="dark",
+            docs_url="https://studio.test/wiki",
         ),
     )
 
@@ -227,6 +255,9 @@ def test_update_basic_settings_view_refreshes_controls():
     )
     assert _find(section, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData() == "compact"
     assert _find(section, SETTINGS_THEME_COMBO_OBJECT_NAME).currentData() == "dark"
+    assert _find(section, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME).value == (
+        "https://studio.test/wiki"
+    )
 
 
 def _find(widget: object, object_name: str) -> object:

@@ -212,6 +212,25 @@ def _panel_navigation_callbacks(
             qt_widgets,
             settings=True,
         ),
+        on_open_documentation=lambda: _open_documentation_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+    )
+
+
+def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.ui.documentation_actions import open_documentation_url
+
+    user_config = _user_config_for_content(content)
+    opened = open_documentation_url(user_config.docs_url)
+    if opened:
+        return
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        "Could not open documentation URL. Check Settings → Basic → Documentation URL.",
     )
 
 
