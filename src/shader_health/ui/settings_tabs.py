@@ -28,9 +28,7 @@ SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
         tab_id="basic",
         title="Basic",
         object_name=SETTINGS_BASIC_TAB_OBJECT_NAME,
-        placeholder_text=(
-            "Basic plugin preferences will live here (default profile, UI density, scan defaults)."
-        ),
+        placeholder_text="",
     ),
     SettingsTabSpec(
         tab_id="advanced",

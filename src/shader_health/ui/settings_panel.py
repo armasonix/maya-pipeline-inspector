@@ -13,7 +13,13 @@ from shader_health.connectors_registry import (
     read_connectors_from_settings_view as _read_connectors_from_registry,
 )
 from shader_health.studio_config import ConnectorSettings, StudioConfig
+from shader_health.ui.basic_settings_section import (
+    build_basic_settings_section,
+    read_basic_user_preferences_from_view,
+    update_basic_settings_view,
+)
 from shader_health.ui.settings_tabs import (
+    SETTINGS_BASIC_TAB_OBJECT_NAME,
     SETTINGS_CONNECTORS_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_TAB_OBJECT_NAME,
     SETTINGS_TAB_SPECS,
@@ -61,6 +67,7 @@ class SettingsActionCallbacks:
     on_load_studio_settings: Optional[Callable[[], None]] = None
     on_save_user_preferences: Optional[Callable[[], None]] = None
     on_load_user_preferences: Optional[Callable[[], None]] = None
+    on_user_preferences_changed: Optional[Callable[[], None]] = None
 
 
 def build_settings_view(
@@ -98,6 +105,7 @@ def build_settings_view(
             qt_widgets,
             spec.tab_id,
             studio_config,
+            active_user_config,
             settings_callbacks,
         )
         tabs.addTab(tab_widget, spec.title)
@@ -196,6 +204,9 @@ def update_settings_view(
 
     update_connector_views(view, qt_widgets, config.connectors)
 
+    if user_config is not None:
+        update_basic_settings_view(view, qt_widgets, user_config)
+
     studio_path_label = find_child(
         view,
         qt_widgets.QLabel,
@@ -219,16 +230,30 @@ def update_settings_view(
             status_label.setText(status_message)
 
 
+def read_user_preferences_from_settings_view(
+    view: Any,
+    qt_widgets: Any,
+    *,
+    base: UserPreferences | None = None,
+) -> UserPreferences:
+    """Read user preference fields currently shown in the settings UI."""
+
+    return read_basic_user_preferences_from_view(view, qt_widgets, base=base)
+
+
 def _build_settings_tab(
     qt_widgets: Any,
     tab_id: str,
     config: StudioConfig,
+    user_config: UserPreferences,
     callbacks: SettingsActionCallbacks,
 ) -> Any:
     spec = get_settings_tab_spec(tab_id)
     if spec is None:
         raise ValueError(f"Unknown settings tab id: {tab_id}")
 
+    if tab_id == "basic":
+        return _build_basic_tab(qt_widgets, user_config, callbacks)
     if tab_id == "connectors":
         return build_placeholder_tab(
             qt_widgets,
@@ -242,6 +267,27 @@ def _build_settings_tab(
             builder=lambda widgets: _build_studio_tab(widgets, config, callbacks),
         )
     return build_placeholder_tab(qt_widgets, spec)
+
+
+def _build_basic_tab(
+    qt_widgets: Any,
+    user_config: UserPreferences,
+    callbacks: SettingsActionCallbacks,
+) -> Any:
+    tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_BASIC_TAB_OBJECT_NAME)
+    layout = qt_widgets.QVBoxLayout(tab)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+    layout.addWidget(
+        build_basic_settings_section(
+            qt_widgets,
+            user_config,
+            on_preferences_changed=callbacks.on_user_preferences_changed,
+        )
+    )
+    layout.addStretch(1)
+    return tab
 
 
 def _build_connectors_tab(

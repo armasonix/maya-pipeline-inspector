@@ -46,8 +46,10 @@ from shader_health.ui.settings_panel import (
     SETTINGS_VIEW_OBJECT_NAME,
     SettingsActionCallbacks,
     read_connectors_from_settings_view,
+    read_user_preferences_from_settings_view,
     update_settings_view,
 )
+from shader_health.ui.user_preferences_ui import apply_user_preferences_to_panel
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
     WAIVER_TABLE_OBJECT_NAME,
@@ -173,6 +175,7 @@ def _create_dockable_panel() -> Any:
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
         _wire_validate_splitter_persistence(content, qt_widgets)
+        _apply_user_preferences_to_panel(content, qt_widgets, user_config)
         _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
@@ -235,6 +238,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_user_preferences_changed=lambda: _sync_user_preferences_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
 
 
@@ -283,7 +290,29 @@ def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> N
 
 def _set_user_config(content: Any, qt_widgets: Any, config: UserPreferences) -> None:
     setattr(content, USER_CONFIG_ATTR, config)
+    apply_user_preferences_to_panel(content, qt_widgets, config)
     _refresh_settings_view(content, qt_widgets)
+
+
+def _sync_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    updated = read_user_preferences_from_settings_view(
+        settings_view,
+        qt_widgets,
+        base=_user_config_for_content(content),
+    )
+    setattr(content, USER_CONFIG_ATTR, updated)
+    apply_user_preferences_to_panel(content, qt_widgets, updated)
+
+
+def _apply_user_preferences_to_panel(
+    content: Any,
+    qt_widgets: Any,
+    user_config: UserPreferences,
+) -> None:
+    apply_user_preferences_to_panel(content, qt_widgets, user_config)
 
 
 def _refresh_settings_view(content: Any, qt_widgets: Any, *, status_message: str = "") -> None:
@@ -379,6 +408,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    _sync_user_preferences_from_ui(content, qt_widgets)
     config = _user_config_for_content(content)
     path = config.config_path or default_user_config_path()
     try:

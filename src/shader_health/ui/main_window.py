@@ -1068,6 +1068,35 @@ def combo_profile_id(combo: Any) -> str:
     return str(current_text or "")
 
 
+def select_workflow_profile(
+    combo: Any,
+    profile_id: str,
+    *,
+    options: Sequence[ProfileOption] = DEFAULT_WORKFLOW_PROFILE_OPTIONS,
+) -> None:
+    """Select a workflow profile on an existing combo box."""
+
+    selected = profile_id.strip() or "artist_relaxed"
+    _set_combo_selection(combo, options, selected)
+
+
+def select_asset_class_profile(
+    combo: Any,
+    asset_class_id: str,
+    *,
+    options: Sequence[ProfileOption] = DEFAULT_ASSET_CLASS_PROFILE_OPTIONS,
+) -> None:
+    """Select an asset class overlay on an existing combo box."""
+
+    normalized = asset_class_id.strip() or ASSET_CLASS_NONE_ID
+    if normalized == ASSET_CLASS_NONE_ID:
+        set_current = getattr(combo, "setCurrentIndex", None)
+        if set_current is not None:
+            set_current(0)
+        return
+    _set_combo_selection(combo, options, normalized)
+
+
 def _build_validate_tab(
     qt_widgets: Any,
     validation_callbacks: ValidationActionCallbacks,

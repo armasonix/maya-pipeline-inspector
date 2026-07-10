@@ -64,6 +64,15 @@ def wire_button(button: Any, callback: Optional[Callable[[], None]]) -> None:
         connect(callback)
 
 
+def wire_combo_changed(combo: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        return
+    changed = getattr(combo, "currentIndexChanged", None)
+    connect = getattr(changed, "connect", None)
+    if connect is not None:
+        connect(lambda _index: callback())
+
+
 def find_child(root: Any, widget_type: Any, object_name: str) -> Any | None:
     finder = getattr(root, "findChild", None)
     if finder is not None:

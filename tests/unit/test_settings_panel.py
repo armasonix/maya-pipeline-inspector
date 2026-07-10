@@ -10,7 +10,13 @@ from shader_health.studio_config import (
     StudioConfig,
 )
 from shader_health.ui import deadline_connector_section, settings_panel
+from shader_health.ui.basic_settings_section import (
+    SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
+    SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
+    SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
+)
 from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
+from shader_health.user_config import UserPreferences
 
 _DEADLINE_ENABLED = deadline_connector_section.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME
 _DEADLINE_DETAILS = deadline_connector_section.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME
@@ -95,6 +101,46 @@ class FakeLineEdit(FakeWidget):
         return FakeSignal()
 
 
+class FakeComboBox(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.items: list[tuple[str, str]] = []
+        self.current_index = 0
+        self.tooltip = ""
+        self.currentIndexChanged = FakeSignal()
+
+    def addItem(self, text: str, user_data: str = "") -> None:
+        self.items.append((text, user_data or text))
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.current_index = index
+
+    def setCurrentText(self, text: str) -> None:
+        for index, (label, _data) in enumerate(self.items):
+            if label == text:
+                self.current_index = index
+                return
+
+    def currentText(self) -> str:
+        if not self.items:
+            return ""
+        return self.items[self.current_index][0]
+
+    def currentData(self):
+        if not self.items:
+            return None
+        return self.items[self.current_index][1]
+
+    def findData(self, data: str) -> int:
+        for index, (_label, item_data) in enumerate(self.items):
+            if item_data == data:
+                return index
+        return -1
+
+    def setToolTip(self, text: str) -> None:
+        self.tooltip = text
+
+
 class FakeSignal:
     def __init__(self) -> None:
         self.handlers: list[Any] = []
@@ -151,6 +197,10 @@ class FakeVBoxLayout:
 
     def addLayout(self, layout: Any) -> None:
         self.layouts.append(layout)
+        parent_widget = self.parent
+        for _label, field in getattr(layout, "rows", []):
+            if parent_widget is not None and field not in parent_widget.children:
+                parent_widget.children.append(field)
         for widget in getattr(layout, "widgets", []):
             self._attach_widget(widget)
         for nested in getattr(layout, "layouts", []):
@@ -234,6 +284,7 @@ class FakeQtWidgets:
     QLabel = FakeLabel
     QLineEdit = FakeLineEdit
     QPushButton = FakePushButton
+    QComboBox = FakeComboBox
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
     QFormLayout = FakeFormLayout
@@ -241,6 +292,70 @@ class FakeQtWidgets:
     QSizePolicy = FakeSizePolicy
     Qt = FakeQt
     QTabWidget = FakeTabWidget
+
+
+def test_basic_tab_exposes_user_preference_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(
+            default_profile_id="publish_strict",
+            default_scan_scope="selection",
+            ui_density="compact",
+        ),
+    )
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    basic_tab = tabs.tabs[0][1]
+
+    assert _find(basic_tab, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME).currentData() == (
+        "publish_strict"
+    )
+    assert _find(basic_tab, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
+        "selection"
+    )
+    assert _find(basic_tab, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME).currentData() == "compact"
+
+
+def test_read_user_preferences_from_settings_view_reads_basic_tab():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+    profile_combo = _find(view, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME)
+    profile_combo.setCurrentIndex(profile_combo.findData("supervisor_full"))
+
+    loaded = settings_panel.read_user_preferences_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=UserPreferences(mayapy_path="C:/mayapy.exe"),
+    )
+
+    assert loaded.default_profile_id == "supervisor_full"
+    assert loaded.mayapy_path == "C:/mayapy.exe"
+
+
+def test_update_settings_view_refreshes_basic_tab_controls():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    settings_panel.update_settings_view(
+        view,
+        FakeQtWidgets,
+        config=StudioConfig(),
+        user_config=UserPreferences(
+            default_profile_id="deadline_critical",
+            default_scan_scope="selection",
+            ui_density="compact",
+        ),
+    )
+
+    assert _find(view, SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME).currentData() == (
+        "deadline_critical"
+    )
+    assert _find(view, SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME).currentData() == (
+        "selection"
+    )
 
 
 def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
@@ -426,6 +541,37 @@ def test_require_tx_toggle_styles_off_state():
 
     assert toggle.text == "OFF"
     assert "#4a4a4a" in toggle.style_sheet
+
+
+def test_apply_user_preferences_to_panel_sets_validate_dropdowns_and_scan_scope():
+    from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
+
+    from shader_health.ui import main_window
+    from shader_health.ui.user_preferences_ui import apply_user_preferences_to_panel
+
+    widget = main_window.build_main_widget(
+        MainWindowFakeQtWidgets,
+        user_config=UserPreferences(default_profile_id="artist_relaxed"),
+    )
+
+    apply_user_preferences_to_panel(
+        widget,
+        MainWindowFakeQtWidgets,
+        UserPreferences(
+            default_profile_id="deadline_critical",
+            default_asset_class_id="asset_class_hero",
+            default_scan_scope="selection",
+            ui_density="compact",
+        ),
+    )
+
+    profile_dropdown = _find(widget, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
+    asset_class_dropdown = _find(widget, main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME)
+
+    assert profile_dropdown.currentData() == "deadline_critical"
+    assert asset_class_dropdown.currentData() == "asset_class_hero"
+    assert widget._shader_health_scan_scope == "selection"
+    assert widget._shader_health_ui_density == "compact"
 
 
 def _find(widget: Any, object_name: str) -> Any:
