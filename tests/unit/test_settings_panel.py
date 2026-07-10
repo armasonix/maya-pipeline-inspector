@@ -6,6 +6,7 @@ from typing import Any
 from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
     PipelineSettings,
     StudioConfig,
     StudioEnvironmentSettings,
@@ -14,6 +15,7 @@ from shader_health.studio_config import (
 )
 from shader_health.ui import (
     deadline_connector_section,
+    discord_connector_section,
     main_window,
     settings_panel,
     telegram_connector_section,
@@ -67,6 +69,12 @@ _TELEGRAM_BOT_TOKEN = telegram_connector_section.SETTINGS_TELEGRAM_BOT_TOKEN_INP
 _TELEGRAM_CHAT_ID = telegram_connector_section.SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME
 _TELEGRAM_NOTIFY_PUBLISH = (
     telegram_connector_section.SETTINGS_TELEGRAM_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME
+)
+_DISCORD_ENABLED = discord_connector_section.SETTINGS_DISCORD_ENABLED_TOGGLE_OBJECT_NAME
+_DISCORD_DETAILS = discord_connector_section.SETTINGS_DISCORD_DETAILS_OBJECT_NAME
+_DISCORD_WEBHOOK = discord_connector_section.SETTINGS_DISCORD_WEBHOOK_URL_INPUT_OBJECT_NAME
+_DISCORD_NOTIFY_DEADLINE = (
+    discord_connector_section.SETTINGS_DISCORD_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME
 )
 
 
@@ -991,6 +999,68 @@ def test_read_connectors_from_settings_view_reads_telegram_fields():
     assert connectors.telegram.bot_token == "123:abc"
     assert connectors.telegram.chat_id == "-10099"
     assert connectors.telegram.notify_on == ("block_publish",)
+
+
+def test_connectors_tab_includes_discord_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _DISCORD_ENABLED)
+    details = _find(connectors_tab, _DISCORD_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_connectors_tab_shows_discord_details_when_notifications_enabled():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(
+                    enabled=True,
+                    webhook_url="https://discord.com/api/webhooks/1/secret",
+                    notify_on=("block_deadline",),
+                )
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    details = _find(connectors_tab, _DISCORD_DETAILS)
+    webhook = _find(connectors_tab, _DISCORD_WEBHOOK)
+    deadline = _find(connectors_tab, _DISCORD_NOTIFY_DEADLINE)
+
+    assert details.visible is True
+    assert webhook.value == "https://discord.com/api/webhooks/1/secret"
+    assert webhook.echo_mode == FakeLineEdit.Password
+    assert deadline.checked is True
+
+
+def test_read_connectors_from_settings_view_reads_discord_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    webhook = _find(view, _DISCORD_WEBHOOK)
+    webhook.setText("https://discord.com/api/webhooks/42/abc")
+    deadline = _find(view, _DISCORD_NOTIFY_DEADLINE)
+    deadline.setChecked(True)
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.discord.enabled is True
+    assert connectors.discord.webhook_url == "https://discord.com/api/webhooks/42/abc"
+    assert connectors.discord.notify_on == ("block_deadline",)
 
 
 def test_require_tx_toggle_styles_off_state():

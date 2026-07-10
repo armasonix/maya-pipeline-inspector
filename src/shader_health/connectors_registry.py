@@ -8,9 +8,11 @@ from typing import Any
 from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
     StudioConfig,
     TelegramConnectorSettings,
     resolve_deadline_config,
+    resolve_discord_config,
     resolve_telegram_config,
 )
 from shader_health.ui.deadline_connector_section import (
@@ -19,6 +21,13 @@ from shader_health.ui.deadline_connector_section import (
     get_deadline_settings,
     read_deadline_connector_from_view,
     update_deadline_connector_view,
+)
+from shader_health.ui.discord_connector_section import (
+    apply_discord_settings,
+    build_discord_connector_section,
+    get_discord_settings,
+    read_discord_connector_from_view,
+    update_discord_connector_view,
 )
 from shader_health.ui.telegram_connector_section import (
     apply_telegram_settings,
@@ -81,6 +90,23 @@ def _resolve_telegram(config: StudioConfig) -> Any | None:
     return resolve_telegram_config(config)
 
 
+def _build_discord_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_discord_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_discord_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_discord_settings_changed", None),
+    )
+
+
+def _resolve_discord(config: StudioConfig) -> Any | None:
+    return resolve_discord_config(config)
+
+
 CONNECTORS: tuple[ConnectorDefinition, ...] = (
     ConnectorDefinition(
         id="deadline",
@@ -105,6 +131,18 @@ CONNECTORS: tuple[ConnectorDefinition, ...] = (
         get_settings=get_telegram_settings,
         apply_settings=apply_telegram_settings,
         secret_field_names=frozenset({"bot_token"}),
+    ),
+    ConnectorDefinition(
+        id="discord",
+        display_name="Discord",
+        settings_dataclass=DiscordConnectorSettings,
+        resolve_fn=_resolve_discord,
+        build_section=_build_discord_section,
+        read_from_view=read_discord_connector_from_view,
+        update_view=update_discord_connector_view,
+        get_settings=get_discord_settings,
+        apply_settings=apply_discord_settings,
+        secret_field_names=frozenset({"webhook_url"}),
     ),
 )
 

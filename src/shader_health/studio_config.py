@@ -330,6 +330,58 @@ class DeadlineConnectorSettings:
         )
 
 
+DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
+DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
+DISCORD_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
+    (DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
+    (DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
+)
+
+
+@dataclass(frozen=True)
+class DiscordConnectorSettings:
+    """Discord incoming webhook connector settings stored in the studio config."""
+
+    enabled: bool = False
+    webhook_url: str = ""
+    notify_on: tuple[str, ...] = ()
+
+    def to_discord_config(self) -> Any | None:
+        """Convert connector settings into a Discord runtime config object."""
+
+        from shader_health.integrations.discord.config import DiscordConfig
+
+        webhook_url = self.webhook_url.strip()
+        if not webhook_url:
+            return None
+        return DiscordConfig(webhook_url=webhook_url)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "webhook_url": self.webhook_url,
+            "notify_on": list(self.notify_on),
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> DiscordConnectorSettings:
+        if not data:
+            return cls()
+        notify_raw = data.get("notify_on")
+        notify_on: tuple[str, ...] = ()
+        if isinstance(notify_raw, (list, tuple)):
+            notify_on = tuple(
+                str(event).strip()
+                for event in notify_raw
+                if str(event).strip()
+            )
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            webhook_url=str(data.get("webhook_url", "") or ""),
+            notify_on=notify_on,
+        )
+
+
 TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
 TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
 TELEGRAM_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
@@ -392,15 +444,17 @@ class ConnectorSettings:
 
     deadline: DeadlineConnectorSettings = DeadlineConnectorSettings()
     telegram: TelegramConnectorSettings = TelegramConnectorSettings()
+    discord: DiscordConnectorSettings = DiscordConnectorSettings()
     extra: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "deadline": self.deadline.to_dict(),
             "telegram": self.telegram.to_dict(),
+            "discord": self.discord.to_dict(),
         }
         for connector_id in sorted(self.extra):
-            if connector_id in ("deadline", "telegram"):
+            if connector_id in ("deadline", "telegram", "discord"):
                 continue
             connector_payload = self.extra[connector_id]
             payload[connector_id] = dict(connector_payload)
@@ -413,6 +467,8 @@ class ConnectorSettings:
             return self.deadline.to_dict()
         if connector_id == "telegram":
             return self.telegram.to_dict()
+        if connector_id == "discord":
+            return self.discord.to_dict()
         return self.extra.get(connector_id)
 
     @classmethod
@@ -431,12 +487,20 @@ class ConnectorSettings:
             if isinstance(telegram_raw, Mapping)
             else TelegramConnectorSettings()
         )
+        discord_raw = data.get("discord")
+        discord = (
+            DiscordConnectorSettings.from_mapping(discord_raw)
+            if isinstance(discord_raw, Mapping)
+            else DiscordConnectorSettings()
+        )
         extra: dict[str, dict[str, Any]] = {}
         for connector_id, connector_raw in data.items():
-            if connector_id in ("deadline", "telegram") or not isinstance(connector_raw, Mapping):
+            if connector_id in ("deadline", "telegram", "discord"):
+                continue
+            if not isinstance(connector_raw, Mapping):
                 continue
             extra[str(connector_id)] = dict(connector_raw)
-        return cls(deadline=deadline, telegram=telegram, extra=extra)
+        return cls(deadline=deadline, telegram=telegram, discord=discord, extra=extra)
 
 
 @dataclass(frozen=True)
@@ -592,6 +656,17 @@ def resolve_telegram_config(config: StudioConfig | None) -> Any | None:
     if not telegram.enabled:
         return None
     return telegram.to_telegram_config()
+
+
+def resolve_discord_config(config: StudioConfig | None) -> Any | None:
+    """Return Discord runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    discord = config.connectors.discord
+    if not discord.enabled:
+        return None
+    return discord.to_discord_config()
 
 
 def _normalize_schema_version(value: Any) -> str:

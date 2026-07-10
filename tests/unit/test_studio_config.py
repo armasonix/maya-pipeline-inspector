@@ -13,6 +13,7 @@ from shader_health.studio_config import (
     BugReportSettings,
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
     PipelineSettings,
     StudioConfig,
     StudioEnvironmentSettings,
@@ -23,6 +24,7 @@ from shader_health.studio_config import (
     load_studio_config,
     merge_studio_rule_overrides,
     resolve_deadline_config,
+    resolve_discord_config,
     resolve_studio_config_for_headless,
     resolve_telegram_config,
     save_studio_config,
@@ -176,6 +178,11 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
                 chat_id="12345",
                 notify_on=("block_publish",),
             ),
+            discord=DiscordConnectorSettings(
+                enabled=True,
+                webhook_url="https://discord.com/api/webhooks/1/secret",
+                notify_on=("block_deadline",),
+            ),
         ),
     )
 
@@ -197,6 +204,9 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.connectors.telegram.chat_id == "12345"
     assert loaded.connectors.telegram.bot_token == "token"
     assert loaded.connectors.telegram.notify_on == ("block_publish",)
+    assert loaded.connectors.discord.enabled is True
+    assert loaded.connectors.discord.webhook_url == "https://discord.com/api/webhooks/1/secret"
+    assert loaded.connectors.discord.notify_on == ("block_deadline",)
 
 
 def test_connector_settings_preserves_extensible_connectors():
@@ -331,6 +341,41 @@ def test_resolve_telegram_config_returns_none_when_disabled_or_incomplete():
 
     assert resolve_telegram_config(disabled) is None
     assert resolve_telegram_config(incomplete) is None
+
+
+def test_resolve_discord_config_uses_connector_when_enabled():
+    config = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(
+                enabled=True,
+                webhook_url="https://discord.com/api/webhooks/9/abc",
+            )
+        ),
+    )
+
+    resolved = resolve_discord_config(config)
+
+    assert resolved is not None
+    assert resolved.webhook_url == "https://discord.com/api/webhooks/9/abc"
+
+
+def test_resolve_discord_config_returns_none_when_disabled_or_incomplete():
+    disabled = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(
+                enabled=False,
+                webhook_url="https://discord.com/api/webhooks/9/abc",
+            )
+        ),
+    )
+    incomplete = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(enabled=True, webhook_url=""),
+        ),
+    )
+
+    assert resolve_discord_config(disabled) is None
+    assert resolve_discord_config(incomplete) is None
 
 
 def test_deadline_connector_from_deadline_config_round_trip():

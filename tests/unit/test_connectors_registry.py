@@ -12,28 +12,34 @@ from shader_health.connectors_registry import (
 from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
     StudioConfig,
     TelegramConnectorSettings,
+    resolve_discord_config,
     resolve_telegram_config,
 )
 from shader_health.ui import settings_panel
 
 
-def test_iter_connectors_includes_deadline_and_telegram():
+def test_iter_connectors_includes_deadline_telegram_and_discord():
     connectors = iter_connectors()
 
-    assert len(connectors) == 2
+    assert len(connectors) == 3
     assert connectors[0].id == "deadline"
     assert connectors[0].display_name == "Thinkbox Deadline"
     assert connectors[0].settings_dataclass is DeadlineConnectorSettings
     assert connectors[1].id == "telegram"
     assert connectors[1].settings_dataclass is TelegramConnectorSettings
     assert "bot_token" in connectors[1].secret_field_names
+    assert connectors[2].id == "discord"
+    assert connectors[2].settings_dataclass is DiscordConnectorSettings
+    assert "webhook_url" in connectors[2].secret_field_names
 
 
 def test_get_connector_returns_none_for_unknown_id():
     assert get_connector("unknown") is None
     assert get_connector("telegram") is CONNECTORS[1]
+    assert get_connector("discord") is CONNECTORS[2]
     assert get_connector("deadline") is CONNECTORS[0]
 
 
@@ -99,3 +105,29 @@ def test_resolve_connector_delegates_to_deadline_resolver():
     assert resolved is not None
     assert resolved.api_url == "http://farm.local:8081"
     assert resolve_connector(config, "unknown") is None
+
+
+def test_resolve_connector_delegates_to_discord_resolver():
+    config = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(
+                enabled=True,
+                webhook_url="https://discord.com/api/webhooks/1/secret",
+            )
+        )
+    )
+
+    resolved = resolve_connector(config, "discord")
+
+    assert resolved is not None
+    assert resolved.webhook_url == "https://discord.com/api/webhooks/1/secret"
+    assert resolve_discord_config(
+        StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(
+                    enabled=False,
+                    webhook_url="https://discord.com/api/webhooks/1/secret",
+                ),
+            )
+        )
+    ) is None
