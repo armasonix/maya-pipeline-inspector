@@ -13,16 +13,22 @@ from shader_health.studio_config import (
     BugReportSettings,
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
     PipelineSettings,
+    SlackConnectorSettings,
     StudioConfig,
     StudioEnvironmentSettings,
     StudioUiSettings,
     StudioUpdatesSettings,
+    TelegramConnectorSettings,
     WaiverDefaultsSettings,
     load_studio_config,
     merge_studio_rule_overrides,
     resolve_deadline_config,
+    resolve_discord_config,
+    resolve_slack_config,
     resolve_studio_config_for_headless,
+    resolve_telegram_config,
     save_studio_config,
 )
 
@@ -168,13 +174,24 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
         updates=StudioUpdatesSettings(allow_check=False, pinned_version="0.4.0"),
         connectors=ConnectorSettings(
             deadline=DeadlineConnectorSettings(enabled=False),
-            extra={
-                "telegram": {
-                    "enabled": True,
-                    "bot_token": "token",
-                    "chat_id": "12345",
-                }
-            },
+            telegram=TelegramConnectorSettings(
+                enabled=True,
+                bot_token="token",
+                chat_id="12345",
+                notify_on=("block_publish",),
+            ),
+            discord=DiscordConnectorSettings(
+                enabled=True,
+                webhook_url="https://discord.com/api/webhooks/1/secret",
+                notify_on=("block_deadline",),
+            ),
+            slack=SlackConnectorSettings(
+                enabled=True,
+                publish_webhook_url="https://hooks.slack.com/publish",
+                deadline_webhook_url="https://hooks.slack.com/deadline",
+                notify_on=("block_publish",),
+                include_report_link=False,
+            ),
         ),
     )
 
@@ -192,15 +209,28 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.bug_report.max_reports_per_day == 3
     assert loaded.updates.allow_check is False
     assert loaded.updates.pinned_version == "0.4.0"
-    assert loaded.connectors.extra["telegram"]["enabled"] is True
-    assert loaded.connectors.extra["telegram"]["chat_id"] == "12345"
+    assert loaded.connectors.telegram.enabled is True
+    assert loaded.connectors.telegram.chat_id == "12345"
+    assert loaded.connectors.telegram.bot_token == "token"
+    assert loaded.connectors.telegram.notify_on == ("block_publish",)
+    assert loaded.connectors.discord.enabled is True
+    assert loaded.connectors.discord.webhook_url == "https://discord.com/api/webhooks/1/secret"
+    assert loaded.connectors.discord.notify_on == ("block_deadline",)
+    assert loaded.connectors.slack.enabled is True
+    assert loaded.connectors.slack.publish_webhook_url == "https://hooks.slack.com/publish"
+    assert loaded.connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
+    assert loaded.connectors.slack.notify_on == ("block_publish",)
+    assert loaded.connectors.slack.include_report_link is False
 
 
 def test_connector_settings_preserves_extensible_connectors():
     connectors = ConnectorSettings.from_mapping(
         {
             "deadline": {"enabled": True, "web_service_host": "farm.local"},
-            "slack": {"enabled": True, "webhook_url": "https://hooks.slack.com/example"},
+            "slack": {
+                "enabled": True,
+                "publish_webhook_url": "https://hooks.slack.com/publish",
+            },
             "ftrack": {"enabled": False},
         }
     )
@@ -209,7 +239,8 @@ def test_connector_settings_preserves_extensible_connectors():
 
     assert connectors.deadline.enabled is True
     assert connectors.deadline.web_service_host == "farm.local"
-    assert connectors.extra["slack"]["webhook_url"].startswith("https://hooks.slack.com/")
+    assert connectors.slack.enabled is True
+    assert connectors.slack.publish_webhook_url.startswith("https://hooks.slack.com/")
     assert connectors.extra["ftrack"]["enabled"] is False
     assert restored.to_dict() == connectors.to_dict()
 
@@ -290,6 +321,120 @@ def test_resolve_deadline_config_returns_none_when_disabled(monkeypatch):
     )
 
     assert resolve_deadline_config(config) is None
+
+
+def test_resolve_telegram_config_uses_connector_when_enabled():
+    config = StudioConfig(
+        connectors=ConnectorSettings(
+            telegram=TelegramConnectorSettings(
+                enabled=True,
+                bot_token="123:abc",
+                chat_id="-10042",
+            )
+        ),
+    )
+
+    resolved = resolve_telegram_config(config)
+
+    assert resolved is not None
+    assert resolved.bot_token == "123:abc"
+    assert resolved.chat_id == "-10042"
+
+
+def test_resolve_telegram_config_returns_none_when_disabled_or_incomplete():
+    disabled = StudioConfig(
+        connectors=ConnectorSettings(
+            telegram=TelegramConnectorSettings(
+                enabled=False,
+                bot_token="123:abc",
+                chat_id="-10042",
+            )
+        ),
+    )
+    incomplete = StudioConfig(
+        connectors=ConnectorSettings(
+            telegram=TelegramConnectorSettings(enabled=True, bot_token="", chat_id="-10042"),
+        ),
+    )
+
+    assert resolve_telegram_config(disabled) is None
+    assert resolve_telegram_config(incomplete) is None
+
+
+def test_resolve_discord_config_uses_connector_when_enabled():
+    config = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(
+                enabled=True,
+                webhook_url="https://discord.com/api/webhooks/9/abc",
+            )
+        ),
+    )
+
+    resolved = resolve_discord_config(config)
+
+    assert resolved is not None
+    assert resolved.webhook_url == "https://discord.com/api/webhooks/9/abc"
+
+
+def test_resolve_discord_config_returns_none_when_disabled_or_incomplete():
+    disabled = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(
+                enabled=False,
+                webhook_url="https://discord.com/api/webhooks/9/abc",
+            )
+        ),
+    )
+    incomplete = StudioConfig(
+        connectors=ConnectorSettings(
+            discord=DiscordConnectorSettings(enabled=True, webhook_url=""),
+        ),
+    )
+
+    assert resolve_discord_config(disabled) is None
+    assert resolve_discord_config(incomplete) is None
+
+
+def test_resolve_slack_config_uses_connector_when_enabled():
+    config = StudioConfig(
+        connectors=ConnectorSettings(
+            slack=SlackConnectorSettings(
+                enabled=True,
+                publish_webhook_url="https://hooks.slack.com/publish",
+                deadline_webhook_url="https://hooks.slack.com/deadline",
+            )
+        ),
+    )
+
+    resolved = resolve_slack_config(config)
+
+    assert resolved is not None
+    assert resolved.publish_webhook_url == "https://hooks.slack.com/publish"
+    assert resolved.deadline_webhook_url == "https://hooks.slack.com/deadline"
+
+
+def test_resolve_slack_config_returns_none_when_disabled_or_incomplete():
+    disabled = StudioConfig(
+        connectors=ConnectorSettings(
+            slack=SlackConnectorSettings(
+                enabled=False,
+                publish_webhook_url="https://hooks.slack.com/publish",
+            )
+        ),
+    )
+    incomplete = StudioConfig(
+        connectors=ConnectorSettings(
+            slack=SlackConnectorSettings(
+                enabled=True,
+                publish_webhook_url="",
+                deadline_webhook_url="",
+            ),
+        ),
+    )
+
+    assert resolve_slack_config(disabled) is None
+    assert resolve_slack_config(incomplete) is None
 
 
 def test_deadline_connector_from_deadline_config_round_trip():

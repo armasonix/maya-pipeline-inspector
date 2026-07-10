@@ -6,12 +6,22 @@ from typing import Any
 from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
     PipelineSettings,
+    SlackConnectorSettings,
     StudioConfig,
     StudioEnvironmentSettings,
+    TelegramConnectorSettings,
     WaiverDefaultsSettings,
 )
-from shader_health.ui import deadline_connector_section, main_window, settings_panel
+from shader_health.ui import (
+    deadline_connector_section,
+    discord_connector_section,
+    main_window,
+    settings_panel,
+    slack_connector_section,
+    telegram_connector_section,
+)
 from shader_health.ui.advanced_settings_section import (
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
@@ -55,6 +65,26 @@ _DEADLINE_PORT = deadline_connector_section.SETTINGS_DEADLINE_PORT_INPUT_OBJECT_
 _DEADLINE_LEFT = deadline_connector_section.SETTINGS_DEADLINE_LEFT_COLUMN_OBJECT_NAME
 _DEADLINE_RIGHT = deadline_connector_section.SETTINGS_DEADLINE_RIGHT_COLUMN_OBJECT_NAME
 _DEADLINE_MAYAPY = deadline_connector_section.SETTINGS_DEADLINE_MAYAPY_INPUT_OBJECT_NAME
+_TELEGRAM_ENABLED = telegram_connector_section.SETTINGS_TELEGRAM_ENABLED_TOGGLE_OBJECT_NAME
+_TELEGRAM_DETAILS = telegram_connector_section.SETTINGS_TELEGRAM_DETAILS_OBJECT_NAME
+_TELEGRAM_BOT_TOKEN = telegram_connector_section.SETTINGS_TELEGRAM_BOT_TOKEN_INPUT_OBJECT_NAME
+_TELEGRAM_CHAT_ID = telegram_connector_section.SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME
+_TELEGRAM_NOTIFY_PUBLISH = (
+    telegram_connector_section.SETTINGS_TELEGRAM_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME
+)
+_DISCORD_ENABLED = discord_connector_section.SETTINGS_DISCORD_ENABLED_TOGGLE_OBJECT_NAME
+_DISCORD_DETAILS = discord_connector_section.SETTINGS_DISCORD_DETAILS_OBJECT_NAME
+_DISCORD_WEBHOOK = discord_connector_section.SETTINGS_DISCORD_WEBHOOK_URL_INPUT_OBJECT_NAME
+_DISCORD_NOTIFY_DEADLINE = (
+    discord_connector_section.SETTINGS_DISCORD_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME
+)
+_SLACK_ENABLED = slack_connector_section.SETTINGS_SLACK_ENABLED_TOGGLE_OBJECT_NAME
+_SLACK_DETAILS = slack_connector_section.SETTINGS_SLACK_DETAILS_OBJECT_NAME
+_SLACK_PUBLISH_WEBHOOK = slack_connector_section.SETTINGS_SLACK_PUBLISH_WEBHOOK_INPUT_OBJECT_NAME
+_SLACK_DEADLINE_WEBHOOK = slack_connector_section.SETTINGS_SLACK_DEADLINE_WEBHOOK_INPUT_OBJECT_NAME
+_SLACK_NOTIFY_PUBLISH = (
+    slack_connector_section.SETTINGS_SLACK_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME
+)
 
 
 class FakeWidget:
@@ -106,6 +136,8 @@ class FakeLabel(FakeWidget):
 
 
 class FakeLineEdit(FakeWidget):
+    Password = "password"
+
     def __init__(self, text: str = "") -> None:
         super().__init__()
         self.value = text
@@ -114,6 +146,7 @@ class FakeLineEdit(FakeWidget):
         self.maximum_width: int | None = None
         self.size_policy: tuple[Any, Any] | None = None
         self.tooltip = ""
+        self.echo_mode: Any | None = None
 
     def setText(self, text: str) -> None:
         self.value = text
@@ -135,6 +168,9 @@ class FakeLineEdit(FakeWidget):
 
     def setSizePolicy(self, horizontal: Any, vertical: Any) -> None:
         self.size_policy = (horizontal, vertical)
+
+    def setEchoMode(self, mode: Any) -> None:
+        self.echo_mode = mode
 
     @property
     def editingFinished(self) -> FakeSignal:
@@ -200,6 +236,23 @@ class FakeComboBox(FakeWidget):
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
+
+
+class FakeCheckBox(FakeWidget):
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.text = text
+        self.checked = False
+        self.stateChanged = FakeSignal()
+
+    def setText(self, text: str) -> None:
+        self.text = text
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
+    def isChecked(self) -> bool:
+        return self.checked
 
 
 class FakeSignal:
@@ -346,6 +399,7 @@ class FakeQtWidgets:
     QLineEdit = FakeLineEdit
     QPlainTextEdit = FakePlainTextEdit
     QPushButton = FakePushButton
+    QCheckBox = FakeCheckBox
     QComboBox = FakeComboBox
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
@@ -888,6 +942,202 @@ def test_connectors_tab_uses_parallel_deadline_columns():
     assert host.fixed_width == deadline_connector_section._DEADLINE_FIELD_HOST_WIDTH
     assert port.fixed_width == deadline_connector_section._DEADLINE_FIELD_PORT_WIDTH
     assert host_label.fixed_width == deadline_connector_section._DEADLINE_LABEL_WIDTH
+
+
+def test_connectors_tab_includes_telegram_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                telegram=TelegramConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _TELEGRAM_ENABLED)
+    details = _find(connectors_tab, _TELEGRAM_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_connectors_tab_shows_telegram_details_when_notifications_enabled():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                telegram=TelegramConnectorSettings(
+                    enabled=True,
+                    bot_token="secret-token",
+                    chat_id="-10042",
+                    notify_on=("block_publish",),
+                )
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    details = _find(connectors_tab, _TELEGRAM_DETAILS)
+    token = _find(connectors_tab, _TELEGRAM_BOT_TOKEN)
+    publish = _find(connectors_tab, _TELEGRAM_NOTIFY_PUBLISH)
+
+    assert details.visible is True
+    assert token.value == "secret-token"
+    assert token.echo_mode == FakeLineEdit.Password
+    assert publish.checked is True
+
+
+def test_read_connectors_from_settings_view_reads_telegram_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                telegram=TelegramConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    token = _find(view, _TELEGRAM_BOT_TOKEN)
+    token.setText("123:abc")
+    chat_id = _find(view, _TELEGRAM_CHAT_ID)
+    chat_id.setText("-10099")
+    publish = _find(view, _TELEGRAM_NOTIFY_PUBLISH)
+    publish.setChecked(True)
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.telegram.enabled is True
+    assert connectors.telegram.bot_token == "123:abc"
+    assert connectors.telegram.chat_id == "-10099"
+    assert connectors.telegram.notify_on == ("block_publish",)
+
+
+def test_connectors_tab_includes_discord_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _DISCORD_ENABLED)
+    details = _find(connectors_tab, _DISCORD_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_connectors_tab_shows_discord_details_when_notifications_enabled():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(
+                    enabled=True,
+                    webhook_url="https://discord.com/api/webhooks/1/secret",
+                    notify_on=("block_deadline",),
+                )
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    details = _find(connectors_tab, _DISCORD_DETAILS)
+    webhook = _find(connectors_tab, _DISCORD_WEBHOOK)
+    deadline = _find(connectors_tab, _DISCORD_NOTIFY_DEADLINE)
+
+    assert details.visible is True
+    assert webhook.value == "https://discord.com/api/webhooks/1/secret"
+    assert webhook.echo_mode == FakeLineEdit.Password
+    assert deadline.checked is True
+
+
+def test_read_connectors_from_settings_view_reads_discord_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                discord=DiscordConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    webhook = _find(view, _DISCORD_WEBHOOK)
+    webhook.setText("https://discord.com/api/webhooks/42/abc")
+    deadline = _find(view, _DISCORD_NOTIFY_DEADLINE)
+    deadline.setChecked(True)
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.discord.enabled is True
+    assert connectors.discord.webhook_url == "https://discord.com/api/webhooks/42/abc"
+    assert connectors.discord.notify_on == ("block_deadline",)
+
+
+def test_connectors_tab_includes_slack_toggle_and_collapsed_details():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                slack=SlackConnectorSettings(enabled=False),
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    toggle = _find(connectors_tab, _SLACK_ENABLED)
+    details = _find(connectors_tab, _SLACK_DETAILS)
+
+    assert toggle.checked is False
+    assert details.visible is False
+
+
+def test_connectors_tab_shows_slack_routing_fields_when_notifications_enabled():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                slack=SlackConnectorSettings(
+                    enabled=True,
+                    publish_webhook_url="https://hooks.slack.com/publish",
+                    deadline_webhook_url="https://hooks.slack.com/deadline",
+                    notify_on=("block_publish",),
+                )
+            )
+        ),
+    )
+    connectors_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[2][1]
+    details = _find(connectors_tab, _SLACK_DETAILS)
+    publish = _find(connectors_tab, _SLACK_PUBLISH_WEBHOOK)
+    deadline = _find(connectors_tab, _SLACK_DEADLINE_WEBHOOK)
+    publish_notify = _find(connectors_tab, _SLACK_NOTIFY_PUBLISH)
+
+    assert details.visible is True
+    assert publish.value == "https://hooks.slack.com/publish"
+    assert publish.echo_mode == FakeLineEdit.Password
+    assert deadline.value == "https://hooks.slack.com/deadline"
+    assert publish_notify.checked is True
+
+
+def test_read_connectors_from_settings_view_reads_slack_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            connectors=ConnectorSettings(
+                slack=SlackConnectorSettings(enabled=True),
+            )
+        ),
+    )
+    publish = _find(view, _SLACK_PUBLISH_WEBHOOK)
+    publish.setText("https://hooks.slack.com/publish")
+    deadline = _find(view, _SLACK_DEADLINE_WEBHOOK)
+    deadline.setText("https://hooks.slack.com/deadline")
+    publish_notify = _find(view, _SLACK_NOTIFY_PUBLISH)
+    publish_notify.setChecked(True)
+
+    connectors = settings_panel.read_connectors_from_settings_view(view, FakeQtWidgets)
+
+    assert connectors.slack.enabled is True
+    assert connectors.slack.publish_webhook_url == "https://hooks.slack.com/publish"
+    assert connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
+    assert connectors.slack.notify_on == ("block_publish",)
 
 
 def test_require_tx_toggle_styles_off_state():

@@ -8,8 +8,14 @@ from typing import Any
 from shader_health.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
+    DiscordConnectorSettings,
+    SlackConnectorSettings,
     StudioConfig,
+    TelegramConnectorSettings,
     resolve_deadline_config,
+    resolve_discord_config,
+    resolve_slack_config,
+    resolve_telegram_config,
 )
 from shader_health.ui.deadline_connector_section import (
     apply_deadline_settings,
@@ -17,6 +23,27 @@ from shader_health.ui.deadline_connector_section import (
     get_deadline_settings,
     read_deadline_connector_from_view,
     update_deadline_connector_view,
+)
+from shader_health.ui.discord_connector_section import (
+    apply_discord_settings,
+    build_discord_connector_section,
+    get_discord_settings,
+    read_discord_connector_from_view,
+    update_discord_connector_view,
+)
+from shader_health.ui.slack_connector_section import (
+    apply_slack_settings,
+    build_slack_connector_section,
+    get_slack_settings,
+    read_slack_connector_from_view,
+    update_slack_connector_view,
+)
+from shader_health.ui.telegram_connector_section import (
+    apply_telegram_settings,
+    build_telegram_connector_section,
+    get_telegram_settings,
+    read_telegram_connector_from_view,
+    update_telegram_connector_view,
 )
 
 ConnectorSettingsValue = Any
@@ -55,6 +82,57 @@ def _resolve_deadline(config: StudioConfig) -> Any | None:
     return resolve_deadline_config(config)
 
 
+def _build_telegram_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_telegram_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_telegram_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_telegram_settings_changed", None),
+    )
+
+
+def _resolve_telegram(config: StudioConfig) -> Any | None:
+    return resolve_telegram_config(config)
+
+
+def _build_discord_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_discord_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_discord_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_discord_settings_changed", None),
+    )
+
+
+def _resolve_discord(config: StudioConfig) -> Any | None:
+    return resolve_discord_config(config)
+
+
+def _build_slack_section(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: Any,
+) -> Any:
+    return build_slack_connector_section(
+        qt_widgets,
+        config,
+        on_enabled_changed=getattr(callbacks, "on_slack_enabled_changed", None),
+        on_settings_changed=getattr(callbacks, "on_slack_settings_changed", None),
+    )
+
+
+def _resolve_slack(config: StudioConfig) -> Any | None:
+    return resolve_slack_config(config)
+
+
 CONNECTORS: tuple[ConnectorDefinition, ...] = (
     ConnectorDefinition(
         id="deadline",
@@ -67,6 +145,42 @@ CONNECTORS: tuple[ConnectorDefinition, ...] = (
         get_settings=get_deadline_settings,
         apply_settings=apply_deadline_settings,
         secret_field_names=frozenset(),
+    ),
+    ConnectorDefinition(
+        id="telegram",
+        display_name="Telegram",
+        settings_dataclass=TelegramConnectorSettings,
+        resolve_fn=_resolve_telegram,
+        build_section=_build_telegram_section,
+        read_from_view=read_telegram_connector_from_view,
+        update_view=update_telegram_connector_view,
+        get_settings=get_telegram_settings,
+        apply_settings=apply_telegram_settings,
+        secret_field_names=frozenset({"bot_token"}),
+    ),
+    ConnectorDefinition(
+        id="discord",
+        display_name="Discord",
+        settings_dataclass=DiscordConnectorSettings,
+        resolve_fn=_resolve_discord,
+        build_section=_build_discord_section,
+        read_from_view=read_discord_connector_from_view,
+        update_view=update_discord_connector_view,
+        get_settings=get_discord_settings,
+        apply_settings=apply_discord_settings,
+        secret_field_names=frozenset({"webhook_url"}),
+    ),
+    ConnectorDefinition(
+        id="slack",
+        display_name="Slack",
+        settings_dataclass=SlackConnectorSettings,
+        resolve_fn=_resolve_slack,
+        build_section=_build_slack_section,
+        read_from_view=read_slack_connector_from_view,
+        update_view=update_slack_connector_view,
+        get_settings=get_slack_settings,
+        apply_settings=apply_slack_settings,
+        secret_field_names=frozenset({"publish_webhook_url", "deadline_webhook_url"}),
     ),
 )
 

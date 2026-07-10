@@ -330,17 +330,195 @@ class DeadlineConnectorSettings:
         )
 
 
+SLACK_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
+SLACK_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
+SLACK_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
+    (SLACK_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
+    (SLACK_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
+)
+
+
+@dataclass(frozen=True)
+class SlackConnectorSettings:
+    """Slack incoming webhook connector settings stored in the studio config."""
+
+    enabled: bool = False
+    publish_webhook_url: str = ""
+    deadline_webhook_url: str = ""
+    notify_on: tuple[str, ...] = ()
+    include_report_link: bool = True
+
+    def to_slack_config(self) -> Any | None:
+        """Convert connector settings into a Slack runtime config object."""
+
+        from shader_health.integrations.slack.config import SlackConfig
+
+        publish = self.publish_webhook_url.strip()
+        deadline = self.deadline_webhook_url.strip()
+        if not publish and not deadline:
+            return None
+        return SlackConfig(
+            publish_webhook_url=publish,
+            deadline_webhook_url=deadline,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "publish_webhook_url": self.publish_webhook_url,
+            "deadline_webhook_url": self.deadline_webhook_url,
+            "notify_on": list(self.notify_on),
+            "include_report_link": self.include_report_link,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> SlackConnectorSettings:
+        if not data:
+            return cls()
+        notify_raw = data.get("notify_on")
+        notify_on: tuple[str, ...] = ()
+        if isinstance(notify_raw, (list, tuple)):
+            notify_on = tuple(
+                str(event).strip()
+                for event in notify_raw
+                if str(event).strip()
+            )
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            publish_webhook_url=str(data.get("publish_webhook_url", "") or ""),
+            deadline_webhook_url=str(data.get("deadline_webhook_url", "") or ""),
+            notify_on=notify_on,
+            include_report_link=bool(data.get("include_report_link", True)),
+        )
+
+
+DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
+DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
+DISCORD_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
+    (DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
+    (DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
+)
+
+
+@dataclass(frozen=True)
+class DiscordConnectorSettings:
+    """Discord incoming webhook connector settings stored in the studio config."""
+
+    enabled: bool = False
+    webhook_url: str = ""
+    notify_on: tuple[str, ...] = ()
+
+    def to_discord_config(self) -> Any | None:
+        """Convert connector settings into a Discord runtime config object."""
+
+        from shader_health.integrations.discord.config import DiscordConfig
+
+        webhook_url = self.webhook_url.strip()
+        if not webhook_url:
+            return None
+        return DiscordConfig(webhook_url=webhook_url)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "webhook_url": self.webhook_url,
+            "notify_on": list(self.notify_on),
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> DiscordConnectorSettings:
+        if not data:
+            return cls()
+        notify_raw = data.get("notify_on")
+        notify_on: tuple[str, ...] = ()
+        if isinstance(notify_raw, (list, tuple)):
+            notify_on = tuple(
+                str(event).strip()
+                for event in notify_raw
+                if str(event).strip()
+            )
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            webhook_url=str(data.get("webhook_url", "") or ""),
+            notify_on=notify_on,
+        )
+
+
+TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
+TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
+TELEGRAM_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
+    (TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
+    (TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
+)
+
+
+@dataclass(frozen=True)
+class TelegramConnectorSettings:
+    """Telegram Bot API connector settings stored in the studio config."""
+
+    enabled: bool = False
+    bot_token: str = ""
+    chat_id: str = ""
+    notify_on: tuple[str, ...] = ()
+
+    def to_telegram_config(self) -> Any | None:
+        """Convert connector settings into a Telegram runtime config object."""
+
+        from shader_health.integrations.telegram.config import TelegramConfig
+
+        token = self.bot_token.strip()
+        chat_id = self.chat_id.strip()
+        if not token or not chat_id:
+            return None
+        return TelegramConfig(bot_token=token, chat_id=chat_id)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "bot_token": self.bot_token,
+            "chat_id": self.chat_id,
+            "notify_on": list(self.notify_on),
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> TelegramConnectorSettings:
+        if not data:
+            return cls()
+        notify_raw = data.get("notify_on")
+        notify_on: tuple[str, ...] = ()
+        if isinstance(notify_raw, (list, tuple)):
+            notify_on = tuple(
+                str(event).strip()
+                for event in notify_raw
+                if str(event).strip()
+            )
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            bot_token=str(data.get("bot_token", "") or ""),
+            chat_id=str(data.get("chat_id", "") or ""),
+            notify_on=notify_on,
+        )
+
+
 @dataclass(frozen=True)
 class ConnectorSettings:
     """Third-party integration settings grouped by connector."""
 
     deadline: DeadlineConnectorSettings = DeadlineConnectorSettings()
+    telegram: TelegramConnectorSettings = TelegramConnectorSettings()
+    discord: DiscordConnectorSettings = DiscordConnectorSettings()
+    slack: SlackConnectorSettings = SlackConnectorSettings()
     extra: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {"deadline": self.deadline.to_dict()}
+        payload: dict[str, Any] = {
+            "deadline": self.deadline.to_dict(),
+            "telegram": self.telegram.to_dict(),
+            "discord": self.discord.to_dict(),
+            "slack": self.slack.to_dict(),
+        }
         for connector_id in sorted(self.extra):
-            if connector_id == "deadline":
+            if connector_id in ("deadline", "telegram", "discord", "slack"):
                 continue
             connector_payload = self.extra[connector_id]
             payload[connector_id] = dict(connector_payload)
@@ -351,6 +529,12 @@ class ConnectorSettings:
 
         if connector_id == "deadline":
             return self.deadline.to_dict()
+        if connector_id == "telegram":
+            return self.telegram.to_dict()
+        if connector_id == "discord":
+            return self.discord.to_dict()
+        if connector_id == "slack":
+            return self.slack.to_dict()
         return self.extra.get(connector_id)
 
     @classmethod
@@ -363,12 +547,38 @@ class ConnectorSettings:
             if isinstance(deadline_raw, Mapping)
             else DeadlineConnectorSettings()
         )
+        telegram_raw = data.get("telegram")
+        telegram = (
+            TelegramConnectorSettings.from_mapping(telegram_raw)
+            if isinstance(telegram_raw, Mapping)
+            else TelegramConnectorSettings()
+        )
+        discord_raw = data.get("discord")
+        discord = (
+            DiscordConnectorSettings.from_mapping(discord_raw)
+            if isinstance(discord_raw, Mapping)
+            else DiscordConnectorSettings()
+        )
+        slack_raw = data.get("slack")
+        slack = (
+            SlackConnectorSettings.from_mapping(slack_raw)
+            if isinstance(slack_raw, Mapping)
+            else SlackConnectorSettings()
+        )
         extra: dict[str, dict[str, Any]] = {}
         for connector_id, connector_raw in data.items():
-            if connector_id == "deadline" or not isinstance(connector_raw, Mapping):
+            if connector_id in ("deadline", "telegram", "discord", "slack"):
+                continue
+            if not isinstance(connector_raw, Mapping):
                 continue
             extra[str(connector_id)] = dict(connector_raw)
-        return cls(deadline=deadline, extra=extra)
+        return cls(
+            deadline=deadline,
+            telegram=telegram,
+            discord=discord,
+            slack=slack,
+            extra=extra,
+        )
 
 
 @dataclass(frozen=True)
@@ -513,6 +723,39 @@ def resolve_deadline_config(config: StudioConfig | None) -> Any:
     if not deadline.enabled:
         return None
     return deadline.to_deadline_config()
+
+
+def resolve_telegram_config(config: StudioConfig | None) -> Any | None:
+    """Return Telegram runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    telegram = config.connectors.telegram
+    if not telegram.enabled:
+        return None
+    return telegram.to_telegram_config()
+
+
+def resolve_discord_config(config: StudioConfig | None) -> Any | None:
+    """Return Discord runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    discord = config.connectors.discord
+    if not discord.enabled:
+        return None
+    return discord.to_discord_config()
+
+
+def resolve_slack_config(config: StudioConfig | None) -> Any | None:
+    """Return Slack runtime config from studio settings when enabled."""
+
+    if config is None:
+        return None
+    slack = config.connectors.slack
+    if not slack.enabled:
+        return None
+    return slack.to_slack_config()
 
 
 def _normalize_schema_version(value: Any) -> str:

@@ -1,0 +1,88 @@
+from __future__ import annotations
+
+from shader_health.integrations.slack.blocks import (
+    ValidationBlocksContext,
+    build_optional_report_link,
+    format_validation_blocks,
+    route_matched_events,
+    webhook_url_for_event,
+)
+from shader_health.studio_config import (
+    SLACK_NOTIFY_EVENT_BLOCK_DEADLINE,
+    SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,
+    SlackConnectorSettings,
+)
+
+
+def _context(**overrides: object) -> ValidationBlocksContext:
+    defaults = {
+        "scene_name": "hero.ma",
+        "scene_path": r"C:\shots\hero.ma",
+        "scan_scope": "scene",
+        "profile_id": "publish_strict",
+        "asset_class_id": "",
+        "health_score": 42,
+        "critical_count": 2,
+        "error_count": 1,
+        "warning_count": 3,
+        "info_count": 0,
+        "block_publish": True,
+        "block_deadline": False,
+    }
+    defaults.update(overrides)
+    return ValidationBlocksContext(**defaults)
+
+
+def test_webhook_url_for_event_routes_publish_and_deadline_separately():
+    settings = SlackConnectorSettings(
+        publish_webhook_url="https://hooks.slack.com/publish",
+        deadline_webhook_url="https://hooks.slack.com/deadline",
+    )
+
+    assert webhook_url_for_event(settings, SLACK_NOTIFY_EVENT_BLOCK_PUBLISH) == (
+        "https://hooks.slack.com/publish"
+    )
+    assert webhook_url_for_event(settings, SLACK_NOTIFY_EVENT_BLOCK_DEADLINE) == (
+        "https://hooks.slack.com/deadline"
+    )
+
+
+def test_route_matched_events_returns_only_configured_webhooks():
+    settings = SlackConnectorSettings(
+        publish_webhook_url="https://hooks.slack.com/publish",
+        deadline_webhook_url="",
+        notify_on=("block_publish", "block_deadline"),
+    )
+
+    routes = route_matched_events(
+        settings,
+        (SLACK_NOTIFY_EVENT_BLOCK_PUBLISH, SLACK_NOTIFY_EVENT_BLOCK_DEADLINE),
+    )
+
+    assert routes == ((SLACK_NOTIFY_EVENT_BLOCK_PUBLISH, "https://hooks.slack.com/publish"),)
+
+
+def test_build_optional_report_link_uses_render_root_and_scene_stem():
+    link = build_optional_report_link(
+        scene_path=r"\\farm\assets\hero\hero.ma",
+        render_root=r"\\farm\render",
+    )
+
+    assert link is not None
+    assert link.replace("\\", "/").endswith("/hero_shader_health_report.json")
+
+
+def test_format_validation_blocks_includes_rich_fields_and_report_link():
+    payload = format_validation_blocks(
+        _context(asset_class_id="character"),
+        matched_events=(SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,),
+        report_link=r"\\farm\render\hero_shader_health_report.json",
+    )
+
+    assert payload["blocks"][0]["text"]["text"] == "Shader Health: Publish block"
+    fields = payload["blocks"][1]["fields"]
+    assert fields[0]["text"].endswith("hero.ma")
+    assert fields[1]["text"].endswith("publish_strict+character")
+    assert "42/100" in fields[3]["text"]
+    assert "2 critical" in payload["blocks"][2]["text"]["text"]
+    assert "hero_shader_health_report.json" in payload["blocks"][3]["text"]["text"]

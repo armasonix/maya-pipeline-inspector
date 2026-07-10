@@ -82,6 +82,51 @@ def wire_line_edit_finished(field: Any, callback: Optional[Callable[[], None]]) 
         connect(callback)
 
 
+def wire_checkbox_changed(checkbox: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        return
+    state_changed = getattr(checkbox, "stateChanged", None)
+    connect = getattr(state_changed, "connect", None)
+    if connect is not None:
+        connect(lambda *_args: callback())
+
+
+def apply_password_echo_mode(qt_widgets: Any, field: Any) -> None:
+    """Mask secret connector fields in the settings UI."""
+
+    line_edit_class = getattr(qt_widgets, "QLineEdit", None)
+    if line_edit_class is None:
+        return
+    password_mode = getattr(line_edit_class, "Password", None)
+    set_echo_mode = getattr(field, "setEchoMode", None)
+    if password_mode is not None and set_echo_mode is not None:
+        set_echo_mode(password_mode)
+
+
+def checkbox_checked(view: Any, qt_widgets: Any, object_name: str) -> bool:
+    checkbox = find_child(view, qt_widgets.QCheckBox, object_name)
+    if checkbox is None:
+        return False
+    is_checked = getattr(checkbox, "isChecked", None)
+    if is_checked is None:
+        return False
+    return bool(is_checked())
+
+
+def set_checkbox_checked(
+    view: Any,
+    qt_widgets: Any,
+    object_name: str,
+    checked: bool,
+) -> None:
+    checkbox = find_child(view, qt_widgets.QCheckBox, object_name)
+    if checkbox is None:
+        return
+    set_checked = getattr(checkbox, "setChecked", None)
+    if set_checked is not None:
+        set_checked(checked)
+
+
 def wire_plain_text_changed(field: Any, callback: Optional[Callable[[], None]]) -> None:
     if callback is None:
         return
