@@ -1,6 +1,9 @@
 """Telegram validation notification helpers."""
 from __future__ import annotations
 
+import json
+import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +25,44 @@ _EVENT_LABELS = {
     TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH: "Publish block",
     TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE: "Deadline block",
 }
+
+_DEBUG_LOG_PATH = Path(__file__).resolve().parents[4] / "debug-ee1eca.log"
+
+
+def _agent_debug_log(
+    *,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict[str, object],
+    run_id: str = "pre-fix",
+) -> None:
+    # region agent log
+    try:
+        payload = {
+            "sessionId": "ee1eca",
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
+    # endregion
+
+
+def _scene_basename(scene_path: str) -> str:
+    """Return a cross-platform scene filename from Maya/Windows or POSIX paths."""
+
+    if not scene_path:
+        return "unsaved scene"
+    normalized = scene_path.replace("\\", "/").rstrip("/")
+    name = Path(normalized).name
+    return name or "unsaved scene"
 
 
 @dataclass(frozen=True)
@@ -56,7 +97,21 @@ def validation_notification_context_from_run(result: Any) -> ValidationNotificat
     health = getattr(result, "health_score", None)
     snapshot = getattr(result, "snapshot", None)
     scene_path = str(getattr(snapshot, "scene_path", "") or "")
-    scene_name = Path(scene_path).name if scene_path else "unsaved scene"
+    raw_scene_name = Path(scene_path).name if scene_path else "unsaved scene"
+    scene_name = _scene_basename(scene_path)
+    # region agent log
+    _agent_debug_log(
+        hypothesis_id="A",
+        location="notify.py:validation_notification_context_from_run",
+        message="scene path basename resolution",
+        data={
+            "platform": sys.platform,
+            "scene_path": scene_path,
+            "raw_path_name": raw_scene_name,
+            "normalized_scene_name": scene_name,
+        },
+    )
+    # endregion
     return ValidationNotificationContext(
         scene_name=scene_name,
         scan_scope=str(getattr(result, "scan_scope", "") or "scene"),
