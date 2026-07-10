@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from shader_health.studio_config import (
+    BugReportSettings,
     CerebroConnectorSettings,
     ConnectorSettings,
     DeadlineConnectorSettings,
@@ -18,6 +19,7 @@ from shader_health.studio_config import (
     WaiverDefaultsSettings,
 )
 from shader_health.ui import (
+    bug_report_section,
     cerebro_connector_section,
     deadline_connector_section,
     discord_connector_section,
@@ -700,13 +702,78 @@ def test_settings_tabs_use_stable_object_names():
     ]
 
 
-def test_bug_report_tab_shows_placeholder():
-    view = settings_panel.build_settings_view(FakeQtWidgets)
+def test_bug_report_tab_exposes_relay_settings_and_privacy_notice():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            bug_report=BugReportSettings(
+                enabled=True,
+                relay_url="https://pipeline.studio.internal/shader-health/bug-report",
+                api_key="studio-secret",
+                allow_screenshot=False,
+                max_reports_per_day=3,
+            )
+        ),
+    )
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
     bug_report_tab = tabs.tabs[5][1]
-    bug_report_label = bug_report_tab.layout.widgets[0]
+    section = bug_report_tab.layout.widgets[0]
+    relay_url = _find(section, bug_report_section.SETTINGS_BUG_REPORT_RELAY_URL_INPUT_OBJECT_NAME)
+    api_key = _find(section, bug_report_section.SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME)
+    allow_screenshot = _find(
+        section,
+        bug_report_section.SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
+    )
+    max_reports = _find(
+        section,
+        bug_report_section.SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME,
+    )
+    privacy_notice = _find(
+        section,
+        bug_report_section.SETTINGS_BUG_REPORT_PRIVACY_NOTICE_OBJECT_NAME,
+    )
 
-    assert "relay URL" in bug_report_label.text
+    assert relay_url.text() == "https://pipeline.studio.internal/shader-health/bug-report"
+    assert api_key.text() == "studio-secret"
+    assert allow_screenshot.checked is False
+    assert max_reports.text() == "3"
+    assert "scene basename" in privacy_notice.text
+
+
+def test_studio_config_from_settings_view_reads_bug_report_fields():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    bug_report_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[5][1]
+    section = bug_report_tab.layout.widgets[0]
+    _find(section, bug_report_section.SETTINGS_BUG_REPORT_ENABLED_TOGGLE_OBJECT_NAME).setChecked(
+        True
+    )
+    _find(section, bug_report_section.SETTINGS_BUG_REPORT_RELAY_URL_INPUT_OBJECT_NAME).setText(
+        "https://relay.studio/bug-report"
+    )
+    _find(section, bug_report_section.SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME).setText(
+        "relay-key"
+    )
+    _find(
+        section,
+        bug_report_section.SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
+    ).setChecked(False)
+    _find(section, bug_report_section.SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME).setText(
+        "4"
+    )
+
+    studio = studio_config_from_settings_view(
+        view,
+        FakeQtWidgets,
+        base=StudioConfig(),
+    )
+
+    assert studio.bug_report == BugReportSettings(
+        enabled=True,
+        relay_url="https://relay.studio/bug-report",
+        api_key="relay-key",
+        allow_screenshot=False,
+        max_reports_per_day=4,
+    )
 
 
 def test_studio_environment_tab_exposes_network_path_controls():

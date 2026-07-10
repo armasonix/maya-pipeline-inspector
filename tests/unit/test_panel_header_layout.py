@@ -19,15 +19,16 @@ def test_panel_header_has_expected_root_object_name():
     assert header.object_name == main_window.PANEL_HEADER_OBJECT_NAME
 
 
-def test_panel_header_layout_places_gear_title_docs_and_updates_in_order():
+def test_panel_header_layout_places_gear_title_docs_report_bug_and_updates_in_order():
     header = main_window.build_panel_header(FakeQtWidgets)
     gear = _find(header, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
     title = _find(header, main_window.PANEL_HEADER_TITLE_OBJECT_NAME)
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
     widgets = _panel_header_widgets(header)
-    assert widgets == [gear, title, docs, updates]
+    assert widgets == [gear, title, docs, report_bug, updates]
 
 
 def test_panel_header_title_receives_horizontal_stretch():
@@ -63,6 +64,10 @@ def test_panel_header_button_object_names_are_stable():
         == main_window.DOCUMENTATION_BUTTON_OBJECT_NAME
     )
     assert (
+        _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME).object_name
+        == main_window.REPORT_BUG_BUTTON_OBJECT_NAME
+    )
+    assert (
         _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME).object_name
         == main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME
     )
@@ -72,10 +77,12 @@ def test_panel_header_button_tooltips_are_set():
     header = main_window.build_panel_header(FakeQtWidgets)
     gear = _find(header, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
     assert gear.tooltip == main_window.SETTINGS_GEAR_TOOLTIP
     assert docs.tooltip == main_window.DOCUMENTATION_BUTTON_TOOLTIP
+    assert report_bug.tooltip == main_window.REPORT_BUG_BUTTON_TOOLTIP
     assert updates.tooltip == main_window.CHECK_FOR_UPDATES_BUTTON_TOOLTIP
 
 
@@ -101,15 +108,18 @@ def test_panel_header_navigation_callbacks_for_new_buttons():
         FakeQtWidgets,
         navigation_callbacks=main_window.PanelNavigationCallbacks(
             on_open_documentation=lambda: opened.append("docs"),
+            on_report_bug=lambda: opened.append("report_bug"),
             on_check_for_updates=lambda: opened.append("updates"),
         ),
     )
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
     docs.clicked.emit()
+    report_bug.clicked.emit()
     updates.clicked.emit()
-    assert opened == ["docs", "updates"]
+    assert opened == ["docs", "report_bug", "updates"]
 
 
 def test_panel_header_title_shows_version_and_bold_style():
@@ -131,11 +141,13 @@ def test_panel_header_gear_uses_compact_width():
 def test_panel_header_compact_buttons_use_fixed_vertical_size_policy():
     header = main_window.build_panel_header(FakeQtWidgets)
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
     preferred = FakeQtWidgets.QSizePolicy.Preferred
     fixed = FakeQtWidgets.QSizePolicy.Fixed
     assert docs.size_policy == (preferred, fixed)
+    assert report_bug.size_policy == (preferred, fixed)
     assert updates.size_policy == (preferred, fixed)
 
 
@@ -148,6 +160,7 @@ def test_main_widget_places_panel_header_before_body_stack():
     assert header.object_name == main_window.PANEL_HEADER_OBJECT_NAME
     assert stack.object_name == main_window.PANEL_BODY_STACK_OBJECT_NAME
     _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
+    _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
 

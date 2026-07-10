@@ -14,6 +14,7 @@ from shader_health.studio_config import (
     save_studio_config,
 )
 from shader_health.ui import main_window
+from shader_health.ui.bug_report_section import read_bug_report_from_view
 from shader_health.ui.farm_tab import (
     FARM_STATUS_LABEL_OBJECT_NAME,
     FARM_TAB_OBJECT_NAME,
@@ -220,6 +221,10 @@ def _panel_navigation_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_report_bug=lambda: _report_bug_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
 
 
@@ -231,6 +236,62 @@ def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None
         qt_widgets,
         parent=content,
         installed_version=__version__,
+    )
+
+
+def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health import __version__
+    from shader_health.integrations.bug_report import (
+        build_bug_report_payload,
+        maybe_submit_bug_report,
+    )
+    from shader_health.ui.bug_report_dialog import (
+        BugReportFormValues,
+        show_bug_report_dialog,
+    )
+
+    def submit_form(values: BugReportFormValues):
+        validation_result = getattr(content, "_shader_health_last_validation_result", None)
+        scene_path = getattr(content, "_shader_health_scene_path", "") or _current_scene_path()
+        profile_id = getattr(content, "_shader_health_profile_id", "")
+        maya_version = ""
+        snapshot = getattr(content, "_shader_health_snapshot", None)
+        if snapshot is not None:
+            maya_version = str(getattr(snapshot, "maya_version", "") or "")
+
+        health_score = None
+        validation_summary = ""
+        if validation_result is not None:
+            health = getattr(validation_result, "health_score", None)
+            if health is not None:
+                health_score = int(getattr(health, "score", 0) or 0)
+            results = getattr(validation_result, "results", ()) or ()
+            failed_count = sum(1 for item in results if getattr(item, "status", "") == "failed")
+            if health_score is not None:
+                validation_summary = f"Health {health_score}/100; {failed_count} failed issue(s)."
+            message = str(getattr(validation_result, "message", "") or "").strip()
+            if message:
+                validation_summary = message if not validation_summary else (
+                    f"{validation_summary} {message}"
+                )
+
+        payload = build_bug_report_payload(
+            title=values.title,
+            description=values.description,
+            steps_to_reproduce=values.steps_to_reproduce,
+            plugin_version=__version__,
+            scene_path=scene_path,
+            maya_version=maya_version,
+            profile_id=profile_id,
+            validation_summary=validation_summary,
+            health_score=health_score,
+        )
+        return maybe_submit_bug_report(_studio_config_for_content(content), payload)
+
+    show_bug_report_dialog(
+        qt_widgets,
+        parent=content,
+        on_submit=submit_form,
     )
 
 
@@ -276,6 +337,15 @@ def _settings_action_callbacks(
         on_studio_policy_changed=lambda: _sync_studio_policy_from_ui(
             _panel_content(panel_state),
             qt_widgets,
+        ),
+        on_bug_report_settings_changed=lambda: _sync_bug_report_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_bug_report_enabled_changed=lambda enabled: _set_bug_report_enabled(
+            _panel_content(panel_state),
+            qt_widgets,
+            enabled,
         ),
         on_save_studio_settings=lambda: _save_studio_settings_from_ui(
             _panel_content(panel_state),
@@ -457,6 +527,24 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_studio_config(content, qt_widgets, updated)
 
 
+def _sync_bug_report_from_ui(content: Any, qt_widgets: Any) -> None:
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    updated = read_bug_report_from_view(settings_view, qt_widgets, base=current)
+    _set_studio_config(content, qt_widgets, updated)
+
+
+def _set_bug_report_enabled(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    _sync_bug_report_from_ui(content, qt_widgets)
+    _set_settings_status(
+        content,
+        qt_widgets,
+        f"Bug Report relay {'enabled' if enabled else 'disabled'} for this session.",
+    )
+
+
 def _sync_studio_environment_from_ui(content: Any, qt_widgets: Any) -> None:
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
@@ -510,6 +598,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_deadline_connector_from_ui(content, qt_widgets)
     _sync_studio_environment_from_ui(content, qt_widgets)
     _sync_studio_policy_from_ui(content, qt_widgets)
+    _sync_bug_report_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
     path = _pick_settings_save_path(qt_widgets, config.config_path)
     if path is None:

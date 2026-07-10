@@ -1,0 +1,65 @@
+"""Studio bug report relay integration for Shader Health Inspector."""
+
+from shader_health.integrations.bug_report.config import (
+    DEFAULT_TIMEOUT_SECONDS,
+    BugReportRelayConfig,
+)
+from shader_health.integrations.bug_report.payload import (
+    BUG_REPORT_PAYLOAD_SCHEMA_VERSION,
+    BugReportPayload,
+    build_bug_report_payload,
+    scene_basename,
+)
+from shader_health.integrations.bug_report.relay_client import (
+    BugReportRelayClient,
+    BugReportRelayClientError,
+    BugReportRelayResult,
+    HttpRequest,
+    HttpTransport,
+    RelayResponse,
+    build_multipart_body,
+    default_http_transport,
+    maybe_submit_bug_report,
+    parse_issue_url,
+)
+from shader_health.integrations.bug_report.throttle import (
+    BUG_REPORT_THROTTLE_SCHEMA_VERSION,
+    RATE_LIMITED_SKIPPED_REASON,
+    BugReportThrottleDecision,
+    default_throttle_state_path,
+    evaluate_bug_report_throttle,
+    format_rate_limit_message,
+    record_bug_report_submission,
+    resolve_machine_id,
+    resolve_os_user,
+    throttle_actor_key,
+)
+
+__all__ = [
+    "BUG_REPORT_PAYLOAD_SCHEMA_VERSION",
+    "BUG_REPORT_THROTTLE_SCHEMA_VERSION",
+    "BugReportPayload",
+    "BugReportRelayClient",
+    "BugReportRelayClientError",
+    "BugReportRelayConfig",
+    "BugReportRelayResult",
+    "BugReportThrottleDecision",
+    "DEFAULT_TIMEOUT_SECONDS",
+    "HttpRequest",
+    "HttpTransport",
+    "RATE_LIMITED_SKIPPED_REASON",
+    "RelayResponse",
+    "build_bug_report_payload",
+    "build_multipart_body",
+    "default_http_transport",
+    "default_throttle_state_path",
+    "evaluate_bug_report_throttle",
+    "format_rate_limit_message",
+    "maybe_submit_bug_report",
+    "parse_issue_url",
+    "record_bug_report_submission",
+    "resolve_machine_id",
+    "resolve_os_user",
+    "scene_basename",
+    "throttle_actor_key",
+]

@@ -30,6 +30,10 @@ from shader_health.ui.basic_settings_section import (
     read_basic_user_preferences_from_view,
     update_basic_settings_view,
 )
+from shader_health.ui.bug_report_section import (
+    build_bug_report_section,
+    update_bug_report_view,
+)
 from shader_health.ui.settings_dirty_state import (
     DEFAULT_SETTINGS_STATUS_MESSAGE,
     SETTINGS_DIRTY_BANNER_OBJECT_NAME,
@@ -39,6 +43,7 @@ from shader_health.ui.settings_dirty_state import (
 from shader_health.ui.settings_tabs import (
     SETTINGS_ADVANCED_TAB_OBJECT_NAME,
     SETTINGS_BASIC_TAB_OBJECT_NAME,
+    SETTINGS_BUG_REPORT_TAB_OBJECT_NAME,
     SETTINGS_CONNECTORS_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_TAB_OBJECT_NAME,
@@ -87,6 +92,8 @@ class SettingsActionCallbacks:
     on_deadline_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
+    on_bug_report_settings_changed: Optional[Callable[[], None]] = None
+    on_bug_report_enabled_changed: Optional[Callable[[bool], None]] = None
     on_save_studio_settings: Optional[Callable[[], None]] = None
     on_load_studio_settings: Optional[Callable[[], None]] = None
     on_save_user_preferences: Optional[Callable[[], None]] = None
@@ -235,6 +242,7 @@ def update_settings_view(
     update_connector_views(view, qt_widgets, config.connectors)
     update_tracker_views(view, qt_widgets, config.connectors)
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
+    update_bug_report_view(view, qt_widgets, config.bug_report)
 
     if user_config is not None:
         update_basic_settings_view(view, qt_widgets, user_config)
@@ -318,6 +326,8 @@ def _build_settings_tab(
         )
     if tab_id == "studio_environment":
         return _build_studio_environment_tab(qt_widgets, config, callbacks)
+    if tab_id == "bug_report":
+        return _build_bug_report_tab(qt_widgets, config, callbacks)
     return build_placeholder_tab(qt_widgets, spec)
 
 
@@ -403,6 +413,28 @@ def _build_studio_environment_tab(
             qt_widgets,
             config,
             on_settings_changed=callbacks.on_studio_environment_changed,
+        )
+    )
+    layout.addStretch(1)
+    return tab
+
+
+def _build_bug_report_tab(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: SettingsActionCallbacks,
+) -> Any:
+    tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_BUG_REPORT_TAB_OBJECT_NAME)
+    layout = qt_widgets.QVBoxLayout(tab)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+    layout.addWidget(
+        build_bug_report_section(
+            qt_widgets,
+            config,
+            on_enabled_changed=callbacks.on_bug_report_enabled_changed,
+            on_settings_changed=callbacks.on_bug_report_settings_changed,
         )
     )
     layout.addStretch(1)
