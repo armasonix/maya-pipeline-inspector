@@ -24,6 +24,7 @@ from shader_health.maya.snapshot_enrichment import (
     prepare_snapshot_for_validation,
 )
 from shader_health.studio_config import StudioConfig, merge_studio_rule_overrides
+from shader_health.user_config import UserPreferences
 
 PROFILE_ROOT = DEFAULT_RULE_ROOT / "profiles"
 DEFAULT_PROFILE_ID = "artist_relaxed"
@@ -277,4 +278,39 @@ def run_validation(
         scan_scope=scan_scope,
         profile_id=effective_profile_id,
         asset_class_id=normalized_asset_class,
+    )
+
+
+def run_validation_for_user(
+    snapshot: GraphSnapshot,
+    *,
+    user_config: UserPreferences,
+    studio_config: Optional[StudioConfig] = None,
+    scan_scope: Optional[str] = None,
+    profile_id: Optional[str] = None,
+    asset_class_id: Optional[str] = None,
+    profile_path: Optional[Path] = None,
+    rule_root: Optional[Path] = None,
+    waiver_sidecar_path: Optional[Path] = None,
+) -> ValidationRunResult:
+    """Validate a snapshot using merged user preference defaults."""
+
+    from shader_health.runtime_preferences import user_validation_preferences
+
+    prefs = user_validation_preferences(
+        user_config,
+        scan_scope=scan_scope,
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+    )
+    return run_validation(
+        snapshot,
+        profile_id=prefs.profile_id,
+        asset_class_id=prefs.asset_class_id or None,
+        profile_path=profile_path,
+        rule_root=rule_root,
+        extra_rule_paths=prefs.extra_rule_paths,
+        waiver_sidecar_path=waiver_sidecar_path,
+        scan_scope=prefs.scan_scope,
+        studio_config=studio_config,
     )

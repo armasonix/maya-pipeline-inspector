@@ -36,7 +36,8 @@ def test_apply_panel_theme_sets_stylesheet_on_content_root():
     from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
 
     widget = main_window.build_main_widget(MainWindowFakeQtWidgets)
-    assert getattr(widget, "style_sheet", "") == ""
+    assert widget._shader_health_theme == "classic"
+    assert "#ececec" in widget.style_sheet
 
     apply_user_preferences_to_panel(
         widget,

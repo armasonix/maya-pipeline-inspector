@@ -281,7 +281,12 @@ def build_main_widget(
     tabs = qt_widgets.QTabWidget()
     tabs.setObjectName(TAB_WIDGET_OBJECT_NAME)
     tabs.addTab(
-        _build_validate_tab(qt_widgets, validation_callbacks, issue_details_callbacks),
+        _build_validate_tab(
+            qt_widgets,
+            validation_callbacks,
+            issue_details_callbacks,
+            user_config=active_user_config,
+        ),
         "Validate",
     )
     tabs.addTab(_build_waivers_tab(qt_widgets, waiver_callbacks), "Waivers")
@@ -300,6 +305,10 @@ def build_main_widget(
     stack.addWidget(settings_view)
 
     layout.addWidget(stack)
+
+    from shader_health.ui.user_preferences_ui import apply_user_preferences_to_panel
+
+    apply_user_preferences_to_panel(widget, qt_widgets, active_user_config)
 
     return widget
 
@@ -928,9 +937,18 @@ def build_validate_sticky_chrome(
     qt_widgets: Any,
     validation_callbacks: ValidationActionCallbacks,
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
+    *,
+    user_config: Optional[UserPreferences] = None,
 ) -> Any:
     """Build pinned summary + action bar chrome for the Validate tab."""
 
+    from shader_health.ui.user_preferences_ui import summary_header_state_from_user_config
+
+    summary_state = (
+        summary_header_state_from_user_config(user_config)
+        if user_config is not None
+        else SummaryHeaderState()
+    )
     widget = qt_widgets.QWidget()
     widget.setObjectName(VALIDATE_STICKY_CHROME_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(widget)
@@ -939,6 +957,7 @@ def build_validate_sticky_chrome(
     layout.addWidget(
         build_summary_header(
             qt_widgets,
+            state=summary_state,
             profile_changed=validation_callbacks.on_profile_changed,
             asset_class_changed=validation_callbacks.on_asset_class_changed,
         )
@@ -1101,6 +1120,8 @@ def _build_validate_tab(
     qt_widgets: Any,
     validation_callbacks: ValidationActionCallbacks,
     issue_details_callbacks: IssueDetailsActionCallbacks,
+    *,
+    user_config: Optional[UserPreferences] = None,
 ) -> Any:
     tab = qt_widgets.QWidget()
     layout = qt_widgets.QVBoxLayout(tab)
@@ -1112,6 +1133,7 @@ def _build_validate_tab(
             qt_widgets,
             validation_callbacks,
             issue_details_callbacks,
+            user_config=user_config,
         )
     )
 

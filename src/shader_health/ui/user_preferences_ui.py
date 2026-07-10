@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
+from shader_health.runtime_preferences import (
+    resolved_profile_id,
+    user_validation_preferences,
+)
 from shader_health.ui import main_window
 from shader_health.ui.settings_widgets import find_child
 from shader_health.ui.theme_loader import apply_panel_theme
@@ -22,6 +25,19 @@ _UI_DENSITY_SPACING = {
 }
 
 
+def summary_header_state_from_user_config(user_config: UserPreferences) -> Any:
+    """Build initial Validate tab header defaults from user preferences."""
+
+    from shader_health.ui.main_window import ASSET_CLASS_NONE_ID, SummaryHeaderState
+
+    prefs = user_validation_preferences(user_config)
+    return SummaryHeaderState(
+        profile_id=prefs.profile_id,
+        asset_class_id=prefs.asset_class_id or ASSET_CLASS_NONE_ID,
+        scan_scope=prefs.scan_scope,
+    )
+
+
 def apply_user_preferences_to_panel(
     content: Any,
     qt_widgets: Any,
@@ -36,7 +52,7 @@ def apply_user_preferences_to_panel(
     )
     main_window.select_workflow_profile(
         profile_dropdown,
-        user_config.default_profile_id,
+        resolved_profile_id(user_config),
     )
 
     asset_class_dropdown = find_child(
@@ -49,7 +65,7 @@ def apply_user_preferences_to_panel(
         user_config.default_asset_class_id,
     )
 
-    content._shader_health_scan_scope = user_config.default_scan_scope
+    content._shader_health_scan_scope = user_validation_preferences(user_config).scan_scope
     content._shader_health_ui_density = user_config.ui_density
     content._shader_health_extra_rule_paths = user_config.extra_rule_paths
     content._shader_health_max_issues_displayed = user_config.max_issues_displayed
@@ -69,16 +85,6 @@ def _apply_debug_logging(enabled: bool) -> None:
     root = logging.getLogger()
     if root.level == logging.DEBUG:
         root.setLevel(logging.INFO)
-
-
-def user_extra_rule_paths(user_config: UserPreferences) -> tuple[Path, ...]:
-    """Return resolved extra rule path entries from user preferences."""
-
-    return tuple(
-        Path(path)
-        for path in user_config.extra_rule_paths
-        if str(path).strip()
-    )
 
 
 def _widget_layout(widget: Any) -> Any | None:

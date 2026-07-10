@@ -9,7 +9,7 @@ from shader_health.studio_config import (
     PipelineSettings,
     StudioConfig,
 )
-from shader_health.ui import deadline_connector_section, settings_panel
+from shader_health.ui import deadline_connector_section, main_window, settings_panel
 from shader_health.ui.advanced_settings_section import (
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
@@ -648,6 +648,28 @@ def test_require_tx_toggle_styles_off_state():
 
     assert toggle.text == "OFF"
     assert "#4a4a4a" in toggle.style_sheet
+
+
+def test_build_main_widget_applies_user_defaults_to_validate_tab():
+    from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
+
+    widget = main_window.build_main_widget(
+        MainWindowFakeQtWidgets,
+        user_config=UserPreferences(
+            default_profile_id="deadline_critical",
+            default_asset_class_id="asset_class_hero",
+            default_scan_scope="selection",
+            theme="dark",
+        ),
+    )
+
+    profile_dropdown = _find(widget, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
+    asset_class_dropdown = _find(widget, main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME)
+
+    assert profile_dropdown.currentData() == "deadline_critical"
+    assert asset_class_dropdown.currentData() == "asset_class_hero"
+    assert widget._shader_health_scan_scope == "selection"
+    assert widget._shader_health_theme == "dark"
 
 
 def test_apply_user_preferences_to_panel_sets_validate_dropdowns_and_scan_scope():

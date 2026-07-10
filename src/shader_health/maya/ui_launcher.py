@@ -51,7 +51,6 @@ from shader_health.ui.settings_panel import (
 )
 from shader_health.ui.user_preferences_ui import (
     apply_user_preferences_to_panel,
-    user_extra_rule_paths,
 )
 from shader_health.ui.waiver_manager import (
     WAIVER_STATUS_LABEL_OBJECT_NAME,
@@ -64,6 +63,7 @@ from shader_health.user_config import (
     UserPreferences,
     default_user_config_path,
     load_user_config,
+    merge_runtime_config,
     save_user_config,
 )
 
@@ -73,6 +73,7 @@ DEFAULT_DOCK_AREA = "right"
 VALIDATE_SPLITTER_SIZES_ATTR = "_shader_health_validate_splitter_sizes"
 STUDIO_CONFIG_ATTR = "_shader_health_studio_config"
 USER_CONFIG_ATTR = "_shader_health_user_config"
+MERGED_RUNTIME_CONFIG_ATTR = "_shader_health_merged_runtime_config"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -154,6 +155,7 @@ def _create_dockable_panel() -> Any:
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         studio_config, user_config = _load_runtime_configs()
+        merged_runtime = merge_runtime_config(studio_config, user_config)
         content = main_window.build_main_widget(
             qt_widgets,
             export_callbacks=_export_action_callbacks(),
@@ -171,6 +173,7 @@ def _create_dockable_panel() -> Any:
         self._shader_health_content = content
         setattr(content, STUDIO_CONFIG_ATTR, studio_config)
         setattr(content, USER_CONFIG_ATTR, user_config)
+        setattr(content, MERGED_RUNTIME_CONFIG_ATTR, merged_runtime)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
@@ -178,7 +181,6 @@ def _create_dockable_panel() -> Any:
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
         _wire_validate_splitter_persistence(content, qt_widgets)
-        _apply_user_preferences_to_panel(content, qt_widgets, user_config)
         _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
         _refresh_waiver_manager(content, qt_widgets)
@@ -864,20 +866,19 @@ def _run_validation_job(
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         studio_config = _studio_config_for_content(content)
         user_config = _user_config_for_content(content)
-        extra_rule_paths = user_extra_rule_paths(user_config)
         if scan_scope == "selection":
             result = validate_selection_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
-                extra_rule_paths=extra_rule_paths,
+                user_config=user_config,
             )
         else:
             result = validate_scene_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
-                extra_rule_paths=extra_rule_paths,
+                user_config=user_config,
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"

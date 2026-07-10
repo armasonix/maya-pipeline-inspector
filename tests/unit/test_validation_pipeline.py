@@ -7,7 +7,9 @@ from shader_health.maya.validation_pipeline import (
     list_packaged_profile_ids,
     packaged_profile_path,
     run_validation,
+    run_validation_for_user,
 )
+from shader_health.user_config import UserPreferences
 
 
 def test_list_packaged_profile_ids_includes_mvp_profiles():
@@ -68,3 +70,39 @@ def test_run_validation_enriches_failed_result_materials(tmp_path: Path):
         item for item in failed if item.rule_id == "common.texture.colorspace.data_raw"
     )
     assert colorspace.material == "demo_wrong_colorspace_MTL"
+
+
+def test_run_validation_for_user_applies_user_defaults(tmp_path: Path):
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "demo.ma"),
+        renderer="vray",
+        nodes=[
+            NodeSnapshot(
+                id="node:file1",
+                name="file1",
+                type_name="file",
+                attrs={"colorSpace": "sRGB", "semantic_slot": "roughness"},
+            ),
+            NodeSnapshot(
+                id="node:mtl1",
+                name="mtl1",
+                type_name="VRayMtl",
+            ),
+        ],
+    )
+
+    run = run_validation_for_user(
+        snapshot,
+        user_config=UserPreferences(
+            default_profile_id="publish_strict",
+            default_asset_class_id="asset_class_hero",
+            default_scan_scope="selection",
+            extra_rule_paths=(),
+        ),
+        scan_scope="scene",
+        profile_id="deadline_critical",
+    )
+
+    assert run.profile_id == "deadline_critical"
+    assert run.asset_class_id == "asset_class_hero"
+    assert run.scan_scope == "scene"
