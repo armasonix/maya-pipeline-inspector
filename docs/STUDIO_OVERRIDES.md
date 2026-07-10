@@ -1,11 +1,128 @@
 # Studio custom rules and profile overrides
 
-This guide explains how studios extend Maya Shader Health Inspector with show-specific rule packs and profile JSON without forking the core validator.
+This guide explains how studios extend Maya Shader Health Inspector with show-specific rule packs and profile JSON without forking the core validator. It also documents how to roll out the studio-wide settings file `shader_health_studio.json` via `SHADER_HEALTH_STUDIO_CONFIG`.
 
 Use it together with:
 
+- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and setting `SHADER_HEALTH_STUDIO_CONFIG` in facility launchers
+- [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split and schema 2.0
 - [RULE_AUTHORING.md](RULE_AUTHORING.md) — rule schema, check types, and policy fields
 - [adr/0002-renderer-adapter-boundary.md](adr/0002-renderer-adapter-boundary.md) — where renderer-specific logic belongs
+
+## Studio config file (`shader_health_studio.json`)
+
+Studios roll out pipeline policy, network paths, and connector settings through a single JSON file. That file is separate from the custom rule packs and profile overrides covered later in this guide.
+
+| Concern | File | Rollout mechanism |
+| --- | --- | --- |
+| Studio-wide policy | `shader_health_studio.json` | `SHADER_HEALTH_STUDIO_CONFIG` env var (recommended) |
+| Per-machine UI prefs | `~/.shader_health/user.json` | Local user home (not synced by IT) |
+
+### Deploy via `SHADER_HEALTH_STUDIO_CONFIG`
+
+Set the environment variable to an **absolute path** (local or UNC/network) before Maya or `mayapy` starts:
+
+```powershell
+# Windows — facility launcher or user profile
+$env:SHADER_HEALTH_STUDIO_CONFIG = "\\pipeline\config\shader_health\shader_health_studio.json"
+```
+
+```bash
+# Linux / macOS
+export SHADER_HEALTH_STUDIO_CONFIG="/pipeline/config/shader_health/shader_health_studio.json"
+```
+
+Discovery precedence (same in the Maya panel and headless CLI):
+
+1. `SHADER_HEALTH_STUDIO_CONFIG` when the file exists
+2. `~/.shader_health/shader_health_studio.json`
+3. `~/shader_health_studio.json`
+
+Headless CLI also accepts `--studio-config <path>`, which takes priority over env and default paths.
+
+Validate that a workstation picked up the rollout:
+
+```bash
+python -c "from shader_health.studio_config import discover_studio_config_path; print(discover_studio_config_path())"
+```
+
+In Maya Script Editor after launch:
+
+```python
+from shader_health.studio_config import StudioConfig
+
+print(StudioConfig.default().config_path)
+print(StudioConfig.default().studio_name)
+```
+
+### Minimal rollout template (schema 2.0)
+
+```json
+{
+  "schema_version": "2.0",
+  "studio_name": "Example Studio",
+  "pipeline": {
+    "require_tx_derivatives": true,
+    "waiver_defaults": {
+      "default_approved_by": "pipeline_td",
+      "default_expiry_days": 30,
+      "allow_critical_waivers": false
+    },
+    "manifest_gate_defaults": {
+      "max_new_changes": 0,
+      "max_fingerprint_changes": 0,
+      "block_on_new_textures": true
+    },
+    "pinned_workflow_profile_ids": ["publish_strict", "deadline_critical"],
+    "pinned_asset_class_profile_ids": []
+  },
+  "studio_environment": {
+    "texture_root": "\\\\farm\\textures",
+    "asset_root": "\\\\farm\\assets",
+    "cache_root": "\\\\farm\\cache",
+    "render_root": "\\\\farm\\render",
+    "variable_aliases": {
+      "STUDIO_TEXTURE_ROOT": "\\\\farm\\textures"
+    }
+  },
+  "connectors": {
+    "deadline": {
+      "enabled": true,
+      "api_url": "http://deadline-web:8081",
+      "profile_id": "deadline_critical"
+    }
+  },
+  "bug_report": {
+    "enabled": false,
+    "relay_url": "",
+    "api_key": ""
+  }
+}
+```
+
+Expand `connectors` for Telegram, Discord, Slack, Ftrack, ShotGrid, and Cerebro as needed. See [ADR 0007](adr/0007-settings-and-connectors-architecture.md) for the full schema and secret-field policy.
+
+### Version control and secrets
+
+| Rule | Detail |
+| --- | --- |
+| Do not commit | `shader_health_studio.json` with connector tokens, relay API keys, or internal URLs |
+| Do commit | Sanitized templates (`.example.json`) and facility deployment runbooks |
+| Prefer | Network share + `SHADER_HEALTH_STUDIO_CONFIG`; restrict write access to pipeline TD / IT |
+| User JSON | `user.json` holds theme and local `extra_rule_paths` only — never connector secrets |
+
+Legacy **schema 1.0** files (`pipeline.require_tx_derivatives`, `connectors.deadline`) still load. Saving from the Settings screen rewrites **2.0** with default sections for `studio_environment`, `waiver_defaults`, and related fields.
+
+### How studio config relates to custom rules
+
+| Mechanism | What it controls |
+| --- | --- |
+| `shader_health_studio.json` → `pipeline` | Require `.tx`, waiver defaults, manifest gate defaults, optional pinned profile lists |
+| `shader_health_studio.json` → `studio_environment` | `${STUDIO_*_ROOT}` path substitution during validation |
+| `--extra-rules` / user `extra_rule_paths` | Additional rule JSON layered on packaged rules (below) |
+| Custom profile JSON | Per-step `rule_overrides` (below) |
+
+Studio policy cannot be overridden by user preferences. Custom rules and profiles stack on top at validation time.
 
 ## What studios typically customize
 
@@ -212,8 +329,9 @@ When you validate a studio profile, include the same `--extra-rules` folders (or
 
 ## Related docs
 
+- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and `SHADER_HEALTH_STUDIO_CONFIG` in launchers
+- [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
 - [RULE_AUTHORING.md](RULE_AUTHORING.md) — authoring individual rules and profile override syntax
-- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya
 - [integrations/publish_submit_preflight.md](integrations/publish_submit_preflight.md) — publish gate using `--profile`
 - [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) — farm gate using `--profile`
 
