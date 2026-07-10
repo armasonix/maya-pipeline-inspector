@@ -13,6 +13,10 @@ from shader_health.integrations.slack.blocks import (
     route_matched_events,
 )
 from shader_health.integrations.slack.client import SlackClient
+from shader_health.integrations.trackers.publish import (
+    slack_thread_ts_from_tracker_metadata,
+    tracker_metadata_from_run,
+)
 from shader_health.studio_config import (
     SLACK_NOTIFY_EVENT_BLOCK_DEADLINE,
     SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,
@@ -107,6 +111,7 @@ def send_slack_validation_notification(
     studio_config: StudioConfig | None,
     context: ValidationBlocksContext,
     *,
+    thread_ts: str | None = None,
     client_factory: SlackClientFactory | None = None,
 ) -> SlackNotificationResult:
     """Send Slack validation blocks to routed webhooks when settings match block events."""
@@ -151,6 +156,7 @@ def send_slack_validation_notification(
         context,
         matched_events=matched_events,
         report_link=report_link,
+        thread_ts=thread_ts,
     )
     factory = client_factory or SlackClient
     client = factory()
@@ -188,8 +194,10 @@ def maybe_send_slack_validation_notification(
     """Send Slack validation blocks for a validation run result."""
 
     context = validation_notification_context_from_run(result)
+    thread_ts = slack_thread_ts_from_tracker_metadata(tracker_metadata_from_run(result))
     return send_slack_validation_notification(
         studio_config,
         context,
+        thread_ts=thread_ts,
         client_factory=client_factory,
     )

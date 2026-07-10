@@ -86,3 +86,20 @@ def test_format_validation_blocks_includes_rich_fields_and_report_link():
     assert "42/100" in fields[3]["text"]
     assert "2 critical" in payload["blocks"][2]["text"]["text"]
     assert "hero_shader_health_report.json" in payload["blocks"][3]["text"]["text"]
+
+
+def test_format_validation_blocks_includes_thread_ts_when_provided():
+    payload = format_validation_blocks(
+        _context(),
+        matched_events=(SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,),
+    )
+
+    assert "thread_ts" not in payload
+
+    threaded = format_validation_blocks(
+        _context(),
+        matched_events=(SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,),
+        thread_ts="1710000000.000100",
+    )
+
+    assert threaded["thread_ts"] == "1710000000.000100"

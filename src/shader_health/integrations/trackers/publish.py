@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+SLACK_THREAD_TS_METADATA_KEYS: tuple[str, ...] = ("thread_ts", "slack_thread_ts")
+
 
 def scene_basename(scene_path: str) -> str:
     """Return a cross-platform scene filename from Maya/Windows or POSIX paths."""
@@ -56,6 +58,32 @@ class ValidationPublishPayload:
         return ", ".join(flags) if flags else "No blocks"
 
 
+def tracker_metadata_from_run(result: Any) -> dict[str, str]:
+    """Return optional studio pipeline tracker metadata attached to a validation run."""
+
+    raw_metadata = getattr(result, "tracker_metadata", None)
+    if not isinstance(raw_metadata, Mapping):
+        return {}
+
+    metadata: dict[str, str] = {}
+    for key, value in raw_metadata.items():
+        normalized_key = str(key).strip()
+        normalized_value = str(value or "").strip()
+        if normalized_key and normalized_value:
+            metadata[normalized_key] = normalized_value
+    return metadata
+
+
+def slack_thread_ts_from_tracker_metadata(metadata: Mapping[str, str]) -> str | None:
+    """Return a Slack thread timestamp from optional tracker metadata."""
+
+    for key in SLACK_THREAD_TS_METADATA_KEYS:
+        thread_ts = str(metadata.get(key, "") or "").strip()
+        if thread_ts:
+            return thread_ts
+    return None
+
+
 def validation_publish_payload_from_run(
     result: Any,
     *,
@@ -67,6 +95,9 @@ def validation_publish_payload_from_run(
     health = getattr(result, "health_score", None)
     snapshot = getattr(result, "snapshot", None)
     scene_path = str(getattr(snapshot, "scene_path", "") or "")
+    merged_metadata = tracker_metadata_from_run(result)
+    if metadata:
+        merged_metadata.update(dict(metadata))
     return ValidationPublishPayload(
         scene_name=scene_basename(scene_path),
         scene_path=scene_path,
@@ -82,7 +113,7 @@ def validation_publish_payload_from_run(
         block_deadline=bool(getattr(health, "block_deadline", False)),
         validated_at_utc=str(getattr(snapshot, "scanned_at_utc", "") or ""),
         report_path=report_path,
-        metadata=dict(metadata or {}),
+        metadata=merged_metadata,
     )
 
 

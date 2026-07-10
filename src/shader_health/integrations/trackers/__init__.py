@@ -5,6 +5,8 @@ from shader_health.integrations.trackers.publish import (
     ValidationPublishPayload,
     format_validation_publish_summary,
     scene_basename,
+    slack_thread_ts_from_tracker_metadata,
+    tracker_metadata_from_run,
     validation_publish_payload_from_run,
 )
 from shader_health.integrations.trackers.publish_dispatcher import (
@@ -22,5 +24,7 @@ __all__ = [
     "format_validation_publish_summary",
     "publish_validation_to_first_tracker",
     "scene_basename",
+    "slack_thread_ts_from_tracker_metadata",
+    "tracker_metadata_from_run",
     "validation_publish_payload_from_run",
 ]

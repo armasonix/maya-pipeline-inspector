@@ -8,6 +8,8 @@ from shader_health.integrations.trackers.publish import (
     ValidationPublishPayload,
     format_validation_publish_summary,
     scene_basename,
+    slack_thread_ts_from_tracker_metadata,
+    tracker_metadata_from_run,
     validation_publish_payload_from_run,
 )
 
@@ -59,6 +61,48 @@ def test_validation_publish_payload_from_run_reads_snapshot_and_health():
     assert payload.validated_at_utc == "2026-07-10T12:00:00Z"
     assert payload.report_path.endswith("hero_shader_health_report.json")
     assert payload.metadata["thread_ts"] == "123.456"
+
+
+def test_tracker_metadata_from_run_reads_pipeline_metadata_mapping():
+    result = _run_result(
+        tracker_metadata={
+            "task_id": "task-7",
+            "thread_ts": "1710000000.000100",
+            "empty": "",
+        }
+    )
+
+    assert tracker_metadata_from_run(result) == {
+        "task_id": "task-7",
+        "thread_ts": "1710000000.000100",
+    }
+
+
+def test_validation_publish_payload_from_run_merges_tracker_metadata_from_result():
+    result = _run_result(
+        tracker_metadata={
+            "task_id": "task-7",
+            "slack_thread_ts": "1710000000.000200",
+        }
+    )
+
+    payload = validation_publish_payload_from_run(
+        result,
+        metadata={"thread_ts": "override"},
+    )
+
+    assert payload.metadata["task_id"] == "task-7"
+    assert payload.metadata["slack_thread_ts"] == "1710000000.000200"
+    assert payload.metadata["thread_ts"] == "override"
+
+
+def test_slack_thread_ts_from_tracker_metadata_accepts_thread_ts_aliases():
+    assert slack_thread_ts_from_tracker_metadata({"thread_ts": "123.456"}) == "123.456"
+    assert (
+        slack_thread_ts_from_tracker_metadata({"slack_thread_ts": "789.012"})
+        == "789.012"
+    )
+    assert slack_thread_ts_from_tracker_metadata({}) is None
 
 
 def test_validation_publish_payload_profile_and_block_labels():
