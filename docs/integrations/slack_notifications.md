@@ -89,7 +89,7 @@ src/shader_health/integrations/slack/
   blocks.py    # Block Kit formatter + routing helpers
 ```
 
-Runtime wiring from validation events is handled separately from this connector package (see Milestone 34 notification dispatcher work).
+Runtime wiring from validation and farm events is handled by `integrations/notify/dispatcher.py`, which fans out to enabled Telegram, Discord, and Slack connectors.
 
 ## Security notes
 

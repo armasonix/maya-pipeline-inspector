@@ -315,22 +315,33 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
     assert calls == [(content, result)]
 
 
-def test_maybe_notify_validation_delegates_to_telegram_and_discord(monkeypatch: Any):
+def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
     content = SimpleNamespace()
     result = SimpleNamespace()
-    calls: list[str] = []
+    calls: list[tuple[Any, Any]] = []
+
+    def _fake_dispatch(studio_config: Any, validation_result: Any) -> Any:
+        calls.append((studio_config, validation_result))
+        from shader_health.integrations.notify.dispatcher import (
+            ValidationNotificationDispatchResult,
+        )
+
+        return ValidationNotificationDispatchResult(outcomes=())
 
     monkeypatch.setattr(
-        ui_launcher,
-        "_maybe_notify_telegram_validation",
-        lambda *_args: calls.append("telegram"),
+        "shader_health.integrations.notify.dispatcher.dispatch_validation_notifications",
+        _fake_dispatch,
+    )
+    monkeypatch.setattr(
+        "shader_health.integrations.notify.dispatcher.report_validation_notification_outcomes",
+        lambda *_args: None,
     )
     monkeypatch.setattr(
         ui_launcher,
-        "_maybe_notify_discord_validation",
-        lambda *_args: calls.append("discord"),
+        "_studio_config_for_content",
+        lambda _content: "studio-config",
     )
 
     ui_launcher._maybe_notify_validation(content, result)
 
-    assert calls == ["telegram", "discord"]
+    assert calls == [("studio-config", result)]

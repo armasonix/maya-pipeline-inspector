@@ -1027,48 +1027,19 @@ def _run_validation_job(
 def _maybe_notify_validation(content: Any, result: Any) -> None:
     """Send configured validation notifications without interrupting the Maya UI flow."""
 
-    _maybe_notify_telegram_validation(content, result)
-    _maybe_notify_discord_validation(content, result)
-
-
-def _maybe_notify_telegram_validation(content: Any, result: Any) -> None:
-    """Send a Telegram validation summary without interrupting the Maya UI flow."""
-
     try:
-        from shader_health.integrations.telegram.notify import (
-            maybe_send_telegram_validation_notification,
+        from shader_health.integrations.notify.dispatcher import (
+            dispatch_validation_notifications,
+            report_validation_notification_outcomes,
         )
 
-        notify_result = maybe_send_telegram_validation_notification(
+        dispatch_result = dispatch_validation_notifications(
             _studio_config_for_content(content),
             result,
         )
-        if notify_result.sent:
-            print("Telegram notification sent.")
-        elif notify_result.error_message:
-            print(f"Telegram notification failed: {notify_result.error_message}")
+        report_validation_notification_outcomes(dispatch_result)
     except Exception as exc:  # noqa: BLE001
-        print(f"Telegram notification failed: {exc}")
-
-
-def _maybe_notify_discord_validation(content: Any, result: Any) -> None:
-    """Send a Discord validation embed without interrupting the Maya UI flow."""
-
-    try:
-        from shader_health.integrations.discord.notify import (
-            maybe_send_discord_validation_notification,
-        )
-
-        notify_result = maybe_send_discord_validation_notification(
-            _studio_config_for_content(content),
-            result,
-        )
-        if notify_result.sent:
-            print("Discord notification sent.")
-        elif notify_result.error_message:
-            print(f"Discord notification failed: {notify_result.error_message}")
-    except Exception as exc:  # noqa: BLE001
-        print(f"Discord notification failed: {exc}")
+        print(f"Validation notification dispatch failed: {exc}")
 
 
 def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:
@@ -1191,6 +1162,7 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
     content._shader_health_scan_scope = "scene"
     _populate_validation_result(content, qt_widgets, validation)
     _update_validation_chrome_labels(content, qt_widgets, validation)
+    _maybe_notify_validation(content, validation)
     connection_state = getattr(content, "_shader_health_farm_tab_state", None)
     result = run_farm_preflight_action(
         summary=getattr(validation, "summary", None),
