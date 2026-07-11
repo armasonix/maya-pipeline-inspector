@@ -6,8 +6,12 @@ Use it together with:
 
 - [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and setting `SHADER_HEALTH_STUDIO_CONFIG` in facility launchers
 - [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split and schema 2.0
-- [RULE_AUTHORING.md](RULE_AUTHORING.md) — rule schema, check types, and policy fields
+- [RULE_AUTHORING.md](RULE_AUTHORING.md) — rule schema, incident-to-rule workflow, and profile override syntax
 - [adr/0002-renderer-adapter-boundary.md](adr/0002-renderer-adapter-boundary.md) — where renderer-specific logic belongs
+- [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) — Deadline connector and farm preflight
+- [integrations/slack_notifications.md](integrations/slack_notifications.md) — Slack webhook routing
+- [integrations/bug_report_relay.md](integrations/bug_report_relay.md) — studio HTTPS relay for plugin bug reports
+- [integrations/auto_update.md](integrations/auto_update.md) — Check for Updates wizard and studio update policy
 
 ## Studio config file (`shader_health_studio.json`)
 
@@ -17,6 +21,35 @@ Studios roll out pipeline policy, network paths, and connector settings through 
 | --- | --- | --- |
 | Studio-wide policy | `shader_health_studio.json` | `SHADER_HEALTH_STUDIO_CONFIG` env var (recommended) |
 | Per-machine UI prefs | `~/.shader_health/user.json` | Local user home (not synced by IT) |
+
+### Studio vs user preferences (v0.5)
+
+Shader Health Inspector uses **two JSON layers**. Studio policy cannot be overridden from `user.json`.
+
+| Domain | File | User override? |
+| --- | --- | --- |
+| Pipeline policy, waiver/manifest defaults, pinned profiles, `extra_rules_folder` | Studio | No |
+| `studio_environment` roots and `variable_aliases` | Studio | No |
+| Connector credentials and `enabled` flags | Studio | No |
+| `bug_report` relay URL and API key | Studio | No |
+| `updates.pinned_version` and `updates.allow_check` | Studio | No |
+| Theme, default profile/asset class/scan scope | User | Yes |
+| `extra_rule_paths`, `debug_logging`, `mayapy_path` | User | Yes |
+
+The Settings screen exposes **Save Studio Config** and **Save User Preferences** as separate actions. See [ADR 0007](adr/0007-settings-and-connectors-architecture.md) for merge semantics and secret-field policy.
+
+### Settings screen map (v0.5)
+
+| Settings tab | JSON section | Typical owner |
+| --- | --- | --- |
+| **Basic** | `user.json` defaults (profile, asset class, scan scope, theme) | Artist |
+| **Advanced** | `user.json` (`extra_rule_paths`, rule authoring entry points, debug) | TD |
+| **Connectors** | `connectors.*` | Pipeline TD |
+| **Studio** | `studio_name`, `pipeline.*` | Pipeline TD |
+| **Studio Environment** | `studio_environment.*` | Pipeline TD |
+| **Bug Report** | `bug_report.*` | Pipeline TD / maintainer liaison |
+
+Headless CLI loads **StudioConfig only** (env, discovery paths, or `--studio-config`). User preferences apply inside the Maya panel.
 
 ### Deploy via `SHADER_HEALTH_STUDIO_CONFIG`
 
@@ -74,7 +107,8 @@ print(StudioConfig.default().studio_name)
       "block_on_new_textures": true
     },
     "pinned_workflow_profile_ids": ["publish_strict", "deadline_critical"],
-    "pinned_asset_class_profile_ids": []
+    "pinned_asset_class_profile_ids": [],
+    "extra_rules_folder": "//studio/share/shader_health/extra_rules"
   },
   "studio_environment": {
     "texture_root": "\\\\farm\\textures",
@@ -82,25 +116,105 @@ print(StudioConfig.default().studio_name)
     "cache_root": "\\\\farm\\cache",
     "render_root": "\\\\farm\\render",
     "variable_aliases": {
-      "STUDIO_TEXTURE_ROOT": "\\\\farm\\textures"
+      "STUDIO_TEXTURE_ROOT": "\\\\farm\\textures",
+      "SHOW_ROOT": "\\\\farm\\show_xyz"
     }
+  },
+  "ui": {
+    "documentation_url": "https://wiki.studio.internal/shader-health"
   },
   "connectors": {
     "deadline": {
       "enabled": true,
-      "api_url": "http://deadline-web:8081",
-      "profile_id": "deadline_critical"
+      "web_service_host": "deadline-web",
+      "web_service_port": 8081,
+      "timeout_seconds": 30,
+      "profile_id": "deadline_critical",
+      "profile_path": "",
+      "mayapy": "mayapy",
+      "repo_root": "",
+      "queue": "",
+      "pool": "",
+      "group": "",
+      "user_name": ""
+    },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": "",
+      "notify_on": ["block_publish", "block_deadline"]
+    },
+    "discord": {
+      "enabled": false,
+      "webhook_url": "",
+      "notify_on": ["block_publish"]
+    },
+    "slack": {
+      "enabled": false,
+      "publish_webhook_url": "",
+      "deadline_webhook_url": "",
+      "notify_on": ["block_publish", "block_deadline"],
+      "include_report_link": true
+    },
+    "ftrack": {
+      "enabled": false,
+      "api_url": "",
+      "api_user": "",
+      "api_key": "",
+      "project": ""
+    },
+    "shotgrid": {
+      "enabled": false,
+      "site_url": "",
+      "script_name": "",
+      "api_key": "",
+      "project": "",
+      "entity_type": "Shot"
+    },
+    "cerebro": {
+      "enabled": false,
+      "server_url": "",
+      "api_user": "",
+      "api_password": "",
+      "project": ""
     }
   },
   "bug_report": {
     "enabled": false,
     "relay_url": "",
-    "api_key": ""
+    "api_key": "",
+    "allow_screenshot": true,
+    "max_reports_per_day": 5
+  },
+  "updates": {
+    "allow_check": true,
+    "pinned_version": ""
   }
 }
 ```
 
-Expand `connectors` for Telegram, Discord, Slack, Ftrack, ShotGrid, and Cerebro as needed. See [ADR 0007](adr/0007-settings-and-connectors-architecture.md) for the full schema and secret-field policy.
+Legacy **schema 1.0** files (`pipeline.require_tx_derivatives`, `connectors.deadline.api_url`) still load. Saving from the Settings screen rewrites **2.0** with default sections for `studio_environment`, `waiver_defaults`, and related fields.
+
+### Schema 2.0 field reference
+
+| Section | Key fields | Purpose |
+| --- | --- | --- |
+| `schema_version` | `"2.0"` | Persistence format; rewritten on save from Settings |
+| `studio_name` | string | Display name in the panel status banner |
+| `pipeline.require_tx_derivatives` | bool | When `false`, disables packaged `.tx` derivative rules via studio rule overrides |
+| `pipeline.waiver_defaults` | `default_approved_by`, `default_expiry_days`, `allow_critical_waivers` | Defaults when artists create waiver sidecars |
+| `pipeline.manifest_gate_defaults` | `max_new_changes`, `max_fingerprint_changes`, `block_on_new_textures` | Baseline manifest regression gate policy |
+| `pipeline.pinned_workflow_profile_ids` | string[] | Optional allow-list for workflow profile dropdown |
+| `pipeline.pinned_asset_class_profile_ids` | string[] | Optional allow-list for asset class overlay dropdown |
+| `pipeline.extra_rules_folder` | path string | Export target for incident rule draft sidecars from the rule wizard |
+| `studio_environment` | four roots + `variable_aliases` | `${STUDIO_*_ROOT}` substitution during validation (below) |
+| `ui.documentation_url` | URL | Optional studio wiki link surfaced in the panel |
+| `connectors.*` | per-connector blocks | Third-party integrations (below) |
+| `bug_report.*` | relay URL, API key, limits | Plugin defect reports via studio HTTPS relay |
+| `updates.allow_check` | bool | Studio policy for in-app update checks |
+| `updates.pinned_version` | semver string | When set, blocks installing versions above the pin |
+
+Per-connector field tables and notification routing live in [Connectors (schema 2.0)](#connectors-schema-20). Path substitution details live in [Studio environment paths](#studio-environment-paths).
 
 ### Version control and secrets
 
@@ -109,20 +223,105 @@ Expand `connectors` for Telegram, Discord, Slack, Ftrack, ShotGrid, and Cerebro 
 | Do not commit | `shader_health_studio.json` with connector tokens, relay API keys, or internal URLs |
 | Do commit | Sanitized templates (`.example.json`) and facility deployment runbooks |
 | Prefer | Network share + `SHADER_HEALTH_STUDIO_CONFIG`; restrict write access to pipeline TD / IT |
-| User JSON | `user.json` holds theme and local `extra_rule_paths` only — never connector secrets |
-
-Legacy **schema 1.0** files (`pipeline.require_tx_derivatives`, `connectors.deadline`) still load. Saving from the Settings screen rewrites **2.0** with default sections for `studio_environment`, `waiver_defaults`, and related fields.
+| User JSON | `user.json` holds theme, local `extra_rule_paths`, and TD debug prefs only — never connector secrets |
 
 ### How studio config relates to custom rules
 
 | Mechanism | What it controls |
 | --- | --- |
-| `shader_health_studio.json` → `pipeline` | Require `.tx`, waiver defaults, manifest gate defaults, optional pinned profile lists |
-| `shader_health_studio.json` → `studio_environment` | `${STUDIO_*_ROOT}` path substitution during validation |
+| `shader_health_studio.json` → `pipeline` | Require `.tx`, waiver defaults, manifest gate defaults, pinned profile lists, `extra_rules_folder` |
+| `shader_health_studio.json` → `studio_environment` | `${STUDIO_*_ROOT}` and custom alias substitution during validation |
+| `pipeline.extra_rules_folder` | Studio export folder for incident rule sidecars ([RULE_AUTHORING.md](RULE_AUTHORING.md#incident-to-rule-workflow-maya-ui)) |
 | `--extra-rules` / user `extra_rule_paths` | Additional rule JSON layered on packaged rules (below) |
 | Custom profile JSON | Per-step `rule_overrides` (below) |
 
 Studio policy cannot be overridden by user preferences. Custom rules and profiles stack on top at validation time.
+
+## Studio environment paths
+
+Studios centralize network roots in `studio_environment` so rule packs, fix plans, and notification links can use portable `${TOKEN}` paths instead of hardcoded drive letters.
+
+### Built-in tokens
+
+| JSON field | Token | Example use in rules |
+| --- | --- | --- |
+| `texture_root` | `${STUDIO_TEXTURE_ROOT}` | Texture path policy checks |
+| `asset_root` | `${STUDIO_ASSET_ROOT}` | Asset-relative path normalization |
+| `cache_root` | `${STUDIO_CACHE_ROOT}` | Local cache / intermediate paths |
+| `render_root` | `${STUDIO_RENDER_ROOT}` | Optional JSON report links in Slack notifications |
+
+During validation, [`resolve_studio_path()`](../src/shader_health/util/paths.py) expands `${VAR}` tokens using the loaded studio config. Legacy `${TEXTURE_ROOT}` / `${ASSET_ROOT}` tokens are normalized to the `STUDIO_*` names.
+
+### Custom aliases
+
+`variable_aliases` adds show-specific tokens on top of the four built-ins:
+
+```json
+"variable_aliases": {
+  "SHOW_ROOT": "\\\\farm\\show_xyz",
+  "STUDIO_TEXTURE_ROOT": "\\\\farm\\textures"
+}
+```
+
+Aliases override built-in names when both are present. Use them in rule `match` / `check` path patterns and in studio fix-plan examples — not in committed open-source demo data.
+
+### Headless CLI and Maya panel
+
+Both entrypoints pass `studio_environment` into [`run_validation()`](../src/shader_health/maya/validation_pipeline.py) when `SHADER_HEALTH_STUDIO_CONFIG` (or `--studio-config`) resolves. Without a studio file, paths containing `${STUDIO_*}` tokens are left unchanged.
+
+Configure roots in **Settings → Studio Environment**, then **Save Studio Config** to the facility JSON path.
+
+## Connectors (schema 2.0)
+
+All connectors live under `connectors` in `shader_health_studio.json`. Each block has an `enabled` flag; when `enabled` is `false`, the integration resolves to `None` and does not fall back to environment variables.
+
+Secret fields (tokens, API keys, webhook URLs, passwords) are masked in the Settings UI and must not be committed to git.
+
+### Deadline (`connectors.deadline`)
+
+Farm preflight and submission. See [deadline_submit_preflight.md](integrations/deadline_submit_preflight.md).
+
+| Field | Purpose |
+| --- | --- |
+| `enabled` | Master toggle |
+| `web_service_host` / `web_service_port` | Deadline Web Service host (or legacy `api_url`) |
+| `timeout_seconds` | HTTP timeout for Web Service calls |
+| `profile_id` / `profile_path` | Validation profile for farm preflight |
+| `mayapy` | Headless Maya binary for remote checks |
+| `repo_root`, `queue`, `pool`, `group`, `user_name` | Optional submission defaults |
+
+### Notification connectors
+
+Telegram, Discord, and Slack post block summaries after validation when `notify_on` includes `block_publish` and/or `block_deadline`.
+
+| Connector | Secret fields | Routing |
+| --- | --- | --- |
+| `telegram` | `bot_token`, `chat_id` | Single chat for matched events |
+| `discord` | `webhook_url` | Single webhook for matched events |
+| `slack` | `publish_webhook_url`, `deadline_webhook_url` | Separate webhooks per block type; see [slack_notifications.md](integrations/slack_notifications.md) |
+
+Shared optional field: `notify_on` — list of `block_publish`, `block_deadline`.
+
+Slack-only: `include_report_link` builds an informational path from `studio_environment.render_root`.
+
+### Task trackers
+
+Used for explicit tracker actions from the panel (not automatic validation fan-out):
+
+| Connector | Required fields when enabled |
+| --- | --- |
+| `ftrack` | `api_url`, `api_user`, `api_key`, `project` |
+| `shotgrid` | `site_url`, `script_name`, `api_key`, `project`; optional `entity_type` (default `Shot`) |
+| `cerebro` | `server_url`, `api_user`, `api_password`, `project` |
+
+### Bug report and updates (top-level sections)
+
+| Section | Purpose | Doc |
+| --- | --- | --- |
+| `bug_report` | HTTPS relay for **plugin** defect reports | [bug_report_relay.md](integrations/bug_report_relay.md) |
+| `updates` | Studio policy for **Check for Updates** (`allow_check`, optional `pinned_version`) | [auto_update.md](integrations/auto_update.md) |
+
+Bug report stays disabled until both `relay_url` and `api_key` are set. Updates policy is studio-controlled; per-user check-on-startup preference lives in `user.json`.
 
 ## What studios typically customize
 
@@ -174,10 +373,13 @@ Studio mirrors often copy this skeleton into a facility config repo:
 Validate studio rule JSON before rollout:
 
 ```bash
+python -m shader_health rules validate examples/studio/rules
 python tools/validate_rules.py examples/studio/rules
 ```
 
-Profile overrides are validated against the loaded rule stack in unit tests and when `tools/validate_rules.py` validates the packaged rule root (it checks packaged `profiles/` entries against packaged rules). For studio profiles, load the same rule stack production uses and call `validate_profile_overrides()` — see [`tests/unit/test_studio_overrides_example.py`](../tests/unit/test_studio_overrides_example.py).
+Both commands share the same validation logic (`shader_health.rules_cli.validate_rule_paths`).
+
+Profile overrides are validated against the loaded rule stack in unit tests and when `shader_health rules validate` (or `tools/validate_rules.py`) validates the packaged rule root (it checks packaged `profiles/` entries against packaged rules). For studio profiles, load the same rule stack production uses and call `validate_profile_overrides()` — see [`tests/unit/test_studio_overrides_example.py`](../tests/unit/test_studio_overrides_example.py).
 
 Fixture examples for valid/invalid rule JSON live under [`tests/fixtures/rules/`](../tests/fixtures/rules/).
 
@@ -218,9 +420,9 @@ run = run_validation(
 
 ### Maya UI pipeline
 
-The dockable panel loads packaged profiles from the dropdown and uses the default packaged rule root. It does **not** expose an extra-rules picker in v0.2.
+The dockable panel loads packaged profiles from the dropdown. Per-machine **Settings → Advanced → Extra rule roots** (`user.json` `extra_rule_paths`) append show rule packs at validation time without editing the studio JSON file.
 
-Studios that need custom rules inside Maya can call the shared pipeline directly from a facility bootstrap script:
+Studios can also wire custom rules through a facility bootstrap script:
 
 ```python
 from pathlib import Path
@@ -308,7 +510,7 @@ After loading the example stack:
 
 ## Profile validation and unknown rule ids
 
-`tools/validate_rules.py` loads the packaged rule stack and verifies that every `rule_overrides` key exists in the loaded rule set. Unknown ids fail validation:
+`shader_health rules validate` (and `tools/validate_rules.py`) loads the packaged rule stack and verifies that every `rule_overrides` key exists in the loaded rule set. Unknown ids fail validation:
 
 ```text
 profile 'show_publish_strict' references unknown rule(s): missing.rule.id
@@ -323,17 +525,20 @@ When you validate a studio profile, include the same `--extra-rules` folders (or
 1. Author or copy base rule packs using [RULE_AUTHORING.md](RULE_AUTHORING.md).
 2. Place show-only rules in a dedicated folder (for example `studio/` or `show_xyz/`).
 3. Create profile JSON per pipeline step: publish, daily review, farm preflight.
-4. Validate JSON with `python tools/validate_rules.py`.
+4. Validate JSON with `python -m shader_health rules validate` (or `python tools/validate_rules.py`).
 5. Wire headless gates through [`publish_submit_preflight.md`](integrations/publish_submit_preflight.md) or [`deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md).
 6. Keep renderer-specific material semantics inside renderer adapters and renderer packs per [ADR 0002](adr/0002-renderer-adapter-boundary.md).
 
 ## Related docs
 
 - [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and `SHADER_HEALTH_STUDIO_CONFIG` in launchers
-- [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
-- [RULE_AUTHORING.md](RULE_AUTHORING.md) — authoring individual rules and profile override syntax
+- [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split, connector registry, secrets
+- [RULE_AUTHORING.md](RULE_AUTHORING.md) — authoring individual rules, incident-to-rule workflow, profile override syntax
+- [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) — Deadline connector and farm gate
+- [integrations/slack_notifications.md](integrations/slack_notifications.md) — Slack webhook routing
+- [integrations/bug_report_relay.md](integrations/bug_report_relay.md) — bug report HTTPS relay
+- [integrations/auto_update.md](integrations/auto_update.md) — Check for Updates and `updates` policy
 - [integrations/publish_submit_preflight.md](integrations/publish_submit_preflight.md) — publish gate using `--profile`
-- [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) — farm gate using `--profile`
 
 ## Automated checks
 
