@@ -22,6 +22,7 @@ SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME = "shaderHealthInspectorSettingsDebugL
 SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsMaxIssuesInput"
 SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsMayapyPathInput"
 SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsBrowseRulesButton"
+SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsNewRuleWizardButton"
 
 _MIN_MAX_ISSUES_DISPLAYED = 1
 _MAX_MAX_ISSUES_DISPLAYED = 5000
@@ -33,6 +34,7 @@ def build_advanced_settings_section(
     *,
     on_preferences_changed: Optional[Callable[[], None]] = None,
     on_open_rule_browser: Optional[Callable[[], None]] = None,
+    on_open_new_rule_wizard: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build the Advanced settings tab content."""
 
@@ -71,6 +73,14 @@ def build_advanced_settings_section(
     )
     wire_button(browse_rules_button, on_open_rule_browser)
     form.addRow("Rule browser", browse_rules_button)
+
+    new_rule_button = qt_widgets.QPushButton("New Rule…")
+    new_rule_button.setObjectName(SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME)
+    new_rule_button.setToolTip(
+        "Create a JSON rule draft from a starter template with validate_rules.py checks."
+    )
+    wire_button(new_rule_button, on_open_new_rule_wizard)
+    form.addRow("Rule authoring", new_rule_button)
 
     debug_row = qt_widgets.QHBoxLayout()
     debug_row.addWidget(qt_widgets.QLabel("Enable verbose shader_health logging"))

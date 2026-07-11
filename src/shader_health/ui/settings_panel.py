@@ -100,6 +100,7 @@ class SettingsActionCallbacks:
     on_load_user_preferences: Optional[Callable[[], None]] = None
     on_user_preferences_changed: Optional[Callable[[], None]] = None
     on_open_rule_browser: Optional[Callable[[], None]] = None
+    on_open_new_rule_wizard: Optional[Callable[[], None]] = None
 
 
 def build_settings_view(
@@ -369,6 +370,7 @@ def _build_advanced_tab(
             user_config,
             on_preferences_changed=callbacks.on_user_preferences_changed,
             on_open_rule_browser=callbacks.on_open_rule_browser,
+            on_open_new_rule_wizard=callbacks.on_open_new_rule_wizard,
         )
     )
     layout.addStretch(1)

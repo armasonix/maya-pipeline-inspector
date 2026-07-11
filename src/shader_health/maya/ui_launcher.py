@@ -378,6 +378,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_open_new_rule_wizard=lambda: _open_new_rule_wizard_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
 
 
@@ -432,6 +436,27 @@ def _open_rule_browser_from_ui(content: Any, qt_widgets: Any) -> None:
         catalog=catalog,
         session_overrides=_session_rule_overrides_for_content(content),
         on_save=lambda overrides: _set_session_rule_overrides(content, overrides),
+    )
+
+
+def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_wizard import known_rule_ids_for_authoring
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.new_rule_wizard_dialog import show_new_rule_wizard_dialog
+
+    if content is None:
+        return
+
+    user_config = _user_config_for_content(content)
+    extra_paths = user_extra_rule_paths(user_config)
+    default_output = ""
+    if extra_paths:
+        default_output = str(extra_paths[0] / "custom_rule.json")
+    show_new_rule_wizard_dialog(
+        qt_widgets,
+        parent=content,
+        known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
+        default_output_path=default_output,
     )
 
 
