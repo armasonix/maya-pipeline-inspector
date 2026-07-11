@@ -463,6 +463,46 @@ def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
     )
 
 
+def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_wizard import (
+        build_draft_prefill_from_issue,
+        known_rule_ids_for_authoring,
+    )
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.new_rule_wizard_dialog import show_new_rule_wizard_dialog
+
+    if content is None:
+        return
+
+    issue = _selected_issue(content)
+    if issue is None:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            "Select a failed issue before creating a rule draft.",
+        )
+        return
+
+    rules = getattr(content, "_shader_health_rules", ())
+    rules_by_id = {rule.id: rule for rule in rules}
+    source_rule = rules_by_id.get(str(getattr(issue, "rule_id", "") or ""))
+    prefill = build_draft_prefill_from_issue(issue, source_rule)
+
+    user_config = _user_config_for_content(content)
+    extra_paths = user_extra_rule_paths(user_config)
+    default_output = ""
+    if extra_paths:
+        default_output = str(extra_paths[0] / f"{prefill.draft_input.rule_id}.json")
+    show_new_rule_wizard_dialog(
+        qt_widgets,
+        parent=content,
+        known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
+        default_output_path=default_output,
+        prefill=prefill,
+    )
+
+
 def _deadline_config_for_content(content: Any) -> Any:
     return resolve_deadline_config(_studio_config_for_content(content))
 
@@ -1095,6 +1135,10 @@ def _issue_details_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
             "reveal_file",
+        ),
+        on_create_rule_draft=lambda: _create_rule_draft_from_issue_ui(
+            _panel_content(panel_state),
+            qt_widgets,
         ),
     )
 
@@ -1925,6 +1969,7 @@ def _store_validation_state(
     content._shader_health_fix_plan = getattr(result, "fix_plan", None)
     content._shader_health_snapshot = getattr(result, "snapshot", None)
     content._shader_health_results = getattr(result, "results", ())
+    content._shader_health_rules = tuple(getattr(result, "rules", ()) or ())
     content._shader_health_profile_id = getattr(result, "profile_id", "")
     content._shader_health_asset_class_id = getattr(result, "asset_class_id", "")
     content._shader_health_summary = getattr(result, "summary", None)

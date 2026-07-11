@@ -114,6 +114,7 @@ SELECT_NODE_BUTTON_OBJECT_NAME = "shaderHealthInspectorSelectNodeButton"
 OPEN_ATTR_EDITOR_BUTTON_OBJECT_NAME = "shaderHealthInspectorOpenAttrEditorButton"
 COPY_PATH_BUTTON_OBJECT_NAME = "shaderHealthInspectorCopyPathButton"
 REVEAL_FILE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRevealFileButton"
+CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME = "shaderHealthInspectorCreateRuleDraftButton"
 ASSET_CLASS_NONE_LABEL = "None"
 DEFAULT_WORKFLOW_PROFILE_OPTIONS = list_workflow_profile_options() or (
     ProfileOption("artist_relaxed", "Artist Relaxed"),
@@ -250,6 +251,7 @@ class IssueDetailsActionCallbacks:
     on_open_in_hypershade: Optional[Callable[[], None]] = None
     on_copy_path: Optional[Callable[[], None]] = None
     on_reveal_file: Optional[Callable[[], None]] = None
+    on_create_rule_draft: Optional[Callable[[], None]] = None
 
 
 def build_main_widget(
@@ -1442,6 +1444,22 @@ def _build_triage_action_group(
             _compact_button(qt_widgets, label, object_name, tooltip, callback)
         )
     actions_layout.addWidget(file_group)
+    actions_layout.addWidget(_action_bar_separator(qt_widgets))
+
+    authoring_group = qt_widgets.QWidget()
+    authoring_layout = qt_widgets.QHBoxLayout(authoring_group)
+    authoring_layout.setContentsMargins(0, 0, 0, 0)
+    authoring_layout.setSpacing(4)
+    authoring_layout.addWidget(
+        _compact_button(
+            qt_widgets,
+            "Create Rule Draft",
+            CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME,
+            "Open the new rule wizard prefilled from the selected failed issue.",
+            issue_callbacks.on_create_rule_draft,
+        )
+    )
+    actions_layout.addWidget(authoring_group)
     return actions
 
 

@@ -607,6 +607,7 @@ def test_validation_action_bar_groups_primary_pipeline_and_triage_buttons():
     assert _find(triage, main_window.OPEN_ATTR_EDITOR_BUTTON_OBJECT_NAME) is not None
     assert _find(triage, main_window.COPY_PATH_BUTTON_OBJECT_NAME) is not None
     assert _find(triage, main_window.REVEAL_FILE_BUTTON_OBJECT_NAME) is not None
+    assert _find(triage, main_window.CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME) is not None
 
 
 def test_format_last_validated_display_parses_utc_timestamp():

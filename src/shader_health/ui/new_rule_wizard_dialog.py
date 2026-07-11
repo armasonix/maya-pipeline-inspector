@@ -8,6 +8,7 @@ from typing import Any
 
 from shader_health.core.rule_schema import SEVERITIES
 from shader_health.core.rule_wizard import (
+    IssueRuleDraftPrefill,
     NewRuleDraftInput,
     RuleDraftValidationResult,
     RuleTemplateSpec,
@@ -70,6 +71,7 @@ class NewRuleWizardDialog:
         *,
         known_rule_ids: Iterable[str] = (),
         default_output_path: str = "",
+        prefill: IssueRuleDraftPrefill | None = None,
         window_title: str = "New Rule Wizard",
     ) -> NewRuleWizardDialog:
         templates = list_rule_templates()
@@ -169,10 +171,44 @@ class NewRuleWizardDialog:
         current_index_changed = getattr(template_combo, "currentIndexChanged", None)
         if current_index_changed is not None:
             current_index_changed.connect(controller.load_template_defaults)
-        controller.load_template_defaults(0)
+        if prefill is not None:
+            controller.apply_prefill(prefill)
+        else:
+            controller.load_template_defaults(0)
         if default_output_path:
             controller.field_inputs["output_path"].setText(default_output_path)
         return controller
+
+    def apply_prefill(self, prefill: IssueRuleDraftPrefill) -> None:
+        template_index = next(
+            (
+                index
+                for index, template in enumerate(self.templates)
+                if template.template_id == prefill.template_id
+            ),
+            0,
+        )
+        set_current_index = getattr(self.template_combo, "setCurrentIndex", None)
+        if set_current_index is not None:
+            set_current_index(template_index)
+
+        draft = prefill.draft_input
+        self._set_field_text("rule_id", draft.rule_id)
+        self._set_field_text("name", draft.name)
+        self._set_field_text("message", draft.message)
+        self._set_field_text("why", draft.why)
+        self._set_combo_text("severity", draft.severity)
+        self._set_field_text("owner", draft.owner)
+        self._set_field_text("scope", draft.scope)
+        self._set_field_text("attribute", draft.attribute)
+        self._set_field_text("expected", draft.expected)
+        if draft.max_value is not None:
+            self._set_field_text("max_value", str(draft.max_value))
+        else:
+            self._set_field_text("max_value", "")
+        self._set_field_text("dependency_kind", draft.dependency_kind)
+        self.last_validation = None
+        self.set_status_message("Prefilled from selected issue context.")
 
     def selected_template(self) -> RuleTemplateSpec:
         index = getattr(self.template_combo, "currentIndex", lambda: 0)()
@@ -317,6 +353,7 @@ def show_new_rule_wizard_dialog(
     parent: Any | None = None,
     known_rule_ids: Iterable[str] = (),
     default_output_path: str = "",
+    prefill: IssueRuleDraftPrefill | None = None,
 ) -> None:
     """Display the new rule wizard dialog."""
 
@@ -324,6 +361,7 @@ def show_new_rule_wizard_dialog(
         qt_widgets,
         known_rule_ids=known_rule_ids,
         default_output_path=default_output_path,
+        prefill=prefill,
     )
     dialog.show(parent=parent, modal=True)
 

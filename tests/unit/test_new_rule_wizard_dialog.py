@@ -14,11 +14,9 @@ from tests.unit.test_advanced_settings_section import (
 )
 from tests.unit.test_telegram_connector_section import _find
 
-from shader_health.core.rule_wizard import (
-    RULE_TEMPLATE_PATH_EXISTS,
-    NewRuleDraftInput,
-    build_rule_draft,
-)
+from shader_health.core.rule_browser import load_packaged_rules_catalog
+from shader_health.core.rule_schema import RuleResult
+from shader_health.core.rule_wizard import build_draft_prefill_from_issue
 from shader_health.ui.new_rule_wizard_dialog import (
     NEW_RULE_WIZARD_DIALOG_OBJECT_NAME,
     NEW_RULE_WIZARD_STATUS_LABEL_OBJECT_NAME,
@@ -48,6 +46,10 @@ class FakeComboBox(FakeWidget):
         if self.current in self.items:
             return self.items.index(self.current)
         return 0
+
+    def setCurrentIndex(self, index: int) -> None:
+        if 0 <= index < len(self.items):
+            self.current = self.items[index]
 
 
 class FakeDialog(FakeWidget):
@@ -92,7 +94,40 @@ def test_new_rule_wizard_dialog_validate_reports_valid_draft():
     assert "valid" in status.text.lower()
 
 
+def test_new_rule_wizard_dialog_applies_issue_prefill():
+    rule = next(
+        entry.rule
+        for entry in load_packaged_rules_catalog()
+        if entry.rule.id == "common.texture.colorspace.data_raw"
+    )
+    issue = RuleResult(
+        rule_id=rule.id,
+        severity=rule.severity,
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        expected_value="Raw",
+    )
+    prefill = build_draft_prefill_from_issue(issue, rule)
+    controller = NewRuleWizardDialog.build(
+        NewRuleWizardFakeQtWidgets,
+        prefill=prefill,
+    )
+
+    assert controller.field_inputs["rule_id"].value == prefill.draft_input.rule_id
+    assert controller.field_inputs["expected"].value == "Raw"
+    assert "Prefilled" in controller.status_label.text
+
+
 def test_new_rule_wizard_dialog_save_writes_json(tmp_path: Path):
+    from shader_health.core.rule_wizard import (
+        RULE_TEMPLATE_PATH_EXISTS,
+        NewRuleDraftInput,
+        build_rule_draft,
+    )
+
     controller = NewRuleWizardDialog.build(
         NewRuleWizardFakeQtWidgets,
         known_rule_ids=frozenset(),

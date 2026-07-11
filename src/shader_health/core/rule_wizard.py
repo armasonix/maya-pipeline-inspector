@@ -301,3 +301,122 @@ def template_field_labels(template_id: str) -> Sequence[tuple[str, str]]:
     if template_id == RULE_TEMPLATE_PATH_EXISTS:
         return (("dependency_kind", "Dependency kind"),)
     return ()
+
+
+@dataclass(frozen=True)
+class IssueRuleDraftPrefill:
+    """Wizard prefill derived from a failed validation issue."""
+
+    template_id: str
+    draft_input: NewRuleDraftInput
+
+
+_CHECK_TYPE_TO_TEMPLATE = {
+    "attribute_equals": RULE_TEMPLATE_ATTRIBUTE_EQUALS,
+    "numeric_max": RULE_TEMPLATE_NUMERIC_MAX,
+    "list_length_max": RULE_TEMPLATE_NUMERIC_MAX,
+    "path_exists": RULE_TEMPLATE_PATH_EXISTS,
+}
+
+
+def template_id_for_check_type(check_type: str) -> str:
+    normalized = check_type.strip()
+    return _CHECK_TYPE_TO_TEMPLATE.get(normalized, RULE_TEMPLATE_ATTRIBUTE_EQUALS)
+
+
+def template_id_for_rule_id(rule_id: str) -> str:
+    lowered = rule_id.lower()
+    if "missing" in lowered or ".path" in lowered:
+        return RULE_TEMPLATE_PATH_EXISTS
+    if ".max" in lowered or "complexity" in lowered or "resolution" in lowered:
+        return RULE_TEMPLATE_NUMERIC_MAX
+    if "colorspace" in lowered:
+        return RULE_TEMPLATE_ATTRIBUTE_EQUALS
+    return RULE_TEMPLATE_ATTRIBUTE_EQUALS
+
+
+def suggested_incident_rule_id(source_rule_id: str) -> str:
+    base = source_rule_id.strip() or "studio.incident.unknown"
+    if base.endswith(".draft"):
+        return base
+    return f"{base}.draft"
+
+
+def build_draft_prefill_from_issue(
+    issue: Any,
+    rule: RuleDefinition | None = None,
+) -> IssueRuleDraftPrefill:
+    """Build a new-rule wizard prefill from a failed issue and optional source rule."""
+
+    rule_id = str(getattr(issue, "rule_id", "") or "")
+    template_id = template_id_for_rule_id(rule_id)
+    if rule is not None:
+        template_id = template_id_for_check_type(rule.check.type)
+
+    message = str(getattr(issue, "message", "") or "")
+    why = str(getattr(issue, "why", "") or "")
+    severity = str(getattr(issue, "severity", "") or "warning")
+    owner = str(getattr(issue, "owner", "") or "shader_td")
+    name = str(getattr(issue, "title", "") or message or rule_id)
+
+    attribute = ""
+    expected = ""
+    max_value: int | float | None = None
+    dependency_kind = "texture"
+    scope = ""
+    renderer: tuple[str, ...] = ("common", "vray", "arnold")
+
+    if rule is not None:
+        name = rule.name or name
+        message = message or rule.message
+        why = why or rule.why
+        severity = severity or rule.severity
+        owner = owner or rule.owner
+        scope = rule.scope
+        renderer = tuple(rule.renderer)
+        check = rule.check
+        if check.type == "attribute_equals":
+            attribute = str(check.params.get("attribute", ""))
+            expected_value = check.params.get("expected")
+            if expected_value is not None:
+                expected = str(expected_value)
+            elif issue.expected_value is not None:
+                expected = str(issue.expected_value)
+        elif check.type in {"numeric_max", "list_length_max"}:
+            attribute = str(check.params.get("attribute", ""))
+            raw_max = check.params.get("max")
+            if isinstance(raw_max, (int, float)) and not isinstance(raw_max, bool):
+                max_value = raw_max
+        elif check.type == "path_exists":
+            dependency_kind = str(rule.match.to_dict().get("dependency_kind", "texture"))
+    else:
+        plug = str(getattr(issue, "plug", "") or "")
+        if plug:
+            attribute = plug
+        if issue.expected_value is not None:
+            expected = str(issue.expected_value)
+        current = issue.current_value
+        if (
+            template_id == RULE_TEMPLATE_NUMERIC_MAX
+            and isinstance(current, (int, float))
+            and not isinstance(current, bool)
+        ):
+            max_value = current
+
+    return IssueRuleDraftPrefill(
+        template_id=template_id,
+        draft_input=NewRuleDraftInput(
+            rule_id=suggested_incident_rule_id(rule_id),
+            name=name,
+            message=message,
+            why=why,
+            severity=severity,
+            owner=owner,
+            scope=scope,
+            attribute=attribute,
+            expected=expected,
+            max_value=max_value,
+            dependency_kind=dependency_kind,
+            renderer=renderer,
+        ),
+    )
