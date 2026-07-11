@@ -6,6 +6,8 @@ Status: **v0.4.0 shipped** (2026-07-08). See [CHANGELOG.md](../CHANGELOG.md). v0
 
 Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
 
+In-app updates (module path vs pip, restart checklist): [`docs/integrations/auto_update.md`](integrations/auto_update.md).
+
 Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md).
 
 ## GUI-first workflow
@@ -19,6 +21,7 @@ Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
 3. **Clear blocking state** — After validation, the summary shows health score, severity counts, and whether the scene **blocks publish** or **blocks Deadline** without opening a report file.
 4. **Low-friction fixes** — Safe auto-fixes use the Fixes tab queue; high-risk or referenced edits still require explicit confirmation per studio policy.
 5. **Same results everywhere** — The panel, `shader_health validate`, and Deadline preflight share one validation pipeline, so GUI and headless reports stay aligned.
+6. **Check for Updates** — Use the panel header button to compare against GitHub Releases. Module-path installs can download and install in-app; pip installs should use `mayapy -m pip install -U` (see [auto_update.md](integrations/auto_update.md)).
 
 UX friction and Wave 1 backlog: [MAYA_UX_AUDIT_v0.4.md](MAYA_UX_AUDIT_v0.4.md).
 

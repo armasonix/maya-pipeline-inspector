@@ -197,6 +197,8 @@ Per v0.5 plan decision (issues #152–#155):
 - Download release asset to a staging directory; install preserves `shader_health_studio.json` and `user.json`.
 - Maya restart is **manual** — show checklist dialog; no fake auto-restart.
 
+User-facing guide: [`docs/integrations/auto_update.md`](../integrations/auto_update.md).
+
 User preference `updates.check_on_startup` may trigger silent check; download/install always requires explicit confirmation (GUI-first clarity).
 
 ### 9. Settings tabs — v0.5 target

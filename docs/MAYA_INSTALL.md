@@ -309,6 +309,14 @@ show_ui()
 
 Prefer **Option A** or **Option B** for repeatable studio rollout.
 
+## In-app updates (Check for Updates)
+
+When the plugin is installed via **Option A** (`MAYA_MODULE_PATH` + full repo checkout), artists and TDs can use the panel header **Check for Updates** button to download a GitHub Release and install it with config preservation and rollback.
+
+**Option B (`pip`)** and legacy `PYTHONPATH`-only layouts are not updated in-place by the wizard — use `mayapy -m pip install -U` and restart Maya instead.
+
+Full flow, studio policy fields, staging paths, and the **Maya restart checklist**: [`docs/integrations/auto_update.md`](integrations/auto_update.md).
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -349,6 +357,7 @@ When using Plug-in Manager, unloading `shader_health_inspector` runs the same cl
 - [`adr/0007-settings-and-connectors-architecture.md`](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
 - [`integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) — publish gate example
 - [`integrations/deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
+- [`integrations/auto_update.md`](integrations/auto_update.md) — Check for Updates wizard, module vs pip paths, restart checklist (v0.5)
 
 ## Automated checks
 
