@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from shader_health import __version__
+import json
+
+from shader_health.integrations.update.github_releases import GitHubReleasesResponse, HttpRequest
 from shader_health.ui.update_modal import (
     UPDATE_MODAL_CLOSE_BUTTON_OBJECT_NAME,
     UPDATE_MODAL_PROGRESS_BAR_OBJECT_NAME,
@@ -18,6 +20,7 @@ from shader_health.ui.update_modal import (
 from shader_health.ui.update_progress_dialog import (
     update_progress_step_description_object_name,
 )
+from shader_health.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
 
 
 class FakeWidget:
@@ -138,10 +141,15 @@ class FakeDialog(FakeWidget):
     def __init__(self) -> None:
         super().__init__()
         self.exec_called = False
+        self.show_called = False
 
     def exec_(self) -> int:
         self.exec_called = True
         return 0
+
+    def show(self) -> None:
+        self.show_called = True
+        self.visible = True
 
 
 class FakeQt:
@@ -206,17 +214,42 @@ def test_build_update_modal_shell_exposes_staged_progress_labels():
     assert progress.text_visible is False
 
 
+def _github_transport(payload: dict[str, object]):
+    def transport(_request: HttpRequest, _timeout: float) -> GitHubReleasesResponse:
+        return GitHubReleasesResponse(
+            status_code=200,
+            body=json.dumps(payload),
+            json_data=payload,
+        )
+
+    return transport
+
+
 def test_show_update_modal_shell_uses_modal_exec_and_parent():
     parent = FakeWidget()
     dialog = show_update_modal_shell(
         FakeQtWidgets,
         parent=parent,
-        installed_version=__version__,
+        installed_version="0.5.0",
+        transport=_github_transport(
+            {
+                "tag_name": "v0.5.0",
+                "name": "v0.5.0",
+                "html_url": "https://github.com/example/releases/tag/v0.5.0",
+                "published_at": "2026-07-11T07:00:00Z",
+                "body": "",
+                "assets": [],
+            }
+        ),
     )
 
     assert dialog.exec_called is True
+    assert dialog.show_called is True
     assert dialog.parent is parent
     assert dialog.modality == FakeQt.ApplicationModal
+    assert UPDATE_WIZARD_STATUS_UP_TO_DATE.format(installed_version="0.5.0") in (
+        _find(dialog, UPDATE_MODAL_STATUS_LABEL_OBJECT_NAME).text
+    )
 
 
 def test_update_modal_close_button_rejects_dialog():

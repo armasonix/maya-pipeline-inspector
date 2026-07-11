@@ -230,12 +230,18 @@ def _panel_navigation_callbacks(
 
 def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health import __version__
+    from shader_health.studio_config import StudioConfig
     from shader_health.ui.update_modal import show_update_modal_shell
+
+    studio_config = getattr(content, "_shader_health_studio_config", None)
+    if studio_config is not None and not isinstance(studio_config, StudioConfig):
+        studio_config = None
 
     show_update_modal_shell(
         qt_widgets,
         parent=content,
         installed_version=__version__,
+        studio_config=studio_config,
     )
 
 
