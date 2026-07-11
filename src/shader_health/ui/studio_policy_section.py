@@ -49,6 +49,9 @@ SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME = (
 SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME = (
     "shaderHealthInspectorSettingsPinnedAssetClassProfilesInput"
 )
+SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME = (
+    "shaderHealthInspectorSettingsExtraRulesFolderInput"
+)
 
 
 def build_studio_policy_section(
@@ -190,6 +193,15 @@ def build_studio_policy_section(
     wire_plain_text_changed(pinned_asset_class_input, on_settings_changed)
     form.addRow("Pinned asset class profiles", pinned_asset_class_input)
 
+    extra_rules_input = qt_widgets.QLineEdit(config.pipeline.extra_rules_folder)
+    extra_rules_input.setObjectName(SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME)
+    extra_rules_input.setPlaceholderText("//studio/share/shader_health/extra_rules")
+    extra_rules_input.setToolTip(
+        "Studio folder where incident rule draft sidecars are exported from the rule wizard."
+    )
+    wire_line_edit_finished(extra_rules_input, on_settings_changed)
+    form.addRow("Extra rules folder", extra_rules_input)
+
     layout.addLayout(form)
 
     hint = qt_widgets.QLabel(
@@ -268,6 +280,11 @@ def read_pipeline_settings_from_view(
                     SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME,
                 )
             )
+        ),
+        extra_rules_folder=line_edit_text(
+            view,
+            qt_widgets,
+            SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
         ),
     )
 
@@ -350,6 +367,12 @@ def update_pipeline_settings_view(
             SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME,
         ),
         format_profile_id_list(pipeline.pinned_asset_class_profile_ids),
+    )
+    set_line_edit_text(
+        view,
+        qt_widgets,
+        SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
+        pipeline.extra_rules_folder,
     )
 
 

@@ -19,6 +19,7 @@ from shader_health.core.rule_schema import RuleResult
 from shader_health.core.rule_wizard import build_draft_prefill_from_issue
 from shader_health.ui.new_rule_wizard_dialog import (
     NEW_RULE_WIZARD_DIALOG_OBJECT_NAME,
+    NEW_RULE_WIZARD_EXPORT_STUDIO_BUTTON_OBJECT_NAME,
     NEW_RULE_WIZARD_STATUS_LABEL_OBJECT_NAME,
     NewRuleWizardDialog,
 )
@@ -119,6 +120,48 @@ def test_new_rule_wizard_dialog_applies_issue_prefill():
     assert controller.field_inputs["rule_id"].value == prefill.draft_input.rule_id
     assert controller.field_inputs["expected"].value == "Raw"
     assert "Prefilled" in controller.status_label.text
+
+
+def test_new_rule_wizard_dialog_exports_to_studio_extra_rules(tmp_path: Path):
+    from shader_health.core.rule_wizard import (
+        RULE_TEMPLATE_PATH_EXISTS,
+        IncidentRuleExportContext,
+        NewRuleDraftInput,
+        build_rule_draft,
+    )
+
+    controller = NewRuleWizardDialog.build(
+        NewRuleWizardFakeQtWidgets,
+        studio_extra_rules_folder=str(tmp_path / "extra_rules"),
+        export_context=IncidentRuleExportContext(
+            source_rule_id="common.texture.missing",
+            scene_path=str(tmp_path / "demo.ma"),
+        ),
+    )
+    draft = build_rule_draft(
+        RULE_TEMPLATE_PATH_EXISTS,
+        NewRuleDraftInput(
+            rule_id="studio.incident.export.test",
+            name="Export test",
+            message="Missing file.",
+            why="Farm risk.",
+            severity="critical",
+            dependency_kind="texture",
+        ),
+    )
+    controller.field_inputs["rule_id"].setText(draft["id"])
+    controller.field_inputs["name"].setText(draft["name"])
+    controller.field_inputs["message"].setText(draft["message"])
+    controller.field_inputs["why"].setText(draft["why"])
+    controller.field_inputs["severity"].setCurrentText("critical")
+    controller.field_inputs["dependency_kind"].setText("texture")
+
+    export_button = _find(controller.dialog, NEW_RULE_WIZARD_EXPORT_STUDIO_BUTTON_OBJECT_NAME)
+    export_button.clicked.handlers[0]()
+
+    status = _find(controller.dialog, NEW_RULE_WIZARD_STATUS_LABEL_OBJECT_NAME)
+    assert "Exported incident rule sidecar" in status.text
+    assert (tmp_path / "extra_rules" / "studio.incident.export.test.json").is_file()
 
 
 def test_new_rule_wizard_dialog_save_writes_json(tmp_path: Path):

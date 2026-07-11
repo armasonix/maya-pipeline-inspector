@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +13,13 @@ from shader_health.core.rule_loader import DEFAULT_RULE_ROOT
 from shader_health.core.rule_pack_validation import (
     RuleValidationFailure,
     collect_rule_ids,
+    validate_paths,
     validate_rule_object,
 )
 from shader_health.core.rule_schema import RULE_SCHEMA_VERSION, SEVERITIES, RuleDefinition
+from shader_health.studio_config import StudioConfig
+
+INCIDENT_RULE_SIDECAR_SCHEMA_VERSION = "1.0"
 
 RULE_TEMPLATE_ATTRIBUTE_EQUALS = "attribute_equals"
 RULE_TEMPLATE_NUMERIC_MAX = "numeric_max"
@@ -67,6 +72,23 @@ class RuleDraftValidationResult:
     valid: bool
     rule: RuleDefinition | None
     errors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IncidentRuleExportContext:
+    """Optional incident metadata stored in exported sidecar JSON."""
+
+    source_rule_id: str = ""
+    scene_path: str = ""
+
+
+@dataclass(frozen=True)
+class IncidentRuleDraftExportResult:
+    """Outcome from exporting an incident rule draft sidecar."""
+
+    success: bool
+    path: Path | None
+    message: str
 
 
 _RULE_TEMPLATES: dict[str, RuleTemplateSpec] = {
@@ -262,6 +284,89 @@ def write_rule_draft_file(path: Path, draft: Mapping[str, Any]) -> Path:
         encoding="utf-8",
     )
     return normalized.resolve()
+
+
+def studio_extra_rules_folder(studio_config: StudioConfig | None) -> Path | None:
+    """Return the configured studio extra_rules export folder, if any."""
+
+    if studio_config is None:
+        return None
+    raw = studio_config.pipeline.extra_rules_folder.strip()
+    if not raw:
+        return None
+    return Path(raw)
+
+
+def build_incident_rule_sidecar_payload(
+    draft: Mapping[str, Any],
+    *,
+    source_rule_id: str = "",
+    scene_path: str = "",
+    exported_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Build the incident rule sidecar JSON payload."""
+
+    timestamp = exported_at_utc or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return {
+        "schema_version": INCIDENT_RULE_SIDECAR_SCHEMA_VERSION,
+        "exported_from": "incident",
+        "source_rule_id": source_rule_id.strip(),
+        "scene_path": scene_path.strip(),
+        "exported_at_utc": timestamp,
+        "rules": [dict(draft)],
+    }
+
+
+def incident_rule_sidecar_path(extra_rules_folder: Path, rule_id: str) -> Path:
+    """Return the export path for one incident rule sidecar."""
+
+    safe_name = rule_id.strip().replace("/", "_").replace("\\", "_") or "studio.incident.draft"
+    return extra_rules_folder.expanduser() / f"{safe_name}.json"
+
+
+def export_incident_rule_draft_to_studio_extra_rules(
+    draft: Mapping[str, Any],
+    extra_rules_folder: Path | str,
+    *,
+    export_context: IncidentRuleExportContext | None = None,
+    known_rule_ids: Iterable[str] = (),
+) -> IncidentRuleDraftExportResult:
+    """Validate and export an incident rule draft sidecar to the studio extra_rules folder."""
+
+    validation = validate_new_rule_draft(draft, known_rule_ids=known_rule_ids)
+    if not validation.valid or validation.rule is None:
+        message = validation.errors[0] if validation.errors else "Rule draft is invalid."
+        return IncidentRuleDraftExportResult(success=False, path=None, message=message)
+
+    folder = Path(extra_rules_folder).expanduser()
+    context = export_context or IncidentRuleExportContext()
+    output_path = incident_rule_sidecar_path(folder, validation.rule.id)
+    payload = build_incident_rule_sidecar_payload(
+        validation.rule.to_dict(),
+        source_rule_id=context.source_rule_id,
+        scene_path=context.scene_path,
+    )
+
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        validate_paths([output_path])
+    except (OSError, RuleValidationFailure) as exc:
+        return IncidentRuleDraftExportResult(
+            success=False,
+            path=None,
+            message=f"Could not export incident rule draft: {exc}",
+        )
+
+    resolved = output_path.resolve()
+    return IncidentRuleDraftExportResult(
+        success=True,
+        path=resolved,
+        message=f"Exported incident rule sidecar to {resolved}",
+    )
 
 
 def default_draft_input_for_template(template_id: str) -> NewRuleDraftInput:

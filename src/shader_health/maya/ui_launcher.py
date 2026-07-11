@@ -442,6 +442,11 @@ def _open_rule_editor_from_ui(content: Any, qt_widgets: Any) -> None:
 _open_rule_browser_from_ui = _open_rule_editor_from_ui
 
 
+def _studio_extra_rules_folder_for_content(content: Any) -> str:
+    studio_config = _studio_config_for_content(content)
+    return studio_config.pipeline.extra_rules_folder.strip()
+
+
 def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.core.rule_wizard import known_rule_ids_for_authoring
     from shader_health.runtime_preferences import user_extra_rule_paths
@@ -452,20 +457,26 @@ def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
 
     user_config = _user_config_for_content(content)
     extra_paths = user_extra_rule_paths(user_config)
+    studio_folder = _studio_extra_rules_folder_for_content(content)
     default_output = ""
-    if extra_paths:
+    if studio_folder:
+        default_output = str(Path(studio_folder) / "custom_rule.json")
+    elif extra_paths:
         default_output = str(extra_paths[0] / "custom_rule.json")
     show_new_rule_wizard_dialog(
         qt_widgets,
         parent=content,
         known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
         default_output_path=default_output,
+        studio_extra_rules_folder=studio_folder,
     )
 
 
 def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.core.rule_wizard import (
+        IncidentRuleExportContext,
         build_draft_prefill_from_issue,
+        incident_rule_sidecar_path,
         known_rule_ids_for_authoring,
     )
     from shader_health.runtime_preferences import user_extra_rule_paths
@@ -486,13 +497,19 @@ def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
 
     rules = getattr(content, "_shader_health_rules", ())
     rules_by_id = {rule.id: rule for rule in rules}
-    source_rule = rules_by_id.get(str(getattr(issue, "rule_id", "") or ""))
+    source_rule_id = str(getattr(issue, "rule_id", "") or "")
+    source_rule = rules_by_id.get(source_rule_id)
     prefill = build_draft_prefill_from_issue(issue, source_rule)
 
     user_config = _user_config_for_content(content)
     extra_paths = user_extra_rule_paths(user_config)
+    studio_folder = _studio_extra_rules_folder_for_content(content)
     default_output = ""
-    if extra_paths:
+    if studio_folder:
+        default_output = str(
+            incident_rule_sidecar_path(Path(studio_folder), prefill.draft_input.rule_id)
+        )
+    elif extra_paths:
         default_output = str(extra_paths[0] / f"{prefill.draft_input.rule_id}.json")
     show_new_rule_wizard_dialog(
         qt_widgets,
@@ -500,6 +517,11 @@ def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
         known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
         default_output_path=default_output,
         prefill=prefill,
+        studio_extra_rules_folder=studio_folder,
+        export_context=IncidentRuleExportContext(
+            source_rule_id=source_rule_id,
+            scene_path=str(getattr(content, "_shader_health_scene_path", "") or ""),
+        ),
     )
 
 

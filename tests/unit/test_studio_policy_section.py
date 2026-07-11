@@ -8,6 +8,7 @@ from shader_health.studio_config import (
 )
 from shader_health.ui.studio_policy_section import (
     SETTINGS_ALLOW_CRITICAL_WAIVERS_TOGGLE_OBJECT_NAME,
+    SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
     SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,
     SETTINGS_MANIFEST_MAX_FINGERPRINT_CHANGES_INPUT_OBJECT_NAME,
     SETTINGS_MANIFEST_MAX_NEW_CHANGES_INPUT_OBJECT_NAME,
@@ -233,11 +234,15 @@ def test_build_studio_policy_section_populates_policy_fields():
             ),
             pinned_workflow_profile_ids=("artist_relaxed",),
             pinned_asset_class_profile_ids=("asset_class_hero",),
+            extra_rules_folder="//studio/share/extra_rules",
         ),
     )
     section = build_studio_policy_section(FakeQtWidgets, config)
 
     assert _find(section, SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME).value == "Demo Studio"
+    assert _find(section, SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME).value == (
+        "//studio/share/extra_rules"
+    )
     assert _find(section, SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME).checked is False
     assert _find(section, SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME).value == "pipeline_td"
     assert _find(section, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).value == (
@@ -261,6 +266,9 @@ def test_read_studio_policy_from_view_reads_policy_fields():
     _find(section, SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME).setPlainText(
         "asset_class_prop"
     )
+    _find(section, SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME).setText(
+        "D:/studio/extra_rules"
+    )
 
     studio = read_studio_policy_from_view(section, FakeQtWidgets, base=config)
 
@@ -273,6 +281,7 @@ def test_read_studio_policy_from_view_reads_policy_fields():
     assert studio.pipeline.manifest_gate_defaults.block_on_new_textures is False
     assert studio.pipeline.pinned_workflow_profile_ids == ("publish_strict",)
     assert studio.pipeline.pinned_asset_class_profile_ids == ("asset_class_prop",)
+    assert studio.pipeline.extra_rules_folder == "D:/studio/extra_rules"
 
 
 def test_update_studio_policy_view_refreshes_policy_fields():
