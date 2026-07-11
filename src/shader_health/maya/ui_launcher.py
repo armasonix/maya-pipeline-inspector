@@ -82,6 +82,7 @@ USER_CONFIG_ATTR = "_shader_health_user_config"
 MERGED_RUNTIME_CONFIG_ATTR = "_shader_health_merged_runtime_config"
 SAVED_STUDIO_CONFIG_ATTR = "_shader_health_saved_studio_config"
 SAVED_USER_CONFIG_ATTR = "_shader_health_saved_user_config"
+SESSION_RULE_OVERRIDES_ATTR = "_shader_health_session_rule_overrides"
 
 _PANEL: Optional[Any] = None
 _SCRIPT_JOBS: list[int] = []
@@ -373,6 +374,14 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_open_rule_editor=lambda: _open_rule_editor_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_open_new_rule_wizard=lambda: _open_new_rule_wizard_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
 
 
@@ -396,6 +405,62 @@ def _user_config_for_content(content: Any) -> UserPreferences:
     if isinstance(config, UserPreferences):
         return config
     return UserPreferences.default()
+
+
+def _session_rule_overrides_for_content(content: Any) -> dict[str, Any]:
+    overrides = getattr(content, SESSION_RULE_OVERRIDES_ATTR, None)
+    if isinstance(overrides, dict):
+        return overrides
+    return {}
+
+
+def _set_session_rule_overrides(content: Any, overrides: dict[str, Any]) -> None:
+    setattr(content, SESSION_RULE_OVERRIDES_ATTR, dict(overrides))
+
+
+def _open_rule_editor_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_browser import load_packaged_rules_catalog
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.rule_editor_dialog import show_rule_editor_dialog
+
+    if content is None:
+        return
+
+    user_config = _user_config_for_content(content)
+    catalog = load_packaged_rules_catalog(
+        extra_rule_paths=user_extra_rule_paths(user_config),
+    )
+    show_rule_editor_dialog(
+        qt_widgets,
+        parent=content,
+        catalog=catalog,
+        session_overrides=_session_rule_overrides_for_content(content),
+        on_save=lambda overrides: _set_session_rule_overrides(content, overrides),
+    )
+
+
+_open_rule_browser_from_ui = _open_rule_editor_from_ui
+
+
+def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_wizard import known_rule_ids_for_authoring
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.new_rule_wizard_dialog import show_new_rule_wizard_dialog
+
+    if content is None:
+        return
+
+    user_config = _user_config_for_content(content)
+    extra_paths = user_extra_rule_paths(user_config)
+    default_output = ""
+    if extra_paths:
+        default_output = str(extra_paths[0] / "custom_rule.json")
+    show_new_rule_wizard_dialog(
+        qt_widgets,
+        parent=content,
+        known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
+        default_output_path=default_output,
+    )
 
 
 def _deadline_config_for_content(content: Any) -> Any:
@@ -1125,12 +1190,14 @@ def _run_validation_job(
         asset_class_id = _selected_asset_class_id(content, qt_widgets)
         studio_config = _studio_config_for_content(content)
         user_config = _user_config_for_content(content)
+        session_rule_overrides = _session_rule_overrides_for_content(content)
         if scan_scope == "selection":
             result = validate_selection_action(
                 profile_id=selected_profile,
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
                 user_config=user_config,
+                session_rule_overrides=session_rule_overrides,
             )
         else:
             result = validate_scene_action(
@@ -1138,6 +1205,7 @@ def _run_validation_job(
                 asset_class_id=asset_class_id,
                 studio_config=studio_config,
                 user_config=user_config,
+                session_rule_overrides=session_rule_overrides,
             )
     except Exception as exc:  # noqa: BLE001
         message = f"Validation failed: {exc}"

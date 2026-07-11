@@ -79,6 +79,7 @@ def validate_scene_action(
     studio_config: Optional[Any] = None,
     extra_rule_paths: tuple[Path, ...] = (),
     user_config: Optional[UserPreferences] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> Any:
     """Validate the current Maya scene and return a UI-friendly result object."""
 
@@ -89,6 +90,7 @@ def validate_scene_action(
         studio_config=studio_config,
         extra_rule_paths=extra_rule_paths,
         user_config=user_config,
+        session_rule_overrides=session_rule_overrides,
     )
 
 
@@ -99,6 +101,7 @@ def validate_selection_action(
     studio_config: Optional[Any] = None,
     extra_rule_paths: tuple[Path, ...] = (),
     user_config: Optional[UserPreferences] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> Any:
     """Validate the current Maya selection and return a UI-friendly result object."""
 
@@ -109,6 +112,7 @@ def validate_selection_action(
         studio_config=studio_config,
         extra_rule_paths=extra_rule_paths,
         user_config=user_config,
+        session_rule_overrides=session_rule_overrides,
     )
 
 
@@ -390,6 +394,7 @@ def _validate(
     studio_config: Optional[Any] = None,
     extra_rule_paths: tuple[Path, ...] = (),
     user_config: Optional[UserPreferences] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> Any:
     from shader_health.maya.scanner import scan_scene, scan_selection, selection_node_names
 
@@ -420,6 +425,7 @@ def _validate(
             profile_id=profile_id or None,
             asset_class_id=asset_class_id or None,
             studio_config=studio_config,
+            session_rule_overrides=session_rule_overrides,
         )
     else:
         run = run_validation(
@@ -429,6 +435,7 @@ def _validate(
             scan_scope=scan_scope,
             studio_config=studio_config,
             extra_rule_paths=extra_rule_paths,
+            session_rule_overrides=session_rule_overrides,
         )
     return _validation_result(run, action=f"validate_{scan_scope}")
 
