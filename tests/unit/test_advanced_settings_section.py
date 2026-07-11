@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from shader_health.ui.advanced_settings_section import (
-    SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME,
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
     SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
     SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME,
     SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME,
+    SETTINGS_RULE_EDITOR_BUTTON_OBJECT_NAME,
     build_advanced_settings_section,
     parse_extra_rule_paths,
     parse_max_issues_displayed,
@@ -190,6 +190,21 @@ def test_advanced_settings_section_exposes_new_rule_wizard_button():
     assert opened == ["opened"]
 
 
+def test_advanced_settings_section_exposes_rule_editor_button():
+    opened: list[str] = []
+
+    section = build_advanced_settings_section(
+        FakeQtWidgets,
+        UserPreferences(),
+        on_open_rule_editor=lambda: opened.append("opened"),
+    )
+    button = _find(section, SETTINGS_RULE_EDITOR_BUTTON_OBJECT_NAME)
+
+    assert button.text == "Open Rule Editor…"
+    button.clicked.handlers[0]()
+    assert opened == ["opened"]
+
+
 def test_advanced_settings_section_exposes_browse_rules_button():
     opened: list[str] = []
 
@@ -198,9 +213,9 @@ def test_advanced_settings_section_exposes_browse_rules_button():
         UserPreferences(),
         on_open_rule_browser=lambda: opened.append("opened"),
     )
-    button = _find(section, SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME)
+    button = _find(section, SETTINGS_RULE_EDITOR_BUTTON_OBJECT_NAME)
 
-    assert button.text == "Browse Rules…"
+    assert button.text == "Open Rule Editor…"
     assert button.clicked.handlers
     button.clicked.handlers[0]()
     assert opened == ["opened"]

@@ -1,7 +1,7 @@
 """Packaged rule catalog and safe session override helpers for the rule browser."""
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,7 @@ from shader_health.core.rule_loader import (
     build_rule_search_paths,
     load_rules_from_path,
 )
+from shader_health.core.rule_pack_validation import RuleValidationFailure, validate_rule_object
 from shader_health.core.rule_schema import SEVERITIES, RuleDefinition
 
 SAFE_SEVERITIES = tuple(sorted(SEVERITIES))
@@ -155,6 +156,36 @@ def merge_session_rule_overrides(
     merged = dict(profile_overrides)
     merged.update(session_overrides)
     return merged
+
+
+def validate_effective_rule(
+    entry: RuleBrowserEntry,
+    session_override: RuleOverride | None,
+) -> RuleDefinition:
+    """Validate the effective rule using the same schema checks as validate_rules.py."""
+
+    rule = effective_rule(entry, session_override)
+    return validate_rule_object(rule.to_dict())
+
+
+def validate_session_overrides(
+    catalog: Sequence[RuleBrowserEntry],
+    session_overrides: Mapping[str, RuleOverride],
+) -> tuple[str, ...]:
+    """Validate every active session override against the rule schema."""
+
+    entries_by_id = {entry.rule.id: entry for entry in catalog}
+    errors: list[str] = []
+    for rule_id, override in session_overrides.items():
+        entry = entries_by_id.get(rule_id)
+        if entry is None:
+            errors.append(f"Unknown rule id {rule_id!r}.")
+            continue
+        try:
+            validate_effective_rule(entry, override)
+        except RuleValidationFailure as exc:
+            errors.append(f"{rule_id}: {exc}")
+    return tuple(errors)
 
 
 def _coerce_threshold_value(value: int | float) -> int | float:

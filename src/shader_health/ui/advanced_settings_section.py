@@ -21,7 +21,8 @@ SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME = (
 SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME = "shaderHealthInspectorSettingsDebugLoggingToggle"
 SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsMaxIssuesInput"
 SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsMayapyPathInput"
-SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsBrowseRulesButton"
+SETTINGS_RULE_EDITOR_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsRuleEditorButton"
+SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME = SETTINGS_RULE_EDITOR_BUTTON_OBJECT_NAME
 SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsNewRuleWizardButton"
 
 _MIN_MAX_ISSUES_DISPLAYED = 1
@@ -33,8 +34,9 @@ def build_advanced_settings_section(
     user_config: UserPreferences,
     *,
     on_preferences_changed: Optional[Callable[[], None]] = None,
-    on_open_rule_browser: Optional[Callable[[], None]] = None,
+    on_open_rule_editor: Optional[Callable[[], None]] = None,
     on_open_new_rule_wizard: Optional[Callable[[], None]] = None,
+    on_open_rule_browser: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build the Advanced settings tab content."""
 
@@ -66,13 +68,14 @@ def build_advanced_settings_section(
     wire_plain_text_changed(extra_paths_input, on_preferences_changed)
     form.addRow("Extra rule roots", extra_paths_input)
 
-    browse_rules_button = qt_widgets.QPushButton("Browse Rules…")
-    browse_rules_button.setObjectName(SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME)
-    browse_rules_button.setToolTip(
-        "Open the packaged rule catalog and edit safe session overrides."
+    rule_editor_callback = on_open_rule_editor or on_open_rule_browser
+    rule_editor_button = qt_widgets.QPushButton("Open Rule Editor…")
+    rule_editor_button.setObjectName(SETTINGS_RULE_EDITOR_BUTTON_OBJECT_NAME)
+    rule_editor_button.setToolTip(
+        "Open the Rule Editor to browse packaged rules and save safe session overrides."
     )
-    wire_button(browse_rules_button, on_open_rule_browser)
-    form.addRow("Rule browser", browse_rules_button)
+    wire_button(rule_editor_button, rule_editor_callback)
+    form.addRow("Rule Editor", rule_editor_button)
 
     new_rule_button = qt_widgets.QPushButton("New Rule…")
     new_rule_button.setObjectName(SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME)

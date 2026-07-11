@@ -16,6 +16,7 @@ from shader_health.core.rule_browser import load_packaged_rules_catalog
 from shader_health.ui.rule_editor_dialog import (
     RULE_BROWSER_LIST_OBJECT_NAME,
     RULE_EDITOR_DIALOG_OBJECT_NAME,
+    RULE_EDITOR_SAVE_BUTTON_OBJECT_NAME,
     RULE_EDITOR_STATUS_LABEL_OBJECT_NAME,
     RuleEditorDialog,
 )
@@ -110,6 +111,30 @@ def test_rule_editor_dialog_apply_saves_session_override():
     assert controller.session_overrides[entry.rule.id].enabled is False
     assert controller.session_overrides[entry.rule.id].severity == "error"
     assert controller.session_overrides[entry.rule.id].check_params == {"max": 48}
+
+
+def test_rule_editor_dialog_save_validates_and_invokes_callback():
+    entry = next(
+        item
+        for item in load_packaged_rules_catalog()
+        if item.rule.id == "common.shader_complexity.graph_nodes.max"
+    )
+    saved: list[dict[str, object]] = []
+
+    controller = RuleEditorDialog.build(
+        RuleEditorFakeQtWidgets,
+        catalog=(entry,),
+        on_save=lambda overrides: saved.append(dict(overrides)),
+    )
+    controller.enabled_toggle.setChecked(False)
+    controller.apply_selected_rule()
+    save_button = _find(controller.dialog, RULE_EDITOR_SAVE_BUTTON_OBJECT_NAME)
+    save_button.clicked.handlers[0]()
+
+    assert len(saved) == 1
+    assert entry.rule.id in saved[0]
+    status = _find(controller.dialog, RULE_EDITOR_STATUS_LABEL_OBJECT_NAME)
+    assert "validate_rules" in status.text.lower()
 
 
 def test_rule_editor_dialog_apply_clears_override_when_defaults_restored():

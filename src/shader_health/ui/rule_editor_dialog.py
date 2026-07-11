@@ -11,8 +11,11 @@ from shader_health.core.rule_browser import (
     build_session_override_from_edits,
     editable_fields_for_rule,
     effective_rule,
+    validate_effective_rule,
+    validate_session_overrides,
 )
 from shader_health.core.rule_loader import RuleOverride
+from shader_health.core.rule_pack_validation import RuleValidationFailure
 from shader_health.ui.settings_widgets import wire_button
 
 RULE_EDITOR_DIALOG_OBJECT_NAME = "shaderHealthInspectorRuleEditorDialog"
@@ -25,12 +28,13 @@ RULE_EDITOR_THRESHOLD_INPUT_OBJECT_NAME = "shaderHealthInspectorRuleEditorThresh
 RULE_EDITOR_THRESHOLD_LABEL_OBJECT_NAME = "shaderHealthInspectorRuleEditorThresholdLabel"
 RULE_EDITOR_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorRuleEditorStatusLabel"
 RULE_EDITOR_APPLY_BUTTON_OBJECT_NAME = "shaderHealthInspectorRuleEditorApplyButton"
+RULE_EDITOR_SAVE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRuleEditorSaveButton"
 RULE_EDITOR_CLOSE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRuleEditorCloseButton"
 
 RULE_EDITOR_INTRO = (
-    "Browse packaged validation rules and apply safe session overrides for enabled, "
-    "severity, and numeric thresholds. Changes apply to the current Maya session until "
-    "the panel is closed."
+    "Browse packaged validation rules and edit the safe enabled, severity, and threshold "
+    "subset. Save runs the same schema checks as tools/validate_rules.py before applying "
+    "session overrides for the current Maya session."
 )
 
 
@@ -49,6 +53,7 @@ class RuleEditorDialog:
     status_label: Any
     entries: tuple[RuleBrowserEntry, ...]
     session_overrides: dict[str, RuleOverride]
+    on_save: Callable[[dict[str, RuleOverride]], None] | None = None
 
     @classmethod
     def build(
@@ -57,7 +62,8 @@ class RuleEditorDialog:
         *,
         catalog: Sequence[RuleBrowserEntry],
         session_overrides: Mapping[str, RuleOverride] | None = None,
-        window_title: str = "Rule Browser",
+        on_save: Callable[[dict[str, RuleOverride]], None] | None = None,
+        window_title: str = "Rule Editor",
     ) -> RuleEditorDialog:
         dialog = qt_widgets.QDialog()
         dialog.setObjectName(RULE_EDITOR_DIALOG_OBJECT_NAME)
@@ -131,11 +137,14 @@ class RuleEditorDialog:
         layout.addWidget(status_label)
 
         button_row = qt_widgets.QHBoxLayout()
-        apply_button = qt_widgets.QPushButton("Apply Session Override")
+        apply_button = qt_widgets.QPushButton("Apply")
         apply_button.setObjectName(RULE_EDITOR_APPLY_BUTTON_OBJECT_NAME)
+        save_button = qt_widgets.QPushButton("Save")
+        save_button.setObjectName(RULE_EDITOR_SAVE_BUTTON_OBJECT_NAME)
         close_button = qt_widgets.QPushButton("Close")
         close_button.setObjectName(RULE_EDITOR_CLOSE_BUTTON_OBJECT_NAME)
         button_row.addWidget(apply_button)
+        button_row.addWidget(save_button)
         button_row.addStretch(1)
         button_row.addWidget(close_button)
         layout.addLayout(button_row)
@@ -152,9 +161,18 @@ class RuleEditorDialog:
             status_label=status_label,
             entries=tuple(catalog),
             session_overrides=dict(session_overrides or {}),
+            on_save=on_save,
         )
         wire_button(close_button, lambda: _close_dialog(dialog))
-        wire_button(apply_button, controller.apply_selected_rule)
+
+        def _apply_selected_rule() -> None:
+            controller.apply_selected_rule()
+
+        def _save_session_overrides() -> None:
+            controller.save_session_overrides()
+
+        wire_button(apply_button, _apply_selected_rule)
+        wire_button(save_button, _save_session_overrides)
         current_row_changed = getattr(rule_list, "currentRowChanged", None)
         if current_row_changed is not None:
             current_row_changed.connect(controller.load_selected_rule)
@@ -228,6 +246,12 @@ class RuleEditorDialog:
             self.set_status_message(str(exc))
             return
 
+        try:
+            validate_effective_rule(entry, override)
+        except RuleValidationFailure as exc:
+            self.set_status_message(f"validate_rules check failed: {exc}")
+            return
+
         if override is None:
             self.session_overrides.pop(entry.rule.id, None)
             self.set_status_message("Session override cleared; packaged defaults restored.")
@@ -235,6 +259,27 @@ class RuleEditorDialog:
             self.session_overrides[entry.rule.id] = override
             self.set_status_message("Session override saved for this rule.")
         self.load_selected_rule(getattr(self.rule_list, "currentRow", lambda: 0)())
+
+    def save_session_overrides(self) -> bool:
+        """Apply pending edits, validate overrides, and persist to the panel session."""
+
+        self.apply_selected_rule()
+        errors = validate_session_overrides(self.entries, self.session_overrides)
+        if errors:
+            self.set_status_message(errors[0])
+            return False
+
+        if self.on_save is not None:
+            self.on_save(dict(self.session_overrides))
+
+        count = len(self.session_overrides)
+        if count:
+            self.set_status_message(
+                f"Saved {count} session override(s) after validate_rules checks."
+            )
+        else:
+            self.set_status_message("Saved with no active session overrides.")
+        return True
 
     def set_status_message(self, message: str) -> None:
         set_text = getattr(self.status_label, "setText", None)
@@ -269,10 +314,9 @@ def show_rule_editor_dialog(
         qt_widgets,
         catalog=catalog,
         session_overrides=session_overrides,
+        on_save=on_save,
     )
     dialog.show(parent=parent, modal=True)
-    if on_save is not None:
-        on_save(dict(dialog.session_overrides))
     return dict(dialog.session_overrides)
 
 

@@ -72,6 +72,25 @@ def test_build_session_override_from_edits_captures_safe_changes():
     assert effective.check.params["max"] == 32
 
 
+def test_validate_effective_rule_uses_validate_rules_schema():
+    entry = next(
+        item
+        for item in load_packaged_rules_catalog()
+        if item.rule.id == "common.shader_complexity.graph_nodes.max"
+    )
+    from shader_health.core.rule_browser import validate_effective_rule
+    from shader_health.core.rule_loader import RuleOverride
+
+    rule = validate_effective_rule(
+        entry,
+        RuleOverride(rule_id=entry.rule.id, severity="error", check_params={"max": 32}),
+    )
+
+    assert rule.id == entry.rule.id
+    assert rule.severity == "error"
+    assert rule.check.params["max"] == 32
+
+
 def test_merge_session_rule_overrides_layers_on_profile_overrides():
     profile_override = RuleOverride(rule_id="common.test", severity="warning")
     session_override = RuleOverride(rule_id="common.test", enabled=False)
