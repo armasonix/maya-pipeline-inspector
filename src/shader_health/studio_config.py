@@ -69,6 +69,7 @@ class PipelineSettings:
     manifest_gate_defaults: ManifestGatePolicy = ManifestGatePolicy()
     pinned_workflow_profile_ids: tuple[str, ...] = ()
     pinned_asset_class_profile_ids: tuple[str, ...] = ()
+    extra_rules_folder: str = ""
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> PipelineSettings:
@@ -94,6 +95,7 @@ class PipelineSettings:
             pinned_asset_class_profile_ids=_profile_ids_from_value(
                 data.get("pinned_asset_class_profile_ids")
             ),
+            extra_rules_folder=str(data.get("extra_rules_folder", "") or ""),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -111,6 +113,7 @@ class PipelineSettings:
             },
             "pinned_workflow_profile_ids": list(self.pinned_workflow_profile_ids),
             "pinned_asset_class_profile_ids": list(self.pinned_asset_class_profile_ids),
+            "extra_rules_folder": self.extra_rules_folder,
         }
 
 

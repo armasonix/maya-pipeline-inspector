@@ -8,11 +8,14 @@ from typing import Any
 
 from shader_health.core.rule_schema import SEVERITIES
 from shader_health.core.rule_wizard import (
+    IncidentRuleExportContext,
+    IssueRuleDraftPrefill,
     NewRuleDraftInput,
     RuleDraftValidationResult,
     RuleTemplateSpec,
     build_rule_draft,
     default_draft_input_for_template,
+    export_incident_rule_draft_to_studio_extra_rules,
     list_rule_templates,
     validate_new_rule_draft,
     write_rule_draft_file,
@@ -29,6 +32,9 @@ NEW_RULE_WIZARD_VALIDATE_BUTTON_OBJECT_NAME = (
     "shaderHealthInspectorNewRuleWizardValidateButton"
 )
 NEW_RULE_WIZARD_SAVE_BUTTON_OBJECT_NAME = "shaderHealthInspectorNewRuleWizardSaveButton"
+NEW_RULE_WIZARD_EXPORT_STUDIO_BUTTON_OBJECT_NAME = (
+    "shaderHealthInspectorNewRuleWizardExportStudioButton"
+)
 NEW_RULE_WIZARD_CLOSE_BUTTON_OBJECT_NAME = "shaderHealthInspectorNewRuleWizardCloseButton"
 
 NEW_RULE_WIZARD_INTRO = (
@@ -59,8 +65,11 @@ class NewRuleWizardDialog:
     status_label: Any
     validate_button: Any
     save_button: Any
+    export_studio_button: Any
     templates: tuple[RuleTemplateSpec, ...]
     known_rule_ids: frozenset[str]
+    studio_extra_rules_folder: str = ""
+    export_context: IncidentRuleExportContext | None = None
     last_validation: RuleDraftValidationResult | None = None
 
     @classmethod
@@ -70,6 +79,9 @@ class NewRuleWizardDialog:
         *,
         known_rule_ids: Iterable[str] = (),
         default_output_path: str = "",
+        prefill: IssueRuleDraftPrefill | None = None,
+        studio_extra_rules_folder: str = "",
+        export_context: IncidentRuleExportContext | None = None,
         window_title: str = "New Rule Wizard",
     ) -> NewRuleWizardDialog:
         templates = list_rule_templates()
@@ -139,10 +151,13 @@ class NewRuleWizardDialog:
         validate_button.setObjectName(NEW_RULE_WIZARD_VALIDATE_BUTTON_OBJECT_NAME)
         save_button = qt_widgets.QPushButton("Save Draft")
         save_button.setObjectName(NEW_RULE_WIZARD_SAVE_BUTTON_OBJECT_NAME)
+        export_studio_button = qt_widgets.QPushButton("Export to Studio extra_rules")
+        export_studio_button.setObjectName(NEW_RULE_WIZARD_EXPORT_STUDIO_BUTTON_OBJECT_NAME)
         close_button = qt_widgets.QPushButton("Close")
         close_button.setObjectName(NEW_RULE_WIZARD_CLOSE_BUTTON_OBJECT_NAME)
         button_row.addWidget(validate_button)
         button_row.addWidget(save_button)
+        button_row.addWidget(export_studio_button)
         button_row.addStretch(1)
         button_row.addWidget(close_button)
         layout.addLayout(button_row)
@@ -154,8 +169,11 @@ class NewRuleWizardDialog:
             status_label=status_label,
             validate_button=validate_button,
             save_button=save_button,
+            export_studio_button=export_studio_button,
             templates=templates,
             known_rule_ids=frozenset(known_rule_ids),
+            studio_extra_rules_folder=studio_extra_rules_folder,
+            export_context=export_context,
         )
         def _validate_draft() -> None:
             controller.validate_draft()
@@ -163,16 +181,57 @@ class NewRuleWizardDialog:
         def _save_draft() -> None:
             controller.save_draft()
 
+        def _export_to_studio_extra_rules() -> None:
+            controller.export_to_studio_extra_rules()
+
         wire_button(close_button, lambda: _close_dialog(dialog))
         wire_button(validate_button, _validate_draft)
         wire_button(save_button, _save_draft)
+        wire_button(export_studio_button, _export_to_studio_extra_rules)
+        set_export_enabled = getattr(export_studio_button, "setEnabled", None)
+        if set_export_enabled is not None:
+            set_export_enabled(bool(studio_extra_rules_folder.strip()))
         current_index_changed = getattr(template_combo, "currentIndexChanged", None)
         if current_index_changed is not None:
             current_index_changed.connect(controller.load_template_defaults)
-        controller.load_template_defaults(0)
+        if prefill is not None:
+            controller.apply_prefill(prefill)
+        else:
+            controller.load_template_defaults(0)
         if default_output_path:
             controller.field_inputs["output_path"].setText(default_output_path)
         return controller
+
+    def apply_prefill(self, prefill: IssueRuleDraftPrefill) -> None:
+        template_index = next(
+            (
+                index
+                for index, template in enumerate(self.templates)
+                if template.template_id == prefill.template_id
+            ),
+            0,
+        )
+        set_current_index = getattr(self.template_combo, "setCurrentIndex", None)
+        if set_current_index is not None:
+            set_current_index(template_index)
+
+        draft = prefill.draft_input
+        self._set_field_text("rule_id", draft.rule_id)
+        self._set_field_text("name", draft.name)
+        self._set_field_text("message", draft.message)
+        self._set_field_text("why", draft.why)
+        self._set_combo_text("severity", draft.severity)
+        self._set_field_text("owner", draft.owner)
+        self._set_field_text("scope", draft.scope)
+        self._set_field_text("attribute", draft.attribute)
+        self._set_field_text("expected", draft.expected)
+        if draft.max_value is not None:
+            self._set_field_text("max_value", str(draft.max_value))
+        else:
+            self._set_field_text("max_value", "")
+        self._set_field_text("dependency_kind", draft.dependency_kind)
+        self.last_validation = None
+        self.set_status_message("Prefilled from selected issue context.")
 
     def selected_template(self) -> RuleTemplateSpec:
         index = getattr(self.template_combo, "currentIndex", lambda: 0)()
@@ -261,6 +320,31 @@ class NewRuleWizardDialog:
         self.set_status_message(f"Saved rule draft to {saved_path}")
         return saved_path
 
+    def export_to_studio_extra_rules(self) -> Path | None:
+        folder = self.studio_extra_rules_folder.strip()
+        if not folder:
+            self.set_status_message(
+                "Configure pipeline.extra_rules_folder in shader_health_studio.json first."
+            )
+            return None
+
+        try:
+            draft = self.build_draft()
+        except ValueError as exc:
+            self.set_status_message(str(exc))
+            return None
+
+        result = export_incident_rule_draft_to_studio_extra_rules(
+            draft,
+            folder,
+            export_context=self.export_context,
+            known_rule_ids=self.known_rule_ids,
+        )
+        self.set_status_message(result.message)
+        if result.success and result.path is not None:
+            self._set_field_text("output_path", str(result.path))
+        return result.path if result.success else None
+
     def set_status_message(self, message: str) -> None:
         set_text = getattr(self.status_label, "setText", None)
         if set_text is not None:
@@ -317,6 +401,9 @@ def show_new_rule_wizard_dialog(
     parent: Any | None = None,
     known_rule_ids: Iterable[str] = (),
     default_output_path: str = "",
+    prefill: IssueRuleDraftPrefill | None = None,
+    studio_extra_rules_folder: str = "",
+    export_context: IncidentRuleExportContext | None = None,
 ) -> None:
     """Display the new rule wizard dialog."""
 
@@ -324,6 +411,9 @@ def show_new_rule_wizard_dialog(
         qt_widgets,
         known_rule_ids=known_rule_ids,
         default_output_path=default_output_path,
+        prefill=prefill,
+        studio_extra_rules_folder=studio_extra_rules_folder,
+        export_context=export_context,
     )
     dialog.show(parent=parent, modal=True)
 

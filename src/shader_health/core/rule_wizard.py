@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +13,13 @@ from shader_health.core.rule_loader import DEFAULT_RULE_ROOT
 from shader_health.core.rule_pack_validation import (
     RuleValidationFailure,
     collect_rule_ids,
+    validate_paths,
     validate_rule_object,
 )
 from shader_health.core.rule_schema import RULE_SCHEMA_VERSION, SEVERITIES, RuleDefinition
+from shader_health.studio_config import StudioConfig
+
+INCIDENT_RULE_SIDECAR_SCHEMA_VERSION = "1.0"
 
 RULE_TEMPLATE_ATTRIBUTE_EQUALS = "attribute_equals"
 RULE_TEMPLATE_NUMERIC_MAX = "numeric_max"
@@ -67,6 +72,23 @@ class RuleDraftValidationResult:
     valid: bool
     rule: RuleDefinition | None
     errors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IncidentRuleExportContext:
+    """Optional incident metadata stored in exported sidecar JSON."""
+
+    source_rule_id: str = ""
+    scene_path: str = ""
+
+
+@dataclass(frozen=True)
+class IncidentRuleDraftExportResult:
+    """Outcome from exporting an incident rule draft sidecar."""
+
+    success: bool
+    path: Path | None
+    message: str
 
 
 _RULE_TEMPLATES: dict[str, RuleTemplateSpec] = {
@@ -264,6 +286,89 @@ def write_rule_draft_file(path: Path, draft: Mapping[str, Any]) -> Path:
     return normalized.resolve()
 
 
+def studio_extra_rules_folder(studio_config: StudioConfig | None) -> Path | None:
+    """Return the configured studio extra_rules export folder, if any."""
+
+    if studio_config is None:
+        return None
+    raw = studio_config.pipeline.extra_rules_folder.strip()
+    if not raw:
+        return None
+    return Path(raw)
+
+
+def build_incident_rule_sidecar_payload(
+    draft: Mapping[str, Any],
+    *,
+    source_rule_id: str = "",
+    scene_path: str = "",
+    exported_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Build the incident rule sidecar JSON payload."""
+
+    timestamp = exported_at_utc or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return {
+        "schema_version": INCIDENT_RULE_SIDECAR_SCHEMA_VERSION,
+        "exported_from": "incident",
+        "source_rule_id": source_rule_id.strip(),
+        "scene_path": scene_path.strip(),
+        "exported_at_utc": timestamp,
+        "rules": [dict(draft)],
+    }
+
+
+def incident_rule_sidecar_path(extra_rules_folder: Path, rule_id: str) -> Path:
+    """Return the export path for one incident rule sidecar."""
+
+    safe_name = rule_id.strip().replace("/", "_").replace("\\", "_") or "studio.incident.draft"
+    return extra_rules_folder.expanduser() / f"{safe_name}.json"
+
+
+def export_incident_rule_draft_to_studio_extra_rules(
+    draft: Mapping[str, Any],
+    extra_rules_folder: Path | str,
+    *,
+    export_context: IncidentRuleExportContext | None = None,
+    known_rule_ids: Iterable[str] = (),
+) -> IncidentRuleDraftExportResult:
+    """Validate and export an incident rule draft sidecar to the studio extra_rules folder."""
+
+    validation = validate_new_rule_draft(draft, known_rule_ids=known_rule_ids)
+    if not validation.valid or validation.rule is None:
+        message = validation.errors[0] if validation.errors else "Rule draft is invalid."
+        return IncidentRuleDraftExportResult(success=False, path=None, message=message)
+
+    folder = Path(extra_rules_folder).expanduser()
+    context = export_context or IncidentRuleExportContext()
+    output_path = incident_rule_sidecar_path(folder, validation.rule.id)
+    payload = build_incident_rule_sidecar_payload(
+        validation.rule.to_dict(),
+        source_rule_id=context.source_rule_id,
+        scene_path=context.scene_path,
+    )
+
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        validate_paths([output_path])
+    except (OSError, RuleValidationFailure) as exc:
+        return IncidentRuleDraftExportResult(
+            success=False,
+            path=None,
+            message=f"Could not export incident rule draft: {exc}",
+        )
+
+    resolved = output_path.resolve()
+    return IncidentRuleDraftExportResult(
+        success=True,
+        path=resolved,
+        message=f"Exported incident rule sidecar to {resolved}",
+    )
+
+
 def default_draft_input_for_template(template_id: str) -> NewRuleDraftInput:
     """Return starter form values for one template."""
 
@@ -301,3 +406,122 @@ def template_field_labels(template_id: str) -> Sequence[tuple[str, str]]:
     if template_id == RULE_TEMPLATE_PATH_EXISTS:
         return (("dependency_kind", "Dependency kind"),)
     return ()
+
+
+@dataclass(frozen=True)
+class IssueRuleDraftPrefill:
+    """Wizard prefill derived from a failed validation issue."""
+
+    template_id: str
+    draft_input: NewRuleDraftInput
+
+
+_CHECK_TYPE_TO_TEMPLATE = {
+    "attribute_equals": RULE_TEMPLATE_ATTRIBUTE_EQUALS,
+    "numeric_max": RULE_TEMPLATE_NUMERIC_MAX,
+    "list_length_max": RULE_TEMPLATE_NUMERIC_MAX,
+    "path_exists": RULE_TEMPLATE_PATH_EXISTS,
+}
+
+
+def template_id_for_check_type(check_type: str) -> str:
+    normalized = check_type.strip()
+    return _CHECK_TYPE_TO_TEMPLATE.get(normalized, RULE_TEMPLATE_ATTRIBUTE_EQUALS)
+
+
+def template_id_for_rule_id(rule_id: str) -> str:
+    lowered = rule_id.lower()
+    if "missing" in lowered or ".path" in lowered:
+        return RULE_TEMPLATE_PATH_EXISTS
+    if ".max" in lowered or "complexity" in lowered or "resolution" in lowered:
+        return RULE_TEMPLATE_NUMERIC_MAX
+    if "colorspace" in lowered:
+        return RULE_TEMPLATE_ATTRIBUTE_EQUALS
+    return RULE_TEMPLATE_ATTRIBUTE_EQUALS
+
+
+def suggested_incident_rule_id(source_rule_id: str) -> str:
+    base = source_rule_id.strip() or "studio.incident.unknown"
+    if base.endswith(".draft"):
+        return base
+    return f"{base}.draft"
+
+
+def build_draft_prefill_from_issue(
+    issue: Any,
+    rule: RuleDefinition | None = None,
+) -> IssueRuleDraftPrefill:
+    """Build a new-rule wizard prefill from a failed issue and optional source rule."""
+
+    rule_id = str(getattr(issue, "rule_id", "") or "")
+    template_id = template_id_for_rule_id(rule_id)
+    if rule is not None:
+        template_id = template_id_for_check_type(rule.check.type)
+
+    message = str(getattr(issue, "message", "") or "")
+    why = str(getattr(issue, "why", "") or "")
+    severity = str(getattr(issue, "severity", "") or "warning")
+    owner = str(getattr(issue, "owner", "") or "shader_td")
+    name = str(getattr(issue, "title", "") or message or rule_id)
+
+    attribute = ""
+    expected = ""
+    max_value: int | float | None = None
+    dependency_kind = "texture"
+    scope = ""
+    renderer: tuple[str, ...] = ("common", "vray", "arnold")
+
+    if rule is not None:
+        name = rule.name or name
+        message = message or rule.message
+        why = why or rule.why
+        severity = severity or rule.severity
+        owner = owner or rule.owner
+        scope = rule.scope
+        renderer = tuple(rule.renderer)
+        check = rule.check
+        if check.type == "attribute_equals":
+            attribute = str(check.params.get("attribute", ""))
+            expected_value = check.params.get("expected")
+            if expected_value is not None:
+                expected = str(expected_value)
+            elif issue.expected_value is not None:
+                expected = str(issue.expected_value)
+        elif check.type in {"numeric_max", "list_length_max"}:
+            attribute = str(check.params.get("attribute", ""))
+            raw_max = check.params.get("max")
+            if isinstance(raw_max, (int, float)) and not isinstance(raw_max, bool):
+                max_value = raw_max
+        elif check.type == "path_exists":
+            dependency_kind = str(rule.match.to_dict().get("dependency_kind", "texture"))
+    else:
+        plug = str(getattr(issue, "plug", "") or "")
+        if plug:
+            attribute = plug
+        if issue.expected_value is not None:
+            expected = str(issue.expected_value)
+        current = issue.current_value
+        if (
+            template_id == RULE_TEMPLATE_NUMERIC_MAX
+            and isinstance(current, (int, float))
+            and not isinstance(current, bool)
+        ):
+            max_value = current
+
+    return IssueRuleDraftPrefill(
+        template_id=template_id,
+        draft_input=NewRuleDraftInput(
+            rule_id=suggested_incident_rule_id(rule_id),
+            name=name,
+            message=message,
+            why=why,
+            severity=severity,
+            owner=owner,
+            scope=scope,
+            attribute=attribute,
+            expected=expected,
+            max_value=max_value,
+            dependency_kind=dependency_kind,
+            renderer=renderer,
+        ),
+    )
