@@ -1,0 +1,351 @@
+"""Rule browser and safe field editor dialog for packaged rules."""
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
+
+from shader_health.core.rule_browser import (
+    SAFE_SEVERITIES,
+    RuleBrowserEntry,
+    build_session_override_from_edits,
+    editable_fields_for_rule,
+    effective_rule,
+)
+from shader_health.core.rule_loader import RuleOverride
+from shader_health.ui.settings_widgets import wire_button
+
+RULE_EDITOR_DIALOG_OBJECT_NAME = "shaderHealthInspectorRuleEditorDialog"
+RULE_BROWSER_LIST_OBJECT_NAME = "shaderHealthInspectorRuleBrowserList"
+RULE_EDITOR_NAME_LABEL_OBJECT_NAME = "shaderHealthInspectorRuleEditorNameLabel"
+RULE_EDITOR_SOURCE_LABEL_OBJECT_NAME = "shaderHealthInspectorRuleEditorSourceLabel"
+RULE_EDITOR_ENABLED_TOGGLE_OBJECT_NAME = "shaderHealthInspectorRuleEditorEnabledToggle"
+RULE_EDITOR_SEVERITY_COMBO_OBJECT_NAME = "shaderHealthInspectorRuleEditorSeverityCombo"
+RULE_EDITOR_THRESHOLD_INPUT_OBJECT_NAME = "shaderHealthInspectorRuleEditorThresholdInput"
+RULE_EDITOR_THRESHOLD_LABEL_OBJECT_NAME = "shaderHealthInspectorRuleEditorThresholdLabel"
+RULE_EDITOR_STATUS_LABEL_OBJECT_NAME = "shaderHealthInspectorRuleEditorStatusLabel"
+RULE_EDITOR_APPLY_BUTTON_OBJECT_NAME = "shaderHealthInspectorRuleEditorApplyButton"
+RULE_EDITOR_CLOSE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRuleEditorCloseButton"
+
+RULE_EDITOR_INTRO = (
+    "Browse packaged validation rules and apply safe session overrides for enabled, "
+    "severity, and numeric thresholds. Changes apply to the current Maya session until "
+    "the panel is closed."
+)
+
+
+@dataclass
+class RuleEditorDialog:
+    """Controller for the rule browser and safe field editor."""
+
+    dialog: Any
+    rule_list: Any
+    name_label: Any
+    source_label: Any
+    enabled_toggle: Any
+    severity_combo: Any
+    threshold_label: Any
+    threshold_input: Any
+    status_label: Any
+    entries: tuple[RuleBrowserEntry, ...]
+    session_overrides: dict[str, RuleOverride]
+
+    @classmethod
+    def build(
+        cls,
+        qt_widgets: Any,
+        *,
+        catalog: Sequence[RuleBrowserEntry],
+        session_overrides: Mapping[str, RuleOverride] | None = None,
+        window_title: str = "Rule Browser",
+    ) -> RuleEditorDialog:
+        dialog = qt_widgets.QDialog()
+        dialog.setObjectName(RULE_EDITOR_DIALOG_OBJECT_NAME)
+        set_window_title = getattr(dialog, "setWindowTitle", None)
+        if set_window_title is not None:
+            set_window_title(window_title)
+
+        layout = qt_widgets.QVBoxLayout(dialog)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        intro = qt_widgets.QLabel(RULE_EDITOR_INTRO)
+        set_word_wrap = getattr(intro, "setWordWrap", None)
+        if set_word_wrap is not None:
+            set_word_wrap(True)
+        layout.addWidget(intro)
+
+        rule_list = qt_widgets.QListWidget()
+        rule_list.setObjectName(RULE_BROWSER_LIST_OBJECT_NAME)
+        for entry in catalog:
+            item = qt_widgets.QListWidgetItem(_rule_list_label(entry))
+            set_data = getattr(item, "setData", None)
+            if set_data is not None:
+                set_data(256, entry.rule.id)
+            add_item = getattr(rule_list, "addItem", None)
+            if add_item is not None:
+                add_item(item)
+        layout.addWidget(rule_list)
+
+        name_label = qt_widgets.QLabel("")
+        name_label.setObjectName(RULE_EDITOR_NAME_LABEL_OBJECT_NAME)
+        set_name_word_wrap = getattr(name_label, "setWordWrap", None)
+        if set_name_word_wrap is not None:
+            set_name_word_wrap(True)
+        layout.addWidget(name_label)
+
+        source_label = qt_widgets.QLabel("")
+        source_label.setObjectName(RULE_EDITOR_SOURCE_LABEL_OBJECT_NAME)
+        set_source_word_wrap = getattr(source_label, "setWordWrap", None)
+        if set_source_word_wrap is not None:
+            set_source_word_wrap(True)
+        layout.addWidget(source_label)
+
+        form = qt_widgets.QFormLayout()
+        set_form_margins = getattr(form, "setContentsMargins", None)
+        if set_form_margins is not None:
+            set_form_margins(0, 0, 0, 0)
+
+        enabled_toggle = _build_enabled_toggle(qt_widgets)
+        form.addRow("Enabled", enabled_toggle)
+
+        severity_combo = qt_widgets.QComboBox()
+        severity_combo.setObjectName(RULE_EDITOR_SEVERITY_COMBO_OBJECT_NAME)
+        add_items = getattr(severity_combo, "addItems", None)
+        if add_items is not None:
+            add_items(list(SAFE_SEVERITIES))
+        form.addRow("Severity", severity_combo)
+
+        threshold_label = qt_widgets.QLabel("Threshold")
+        threshold_label.setObjectName(RULE_EDITOR_THRESHOLD_LABEL_OBJECT_NAME)
+        threshold_input = qt_widgets.QLineEdit()
+        threshold_input.setObjectName(RULE_EDITOR_THRESHOLD_INPUT_OBJECT_NAME)
+        form.addRow(threshold_label, threshold_input)
+        layout.addLayout(form)
+
+        status_label = qt_widgets.QLabel("")
+        status_label.setObjectName(RULE_EDITOR_STATUS_LABEL_OBJECT_NAME)
+        set_status_word_wrap = getattr(status_label, "setWordWrap", None)
+        if set_status_word_wrap is not None:
+            set_status_word_wrap(True)
+        layout.addWidget(status_label)
+
+        button_row = qt_widgets.QHBoxLayout()
+        apply_button = qt_widgets.QPushButton("Apply Session Override")
+        apply_button.setObjectName(RULE_EDITOR_APPLY_BUTTON_OBJECT_NAME)
+        close_button = qt_widgets.QPushButton("Close")
+        close_button.setObjectName(RULE_EDITOR_CLOSE_BUTTON_OBJECT_NAME)
+        button_row.addWidget(apply_button)
+        button_row.addStretch(1)
+        button_row.addWidget(close_button)
+        layout.addLayout(button_row)
+
+        controller = cls(
+            dialog=dialog,
+            rule_list=rule_list,
+            name_label=name_label,
+            source_label=source_label,
+            enabled_toggle=enabled_toggle,
+            severity_combo=severity_combo,
+            threshold_label=threshold_label,
+            threshold_input=threshold_input,
+            status_label=status_label,
+            entries=tuple(catalog),
+            session_overrides=dict(session_overrides or {}),
+        )
+        wire_button(close_button, lambda: _close_dialog(dialog))
+        wire_button(apply_button, controller.apply_selected_rule)
+        current_row_changed = getattr(rule_list, "currentRowChanged", None)
+        if current_row_changed is not None:
+            current_row_changed.connect(controller.load_selected_rule)
+        if controller.entries:
+            set_current_row = getattr(rule_list, "setCurrentRow", None)
+            if set_current_row is not None:
+                set_current_row(0)
+            controller.load_selected_rule(0)
+        else:
+            controller.set_status_message("No packaged rules found.")
+        return controller
+
+    def selected_entry(self) -> RuleBrowserEntry | None:
+        current_row = getattr(self.rule_list, "currentRow", lambda: -1)()
+        if current_row < 0 or current_row >= len(self.entries):
+            return None
+        return self.entries[current_row]
+
+    def load_selected_rule(self, _row: int = 0) -> None:
+        entry = self.selected_entry()
+        if entry is None:
+            return
+        override = self.session_overrides.get(entry.rule.id)
+        rule = effective_rule(entry, override)
+        fields = editable_fields_for_rule(rule)
+        self.name_label.setText(f"{rule.name} ({rule.id})")
+        self.source_label.setText(f"Source: {entry.source_label}")
+        _set_toggle_checked(self.enabled_toggle, fields.enabled)
+        _set_combo_text(self.severity_combo, fields.severity)
+        if fields.threshold_editable and fields.threshold_value is not None:
+            self.threshold_label.setText(f"Threshold ({fields.threshold_key})")
+            set_enabled = getattr(self.threshold_input, "setEnabled", None)
+            if set_enabled is not None:
+                set_enabled(True)
+            self.threshold_input.setText(str(fields.threshold_value))
+        else:
+            self.threshold_label.setText("Threshold")
+            self.threshold_input.setText("")
+            set_enabled = getattr(self.threshold_input, "setEnabled", None)
+            if set_enabled is not None:
+                set_enabled(False)
+        if override is None:
+            self.set_status_message("Using packaged defaults.")
+        else:
+            self.set_status_message("Session override active for this rule.")
+
+    def apply_selected_rule(self) -> None:
+        entry = self.selected_entry()
+        if entry is None:
+            self.set_status_message("Select a rule to edit.")
+            return
+        try:
+            enabled = _toggle_checked(self.enabled_toggle)
+            severity = _combo_text(self.severity_combo)
+            threshold_key = ""
+            threshold_value: int | float | None = None
+            fields = editable_fields_for_rule(entry.rule)
+            if fields.threshold_editable:
+                threshold_key = fields.threshold_key
+                threshold_value = _parse_threshold_text(
+                    _line_edit_text(self.threshold_input),
+                )
+            override = build_session_override_from_edits(
+                entry.rule,
+                enabled=enabled,
+                severity=severity,
+                threshold_key=threshold_key,
+                threshold_value=threshold_value,
+            )
+        except ValueError as exc:
+            self.set_status_message(str(exc))
+            return
+
+        if override is None:
+            self.session_overrides.pop(entry.rule.id, None)
+            self.set_status_message("Session override cleared; packaged defaults restored.")
+        else:
+            self.session_overrides[entry.rule.id] = override
+            self.set_status_message("Session override saved for this rule.")
+        self.load_selected_rule(getattr(self.rule_list, "currentRow", lambda: 0)())
+
+    def set_status_message(self, message: str) -> None:
+        set_text = getattr(self.status_label, "setText", None)
+        if set_text is not None:
+            set_text(message)
+
+    def show(self, *, parent: Any | None = None, modal: bool = True) -> None:
+        if parent is not None:
+            set_parent = getattr(self.dialog, "setParent", None)
+            if set_parent is not None:
+                set_parent(parent)
+        exec_fn = getattr(self.dialog, "exec_", None) or getattr(self.dialog, "exec", None)
+        if modal and exec_fn is not None:
+            exec_fn()
+            return
+        show = getattr(self.dialog, "show", None)
+        if show is not None:
+            show()
+
+
+def show_rule_editor_dialog(
+    qt_widgets: Any,
+    *,
+    parent: Any | None = None,
+    catalog: Sequence[RuleBrowserEntry],
+    session_overrides: Mapping[str, RuleOverride] | None = None,
+    on_save: Callable[[dict[str, RuleOverride]], None] | None = None,
+) -> dict[str, RuleOverride]:
+    """Display the rule browser dialog and return the session override map."""
+
+    dialog = RuleEditorDialog.build(
+        qt_widgets,
+        catalog=catalog,
+        session_overrides=session_overrides,
+    )
+    dialog.show(parent=parent, modal=True)
+    if on_save is not None:
+        on_save(dict(dialog.session_overrides))
+    return dict(dialog.session_overrides)
+
+
+def _rule_list_label(entry: RuleBrowserEntry) -> str:
+    return f"{entry.rule.id} — {entry.rule.name}"
+
+
+def _build_enabled_toggle(qt_widgets: Any) -> Any:
+    from shader_health.ui.settings_widgets import build_settings_toggle
+
+    return build_settings_toggle(
+        qt_widgets,
+        object_name=RULE_EDITOR_ENABLED_TOGGLE_OBJECT_NAME,
+        enabled=True,
+    )
+
+
+def _set_toggle_checked(toggle: Any, enabled: bool) -> None:
+    set_checked = getattr(toggle, "setChecked", None)
+    if set_checked is not None:
+        set_checked(enabled)
+        return
+    set_text = getattr(toggle, "setText", None)
+    if set_text is not None:
+        set_text("ON" if enabled else "OFF")
+
+
+def _toggle_checked(toggle: Any) -> bool:
+    is_checked = getattr(toggle, "isChecked", None)
+    if is_checked is not None:
+        return bool(is_checked())
+    text = str(getattr(toggle, "text", lambda: "")() or "")
+    return text.strip().upper() == "ON"
+
+
+def _set_combo_text(combo: Any, value: str) -> None:
+    set_current_text = getattr(combo, "setCurrentText", None)
+    if set_current_text is not None:
+        set_current_text(value)
+
+
+def _combo_text(combo: Any) -> str:
+    current_text = getattr(combo, "currentText", None)
+    if current_text is not None:
+        return str(current_text() or "")
+    return ""
+
+
+def _line_edit_text(line_edit: Any) -> str:
+    text = getattr(line_edit, "text", None)
+    if text is not None:
+        return str(text() or "")
+    return ""
+
+
+def _parse_threshold_text(text: str) -> int | float:
+    normalized = text.strip()
+    if not normalized:
+        raise ValueError("Threshold value is required.")
+    if "." in normalized:
+        value: int | float = float(normalized)
+    else:
+        value = int(normalized)
+    if value < 0:
+        raise ValueError("Threshold must be zero or greater.")
+    return value
+
+
+def _close_dialog(dialog: Any) -> None:
+    reject = getattr(dialog, "reject", None)
+    if reject is not None:
+        reject()
+        return
+    close = getattr(dialog, "close", None)
+    if close is not None:
+        close()

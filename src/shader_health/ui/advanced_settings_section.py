@@ -8,6 +8,7 @@ from shader_health.ui.settings_widgets import (
     build_settings_toggle,
     find_child,
     set_line_edit_text,
+    wire_button,
     wire_line_edit_finished,
     wire_plain_text_changed,
 )
@@ -20,6 +21,7 @@ SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME = (
 SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME = "shaderHealthInspectorSettingsDebugLoggingToggle"
 SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsMaxIssuesInput"
 SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsMayapyPathInput"
+SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsBrowseRulesButton"
 
 _MIN_MAX_ISSUES_DISPLAYED = 1
 _MAX_MAX_ISSUES_DISPLAYED = 5000
@@ -30,6 +32,7 @@ def build_advanced_settings_section(
     user_config: UserPreferences,
     *,
     on_preferences_changed: Optional[Callable[[], None]] = None,
+    on_open_rule_browser: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build the Advanced settings tab content."""
 
@@ -60,6 +63,14 @@ def build_advanced_settings_section(
     )
     wire_plain_text_changed(extra_paths_input, on_preferences_changed)
     form.addRow("Extra rule roots", extra_paths_input)
+
+    browse_rules_button = qt_widgets.QPushButton("Browse Rules…")
+    browse_rules_button.setObjectName(SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME)
+    browse_rules_button.setToolTip(
+        "Open the packaged rule catalog and edit safe session overrides."
+    )
+    wire_button(browse_rules_button, on_open_rule_browser)
+    form.addRow("Rule browser", browse_rules_button)
 
     debug_row = qt_widgets.QHBoxLayout()
     debug_row.addWidget(qt_widgets.QLabel("Enable verbose shader_health logging"))

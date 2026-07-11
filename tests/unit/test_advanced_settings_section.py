@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from shader_health.ui.advanced_settings_section import (
+    SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME,
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
     SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
@@ -98,6 +99,7 @@ class FakePushButton(FakeLabel):
         self.checkable = False
         self.checked = False
         self.style_sheet = ""
+        self.clicked = FakeSignal()
 
     def setCheckable(self, enabled: bool) -> None:
         self.checkable = enabled
@@ -170,6 +172,22 @@ class FakeQtWidgets:
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
     QFormLayout = FakeFormLayout
+
+
+def test_advanced_settings_section_exposes_browse_rules_button():
+    opened: list[str] = []
+
+    section = build_advanced_settings_section(
+        FakeQtWidgets,
+        UserPreferences(),
+        on_open_rule_browser=lambda: opened.append("opened"),
+    )
+    button = _find(section, SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME)
+
+    assert button.text == "Browse Rules…"
+    assert button.clicked.handlers
+    button.clicked.handlers[0]()
+    assert opened == ["opened"]
 
 
 def test_advanced_settings_section_exposes_rule_paths_debug_max_issues_and_mayapy():

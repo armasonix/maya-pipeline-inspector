@@ -239,6 +239,7 @@ def run_validation(
     waiver_sidecar_path: Optional[Path] = None,
     scan_scope: str = "scene",
     studio_config: Optional[StudioConfig] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> ValidationRunResult:
     """Validate an enriched snapshot using packaged rules, profile, and waivers."""
 
@@ -257,6 +258,25 @@ def run_validation(
         profile = replace(
             profile,
             rule_overrides=merge_studio_rule_overrides(profile.rule_overrides, studio_config),
+        )
+    if session_rule_overrides:
+        from shader_health.core.rule_browser import merge_session_rule_overrides
+        from shader_health.core.rule_loader import RuleOverride
+
+        normalized_overrides = {
+            str(rule_id): (
+                override
+                if isinstance(override, RuleOverride)
+                else RuleOverride.from_dict(str(rule_id), override)
+            )
+            for rule_id, override in session_rule_overrides.items()
+        }
+        profile = replace(
+            profile,
+            rule_overrides=merge_session_rule_overrides(
+                profile.rule_overrides,
+                normalized_overrides,
+            ),
         )
     renderer_ids = (enriched.renderer,) if enriched.renderer else ()
     rules = load_rule_stack(
@@ -312,6 +332,7 @@ def run_validation_for_user(
     profile_path: Optional[Path] = None,
     rule_root: Optional[Path] = None,
     waiver_sidecar_path: Optional[Path] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> ValidationRunResult:
     """Validate a snapshot using merged user preference defaults."""
 
@@ -333,4 +354,5 @@ def run_validation_for_user(
         waiver_sidecar_path=waiver_sidecar_path,
         scan_scope=prefs.scan_scope,
         studio_config=studio_config,
+        session_rule_overrides=session_rule_overrides,
     )

@@ -106,3 +106,38 @@ def test_run_validation_for_user_applies_user_defaults(tmp_path: Path):
     assert run.profile_id == "deadline_critical"
     assert run.asset_class_id == "asset_class_hero"
     assert run.scan_scope == "scene"
+
+
+def test_run_validation_applies_session_rule_overrides(tmp_path: Path):
+    from shader_health.core.rule_loader import RuleOverride
+
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "demo.ma"),
+        renderer="vray",
+        nodes=[
+            NodeSnapshot(
+                id="node:file1",
+                name="file1",
+                type_name="file",
+                attrs={"colorSpace": "sRGB", "semantic_slot": "roughness"},
+            ),
+            NodeSnapshot(
+                id="node:mtl1",
+                name="mtl1",
+                type_name="VRayMtl",
+            ),
+        ],
+    )
+    rule_id = "common.shader_complexity.graph_nodes.max"
+    override = RuleOverride(rule_id=rule_id, enabled=False)
+
+    run = run_validation(
+        snapshot,
+        profile_id="artist_relaxed",
+        session_rule_overrides={rule_id: override},
+    )
+
+    matched = next((rule for rule in run.rules if rule.id == rule_id), None)
+    assert matched is not None
+    assert matched.enabled is False
+
