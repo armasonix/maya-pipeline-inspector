@@ -83,6 +83,33 @@ def evaluate_bug_report_throttle(
     actor = throttle_actor_key(machine_id=machine_id, os_user=os_user)
     state = _load_throttle_state(state_path or default_throttle_state_path())
     reports_today = _reports_today_for_actor(state, actor=actor, day=_utc_day(moment))
+    # #region agent log
+    try:
+        import json as _json
+        with open("debug-88835a.log", "a", encoding="utf-8") as _log:
+            _log.write(
+                _json.dumps(
+                    {
+                        "sessionId": "88835a",
+                        "runId": "pre-fix",
+                        "hypothesisId": "H1",
+                        "location": "throttle.py:evaluate_bug_report_throttle",
+                        "message": "throttle evaluation",
+                        "data": {
+                            "eval_day": _utc_day(moment),
+                            "actor": actor,
+                            "reports_today": reports_today,
+                            "limit": limit,
+                            "state_path": str(state_path or default_throttle_state_path()),
+                        },
+                        "timestamp": int(moment.timestamp() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # #endregion
     if reports_today >= limit:
         return BugReportThrottleDecision(
             allowed=False,

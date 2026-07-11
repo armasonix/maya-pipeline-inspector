@@ -149,7 +149,7 @@ def test_maybe_submit_bug_report_returns_incomplete_config_when_relay_missing():
 
 def test_maybe_submit_bug_report_blocks_when_local_daily_limit_reached(tmp_path: Path):
     state_path = tmp_path / "bug_report_throttle.json"
-    now = datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
     payload = BugReportPayload(
         title="Shader Health bug",
         description="Issue details from the Maya panel.",
