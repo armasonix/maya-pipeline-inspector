@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
+
+import pytest
 
 from shader_health.integrations.update.download import select_update_asset
 from shader_health.integrations.update.github_releases import (
@@ -177,6 +180,26 @@ class FakeQtWidgets:
     QApplication = FakeApplication
 
 
+def _write_install_tree(root: Path, *, version: str) -> None:
+    maya_module = root / "maya_module"
+    package = root / "src" / "shader_health"
+    maya_module.mkdir(parents=True)
+    package.mkdir(parents=True)
+    (maya_module / "shader_health_inspector.mod").write_text(
+        f"+ shader_health_inspector {version} .\n",
+        encoding="utf-8",
+    )
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "version_marker.txt").write_text(version, encoding="utf-8")
+
+
+def _write_zip_from_payload(zip_path: Path, payload_root: Path) -> None:
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        for path in payload_root.rglob("*"):
+            if path.is_file():
+                archive.write(path, arcname=str(path.relative_to(payload_root.parent)))
+
+
 def _release_payload(*, tag_name: str = "v0.5.0", version: str | None = None) -> dict[str, object]:
     resolved = version or tag_name.lstrip("v")
     return {
@@ -238,34 +261,76 @@ def test_run_update_wizard_flow_reports_up_to_date_and_enables_close():
     assert controller.spinner.visible is False
 
 
-def test_run_update_wizard_flow_advances_through_download_install_and_restart(tmp_path: Path):
-    controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
-    install_messages: list[str] = []
+def test_run_update_wizard_flow_advances_through_download_install_and_restart(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    install_root = tmp_path / "install"
+    _write_install_tree(install_root, version="0.4.0")
+    payload_root = tmp_path / "package" / "maya-shader-health-inspector"
+    _write_install_tree(payload_root, version="0.5.0")
+    zip_path = tmp_path / "package" / "maya-shader-health-inspector-0.5.0.zip"
+    _write_zip_from_payload(zip_path, payload_root)
 
-    def install_handler(staging_path: Path, _release) -> object:
-        install_messages.append(str(staging_path))
+    controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
+
+    def install_handler(staging_path: Path, release) -> object:
+        from shader_health.integrations.update.install import install_staged_update
         from shader_health.ui.update_wizard import UpdateInstallOutcome
 
-        return UpdateInstallOutcome(success=True, deferred=True, message="Install deferred.")
+        result = install_staged_update(
+            staging_path,
+            tag_name=release.tag_name,
+            install_root=install_root,
+            backup_root=tmp_path / "backups",
+        )
+        return UpdateInstallOutcome(success=result.success, message=result.message)
 
     result = run_update_wizard_flow(
         controller,
         installed_version="0.4.0",
         transport=_github_transport(_release_payload(tag_name="v0.5.0")),
-        staging_root=tmp_path,
-        download_transport=lambda _url, _timeout: b"zip-bytes",
+        staging_root=tmp_path / "staging",
+        download_transport=lambda _url, _timeout: zip_path.read_bytes(),
         install_handler=install_handler,
     )
 
     assert result.completed is True
     assert result.update_available is True
-    assert result.staging_path.endswith(".zip")
-    assert install_messages
+    assert (
+        install_root / "src" / "shader_health" / "version_marker.txt"
+    ).read_text(encoding="utf-8") == "0.5.0"
     assert controller.status_label.text == UPDATE_WIZARD_STATUS_RESTART
     assert controller.step_labels[UPDATE_WIZARD_STAGE_RESTART].text.startswith("[current] 5.")
-    assert controller.step_descriptions[UPDATE_WIZARD_STAGE_RESTART].text == (
-        UPDATE_WIZARD_STATUS_RESTART
+
+
+def test_run_update_wizard_flow_stops_on_install_failure(tmp_path: Path):
+    install_root = tmp_path / "install"
+    _write_install_tree(install_root, version="0.4.0")
+    payload_root = tmp_path / "package" / "maya-shader-health-inspector"
+    _write_install_tree(payload_root, version="0.5.0")
+    zip_path = tmp_path / "package" / "maya-shader-health-inspector-0.5.0.zip"
+    _write_zip_from_payload(zip_path, payload_root)
+    controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
+
+    def install_handler(_staging_path: Path, _release) -> object:
+        from shader_health.ui.update_wizard import UpdateInstallOutcome
+
+        return UpdateInstallOutcome(success=False, message="Install failed in test.")
+
+    result = run_update_wizard_flow(
+        controller,
+        installed_version="0.4.0",
+        transport=_github_transport(_release_payload(tag_name="v0.5.0")),
+        staging_root=tmp_path / "staging",
+        download_transport=lambda _url, _timeout: zip_path.read_bytes(),
+        install_handler=install_handler,
     )
+
+    assert result.completed is False
+    assert "Install failed in test." in result.error_message
+    assert controller.status_label.text == "Install failed in test."
+    assert controller.close_button.enabled is True
 
 
 def test_run_update_wizard_flow_honors_studio_disabled_policy():

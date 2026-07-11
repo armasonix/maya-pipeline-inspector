@@ -42,13 +42,15 @@ UPDATE_WIZARD_STATUS_DOWNLOAD_COMPLETE = (
 UPDATE_WIZARD_STATUS_INSTALL = (
     "Preparing install while preserving shader_health_studio.json and user.json..."
 )
-UPDATE_WIZARD_STATUS_INSTALL_DEFERRED = (
-    "Update package is staged. Safe install with config preservation ships in the next "
-    "milestone step; restart Maya manually after your TD applies the package."
+UPDATE_WIZARD_STATUS_INSTALL_SUCCESS = (
+    "Update installed to {install_root}. shader_health_studio.json and user.json preserved."
+)
+UPDATE_WIZARD_STATUS_INSTALL_FAILED = (
+    "Install failed and previous plugin files were restored: {error}"
 )
 UPDATE_WIZARD_STATUS_RESTART = (
-    "Manual Maya restart checklist: save work, close Maya, apply the staged update if "
-    "needed, relaunch Maya, and reopen Shader Health Inspector."
+    "Manual Maya restart checklist: save your scene, close Maya, relaunch Maya, "
+    "and reopen Shader Health Inspector."
 )
 UPDATE_WIZARD_STATUS_DISABLED = "Studio policy disables in-app update checks."
 UPDATE_WIZARD_STATUS_PINNED = (
@@ -87,15 +89,25 @@ class UpdateWizardResult:
 
 
 def default_install_handler(
-    _staging_path: Path,
-    _release: GitHubRelease,
+    staging_path: Path,
+    release: GitHubRelease,
 ) -> UpdateInstallOutcome:
-    """Placeholder install stage until safe rollback install ships."""
+    """Install a staged update package with config preservation and rollback."""
 
+    from shader_health.integrations.update.install import install_staged_update
+
+    result = install_staged_update(
+        staging_path,
+        tag_name=release.tag_name,
+    )
+    if result.success:
+        return UpdateInstallOutcome(
+            success=True,
+            message=result.message,
+        )
     return UpdateInstallOutcome(
-        success=True,
-        deferred=True,
-        message=UPDATE_WIZARD_STATUS_INSTALL_DEFERRED,
+        success=False,
+        message=result.message,
     )
 
 
@@ -303,7 +315,28 @@ def run_update_wizard_flow(
     _refresh_ui()
 
     install_outcome = installer(staging_path, release)
-    install_status = install_outcome.message or UPDATE_WIZARD_STATUS_INSTALL_DEFERRED
+    if not install_outcome.success:
+        install_status = install_outcome.message or UPDATE_WIZARD_STATUS_INSTALL_FAILED.format(
+            error="unknown install error"
+        )
+        controller.set_active_stage(
+            UPDATE_WIZARD_STAGE_INSTALL,
+            status_message=install_status,
+        )
+        _finish_wizard(controller, process_ui=_refresh_ui)
+        return UpdateWizardResult(
+            completed=False,
+            update_available=True,
+            installed_version=installed_version,
+            latest_version=check_result.latest_version,
+            tag_name=check_result.tag_name,
+            staging_path=str(staging_path),
+            error_message=install_status,
+        )
+
+    install_status = install_outcome.message or UPDATE_WIZARD_STATUS_INSTALL_SUCCESS.format(
+        install_root=staging_path.parent,
+    )
     controller.set_active_stage(
         UPDATE_WIZARD_STAGE_INSTALL,
         status_message=install_status,

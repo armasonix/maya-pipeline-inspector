@@ -15,7 +15,6 @@ from shader_health.integrations.update.github_releases import (
     HttpRequest,
     HttpTransport,
     ReleaseAsset,
-    SemverVersion,
     UpdateCheckResult,
     compare_semver,
     default_http_transport,
@@ -23,6 +22,10 @@ from shader_health.integrations.update.github_releases import (
     normalize_release_tag,
     parse_release_payload,
     parse_semver,
+)
+from shader_health.integrations.update.install import (
+    UpdateInstallResult,
+    install_staged_update,
 )
 
 __all__ = [
@@ -38,10 +41,11 @@ __all__ = [
     "HttpRequest",
     "HttpTransport",
     "ReleaseAsset",
-    "SemverVersion",
     "UpdateCheckResult",
+    "UpdateInstallResult",
     "compare_semver",
     "default_http_transport",
+    "install_staged_update",
     "is_newer_version",
     "normalize_release_tag",
     "parse_release_payload",
