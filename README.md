@@ -231,6 +231,7 @@ The package uses a `src` layout so imports during tests match installed-package 
 - [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) — rule pack authoring
 - [`docs/SNAPSHOT_SCHEMA.md`](docs/SNAPSHOT_SCHEMA.md) — snapshot contract
 - [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
+- [`docs/integrations/auto_update.md`](docs/integrations/auto_update.md) — Check for Updates wizard, module vs pip paths, restart checklist (v0.5)
 - [`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md) — publish preflight hook
 - [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) — Maya module and `pip` install guide
 - [`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md) — custom rules and profile overrides
