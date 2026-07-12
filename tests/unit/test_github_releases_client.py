@@ -172,4 +172,4 @@ def test_github_releases_client_check_for_update_surfaces_http_errors():
 
     assert result.update_available is False
     assert result.status_code == 404
-    assert "HTTP 404" in result.error_message
+    assert "github_token" in result.error_message

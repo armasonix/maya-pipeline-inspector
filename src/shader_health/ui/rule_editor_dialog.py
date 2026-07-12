@@ -1,6 +1,8 @@
 """Rule browser and safe field editor dialog for packaged rules."""
 from __future__ import annotations
 
+from shader_health.core.rule_pack_validation import RuleValidationFailure
+
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -37,8 +39,11 @@ RULE_EDITOR_INTRO = (
     "session overrides for the current Maya session."
 )
 
+_RULE_EDITOR_LABEL_WIDTH = 88
+_RULE_EDITOR_FIELD_WIDTH = 140
 
-@dataclass
+
+@dataclass(eq=False)
 class RuleEditorDialog:
     """Controller for the rule browser and safe field editor."""
 
@@ -50,6 +55,7 @@ class RuleEditorDialog:
     severity_combo: Any
     threshold_label: Any
     threshold_input: Any
+    threshold_row: Any
     status_label: Any
     entries: tuple[RuleBrowserEntry, ...]
     session_overrides: dict[str, RuleOverride]
@@ -107,27 +113,36 @@ class RuleEditorDialog:
             set_source_word_wrap(True)
         layout.addWidget(source_label)
 
-        form = qt_widgets.QFormLayout()
-        set_form_margins = getattr(form, "setContentsMargins", None)
-        if set_form_margins is not None:
-            set_form_margins(0, 0, 0, 0)
-
         enabled_toggle = _build_enabled_toggle(qt_widgets)
-        form.addRow("Enabled", enabled_toggle)
+        layout.addWidget(
+            _rule_editor_field_row(qt_widgets, "Enabled", enabled_toggle),
+        )
 
         severity_combo = qt_widgets.QComboBox()
         severity_combo.setObjectName(RULE_EDITOR_SEVERITY_COMBO_OBJECT_NAME)
         add_items = getattr(severity_combo, "addItems", None)
         if add_items is not None:
             add_items(list(SAFE_SEVERITIES))
-        form.addRow("Severity", severity_combo)
+        set_fixed_width = getattr(severity_combo, "setFixedWidth", None)
+        if set_fixed_width is not None:
+            set_fixed_width(_RULE_EDITOR_FIELD_WIDTH)
+        layout.addWidget(
+            _rule_editor_field_row(qt_widgets, "Severity", severity_combo),
+        )
 
         threshold_label = qt_widgets.QLabel("Threshold")
         threshold_label.setObjectName(RULE_EDITOR_THRESHOLD_LABEL_OBJECT_NAME)
         threshold_input = qt_widgets.QLineEdit()
         threshold_input.setObjectName(RULE_EDITOR_THRESHOLD_INPUT_OBJECT_NAME)
-        form.addRow(threshold_label, threshold_input)
-        layout.addLayout(form)
+        set_threshold_width = getattr(threshold_input, "setFixedWidth", None)
+        if set_threshold_width is not None:
+            set_threshold_width(_RULE_EDITOR_FIELD_WIDTH)
+        threshold_row = _rule_editor_field_row(
+            qt_widgets,
+            threshold_label,
+            threshold_input,
+        )
+        layout.addWidget(threshold_row)
 
         status_label = qt_widgets.QLabel("")
         status_label.setObjectName(RULE_EDITOR_STATUS_LABEL_OBJECT_NAME)
@@ -158,6 +173,7 @@ class RuleEditorDialog:
             severity_combo=severity_combo,
             threshold_label=threshold_label,
             threshold_input=threshold_input,
+            threshold_row=threshold_row,
             status_label=status_label,
             entries=tuple(catalog),
             session_overrides=dict(session_overrides or {}),
@@ -175,7 +191,7 @@ class RuleEditorDialog:
         wire_button(save_button, _save_session_overrides)
         current_row_changed = getattr(rule_list, "currentRowChanged", None)
         if current_row_changed is not None:
-            current_row_changed.connect(controller.load_selected_rule)
+            current_row_changed.connect(lambda row: controller.load_selected_rule(row))
         if controller.entries:
             set_current_row = getattr(rule_list, "setCurrentRow", None)
             if set_current_row is not None:
@@ -202,12 +218,14 @@ class RuleEditorDialog:
         self.source_label.setText(f"Source: {entry.source_label}")
         _set_toggle_checked(self.enabled_toggle, fields.enabled)
         _set_combo_text(self.severity_combo, fields.severity)
-        if fields.threshold_editable and fields.threshold_value is not None:
+        threshold_visible = fields.threshold_editable
+        _set_widget_visible(self.threshold_row, threshold_visible)
+        if threshold_visible and fields.threshold_value is not None:
             self.threshold_label.setText(f"Threshold ({fields.threshold_key})")
+            self.threshold_input.setText(str(fields.threshold_value))
             set_enabled = getattr(self.threshold_input, "setEnabled", None)
             if set_enabled is not None:
                 set_enabled(True)
-            self.threshold_input.setText(str(fields.threshold_value))
         else:
             self.threshold_label.setText("Threshold")
             self.threshold_input.setText("")
@@ -286,7 +304,18 @@ class RuleEditorDialog:
         if set_text is not None:
             set_text(message)
 
-    def show(self, *, parent: Any | None = None, modal: bool = True) -> None:
+    def show(
+        self,
+        *,
+        parent: Any | None = None,
+        modal: bool = True,
+        qt_widgets: Any | None = None,
+    ) -> None:
+        if modal and qt_widgets is not None:
+            from shader_health.ui.settings_widgets import show_modal_dialog
+
+            show_modal_dialog(self.dialog, qt_widgets, singleton_key=RULE_EDITOR_DIALOG_OBJECT_NAME)
+            return
         if parent is not None:
             set_parent = getattr(self.dialog, "setParent", None)
             if set_parent is not None:
@@ -316,12 +345,53 @@ def show_rule_editor_dialog(
         session_overrides=session_overrides,
         on_save=on_save,
     )
-    dialog.show(parent=parent, modal=True)
+    dialog.show(parent=parent, modal=True, qt_widgets=qt_widgets)
     return dict(dialog.session_overrides)
 
 
 def _rule_list_label(entry: RuleBrowserEntry) -> str:
     return f"{entry.rule.id} — {entry.rule.name}"
+
+
+def _rule_editor_field_row(
+    qt_widgets: Any,
+    label: Any,
+    field: Any,
+) -> Any:
+    from shader_health.ui.settings_widgets import set_fixed_horizontal_size_policy
+
+    row = qt_widgets.QHBoxLayout()
+    set_margins = getattr(row, "setContentsMargins", None)
+    if set_margins is not None:
+        set_margins(0, 0, 0, 0)
+    set_spacing = getattr(row, "setSpacing", None)
+    if set_spacing is not None:
+        set_spacing(8)
+
+    caption = qt_widgets.QLabel(label) if isinstance(label, str) else label
+    set_fixed_width = getattr(caption, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(_RULE_EDITOR_LABEL_WIDTH)
+    set_word_wrap = getattr(caption, "setWordWrap", None)
+    if set_word_wrap is not None:
+        set_word_wrap(True)
+    set_fixed_horizontal_size_policy(qt_widgets, caption)
+    row.addWidget(caption, 0)
+    set_fixed_horizontal_size_policy(qt_widgets, field)
+    row.addWidget(field, 0)
+    add_stretch = getattr(row, "addStretch", None)
+    if add_stretch is not None:
+        add_stretch(1)
+
+    host = qt_widgets.QWidget()
+    host.setLayout(row)
+    return host
+
+
+def _set_widget_visible(widget: Any, visible: bool) -> None:
+    set_visible = getattr(widget, "setVisible", None)
+    if set_visible is not None:
+        set_visible(visible)
 
 
 def _build_enabled_toggle(qt_widgets: Any) -> Any:

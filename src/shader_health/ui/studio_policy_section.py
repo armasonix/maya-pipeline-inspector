@@ -12,14 +12,25 @@ from shader_health.studio_config import (
 )
 from shader_health.ui.settings_widgets import (
     apply_toggle_style,
+    build_labeled_toggle_row,
     build_settings_toggle,
+    configure_compact_line_edit,
     find_child,
     line_edit_text,
+    set_fixed_horizontal_size_policy,
     set_line_edit_text,
     toggle_label,
+    widget_has_focus,
     wire_line_edit_finished,
     wire_plain_text_changed,
 )
+
+_LABEL_WIDTH = 84
+_FIELD_WIDTH = 240
+_PLAIN_TEXT_WIDTH = 292
+_PLAIN_TEXT_HEIGHT = 72
+_STUDIO_TOGGLE_LABEL_WIDTH = 228
+_STUDIO_TOGGLE_GAP = 12
 
 SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME = "shaderHealthInspectorSettingsRequireTxToggle"
 
@@ -52,6 +63,9 @@ SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME = (
 SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME = (
     "shaderHealthInspectorSettingsExtraRulesFolderInput"
 )
+SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME = (
+    "shaderHealthInspectorSettingsExtraRulesFolderInput"
+)
 
 
 def build_studio_policy_section(
@@ -76,69 +90,79 @@ def build_studio_policy_section(
     intro.setWordWrap(True)
     layout.addWidget(intro)
 
-    form = qt_widgets.QFormLayout()
-    set_form_margins = getattr(form, "setContentsMargins", None)
-    if set_form_margins is not None:
-        set_form_margins(0, 0, 0, 0)
-
+    layout.addWidget(_section_title(qt_widgets, "Studio"))
     studio_name_input = qt_widgets.QLineEdit(config.studio_name)
     studio_name_input.setObjectName(SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME)
     studio_name_input.setPlaceholderText("Example Studio")
-    studio_name_input.setToolTip("Display name for this studio deployment.")
-    wire_line_edit_finished(studio_name_input, on_settings_changed)
-    form.addRow("Studio name", studio_name_input)
-
-    tx_row = qt_widgets.QHBoxLayout()
-    tx_row.addWidget(
-        qt_widgets.QLabel("Require .tx optimized texture derivatives")
+    set_fixed_width = getattr(studio_name_input, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(_FIELD_WIDTH)
+    set_fixed_horizontal_size_policy(qt_widgets, studio_name_input)
+    studio_name_input.setToolTip(
+        "Display name shown in Settings (Studio tab header) and studio config labels."
     )
-    tx_row.addStretch(1)
-    tx_row.addWidget(
-        build_settings_toggle(
+    wire_line_edit_finished(studio_name_input, on_settings_changed)
+    layout.addWidget(_labeled_field_row(qt_widgets, "Name", studio_name_input))
+
+    studio_hint = qt_widgets.QLabel(
+        "Studio name appears above the config file path on the Studio tab after you save."
+    )
+    studio_hint.setWordWrap(True)
+    layout.addWidget(studio_hint)
+
+    layout.addWidget(_section_title(qt_widgets, "Pipeline"))
+    layout.addWidget(
+        _labeled_toggle_row(
             qt_widgets,
-            object_name=SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME,
-            enabled=config.pipeline.require_tx_derivatives,
-            on_changed=on_require_tx_changed,
+            "Require .tx optimized texture derivatives",
+            build_settings_toggle(
+                qt_widgets,
+                object_name=SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME,
+                enabled=config.pipeline.require_tx_derivatives,
+                on_changed=on_require_tx_changed,
+            ),
         )
     )
-    form.addRow("Pipeline", _wrap_layout_widget(qt_widgets, tx_row))
 
+    layout.addWidget(_section_title(qt_widgets, "Waiver defaults"))
     waiver_defaults = config.pipeline.waiver_defaults
     approved_by_input = qt_widgets.QLineEdit(waiver_defaults.default_approved_by)
     approved_by_input.setObjectName(SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME)
     approved_by_input.setPlaceholderText("pipeline_td")
     approved_by_input.setToolTip("Default approver name prefilled in the waiver manager.")
+    _configure_compact_line_edit(qt_widgets, approved_by_input, _FIELD_WIDTH)
     wire_line_edit_finished(approved_by_input, on_settings_changed)
-    form.addRow("Default waiver approver", approved_by_input)
+    layout.addWidget(_labeled_field_row(qt_widgets, "Approver", approved_by_input))
 
     expiry_input = qt_widgets.QLineEdit(str(waiver_defaults.default_expiry_days))
     expiry_input.setObjectName(SETTINGS_WAIVER_EXPIRY_DAYS_INPUT_OBJECT_NAME)
     expiry_input.setPlaceholderText(str(DEFAULT_WAIVER_EXPIRY_DAYS))
     expiry_input.setToolTip("Default waiver lifetime in days.")
+    _configure_compact_line_edit(qt_widgets, expiry_input, 72)
     wire_line_edit_finished(expiry_input, on_settings_changed)
-    form.addRow("Default waiver expiry (days)", expiry_input)
+    layout.addWidget(_labeled_field_row(qt_widgets, "Expiry days", expiry_input))
 
-    critical_row = qt_widgets.QHBoxLayout()
-    critical_row.addWidget(
-        qt_widgets.QLabel("Allow waivers on critical farm-blocking issues")
-    )
-    critical_row.addStretch(1)
-    critical_row.addWidget(
-        build_settings_toggle(
+    layout.addWidget(
+        _labeled_toggle_row(
             qt_widgets,
-            object_name=SETTINGS_ALLOW_CRITICAL_WAIVERS_TOGGLE_OBJECT_NAME,
-            enabled=waiver_defaults.allow_critical_waivers,
-            on_changed=lambda _checked: on_settings_changed() if on_settings_changed else None,
+            "Allow waivers on critical farm-blocking issues",
+            build_settings_toggle(
+                qt_widgets,
+                object_name=SETTINGS_ALLOW_CRITICAL_WAIVERS_TOGGLE_OBJECT_NAME,
+                enabled=waiver_defaults.allow_critical_waivers,
+                on_changed=lambda _checked: on_settings_changed() if on_settings_changed else None,
+            ),
         )
     )
-    form.addRow("Waiver policy", _wrap_layout_widget(qt_widgets, critical_row))
 
+    layout.addWidget(_section_title(qt_widgets, "Manifest gate"))
     manifest_defaults = config.pipeline.manifest_gate_defaults
     max_new_input = qt_widgets.QLineEdit(str(manifest_defaults.max_new_changes))
     max_new_input.setObjectName(SETTINGS_MANIFEST_MAX_NEW_CHANGES_INPUT_OBJECT_NAME)
     max_new_input.setToolTip("Maximum new manifest entries allowed before gate blocks.")
+    _configure_compact_line_edit(qt_widgets, max_new_input, 72)
     wire_line_edit_finished(max_new_input, on_settings_changed)
-    form.addRow("Manifest gate max new entries", max_new_input)
+    layout.addWidget(_labeled_field_row(qt_widgets, "Max new", max_new_input))
 
     max_fingerprint_input = qt_widgets.QLineEdit(
         str(manifest_defaults.max_fingerprint_changes)
@@ -149,24 +173,26 @@ def build_studio_policy_section(
     max_fingerprint_input.setToolTip(
         "Maximum graph fingerprint changes allowed before gate blocks."
     )
+    _configure_compact_line_edit(qt_widgets, max_fingerprint_input, 72)
     wire_line_edit_finished(max_fingerprint_input, on_settings_changed)
-    form.addRow("Manifest gate max fingerprint changes", max_fingerprint_input)
-
-    block_textures_row = qt_widgets.QHBoxLayout()
-    block_textures_row.addWidget(
-        qt_widgets.QLabel("Block manifest gate when new textures appear")
+    layout.addWidget(
+        _labeled_field_row(qt_widgets, "Max fingerprint", max_fingerprint_input)
     )
-    block_textures_row.addStretch(1)
-    block_textures_row.addWidget(
-        build_settings_toggle(
+
+    layout.addWidget(
+        _labeled_toggle_row(
             qt_widgets,
-            object_name=SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,
-            enabled=manifest_defaults.block_on_new_textures,
-            on_changed=lambda _checked: on_settings_changed() if on_settings_changed else None,
+            "Block manifest gate when new textures appear",
+            build_settings_toggle(
+                qt_widgets,
+                object_name=SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,
+                enabled=manifest_defaults.block_on_new_textures,
+                on_changed=lambda _checked: on_settings_changed() if on_settings_changed else None,
+            ),
         )
     )
-    form.addRow("Manifest gate", _wrap_layout_widget(qt_widgets, block_textures_row))
 
+    layout.addWidget(_section_title(qt_widgets, "Profile allow-lists"))
     pinned_workflow_input = _build_plain_text_input(
         qt_widgets,
         object_name=SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
@@ -176,9 +202,11 @@ def build_studio_policy_section(
             "Optional allow-list of workflow profile ids. "
             "Leave blank to expose every packaged workflow profile."
         ),
+        width=_PLAIN_TEXT_WIDTH,
+        height=_PLAIN_TEXT_HEIGHT,
     )
     wire_plain_text_changed(pinned_workflow_input, on_settings_changed)
-    form.addRow("Pinned workflow profiles", pinned_workflow_input)
+    layout.addWidget(_labeled_field_row(qt_widgets, "Workflow", pinned_workflow_input))
 
     pinned_asset_class_input = _build_plain_text_input(
         qt_widgets,
@@ -189,20 +217,26 @@ def build_studio_policy_section(
             "Optional allow-list of asset class overlay profile ids. "
             "Leave blank to expose every packaged asset class profile."
         ),
+        width=_PLAIN_TEXT_WIDTH,
+        height=_PLAIN_TEXT_HEIGHT,
     )
     wire_plain_text_changed(pinned_asset_class_input, on_settings_changed)
-    form.addRow("Pinned asset class profiles", pinned_asset_class_input)
+    layout.addWidget(
+        _labeled_field_row(qt_widgets, "Asset class", pinned_asset_class_input)
+    )
 
+    layout.addWidget(_section_title(qt_widgets, "Rule authoring"))
     extra_rules_input = qt_widgets.QLineEdit(config.pipeline.extra_rules_folder)
     extra_rules_input.setObjectName(SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME)
     extra_rules_input.setPlaceholderText("//studio/share/shader_health/extra_rules")
     extra_rules_input.setToolTip(
         "Studio folder where incident rule draft sidecars are exported from the rule wizard."
     )
+    _configure_compact_line_edit(qt_widgets, extra_rules_input, _PLAIN_TEXT_WIDTH)
     wire_line_edit_finished(extra_rules_input, on_settings_changed)
-    form.addRow("Extra rules folder", extra_rules_input)
-
-    layout.addLayout(form)
+    layout.addWidget(
+        _labeled_field_row(qt_widgets, "Extra rules", extra_rules_input)
+    )
 
     hint = qt_widgets.QLabel(
         "Pinned profile lists restrict which workflow and asset class profiles appear "
@@ -224,7 +258,12 @@ def read_studio_policy_from_view(
 
     pipeline = read_pipeline_settings_from_view(view, qt_widgets, base=base.pipeline)
     return base.with_updates(
-        studio_name=line_edit_text(view, qt_widgets, SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME),
+        studio_name=line_edit_text(
+            view,
+            qt_widgets,
+            SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME,
+            fallback=base.studio_name,
+        ),
         pipeline=pipeline,
     )
 
@@ -250,9 +289,15 @@ def read_pipeline_settings_from_view(
                 view,
                 qt_widgets,
                 SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME,
+                fallback=current.waiver_defaults.default_approved_by,
             ),
             default_expiry_days=_positive_int(
-                line_edit_text(view, qt_widgets, SETTINGS_WAIVER_EXPIRY_DAYS_INPUT_OBJECT_NAME),
+                line_edit_text(
+                    view,
+                    qt_widgets,
+                    SETTINGS_WAIVER_EXPIRY_DAYS_INPUT_OBJECT_NAME,
+                    fallback=str(current.waiver_defaults.default_expiry_days),
+                ),
                 current.waiver_defaults.default_expiry_days,
             ),
             allow_critical_waivers=_toggle_checked(
@@ -285,6 +330,7 @@ def read_pipeline_settings_from_view(
             view,
             qt_widgets,
             SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
+            fallback=current.extra_rules_folder,
         ),
     )
 
@@ -307,6 +353,18 @@ def update_pipeline_settings_view(
     pipeline: PipelineSettings,
 ) -> None:
     """Refresh pipeline policy controls from studio config."""
+    # region agent log
+    from shader_health._agent_debug_log import agent_debug_log
+
+    agent_debug_log(
+        "H4",
+        "studio_policy_section.update_pipeline_settings_view",
+        "refresh pipeline fields",
+        {
+            "default_approved_by_len": len(pipeline.waiver_defaults.default_approved_by or ""),
+        },
+    )
+    # endregion
 
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
     if toggle is not None:
@@ -352,22 +410,26 @@ def update_pipeline_settings_view(
         SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,
         pipeline.manifest_gate_defaults.block_on_new_textures,
     )
-    _set_plain_text(
-        find_child(
-            view,
-            _plain_text_widget_type(qt_widgets),
-            SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
-        ),
-        format_profile_id_list(pipeline.pinned_workflow_profile_ids),
+    workflow_input = find_child(
+        view,
+        _plain_text_widget_type(qt_widgets),
+        SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
     )
-    _set_plain_text(
-        find_child(
-            view,
-            _plain_text_widget_type(qt_widgets),
-            SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME,
-        ),
-        format_profile_id_list(pipeline.pinned_asset_class_profile_ids),
+    if workflow_input is not None and not widget_has_focus(workflow_input):
+        _set_plain_text(
+            workflow_input,
+            format_profile_id_list(pipeline.pinned_workflow_profile_ids),
+        )
+    asset_class_input = find_child(
+        view,
+        _plain_text_widget_type(qt_widgets),
+        SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME,
     )
+    if asset_class_input is not None and not widget_has_focus(asset_class_input):
+        _set_plain_text(
+            asset_class_input,
+            format_profile_id_list(pipeline.pinned_asset_class_profile_ids),
+        )
     set_line_edit_text(
         view,
         qt_widgets,
@@ -421,10 +483,48 @@ def _read_manifest_gate_defaults(
     )
 
 
-def _wrap_layout_widget(qt_widgets: Any, layout: Any) -> Any:
+def _section_title(qt_widgets: Any, text: str) -> Any:
+    label = qt_widgets.QLabel(text)
+    set_style = getattr(label, "setStyleSheet", None)
+    if set_style is not None:
+        set_style("font-size: 11pt; font-weight: bold;")
+    set_fixed_horizontal_size_policy(qt_widgets, label)
+    return label
+
+
+def _labeled_toggle_row(qt_widgets: Any, label_text: str, toggle: Any) -> Any:
+    return build_labeled_toggle_row(
+        qt_widgets,
+        label_text,
+        toggle,
+        label_width=_STUDIO_TOGGLE_LABEL_WIDTH,
+        gap=_STUDIO_TOGGLE_GAP,
+    )
+
+
+def _labeled_field_row(qt_widgets: Any, label_text: str, field: Any) -> Any:
+    row = qt_widgets.QHBoxLayout()
+    set_margins = getattr(row, "setContentsMargins", None)
+    if set_margins is not None:
+        set_margins(0, 0, 0, 0)
+    set_spacing = getattr(row, "setSpacing", None)
+    if set_spacing is not None:
+        set_spacing(6)
+    caption = qt_widgets.QLabel(label_text)
+    set_fixed_width = getattr(caption, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(_LABEL_WIDTH)
+    set_fixed_horizontal_size_policy(qt_widgets, caption)
+    row.addWidget(caption, 0)
+    row.addWidget(field, 0)
+    row.addStretch(1)
     host = qt_widgets.QWidget()
-    host.setLayout(layout)
+    host.setLayout(row)
     return host
+
+
+def _configure_compact_line_edit(qt_widgets: Any, field: Any, width: int) -> None:
+    configure_compact_line_edit(qt_widgets, field, width)
 
 
 def _build_plain_text_input(
@@ -434,6 +534,8 @@ def _build_plain_text_input(
     text: str,
     placeholder: str,
     tooltip: str,
+    width: int = _PLAIN_TEXT_WIDTH,
+    height: int = _PLAIN_TEXT_HEIGHT,
 ) -> Any:
     plain_text_class = _plain_text_widget_type(qt_widgets)
     field = plain_text_class()
@@ -445,6 +547,13 @@ def _build_plain_text_input(
     if set_placeholder is not None:
         set_placeholder(placeholder)
     field.setToolTip(tooltip)
+    set_fixed_width = getattr(field, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(width)
+    set_fixed_height = getattr(field, "setFixedHeight", None)
+    if set_fixed_height is not None:
+        set_fixed_height(height)
+    set_fixed_horizontal_size_policy(qt_widgets, field)
     return field
 
 

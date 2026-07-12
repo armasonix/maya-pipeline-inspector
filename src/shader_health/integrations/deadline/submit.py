@@ -28,10 +28,8 @@ COMMAND_SCRIPT_PLUGIN = "CommandScript"
 MAYA_BATCH_PLUGIN = "MayaBatch"
 DEFAULT_FRAMES = "0"
 
-
 class DeadlineSubmitError(RuntimeError):
     """Raised when farm validation submit is blocked or fails."""
-
 
 @dataclass(frozen=True)
 class ShaderHealthValidationJobResult:
@@ -44,7 +42,6 @@ class ShaderHealthValidationJobResult:
     eligibility: FarmEligibilityResult | None = None
     command_script_line: str | None = None
 
-
 def build_command_script_line(command: Sequence[str]) -> str:
     """Format a validator command for a Deadline CommandScript aux file."""
 
@@ -54,7 +51,6 @@ def build_command_script_line(command: Sequence[str]) -> str:
         return subprocess.list2cmdline(list(command))
     return " ".join(shlex.quote(part) for part in command)
 
-
 def write_command_script_file(path: Path, command: Sequence[str]) -> str:
     """Write a CommandScript aux file and return the rendered command line."""
 
@@ -62,7 +58,6 @@ def write_command_script_file(path: Path, command: Sequence[str]) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(line + "\n", encoding="utf-8")
     return line
-
 
 def build_command_script_job(
     *,
@@ -102,7 +97,6 @@ def build_command_script_job(
     aux_files = (str(command_script_path),)
     return job_info, plugin_info, aux_files
 
-
 def build_maya_batch_script_job(
     *,
     config: DeadlineConfig,
@@ -134,7 +128,6 @@ def build_maya_batch_script_job(
     if maya_version:
         plugin_info["Version"] = maya_version
     return job_info, plugin_info, ()
-
 
 def submit_shader_health_validation_job(
     *,
@@ -239,7 +232,6 @@ def submit_shader_health_validation_job(
         command_script_line=command_script_line,
     )
 
-
 def _evaluate_optional_eligibility(
     validation_result: FarmValidationResult | None,
     scene_state: FarmSceneState | None,
@@ -247,7 +239,6 @@ def _evaluate_optional_eligibility(
     if validation_result is None or scene_state is None:
         return None
     return evaluate_farm_submit_eligibility(validation_result, scene_state)
-
 
 def _base_job_info(
     *,
@@ -275,12 +266,10 @@ def _base_job_info(
         job_info.update(dict(extra_job_info))
     return job_info
 
-
 def _startup_directory(scene_path: Path, repo_root: Path | None) -> str:
     if repo_root is not None:
         return str(repo_root)
     return str(scene_path.parent)
-
 
 def _needs_shell_quoting() -> bool:
     import sys

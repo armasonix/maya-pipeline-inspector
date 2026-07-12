@@ -22,7 +22,7 @@ def test_load_theme_stylesheet_returns_non_empty_qss():
 
     assert "shaderHealthInspectorPanelContent" in classic
     assert "shaderHealthInspectorPanelContent" in dark
-    assert "#ececec" in classic
+    assert "#cccccc" in classic
     assert "#2b2b2b" in dark
 
 
@@ -35,9 +35,12 @@ def test_normalize_theme_falls_back_to_classic_for_unknown_values():
 def test_apply_panel_theme_sets_stylesheet_on_content_root():
     from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
 
-    widget = main_window.build_main_widget(MainWindowFakeQtWidgets)
+    widget = main_window.build_main_widget(
+        MainWindowFakeQtWidgets,
+        user_config=UserPreferences(theme="classic"),
+    )
     assert widget._shader_health_theme == "classic"
-    assert "#ececec" in widget.style_sheet
+    assert "#cccccc" in widget.style_sheet
 
     apply_user_preferences_to_panel(
         widget,
@@ -67,4 +70,4 @@ def test_apply_panel_theme_normalizes_unknown_theme_ids():
 
     assert applied == DEFAULT_THEME
     assert widget._shader_health_theme == DEFAULT_THEME
-    assert "#ececec" in widget.style_sheet
+    assert "#cccccc" in widget.style_sheet

@@ -54,7 +54,6 @@ _DISCORD_NOTIFY_CHECKBOX_OBJECT_NAMES = {
     )
 }
 
-
 def build_discord_connector_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -179,7 +178,6 @@ def build_discord_connector_section(
     section_layout.addWidget(hint)
     return section
 
-
 def read_discord_connector_from_view(view: Any, qt_widgets: Any) -> DiscordConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_DISCORD_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
@@ -197,7 +195,6 @@ def read_discord_connector_from_view(view: Any, qt_widgets: Any) -> DiscordConne
         ),
         notify_on=notify_on,
     )
-
 
 def update_discord_connector_view(
     view: Any,
@@ -232,17 +229,14 @@ def update_discord_connector_view(
             event_id in discord.notify_on,
         )
 
-
 def get_discord_settings(connectors: ConnectorSettings) -> DiscordConnectorSettings:
     return connectors.discord
-
 
 def apply_discord_settings(
     connectors: ConnectorSettings,
     settings: DiscordConnectorSettings,
 ) -> ConnectorSettings:
     return replace(connectors, discord=settings)
-
 
 def _on_discord_enabled_changed(
     qt_widgets: Any,
@@ -255,7 +249,6 @@ def _on_discord_enabled_changed(
         _set_discord_details_visible(details, enabled)
     if on_enabled_changed is not None:
         on_enabled_changed(enabled)
-
 
 def _build_discord_field_row(
     qt_widgets: Any,
@@ -298,7 +291,6 @@ def _build_discord_field_row(
     row_layout.addWidget(field)
     row_layout.addStretch(1)
     return row
-
 
 def _set_discord_details_visible(details: Any, visible: bool) -> None:
     set_visible = getattr(details, "setVisible", None)

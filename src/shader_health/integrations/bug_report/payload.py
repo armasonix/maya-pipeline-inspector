@@ -11,7 +11,6 @@ from shader_health.version import APP_NAME
 
 BUG_REPORT_PAYLOAD_SCHEMA_VERSION = "1.0"
 
-
 def scene_basename(scene_path: str) -> str:
     """Return a privacy-safe scene filename from Maya/Windows or POSIX paths."""
 
@@ -20,7 +19,6 @@ def scene_basename(scene_path: str) -> str:
     normalized = scene_path.replace("\\", "/").rstrip("/")
     name = Path(normalized).name
     return name or "unsaved scene"
-
 
 @dataclass(frozen=True)
 class BugReportPayload:
@@ -65,7 +63,6 @@ class BugReportPayload:
         """Return the JSON document posted as the multipart payload field."""
 
         return json.dumps(self.to_dict(), ensure_ascii=False)
-
 
 def build_bug_report_payload(
     *,

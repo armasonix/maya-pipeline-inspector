@@ -18,7 +18,6 @@ PREFLIGHT_ERROR = 3
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
-
 @dataclass(frozen=True)
 class DeadlinePreflightResult:
     """Result returned by the Deadline submit preflight helper."""
@@ -30,7 +29,6 @@ class DeadlinePreflightResult:
     report_path: Path
     stdout: str = ""
     stderr: str = ""
-
 
 def build_validator_command(
     *,
@@ -56,7 +54,6 @@ def build_validator_command(
         str(profile_path),
         *tuple(extra_args),
     )
-
 
 def run_deadline_preflight(
     *,
@@ -94,7 +91,6 @@ def run_deadline_preflight(
         )
     return _result(False, PREFLIGHT_ERROR, validator_exit_code, command, report_path, completed)
 
-
 def blocked_message(result: DeadlinePreflightResult) -> str:
     """Return a stderr-friendly message for blocked preflight runs."""
 
@@ -103,7 +99,6 @@ def blocked_message(result: DeadlinePreflightResult) -> str:
         f"validator_exit_code={result.validator_exit_code}; "
         f"report={result.report_path}"
     )
-
 
 def _result(
     allowed: bool,

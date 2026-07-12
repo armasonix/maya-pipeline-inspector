@@ -72,20 +72,19 @@ def test_build_optional_report_link_uses_render_root_and_scene_stem():
     assert link.replace("\\", "/").endswith("/hero_shader_health_report.json")
 
 
-def test_format_validation_blocks_includes_rich_fields_and_report_link():
+def test_format_validation_blocks_uses_unified_chat_layout():
     payload = format_validation_blocks(
         _context(asset_class_id="character"),
         matched_events=(SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,),
         report_link=r"\\farm\render\hero_shader_health_report.json",
     )
 
-    assert payload["blocks"][0]["text"]["text"] == "Shader Health: Publish block"
-    fields = payload["blocks"][1]["fields"]
-    assert fields[0]["text"].endswith("hero.ma")
-    assert fields[1]["text"].endswith("publish_strict+character")
-    assert "42/100" in fields[3]["text"]
-    assert "2 critical" in payload["blocks"][2]["text"]["text"]
-    assert "hero_shader_health_report.json" in payload["blocks"][3]["text"]["text"]
+    summary_text = payload["blocks"][0]["text"]["text"]
+    assert summary_text.startswith("🔍 Health Validation · Publish block")
+    assert "📊 Actual Issue list:" in summary_text
+    assert "publish_strict+character" in summary_text
+    assert "- Publish block" in summary_text
+    assert "hero_shader_health_report.json" in payload["blocks"][1]["text"]["text"]
 
 
 def test_format_validation_blocks_includes_thread_ts_when_provided():

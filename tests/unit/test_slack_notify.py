@@ -145,7 +145,8 @@ def test_send_slack_validation_notification_posts_blocks_to_routed_publish_webho
     assert len(captured) == 1
     assert captured[0].url == "https://hooks.slack.com/services/publish"
     payload = json.loads(captured[0].body.decode("utf-8"))
-    assert payload["blocks"][0]["text"]["text"] == "Shader Health: Publish block"
+    assert payload["blocks"][0]["text"]["text"].startswith("🔍 Health Validation · Publish block")
+    assert "📊 Actual Issue list:" in payload["blocks"][0]["text"]["text"]
 
 
 def test_send_slack_validation_notification_routes_deadline_block_to_deadline_webhook():

@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-from tests.unit.test_validate_rules_cli import make_rule, run_validator, write_rule_pack
 
 from shader_health.core.rule_wizard import (
     RULE_TEMPLATE_ATTRIBUTE_EQUALS,
@@ -17,6 +16,7 @@ from shader_health.core.rule_wizard import (
     validate_new_rule_draft,
     write_rule_draft_file,
 )
+from tests.unit.test_validate_rules_cli import make_rule, run_validator, write_rule_pack
 
 
 def test_list_rule_templates_includes_mvp_starters():

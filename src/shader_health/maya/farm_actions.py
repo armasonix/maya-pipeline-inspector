@@ -23,7 +23,6 @@ RENDERER_PLUGIN_CANDIDATES = {
     "arnold": ("mtoa",),
 }
 
-
 @dataclass(frozen=True)
 class FarmPreflightActionResult:
     """Result from an in-panel farm preflight run."""
@@ -32,7 +31,6 @@ class FarmPreflightActionResult:
     message: str
     tab_state: FarmTabState
     eligibility: FarmEligibilityResult | None = None
-
 
 @dataclass(frozen=True)
 class FarmSubmitActionResult:
@@ -43,9 +41,7 @@ class FarmSubmitActionResult:
     tab_state: FarmTabState
     job_id: str = ""
 
-
 DeadlineClientFactory = Callable[[DeadlineConfig], DeadlineClient]
-
 
 def collect_farm_scene_state(*, cmds: Any | None = None) -> FarmSceneState:
     """Collect Maya scene readiness signals for the farm eligibility gate."""
@@ -56,7 +52,6 @@ def collect_farm_scene_state(*, cmds: Any | None = None) -> FarmSceneState:
         scene_saved=scene_saved,
         renderer_plugin_loaded=_renderer_plugin_loaded(maya_cmds),
     )
-
 
 def farm_validation_result_from_summary(summary: Any) -> FarmValidationResult:
     """Build a farm validation result from a validation summary object."""
@@ -72,20 +67,17 @@ def farm_validation_result_from_summary(summary: Any) -> FarmValidationResult:
         block_deadline=block_deadline,
     )
 
-
 def default_farm_report_path(scene_path: str | Path) -> Path:
     """Return the default JSON report path written by farm validation."""
 
     scene = Path(scene_path)
     return scene.with_name(f"{scene.stem}_shader_health_farm.json")
 
-
 def default_command_script_path(scene_path: str | Path) -> Path:
     """Return the default CommandScript aux file path beside the scene."""
 
     scene = Path(scene_path)
     return scene.with_name(f"{scene.stem}_shader_health_deadline_command.txt")
-
 
 def check_deadline_connection(
     config: DeadlineConfig | None = None,
@@ -117,7 +109,6 @@ def check_deadline_connection(
             else "Deadline Web Service did not respond to ping."
         ),
     )
-
 
 def run_farm_preflight_action(
     *,
@@ -162,7 +153,6 @@ def run_farm_preflight_action(
             status_message=message,
         ),
     )
-
 
 def submit_farm_validation_action(
     *,
@@ -251,7 +241,6 @@ def submit_farm_validation_action(
         ),
     )
 
-
 def _merge_tab_state(
     base: FarmTabState,
     *,
@@ -277,7 +266,6 @@ def _merge_tab_state(
         status_message=status_message or base.status_message,
     )
 
-
 def _eligibility_message(eligibility: FarmEligibilityResult) -> str:
     if eligibility.decision.value == "warn":
         warnings = ", ".join(eligibility.warnings) or "publish-only issues"
@@ -286,7 +274,6 @@ def _eligibility_message(eligibility: FarmEligibilityResult) -> str:
         return "Farm preflight passed. Scene is eligible for farm validation submit."
     reasons = ", ".join(eligibility.reasons) or "blocked"
     return f"Farm preflight blocked: {reasons}."
-
 
 def _renderer_plugin_loaded(cmds: Any) -> bool:
     renderer = ""
@@ -297,7 +284,6 @@ def _renderer_plugin_loaded(cmds: Any) -> bool:
         return True
     return any(cmds.pluginInfo(plugin_name, query=True, loaded=True) for plugin_name in candidates)
 
-
 def _validator_exit_code_from_blocks(*, block_publish: bool, block_deadline: bool) -> int:
     if block_deadline:
         return 2
@@ -305,17 +291,14 @@ def _validator_exit_code_from_blocks(*, block_publish: bool, block_deadline: boo
         return 1
     return 0
 
-
 def _current_scene_path() -> str:
     return _safe_current_scene_path()
-
 
 def _safe_current_scene_path() -> str:
     try:
         return str(_maya_cmds().file(query=True, sceneName=True) or "")
     except (ImportError, ModuleNotFoundError):
         return ""
-
 
 def _maya_cmds() -> Any:
     import maya.cmds as cmds  # type: ignore[import-not-found]

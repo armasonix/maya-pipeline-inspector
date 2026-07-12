@@ -5,7 +5,9 @@ from collections.abc import Callable, Iterable
 from typing import Any, Optional
 
 from shader_health.ui.settings_widgets import (
+    build_labeled_toggle_row,
     build_settings_toggle,
+    configure_compact_line_edit,
     find_child,
     set_line_edit_text,
     wire_button,
@@ -27,6 +29,8 @@ SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsNewR
 
 _MIN_MAX_ISSUES_DISPLAYED = 1
 _MAX_MAX_ISSUES_DISPLAYED = 5000
+_COMPACT_NUMBER_FIELD_WIDTH = 72
+_COMPACT_PATH_FIELD_WIDTH = 292
 
 
 def build_advanced_settings_section(
@@ -85,17 +89,21 @@ def build_advanced_settings_section(
     wire_button(new_rule_button, on_open_new_rule_wizard)
     form.addRow("Rule authoring", new_rule_button)
 
-    debug_row = qt_widgets.QHBoxLayout()
-    debug_row.addWidget(qt_widgets.QLabel("Enable verbose shader_health logging"))
-    debug_row.addStretch(1)
     debug_toggle = build_settings_toggle(
         qt_widgets,
         object_name=SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
         enabled=user_config.debug_logging,
         on_changed=lambda _checked: on_preferences_changed() if on_preferences_changed else None,
     )
-    debug_row.addWidget(debug_toggle)
-    form.addRow("Debug logging", _wrap_layout_widget(qt_widgets, debug_row))
+    form.addRow(
+        "Debug logging",
+        build_labeled_toggle_row(
+            qt_widgets,
+            "Enable verbose shader_health logging",
+            debug_toggle,
+            label_width=228,
+        ),
+    )
 
     max_issues_input = qt_widgets.QLineEdit()
     max_issues_input.setObjectName(SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME)
@@ -104,6 +112,7 @@ def build_advanced_settings_section(
     max_issues_input.setToolTip(
         "Maximum failed issues shown in the Validate table after filtering."
     )
+    configure_compact_line_edit(qt_widgets, max_issues_input, _COMPACT_NUMBER_FIELD_WIDTH)
     wire_line_edit_finished(max_issues_input, on_preferences_changed)
     form.addRow("Max issues displayed", max_issues_input)
 
@@ -114,6 +123,7 @@ def build_advanced_settings_section(
     mayapy_input.setToolTip(
         "Optional local mayapy.exe override for headless validation on this machine."
     )
+    configure_compact_line_edit(qt_widgets, mayapy_input, _COMPACT_PATH_FIELD_WIDTH)
     wire_line_edit_finished(mayapy_input, on_preferences_changed)
     form.addRow("Local mayapy path", mayapy_input)
 
@@ -162,6 +172,8 @@ def read_advanced_user_preferences_from_view(
         text_fn = getattr(mayapy_input, "text", None)
         if text_fn is not None:
             mayapy_text = str(text_fn()).strip()
+    elif base is not None:
+        mayapy_text = base.mayapy_path
 
     return current.with_updates(
         extra_rule_paths=parse_extra_rule_paths(_plain_text(extra_paths_input)),
@@ -177,6 +189,19 @@ def update_advanced_settings_view(
     user_config: UserPreferences,
 ) -> None:
     """Refresh Advanced tab controls from user preferences."""
+    # region agent log
+    from shader_health._agent_debug_log import agent_debug_log
+
+    agent_debug_log(
+        "H3",
+        "advanced_settings_section.update_advanced_settings_view",
+        "refresh advanced tab",
+        {
+            "mayapy_path_len": len(user_config.mayapy_path or ""),
+            "max_issues": user_config.max_issues_displayed,
+        },
+    )
+    # endregion
 
     extra_paths_input = find_child(
         view,
@@ -306,9 +331,3 @@ def _toggle_checked(toggle: Any | None) -> bool:
     if is_checked is None:
         return False
     return bool(is_checked())
-
-
-def _wrap_layout_widget(qt_widgets: Any, layout: Any) -> Any:
-    host = qt_widgets.QWidget()
-    host.setLayout(layout)
-    return host

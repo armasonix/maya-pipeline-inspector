@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from shader_health._agent_debug_log import agent_debug_log
 from shader_health.integrations.discord.client import DiscordClient
 from shader_health.integrations.discord.config import DiscordConfig
 from shader_health.integrations.discord.embed import (
@@ -99,6 +100,21 @@ def should_send_discord_notification(
     )
 
 
+def format_discord_http_error(response: Any) -> str:
+    """Return a user-visible Discord webhook HTTP error string."""
+
+    status_code = int(getattr(response, "status_code", 0) or 0)
+    json_data = getattr(response, "json_data", None)
+    if isinstance(json_data, dict):
+        message = str(json_data.get("message", "") or "").strip()
+        if message:
+            return f"HTTP {status_code}: {message}"
+    body = str(getattr(response, "body", "") or "").strip()
+    if body and len(body) <= 160:
+        return f"HTTP {status_code}: {body}"
+    return f"HTTP {status_code}"
+
+
 def send_discord_validation_notification(
     studio_config: StudioConfig | None,
     context: ValidationEmbedContext,
@@ -125,6 +141,17 @@ def send_discord_validation_notification(
         block_deadline=context.block_deadline,
     )
     if not matched_events:
+        agent_debug_log(
+            "D1",
+            "discord.notify.send_discord_validation_notification",
+            "skipped no matching events",
+            {
+                "notify_on": list(settings.notify_on),
+                "block_publish": context.block_publish,
+                "block_deadline": context.block_deadline,
+            },
+            run_id="post-fix",
+        )
         return DiscordNotificationResult(sent=False, skipped_reason="no_matching_events")
 
     embed = format_validation_embed(context, matched_events=matched_events)
@@ -135,11 +162,25 @@ def send_discord_validation_notification(
         return DiscordNotificationResult(sent=False, error_message=str(exc))
 
     if response.status_code not in (200, 204):
+        agent_debug_log(
+            "D1",
+            "discord.notify.send_discord_validation_notification",
+            "discord HTTP error",
+            {"status_code": response.status_code, "body": response.body[:200]},
+            run_id="post-fix",
+        )
         return DiscordNotificationResult(
             sent=False,
-            error_message=f"HTTP {response.status_code}",
+            error_message=format_discord_http_error(response),
         )
 
+    agent_debug_log(
+        "D1",
+        "discord.notify.send_discord_validation_notification",
+        "discord sent",
+        {"status_code": response.status_code},
+        run_id="post-fix",
+    )
     return DiscordNotificationResult(sent=True)
 
 

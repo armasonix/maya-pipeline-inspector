@@ -197,6 +197,28 @@ def default_user_config_path() -> Path:
     return Path.home() / USER_CONFIG_DIRNAME / USER_CONFIG_FILENAME
 
 
+def infer_local_mayapy_path() -> str:
+    """Return the running mayapy.exe path when launched from Maya."""
+
+    import sys
+
+    executable = Path(sys.executable).resolve()
+    if executable.name.lower() in {"mayapy", "mayapy.exe"}:
+        return str(executable)
+    return ""
+
+
+def enrich_user_preferences(config: UserPreferences) -> UserPreferences:
+    """Fill derived user defaults that should not require manual JSON edits."""
+
+    if config.mayapy_path.strip():
+        return config
+    inferred = infer_local_mayapy_path()
+    if not inferred:
+        return config
+    return config.with_updates(mayapy_path=inferred)
+
+
 def discover_user_config_path() -> Path | None:
     """Return the first discovered user config path, if any."""
 

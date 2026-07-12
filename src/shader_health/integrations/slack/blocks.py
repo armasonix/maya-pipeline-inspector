@@ -84,37 +84,18 @@ def format_validation_blocks(
 ) -> dict[str, Any]:
     """Format a Slack Block Kit payload for a validation summary."""
 
+    from shader_health.integrations.messaging.validation_summary import (
+        render_validation_summary_text,
+        validation_summary_from_context,
+    )
+
     event_labels = ", ".join(_EVENT_LABELS.get(event, event) for event in matched_events)
-    profile_label = context.profile_id or "unknown"
-    if context.asset_class_id:
-        profile_label = f"{profile_label}+{context.asset_class_id}"
-    scope_label = context.scan_scope.title() if context.scan_scope else "Scene"
+    data = validation_summary_from_context(context, event_labels=event_labels)
+    text = render_validation_summary_text(data, platform="chat")
     blocks: list[dict[str, Any]] = [
         {
-            "type": "header",
-            "text": {"type": "plain_text", "text": f"Shader Health: {event_labels}"},
-        },
-        {
             "type": "section",
-            "fields": [
-                {"type": "mrkdwn", "text": f"*Scene:*\n{context.scene_name}"},
-                {"type": "mrkdwn", "text": f"*Profile:*\n{profile_label}"},
-                {"type": "mrkdwn", "text": f"*Scope:*\n{scope_label}"},
-                {"type": "mrkdwn", "text": f"*Health:*\n{context.health_score}/100"},
-            ],
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": (
-                    "*Issues:* "
-                    f"{context.critical_count} critical, "
-                    f"{context.error_count} error, "
-                    f"{context.warning_count} warning, "
-                    f"{context.info_count} info"
-                ),
-            },
+            "text": {"type": "mrkdwn", "text": text},
         },
     ]
     if report_link:
@@ -123,7 +104,7 @@ def format_validation_blocks(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Report:*\n`{report_link}`",
+                    "text": f"📎 *Report:*\n`{report_link}`",
                 },
             }
         )

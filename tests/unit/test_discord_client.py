@@ -22,6 +22,7 @@ def test_discord_client_ping_returns_true_for_no_content_response():
     assert client.ping() is True
     assert captured[0].method == "POST"
     assert captured[0].url == "https://discord.com/api/webhooks/1/token"
+    assert captured[0].headers["User-Agent"].startswith("ShaderHealthInspector/")
     assert captured[0].body is not None
     payload = json.loads(captured[0].body.decode("utf-8"))
     assert payload["embeds"][0]["title"] == "Shader Health"

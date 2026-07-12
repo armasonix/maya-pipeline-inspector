@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from shader_health.ui.advanced_settings_section import (
+    SETTINGS_BROWSE_RULES_BUTTON_OBJECT_NAME,
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
+    SETTINGS_NEW_RULE_WIZARD_BUTTON_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
     SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
     SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME,
@@ -22,9 +24,13 @@ class FakeWidget:
         self.children: list[object] = []
         self.layout: object | None = None
         self.tooltip = ""
+        self.fixed_width: int | None = None
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
+
+    def setFixedWidth(self, width: int) -> None:
+        self.fixed_width = width
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
@@ -101,6 +107,7 @@ class FakePushButton(FakeLabel):
         self.checked = False
         self.style_sheet = ""
         self.clicked = FakeSignal()
+        self.clicked = FakeSignal()
 
     def setCheckable(self, enabled: bool) -> None:
         self.checkable = enabled
@@ -164,6 +171,36 @@ class FakeFormLayout:
         self.rows.append((label, field))
 
 
+class FakeGridLayout:
+    def __init__(self, parent: FakeWidget | None = None) -> None:
+        self.parent = parent
+        self.widgets: list[object] = []
+        if parent is not None:
+            parent.layout = self
+
+    def setContentsMargins(self, *_args: object) -> None:
+        return
+
+    def setHorizontalSpacing(self, _spacing: int) -> None:
+        return
+
+    def setVerticalSpacing(self, _spacing: int) -> None:
+        return
+
+    def setColumnStretch(self, _column: int, _stretch: int) -> None:
+        return
+
+    def addWidget(self, widget: object, _row: int, _column: int, *_args: object) -> None:
+        self.widgets.append(widget)
+        if self.parent is not None and widget not in self.parent.children:
+            self.parent.children.append(widget)
+
+
+class FakeQt:
+    AlignLeft = 1
+    AlignVCenter = 2
+
+
 class FakeQtWidgets:
     QWidget = FakeWidget
     QLabel = FakeLabel
@@ -173,6 +210,8 @@ class FakeQtWidgets:
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
     QFormLayout = FakeFormLayout
+    QGridLayout = FakeGridLayout
+    Qt = FakeQt
 
 
 def test_advanced_settings_section_exposes_new_rule_wizard_button():

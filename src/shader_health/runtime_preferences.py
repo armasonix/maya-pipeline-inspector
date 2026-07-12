@@ -17,13 +17,11 @@ class UserValidationPreferences:
     scan_scope: str
     extra_rule_paths: tuple[Path, ...]
 
-
 def resolved_profile_id(user: UserPreferences, override: str | None = None) -> str:
     """Return the workflow profile id from user prefs with a safe fallback."""
 
     candidate = (override or user.default_profile_id or DEFAULT_PROFILE_ID).strip()
     return candidate or DEFAULT_PROFILE_ID
-
 
 def resolved_asset_class_id(user: UserPreferences, override: str | None = None) -> str:
     """Return the asset class overlay id from user prefs or an override."""
@@ -31,7 +29,6 @@ def resolved_asset_class_id(user: UserPreferences, override: str | None = None) 
     if override is not None:
         return override.strip()
     return (user.default_asset_class_id or "").strip()
-
 
 def resolved_scan_scope(user: UserPreferences, override: str | None = None) -> str:
     """Return the default validation scan scope from user prefs."""
@@ -41,7 +38,6 @@ def resolved_scan_scope(user: UserPreferences, override: str | None = None) -> s
         return "scene"
     return candidate
 
-
 def user_extra_rule_paths(user: UserPreferences) -> tuple[Path, ...]:
     """Return resolved extra rule path entries from user preferences."""
 
@@ -50,7 +46,6 @@ def user_extra_rule_paths(user: UserPreferences) -> tuple[Path, ...]:
         for path in user.extra_rule_paths
         if str(path).strip()
     )
-
 
 def user_validation_preferences(
     user: UserPreferences,

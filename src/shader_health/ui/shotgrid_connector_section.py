@@ -37,7 +37,6 @@ SETTINGS_SHOTGRID_ENTITY_TYPE_INPUT_OBJECT_NAME = (
 _SHOTGRID_LABEL_WIDTH = 84
 _SHOTGRID_FIELD_WIDTH = 292
 
-
 def build_shotgrid_connector_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -177,7 +176,6 @@ def build_shotgrid_connector_section(
     section_layout.addWidget(hint)
     return section
 
-
 def read_shotgrid_connector_from_view(view: Any, qt_widgets: Any) -> ShotGridConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_SHOTGRID_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
@@ -198,7 +196,6 @@ def read_shotgrid_connector_from_view(view: Any, qt_widgets: Any) -> ShotGridCon
         )
         or "Shot",
     )
-
 
 def update_shotgrid_connector_view(
     view: Any,
@@ -250,17 +247,14 @@ def update_shotgrid_connector_view(
         shotgrid.entity_type,
     )
 
-
 def get_shotgrid_settings(connectors: ConnectorSettings) -> ShotGridConnectorSettings:
     return connectors.shotgrid
-
 
 def apply_shotgrid_settings(
     connectors: ConnectorSettings,
     settings: ShotGridConnectorSettings,
 ) -> ConnectorSettings:
     return replace(connectors, shotgrid=settings)
-
 
 def _on_shotgrid_enabled_changed(
     qt_widgets: Any,
@@ -273,7 +267,6 @@ def _on_shotgrid_enabled_changed(
         _set_shotgrid_details_visible(details, enabled)
     if on_enabled_changed is not None:
         on_enabled_changed(enabled)
-
 
 def _build_shotgrid_field_row(
     qt_widgets: Any,
@@ -316,7 +309,6 @@ def _build_shotgrid_field_row(
     row_layout.addWidget(field)
     row_layout.addStretch(1)
     return row
-
 
 def _set_shotgrid_details_visible(details: Any, visible: bool) -> None:
     set_visible = getattr(details, "setVisible", None)

@@ -1,16 +1,32 @@
 global proc shelf_ShaderHealth()
 {
-    shelfButton
-        -label "Shader Health"
-        -annotation "Open Maya Shader Health Inspector"
-        -image1 "commandButton.png"
-        -sourceType "mel"
-        -command "python(\"import shader_health_inspector_bootstrap; shader_health_inspector_bootstrap.show()\")";
+    string $shelfName = "ShaderHealth";
+    string $openButton = "shaderHealthInspectorShelfButton";
+    string $farmButton = "shaderHealthInspectorFarmCheckShelfButton";
 
-    shelfButton
-        -label "Shader Health Farm Check"
-        -annotation "Open the Farm tab and run deadline_critical preflight"
-        -image1 "commandButton.png"
-        -sourceType "mel"
-        -command "python(\"from shader_health.maya.commands import show_farm_check_ui; show_farm_check_ui()\")";
+    if (!`shelfLayout -q -exists $shelfName`) {
+        return;
+    }
+
+    if (!`shelfButton -q -exists $openButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $openButton
+            -label "Shader Health"
+            -annotation "Open Maya Shader Health Inspector"
+            -image1 "commandButton.png"
+            -sourceType "mel"
+            -command "python(\"import shader_health_inspector_bootstrap; shader_health_inspector_bootstrap.show()\")";
+    }
+
+    if (!`shelfButton -q -exists $farmButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $farmButton
+            -label "Shader Health Farm Check"
+            -annotation "Open the Farm tab and run deadline_critical preflight"
+            -image1 "commandButton.png"
+            -sourceType "mel"
+            -command "python(\"from shader_health.maya.commands import show_farm_check_ui; show_farm_check_ui()\")";
+    }
 }

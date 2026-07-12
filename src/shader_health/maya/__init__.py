@@ -17,7 +17,6 @@ __all__ = [
     "scan_selection",
 ]
 
-
 def __getattr__(name: str) -> Any:
     """Load Maya-layer exports lazily.
 

@@ -48,7 +48,6 @@ from shader_health.ui.telegram_connector_section import (
 
 ConnectorSettingsValue = Any
 
-
 @dataclass(frozen=True)
 class ConnectorDefinition:
     """Metadata and UI hooks for one Settings connector."""
@@ -64,7 +63,6 @@ class ConnectorDefinition:
     apply_settings: Callable[[ConnectorSettings, ConnectorSettingsValue], ConnectorSettings]
     secret_field_names: frozenset[str] = frozenset()
 
-
 def _build_deadline_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -77,10 +75,8 @@ def _build_deadline_section(
         on_settings_changed=getattr(callbacks, "on_deadline_settings_changed", None),
     )
 
-
 def _resolve_deadline(config: StudioConfig) -> Any | None:
     return resolve_deadline_config(config)
-
 
 def _build_telegram_section(
     qt_widgets: Any,
@@ -94,10 +90,8 @@ def _build_telegram_section(
         on_settings_changed=getattr(callbacks, "on_telegram_settings_changed", None),
     )
 
-
 def _resolve_telegram(config: StudioConfig) -> Any | None:
     return resolve_telegram_config(config)
-
 
 def _build_discord_section(
     qt_widgets: Any,
@@ -111,10 +105,8 @@ def _build_discord_section(
         on_settings_changed=getattr(callbacks, "on_discord_settings_changed", None),
     )
 
-
 def _resolve_discord(config: StudioConfig) -> Any | None:
     return resolve_discord_config(config)
-
 
 def _build_slack_section(
     qt_widgets: Any,
@@ -128,10 +120,8 @@ def _build_slack_section(
         on_settings_changed=getattr(callbacks, "on_slack_settings_changed", None),
     )
 
-
 def _resolve_slack(config: StudioConfig) -> Any | None:
     return resolve_slack_config(config)
-
 
 CONNECTORS: tuple[ConnectorDefinition, ...] = (
     ConnectorDefinition(
@@ -184,19 +174,16 @@ CONNECTORS: tuple[ConnectorDefinition, ...] = (
     ),
 )
 
-
 def iter_connectors() -> tuple[ConnectorDefinition, ...]:
     """Return registered connector definitions in display order."""
 
     return CONNECTORS
-
 
 def get_connector(connector_id: str) -> ConnectorDefinition | None:
     for connector in CONNECTORS:
         if connector.id == connector_id:
             return connector
     return None
-
 
 def resolve_connector(config: StudioConfig, connector_id: str) -> Any | None:
     """Resolve runtime integration config for a connector id."""
@@ -205,7 +192,6 @@ def resolve_connector(config: StudioConfig, connector_id: str) -> Any | None:
     if connector is None:
         return None
     return connector.resolve_fn(config)
-
 
 def read_connectors_from_settings_view(
     view: Any,
@@ -220,7 +206,6 @@ def read_connectors_from_settings_view(
         settings = connector.read_from_view(view, qt_widgets)
         connectors = connector.apply_settings(connectors, settings)
     return connectors
-
 
 def update_connector_views(
     view: Any,

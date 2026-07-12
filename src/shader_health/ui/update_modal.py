@@ -83,8 +83,8 @@ def show_update_modal_shell(
     staging_root: Path | None = None,
     install_handler: InstallHandler | None = None,
     download_transport: Callable[[str, float], bytes] | None = None,
-) -> Any:
-    """Display the Check for Updates wizard and return the dialog widget."""
+) -> UpdateWizardSession:
+    """Display the Check for Updates wizard and return the session outcome."""
 
     session = show_update_wizard(
         qt_widgets,
@@ -96,7 +96,32 @@ def show_update_modal_shell(
         install_handler=install_handler,
         download_transport=download_transport,
     )
-    return session.dialog
+    return session
+
+
+def show_update_modal_dialog(
+    qt_widgets: Any,
+    *,
+    parent: Any | None = None,
+    installed_version: str = __version__,
+    studio_config: StudioConfig | None = None,
+    transport: HttpTransport | None = None,
+    staging_root: Path | None = None,
+    install_handler: InstallHandler | None = None,
+    download_transport: Callable[[str, float], bytes] | None = None,
+) -> Any:
+    """Display the Check for Updates wizard and return the dialog widget."""
+
+    return show_update_modal_shell(
+        qt_widgets,
+        parent=parent,
+        installed_version=installed_version,
+        studio_config=studio_config,
+        transport=transport,
+        staging_root=staging_root,
+        install_handler=install_handler,
+        download_transport=download_transport,
+    ).dialog
 
 
 __all__ = [

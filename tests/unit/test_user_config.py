@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from shader_health.studio_config import StudioConfig
 from shader_health.user_config import (
     USER_CONFIG_FILENAME,
@@ -45,6 +47,27 @@ def test_user_preferences_round_trips_through_json_file(tmp_path: Path, monkeypa
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "1.0"
     assert payload["theme"] == "dark"
+
+
+def test_enrich_user_preferences_infers_mayapy_from_executable(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import sys
+
+    from shader_health.user_config import enrich_user_preferences, infer_local_mayapy_path
+
+    monkeypatch.setattr(
+        sys,
+        "executable",
+        r"C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe",
+    )
+    assert infer_local_mayapy_path().endswith("mayapy.exe")
+
+    enriched = enrich_user_preferences(UserPreferences())
+    assert enriched.mayapy_path.endswith("mayapy.exe")
+
+    preserved = enrich_user_preferences(UserPreferences(mayapy_path="D:/custom/mayapy.exe"))
+    assert preserved.mayapy_path == "D:/custom/mayapy.exe"
 
 
 def test_user_preferences_default_uses_default_path_when_missing(tmp_path: Path, monkeypatch):

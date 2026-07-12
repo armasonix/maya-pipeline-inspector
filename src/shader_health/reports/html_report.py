@@ -15,7 +15,6 @@ SEVERITY_ORDER = ("critical", "error", "warning", "info")
 JsonDict = dict[str, Any]
 JsonValue = Any
 
-
 def build_html_report(snapshot: GraphSnapshot, results: Iterable[RuleResult]) -> str:
     """Build a deterministic self-contained HTML validation report."""
 
@@ -41,7 +40,6 @@ def build_html_report(snapshot: GraphSnapshot, results: Iterable[RuleResult]) ->
     ]
     return "\n".join(html) + "\n"
 
-
 def write_html_report(
     path: str | Path,
     snapshot: GraphSnapshot,
@@ -53,7 +51,6 @@ def write_html_report(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(build_html_report(snapshot, results), encoding="utf-8")
     return output_path
-
 
 def _render_header(payload: JsonDict) -> str:
     snapshot = _mapping(payload.get("snapshot"))
@@ -94,7 +91,6 @@ def _render_header(payload: JsonDict) -> str:
         ]
     )
 
-
 def _render_summary(payload: JsonDict) -> str:
     summary = _mapping(payload.get("summary"))
     score = _mapping(payload.get("score"))
@@ -121,7 +117,6 @@ def _render_summary(payload: JsonDict) -> str:
         ]
     )
 
-
 def _render_severity_groups(payload: JsonDict) -> str:
     grouped = _group_results_by_severity(payload)
     sections = [
@@ -135,12 +130,10 @@ def _render_severity_groups(payload: JsonDict) -> str:
     sections.append("</section>")
     return "\n".join(sections)
 
-
 def _severity_group_open_by_default(severity: str, results: list[JsonDict]) -> bool:
     if not results:
         return False
     return severity in ("critical", "error")
-
 
 def _render_severity_group(severity: str, results: list[JsonDict]) -> str:
     label = severity.capitalize()
@@ -162,7 +155,6 @@ def _render_severity_group(severity: str, results: list[JsonDict]) -> str:
         lines.extend(_render_results_table(results))
     lines.extend(["</div>", "</details>"])
     return "\n".join(lines)
-
 
 def _render_results_table(results: list[JsonDict]) -> list[str]:
     lines = [
@@ -187,7 +179,6 @@ def _render_results_table(results: list[JsonDict]) -> list[str]:
     lines.extend(["</tbody>", "</table>", "</div>"])
     return lines
 
-
 def _render_result_row(result: JsonDict) -> str:
     target = result.get("target_id") or result.get("node") or result.get("material") or ""
     status = str(result.get("status", "")).lower()
@@ -206,7 +197,6 @@ def _render_result_row(result: JsonDict) -> str:
         ]
     )
 
-
 def _render_footer(payload: JsonDict) -> str:
     snapshot = _mapping(payload.get("snapshot"))
     scan_scope = _text(snapshot.get("scan_scope", "scene"))
@@ -218,7 +208,6 @@ def _render_footer(payload: JsonDict) -> str:
         ]
     )
 
-
 def _metric_card(label: str, value: JsonValue) -> str:
     return "".join(
         [
@@ -228,7 +217,6 @@ def _metric_card(label: str, value: JsonValue) -> str:
             "</article>",
         ]
     )
-
 
 def _block_card(label: str, value: JsonValue) -> str:
     blocked = bool(value)
@@ -243,7 +231,6 @@ def _block_card(label: str, value: JsonValue) -> str:
         ]
     )
 
-
 def _group_results_by_severity(payload: JsonDict) -> dict[str, list[JsonDict]]:
     grouped = {severity: [] for severity in SEVERITY_ORDER}
     for result in payload.get("results", []):
@@ -253,12 +240,10 @@ def _group_results_by_severity(payload: JsonDict) -> dict[str, list[JsonDict]]:
         grouped.setdefault(severity, []).append(dict(result))
     return grouped
 
-
 def _mapping(value: JsonValue) -> JsonDict:
     if isinstance(value, Mapping):
         return dict(value)
     return {}
-
 
 def _format_value(value: JsonValue) -> str:
     if isinstance(value, (dict, list, tuple)):
@@ -267,14 +252,11 @@ def _format_value(value: JsonValue) -> str:
         return ""
     return str(value)
 
-
 def _text(value: JsonValue) -> str:
     return escape(_format_value(value), quote=False)
 
-
 def _attr(value: JsonValue) -> str:
     return escape(_format_value(value), quote=True)
-
 
 def _stylesheet() -> str:
     return """

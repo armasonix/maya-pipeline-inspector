@@ -14,7 +14,6 @@ FIX_PLAN_SCHEMA_VERSION = "1.0"
 JsonDict = dict[str, Any]
 JsonValue = Any
 
-
 def build_fix_plan_export(
     fix_plan: FixPlan,
     *,
@@ -39,7 +38,6 @@ def build_fix_plan_export(
         "total": len(actions),
     }
 
-
 def dumps_fix_plan_export(
     fix_plan: FixPlan,
     *,
@@ -51,7 +49,6 @@ def dumps_fix_plan_export(
 
     payload = build_fix_plan_export(fix_plan, snapshot=snapshot, profile_id=profile_id)
     return json.dumps(payload, indent=indent, sort_keys=True) + "\n"
-
 
 def write_fix_plan_export(
     path: str | Path,
@@ -76,7 +73,6 @@ def write_fix_plan_export(
     )
     return output_path
 
-
 def _action_sort_key(action: FixAction) -> tuple[str, str, str, str]:
     return (
         action.fix_id,
@@ -84,7 +80,6 @@ def _action_sort_key(action: FixAction) -> tuple[str, str, str, str]:
         action.target_id,
         action.fix_type,
     )
-
 
 def _json_safe(value: JsonValue) -> JsonValue:
     if isinstance(value, Mapping):

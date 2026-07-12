@@ -18,7 +18,6 @@ class TrackerPublishResult:
     external_url: str = ""
     metadata: Mapping[str, str] = field(default_factory=dict)
 
-
 class TrackerPublisher(Protocol):
     """Contract implemented by Ftrack, ShotGrid, and Cerebro connectors."""
 

@@ -41,14 +41,12 @@ UPDATE_PROGRESS_SHELL_STATUS = (
     "Shell preview — automated update wizard ships in Milestone 37."
 )
 
-
 @dataclass(frozen=True)
 class UpdateProgressStep:
     """One wizard step with a title and optional detail description."""
 
     label: str
     description: str = ""
-
 
 @dataclass(frozen=True)
 class UpdateProgressStage:
@@ -59,14 +57,11 @@ class UpdateProgressStage:
     description: str
     state: str
 
-
 def update_progress_step_label_object_name(index: int) -> str:
     return f"{UPDATE_PROGRESS_STEP_LABEL_OBJECT_NAME_PREFIX}{index}"
 
-
 def update_progress_step_description_object_name(index: int) -> str:
     return f"{UPDATE_PROGRESS_STEP_DESCRIPTION_OBJECT_NAME_PREFIX}{index}"
-
 
 def default_update_progress_steps() -> tuple[UpdateProgressStep, ...]:
     return tuple(
@@ -76,7 +71,6 @@ def default_update_progress_steps() -> tuple[UpdateProgressStep, ...]:
             DEFAULT_UPDATE_STEP_DESCRIPTIONS,
         )
     )
-
 
 def build_update_progress_stages(
     steps: Sequence[UpdateProgressStep],
@@ -107,7 +101,6 @@ def build_update_progress_stages(
         )
     return tuple(rows)
 
-
 def format_update_progress_stage_label(stage: UpdateProgressStage) -> str:
     prefix = {
         "complete": "[done]",
@@ -115,7 +108,6 @@ def format_update_progress_stage_label(stage: UpdateProgressStage) -> str:
         "pending": "[pending]",
     }.get(stage.state, "[pending]")
     return f"{prefix} {stage.index + 1}. {stage.label}"
-
 
 @dataclass
 class UpdateProgressDialog:
@@ -305,7 +297,6 @@ class UpdateProgressDialog:
     def close(self) -> None:
         _close_dialog(self.dialog)
 
-
 def show_update_progress_dialog(
     qt_widgets: Any,
     *,
@@ -331,7 +322,6 @@ def show_update_progress_dialog(
                 set_modality(application_modal)
     dialog.show(parent=parent, modal=True)
     return dialog
-
 
 def _close_dialog(dialog: Any) -> None:
     reject = getattr(dialog, "reject", None)

@@ -18,7 +18,6 @@ REPORT_SCHEMA_VERSION = "1.0"
 JsonDict = dict[str, Any]
 JsonValue = Any
 
-
 def build_json_report(
     snapshot: GraphSnapshot,
     results: Iterable[RuleResult],
@@ -57,7 +56,6 @@ def build_json_report(
         payload["fix_audit"] = _json_safe(dict(fix_audit))
     return payload
 
-
 def dumps_json_report(
     snapshot: GraphSnapshot,
     results: Iterable[RuleResult],
@@ -69,7 +67,6 @@ def dumps_json_report(
 
     payload = build_json_report(snapshot, results, fix_audit=fix_audit)
     return json.dumps(payload, indent=indent, sort_keys=True) + "\n"
-
 
 def write_json_report(
     path: str | Path,
@@ -89,7 +86,6 @@ def write_json_report(
     )
     return output_path
 
-
 def _snapshot_metadata(snapshot: GraphSnapshot) -> JsonDict:
     return {
         "maya_version": snapshot.maya_version,
@@ -100,7 +96,6 @@ def _snapshot_metadata(snapshot: GraphSnapshot) -> JsonDict:
         "scanned_at_utc": snapshot.scanned_at_utc,
     }
 
-
 def _result_sort_key(result: RuleResult) -> tuple[str, str, str, str, str, str]:
     return (
         result.rule_id,
@@ -110,7 +105,6 @@ def _result_sort_key(result: RuleResult) -> tuple[str, str, str, str, str, str]:
         result.plug or "",
         result.status,
     )
-
 
 def _json_safe(value: JsonValue) -> JsonValue:
     if isinstance(value, Mapping):

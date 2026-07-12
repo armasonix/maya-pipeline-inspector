@@ -45,7 +45,6 @@ _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
 _DISPLACEMENT_NODE_TYPES = {"displacementShader", "VRayDisplacement", "VRayDisplacementTex"}
 
-
 def prepare_snapshot_for_validation(
     snapshot: GraphSnapshot,
     *,
@@ -60,7 +59,6 @@ def prepare_snapshot_for_validation(
     return enrich_displacement_metadata(
         enrich_arnold_metadata(enrich_vray_metadata(propagated))
     )
-
 
 def enrich_rule_results(
     snapshot: GraphSnapshot,
@@ -80,7 +78,6 @@ def enrich_rule_results(
         else:
             enriched.append(replace(result, material=material))
     return enriched
-
 
 def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
     """Map node ids and short names to owning material names."""
@@ -112,7 +109,6 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
                 index[_short_node_id(texture_id)] = material.name
     return index
 
-
 def _upstream_texture_nodes(
     start_node_id: str,
     incoming: dict[str, list[str]],
@@ -133,7 +129,6 @@ def _upstream_texture_nodes(
             continue
         stack.extend(incoming.get(node_id, ()))
     return found
-
 
 def enrich_snapshot(
     snapshot: GraphSnapshot,
@@ -183,7 +178,6 @@ def enrich_snapshot(
         materials=list(materials),
     )
 
-
 def _enrich_node(node: NodeSnapshot) -> NodeSnapshot:
     attrs = dict(node.attrs)
     if _is_displacement_node(node) and "amount" not in attrs:
@@ -193,14 +187,12 @@ def _enrich_node(node: NodeSnapshot) -> NodeSnapshot:
                 break
     return replace(node, attrs=attrs)
 
-
 def _apply_node_semantic(node: NodeSnapshot, semantic: Optional[str]) -> NodeSnapshot:
     if not semantic:
         return node
     attrs = dict(node.attrs)
     attrs.setdefault("semantic_slot", semantic)
     return replace(node, attrs=attrs)
-
 
 def _enrich_connection(
     connection: ConnectionSnapshot,
@@ -212,7 +204,6 @@ def _enrich_connection(
     semantic = _semantic_from_destination(connection.dst_attr, dst_node)
     return replace(connection, semantic=semantic) if semantic else connection
 
-
 def _node_semantics_from_connections(
     connections: tuple[ConnectionSnapshot, ...],
 ) -> dict[str, str]:
@@ -221,7 +212,6 @@ def _node_semantics_from_connections(
         if connection.semantic:
             semantics.setdefault(connection.src_node, connection.semantic)
     return semantics
-
 
 def _semantic_from_destination(
     dst_attr: str,
@@ -251,7 +241,6 @@ def _semantic_from_destination(
     if "basecolor" in attr or "diffuse" in attr or attr == "color":
         return "base_color"
     return None
-
 
 def _enrich_file_dependency(
     dependency: FileDependencySnapshot,
@@ -286,7 +275,6 @@ def _enrich_file_dependency(
     )
     return _enrich_dependency_image_metadata(enriched)
 
-
 def _enrich_dependency_image_metadata(
     dependency: FileDependencySnapshot,
 ) -> FileDependencySnapshot:
@@ -320,7 +308,6 @@ def _enrich_dependency_image_metadata(
         )
     )
 
-
 def _enrich_material_fingerprint(
     material: MaterialSnapshot,
     *,
@@ -351,7 +338,6 @@ def _enrich_material_fingerprint(
         graph_content_fingerprint=content_fingerprint,
     )
 
-
 def _material_texture_paths(
     material: MaterialSnapshot,
     file_dependencies: tuple[FileDependencySnapshot, ...],
@@ -367,7 +353,6 @@ def _material_texture_paths(
             paths.append(path)
     return tuple(paths)
 
-
 def _udim_pattern(raw_path: str, node: Optional[NodeSnapshot]) -> Optional[str]:
     if "<UDIM>" in raw_path or "<udim>" in raw_path:
         return raw_path
@@ -381,16 +366,13 @@ def _udim_pattern(raw_path: str, node: Optional[NodeSnapshot]) -> Optional[str]:
     name = path.name[: match.start()] + "<UDIM>" + path.name[match.end() :]
     return str(path.with_name(name)).replace("\\", "/")
 
-
 def _uses_maya_udim_mode(node: Optional[NodeSnapshot]) -> bool:
     if node is None:
         return False
     return node.attrs.get("uvTilingMode") in _UDIM_MODE_VALUES
 
-
 def _is_displacement_node(node: NodeSnapshot) -> bool:
     return node.type_name in _DISPLACEMENT_NODE_TYPES or "displacement" in node.type_name.lower()
-
 
 def _resolve_path(
     raw_path: str,
@@ -416,13 +398,11 @@ def _resolve_path(
             return str(candidate).replace("\\", "/")
     return str(candidates[-1]).replace("\\", "/")
 
-
 def _path_or_udim_exists(path: Path) -> bool:
     text = str(path).replace("\\", "/")
     if "<UDIM>" in text or "<udim>" in text:
         return bool(_udim_files(text))
     return path.exists()
-
 
 def _udim_glob_pattern(path: str) -> str:
     return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace(
@@ -430,10 +410,8 @@ def _udim_glob_pattern(path: str) -> str:
         "[0-9][0-9][0-9][0-9]",
     )
 
-
 def _udim_files(path: str) -> list[Path]:
     return sorted(Path(item) for item in glob.glob(_udim_glob_pattern(path)))
-
 
 def _existing_udim_tiles(path: str) -> list[int]:
     tiles: set[int] = set()
@@ -443,17 +421,14 @@ def _existing_udim_tiles(path: str) -> list[int]:
             tiles.add(int(matches[-1]))
     return sorted(tiles)
 
-
 def _missing_udim_tiles(existing_tiles: list[int]) -> list[int]:
     if len(existing_tiles) < 2:
         return []
     existing = set(existing_tiles)
     return [tile for tile in range(min(existing), max(existing) + 1) if tile not in existing]
 
-
 def _default_adapter_registry() -> RendererAdapterRegistry:
     return RendererAdapterRegistry([CommonMayaAdapter(), VrayAdapter(), ArnoldAdapter()])
-
 
 def _with_propagated_semantic_slots(snapshot: GraphSnapshot) -> GraphSnapshot:
     semantics_by_src: dict[str, str] = {}
@@ -471,7 +446,6 @@ def _with_propagated_semantic_slots(snapshot: GraphSnapshot) -> GraphSnapshot:
         else:
             nodes.append(node)
     return replace(snapshot, nodes=nodes)
-
 
 def _resolve_result_material(
     result: RuleResult,
@@ -491,7 +465,6 @@ def _resolve_result_material(
         if material:
             return material
     return None
-
 
 def _short_node_id(node_id: str) -> str:
     if node_id.startswith("node:"):

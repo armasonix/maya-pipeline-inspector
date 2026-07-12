@@ -71,7 +71,11 @@ def apply_user_preferences_to_panel(
     content._shader_health_max_issues_displayed = user_config.max_issues_displayed
     content._shader_health_mayapy_path = user_config.mayapy_path
     _apply_ui_density(content, qt_widgets, user_config.ui_density)
-    apply_panel_theme(content, user_config.theme)
+    apply_panel_theme(
+        content,
+        user_config.theme,
+        dock=getattr(content, "_shader_health_dock", None),
+    )
     _apply_debug_logging(user_config.debug_logging)
 
 

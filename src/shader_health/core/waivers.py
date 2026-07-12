@@ -14,7 +14,6 @@ WAIVER_SCHEMA_VERSION = "1.0"
 WAIVED_STATUS = "waived"
 JsonDict = dict[str, Any]
 
-
 @dataclass(frozen=True)
 class WaiverRecord:
     id: str
@@ -72,7 +71,6 @@ class WaiverRecord:
             expires_at_utc=str(data.get("expires_at_utc", "")),
         )
 
-
 @dataclass(frozen=True)
 class WaiverSidecar:
     waivers: tuple[WaiverRecord, ...] = ()
@@ -108,7 +106,6 @@ class WaiverSidecar:
             ),
         )
 
-
 def create_waiver_from_result(
     result: RuleResult,
     *,
@@ -131,7 +128,6 @@ def create_waiver_from_result(
         expires_at_utc=expires_at_utc,
     )
 
-
 def apply_waivers(
     results: Iterable[RuleResult],
     sidecar: WaiverSidecar,
@@ -147,7 +143,6 @@ def apply_waivers(
             resolved.append(result)
     return tuple(resolved)
 
-
 def revoke_waiver(sidecar: WaiverSidecar, waiver_id: str) -> WaiverSidecar:
     """Return a sidecar copy with one waiver removed by id."""
 
@@ -159,12 +154,10 @@ def revoke_waiver(sidecar: WaiverSidecar, waiver_id: str) -> WaiverSidecar:
         schema_version=sidecar.schema_version,
     )
 
-
 def waiver_status_label(waiver: WaiverRecord, *, now_utc: Optional[str] = None) -> str:
     """Return a display status for waiver manager UI."""
 
     return "expired" if waiver.expired(now_utc) else "active"
-
 
 def load_waiver_sidecar_optional(path: Optional[str | Path]) -> WaiverSidecar:
     """Load a waiver sidecar when present, otherwise return an empty sidecar."""
@@ -176,13 +169,11 @@ def load_waiver_sidecar_optional(path: Optional[str | Path]) -> WaiverSidecar:
         return WaiverSidecar()
     return load_waiver_sidecar(sidecar_path)
 
-
 def load_waiver_sidecar(path: str | Path) -> WaiverSidecar:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, Mapping):
         raise ValueError("waiver sidecar root must be an object")
     return WaiverSidecar.from_dict(data)
-
 
 def write_waiver_sidecar(path: str | Path, sidecar: WaiverSidecar) -> Path:
     out = Path(path)
@@ -192,7 +183,6 @@ def write_waiver_sidecar(path: str | Path, sidecar: WaiverSidecar) -> Path:
         encoding="utf-8",
     )
     return out
-
 
 def _waive(result: RuleResult, waiver: WaiverRecord) -> RuleResult:
     evidence = dict(result.evidence)
@@ -206,13 +196,11 @@ def _waive(result: RuleResult, waiver: WaiverRecord) -> RuleResult:
         evidence=evidence,
     )
 
-
 def _parse_utc(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
-
 
 def _optional(value: Any) -> Optional[str]:
     return None if value is None or str(value) == "" else str(value)

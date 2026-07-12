@@ -12,7 +12,6 @@ from shader_health.integrations.telegram.config import TelegramConfig
 
 HttpTransport = Callable[["HttpRequest", float], "TelegramResponse"]
 
-
 @dataclass(frozen=True)
 class HttpRequest:
     """Low-level HTTP request passed to a transport implementation."""
@@ -22,7 +21,6 @@ class HttpRequest:
     body: bytes | None
     headers: Mapping[str, str]
 
-
 @dataclass(frozen=True)
 class TelegramResponse:
     """Normalized Telegram Bot API response."""
@@ -31,10 +29,8 @@ class TelegramResponse:
     body: str
     json_data: dict[str, Any] | list[Any] | None = None
 
-
 class TelegramClientError(RuntimeError):
     """Raised when the Telegram Bot API returns an unexpected response."""
-
 
 class TelegramClient:
     """REST wrapper for Telegram Bot API endpoints."""
@@ -97,7 +93,6 @@ class TelegramClient:
         normalized = api_method if api_method.startswith("/") else f"/{api_method}"
         return f"{base}/bot{self._config.bot_token}{normalized}"
 
-
 def default_http_transport(request: HttpRequest, timeout: float) -> TelegramResponse:
     """Send an HTTP request using the Python standard library."""
 
@@ -122,7 +117,6 @@ def default_http_transport(request: HttpRequest, timeout: float) -> TelegramResp
             body=body,
             json_data=_parse_json_body(body),
         )
-
 
 def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     text = body.strip()

@@ -1,90 +1,118 @@
-/* Classic theme — neutral light panel chrome for Maya docked UI. */
+/* Classic theme — matches Maya default dark-gray UI chrome. */
 
+QWidget#shaderHealthInspectorPanel,
 QWidget#shaderHealthInspectorPanelContent,
+QWidget#shaderHealthInspectorPanel QWidget,
 QWidget#shaderHealthInspectorPanelContent QWidget {
-    background-color: #ececec;
-    color: #1f1f1f;
+    background-color: #535353;
+    color: #cccccc;
+}
+
+QWidget#shaderHealthInspectorPanelHeader {
+    background-color: #535353;
 }
 
 QLabel {
-    color: #1f1f1f;
+    color: #cccccc;
+    background-color: transparent;
 }
 
-QPushButton {
-    background-color: #d8d8d8;
-    color: #1f1f1f;
-    border: 1px solid #a8a8a8;
+QWidget#shaderHealthInspectorPanel QPushButton,
+QWidget#shaderHealthInspectorPanelContent QPushButton {
+    background-color: #606060;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
     border-radius: 4px;
     padding: 4px 10px;
+    min-height: 20px;
 }
 
-QPushButton:hover {
-    background-color: #c8c8c8;
+QWidget#shaderHealthInspectorPanel QPushButton:hover,
+QWidget#shaderHealthInspectorPanelContent QPushButton:hover {
+    background-color: #6a6a6a;
+    border-color: #808080;
 }
 
-QPushButton:pressed {
-    background-color: #b0b0b0;
+QWidget#shaderHealthInspectorPanel QPushButton:pressed,
+QWidget#shaderHealthInspectorPanelContent QPushButton:pressed {
+    background-color: #4a4a4a;
+    border-color: #2a2a2a;
+    padding-top: 5px;
+    padding-left: 11px;
 }
 
-QComboBox {
-    background-color: #f5f5f5;
-    color: #1f1f1f;
-    border: 1px solid #a8a8a8;
+QWidget#shaderHealthInspectorPanel QPushButton:disabled,
+QWidget#shaderHealthInspectorPanelContent QPushButton:disabled {
+    background-color: #4a4a4a;
+    color: #888888;
+}
+
+QWidget#shaderHealthInspectorPanel QComboBox,
+QWidget#shaderHealthInspectorPanelContent QComboBox {
+    background-color: #454545;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
     border-radius: 3px;
     padding: 2px 6px;
 }
 
-QLineEdit,
-QTextEdit,
-QPlainTextEdit {
-    background-color: #ffffff;
-    color: #1f1f1f;
-    border: 1px solid #a8a8a8;
+QWidget#shaderHealthInspectorPanel QLineEdit,
+QWidget#shaderHealthInspectorPanel QTextEdit,
+QWidget#shaderHealthInspectorPanel QPlainTextEdit,
+QWidget#shaderHealthInspectorPanelContent QLineEdit,
+QWidget#shaderHealthInspectorPanelContent QTextEdit,
+QWidget#shaderHealthInspectorPanelContent QPlainTextEdit {
+    background-color: #454545;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
     border-radius: 3px;
     selection-background-color: #4a90d9;
     selection-color: #ffffff;
 }
 
 QTabWidget::pane {
-    border: 1px solid #b8b8b8;
-    background-color: #ececec;
+    border: 1px solid #3a3a3a;
+    background-color: #535353;
 }
 
 QTabBar::tab {
-    background-color: #d4d4d4;
-    color: #1f1f1f;
-    border: 1px solid #b8b8b8;
+    background-color: #454545;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
     border-bottom: none;
     padding: 4px 10px;
     margin-right: 2px;
 }
 
 QTabBar::tab:selected {
-    background-color: #ececec;
+    background-color: #535353;
 }
 
-QTableWidget {
-    background-color: #ffffff;
-    color: #1f1f1f;
-    gridline-color: #c8c8c8;
-    border: 1px solid #b8b8b8;
+QWidget#shaderHealthInspectorPanel QTableWidget,
+QWidget#shaderHealthInspectorPanelContent QTableWidget {
+    background-color: #454545;
+    color: #cccccc;
+    gridline-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
     selection-background-color: #4a90d9;
     selection-color: #ffffff;
+    alternate-background-color: #4a4a4a;
 }
 
 QHeaderView::section {
-    background-color: #d8d8d8;
-    color: #1f1f1f;
-    border: 1px solid #b8b8b8;
+    background-color: #606060;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
     padding: 3px 6px;
 }
 
 QGroupBox {
-    color: #1f1f1f;
-    border: 1px solid #b8b8b8;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
     border-radius: 4px;
     margin-top: 8px;
     padding-top: 8px;
+    background-color: #535353;
 }
 
 QGroupBox::title {
@@ -94,14 +122,27 @@ QGroupBox::title {
 }
 
 QScrollArea {
-    background-color: #ececec;
+    background-color: #535353;
     border: none;
 }
 
 QCheckBox {
-    color: #1f1f1f;
+    color: #cccccc;
+    background-color: transparent;
 }
 
 QSplitter::handle {
-    background-color: #b8b8b8;
+    background-color: #3a3a3a;
+}
+
+QProgressBar {
+    background-color: #454545;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    text-align: center;
+    color: #cccccc;
+}
+
+QProgressBar::chunk {
+    background-color: #4a90d9;
 }

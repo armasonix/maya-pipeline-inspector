@@ -29,6 +29,7 @@ PANEL_CONTENT_OBJECT_NAME = "shaderHealthInspectorPanelContent"
 TAB_WIDGET_OBJECT_NAME = "shaderHealthInspectorTabWidget"
 PANEL_HEADER_OBJECT_NAME = "shaderHealthInspectorPanelHeader"
 PANEL_HEADER_TITLE_OBJECT_NAME = "shaderHealthInspectorPanelHeaderTitle"
+PANEL_HEADER_UNSAVED_OBJECT_NAME = "shaderHealthInspectorPanelHeaderUnsaved"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "shaderHealthInspectorSettingsGearButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "shaderHealthInspectorDocumentationButton"
 REPORT_BUG_BUTTON_OBJECT_NAME = "shaderHealthInspectorReportBugButton"
@@ -114,6 +115,7 @@ SELECT_NODE_BUTTON_OBJECT_NAME = "shaderHealthInspectorSelectNodeButton"
 OPEN_ATTR_EDITOR_BUTTON_OBJECT_NAME = "shaderHealthInspectorOpenAttrEditorButton"
 COPY_PATH_BUTTON_OBJECT_NAME = "shaderHealthInspectorCopyPathButton"
 REVEAL_FILE_BUTTON_OBJECT_NAME = "shaderHealthInspectorRevealFileButton"
+CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME = "shaderHealthInspectorCreateRuleDraftButton"
 CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME = "shaderHealthInspectorCreateRuleDraftButton"
 ASSET_CLASS_NONE_LABEL = "None"
 DEFAULT_WORKFLOW_PROFILE_OPTIONS = list_workflow_profile_options() or (
@@ -252,6 +254,7 @@ class IssueDetailsActionCallbacks:
     on_copy_path: Optional[Callable[[], None]] = None
     on_reveal_file: Optional[Callable[[], None]] = None
     on_create_rule_draft: Optional[Callable[[], None]] = None
+    on_create_rule_draft: Optional[Callable[[], None]] = None
 
 
 def build_main_widget(
@@ -304,6 +307,7 @@ def build_main_widget(
             qt_widgets,
             validation_callbacks,
             issue_details_callbacks,
+            waiver_callbacks=waiver_callbacks,
             user_config=active_user_config,
         ),
         "Validate",
@@ -367,7 +371,18 @@ def build_panel_header(
     set_style = getattr(title_label, "setStyleSheet", None)
     if set_style is not None:
         set_style("font-size: 14pt; font-weight: bold;")
-    row_layout.addWidget(title_label, 1)
+    row_layout.addWidget(title_label, 0)
+
+    unsaved_label = qt_widgets.QLabel("")
+    unsaved_label.setObjectName(PANEL_HEADER_UNSAVED_OBJECT_NAME)
+    set_unsaved_style = getattr(unsaved_label, "setStyleSheet", None)
+    if set_unsaved_style is not None:
+        set_unsaved_style("color: #6eb5ff; font-size: 11pt; font-weight: normal;")
+    set_unsaved_visible = getattr(unsaved_label, "setVisible", None)
+    if set_unsaved_visible is not None:
+        set_unsaved_visible(False)
+    row_layout.addWidget(unsaved_label, 0)
+    row_layout.addStretch(1)
 
     docs_button = _compact_button(
         qt_widgets,
@@ -397,6 +412,33 @@ def build_panel_header(
     row_layout.addWidget(updates_button)
 
     return row
+
+
+def update_panel_header_unsaved_indicator(
+    root: Any,
+    qt_widgets: Any,
+    *,
+    dirty: bool,
+) -> None:
+    """Show or hide the panel header unsaved-settings hint."""
+
+    from shader_health.ui.settings_widgets import find_child
+
+    label = find_child(root, qt_widgets.QLabel, PANEL_HEADER_UNSAVED_OBJECT_NAME)
+    if label is None:
+        return
+    set_text = getattr(label, "setText", None)
+    set_visible = getattr(label, "setVisible", None)
+    if dirty:
+        if set_text is not None:
+            set_text("* unsaved changes")
+        if set_visible is not None:
+            set_visible(True)
+        return
+    if set_text is not None:
+        set_text("")
+    if set_visible is not None:
+        set_visible(False)
 
 
 def build_validation_actions(
@@ -610,6 +652,8 @@ def build_summary_header(
 def build_issues_table(
     qt_widgets: Any,
     rows: Sequence[IssueTableRow] = (),
+    *,
+    on_make_waive: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build the filterable/sortable issues table widget."""
 
@@ -664,6 +708,20 @@ def build_issues_table(
         sort_dropdown,
     ):
         filters_layout.addWidget(combo, 0)
+
+    if on_make_waive is not None:
+        from shader_health.ui.settings_widgets import wire_button
+        from shader_health.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
+
+        make_waive_button = qt_widgets.QPushButton("Make Waive")
+        make_waive_button.setObjectName(WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME)
+        set_tooltip = getattr(make_waive_button, "setToolTip", None)
+        if set_tooltip is not None:
+            set_tooltip(
+                "Create a waiver for the selected issue in the Validate table."
+            )
+        wire_button(make_waive_button, on_make_waive)
+        filters_layout.addWidget(make_waive_button, 0)
 
     filters_layout.addStretch(1)
     layout.addWidget(filters_row)
@@ -1036,7 +1094,7 @@ def format_last_validated_display(scanned_at_utc: str) -> str:
     """Return a local-time last-validated label from an ISO UTC timestamp."""
 
     if not scanned_at_utc:
-        return "Last validated: —"
+        return "Last validated: вЂ”"
     try:
         normalized = scanned_at_utc.replace("Z", "+00:00")
         parsed = datetime.fromisoformat(normalized)
@@ -1054,7 +1112,7 @@ def format_scan_scope_display(scan_scope: str) -> str:
         return "Scope: selection"
     if scan_scope:
         return "Scope: scene"
-    return "Scope: —"
+    return "Scope: вЂ”"
 
 
 def format_profile_chip_text(display_name: str, profile_id: str) -> str:
@@ -1097,7 +1155,7 @@ def build_reports_status_text(
     if scanned_at_utc:
         parts.append("Exports reflect the last validation run.")
     else:
-        parts.append("Validation age unknown — revalidate before publishing exports.")
+        parts.append("Validation age unknown вЂ” revalidate before publishing exports.")
     return "   ".join(parts)
 
 
@@ -1173,12 +1231,15 @@ def _build_validate_tab(
     validation_callbacks: ValidationActionCallbacks,
     issue_details_callbacks: IssueDetailsActionCallbacks,
     *,
+    waiver_callbacks: Optional[WaiverManagerCallbacks] = None,
     user_config: Optional[UserPreferences] = None,
 ) -> Any:
     tab = qt_widgets.QWidget()
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(6)
+
+    waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
 
     layout.addWidget(
         build_validate_sticky_chrome(
@@ -1189,7 +1250,10 @@ def _build_validate_tab(
         )
     )
 
-    issues_table = build_issues_table(qt_widgets)
+    issues_table = build_issues_table(
+        qt_widgets,
+        on_make_waive=waiver_callbacks.on_make_waive,
+    )
     details_panel = build_issue_details_panel(qt_widgets, callbacks=issue_details_callbacks)
     splitter_class = getattr(qt_widgets, "QSplitter", None)
     if splitter_class is None:

@@ -12,12 +12,10 @@ def format_bug_report_success_headline() -> str:
         "Track the fix on GitHub:"
     )
 
-
 def format_bug_report_issue_url_text(issue_url: str) -> str:
     """Return the issue URL label text shown on successful submission."""
 
     return issue_url.strip()
-
 
 def format_bug_report_failure_status(result: BugReportRelayResult) -> str:
     """Return a user-visible failure message for a relay submission outcome."""

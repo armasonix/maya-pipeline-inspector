@@ -53,8 +53,11 @@ class WaiverDefaultsSettings:
     def from_mapping(cls, data: Mapping[str, Any] | None) -> WaiverDefaultsSettings:
         if not data:
             return cls()
+        approved_by = data.get("default_approved_by")
+        if not approved_by:
+            approved_by = data.get("approved_by")
         return cls(
-            default_approved_by=str(data.get("default_approved_by", "") or ""),
+            default_approved_by=str(approved_by or ""),
             default_expiry_days=int(data.get("default_expiry_days", DEFAULT_WAIVER_EXPIRY_DAYS)),
             allow_critical_waivers=bool(data.get("allow_critical_waivers", False)),
         )
@@ -225,11 +228,17 @@ class StudioUpdatesSettings:
 
     allow_check: bool = True
     pinned_version: str = ""
+    github_owner: str = ""
+    github_repo: str = ""
+    github_token: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "allow_check": self.allow_check,
             "pinned_version": self.pinned_version,
+            "github_owner": self.github_owner,
+            "github_repo": self.github_repo,
+            "github_token": self.github_token,
         }
 
     @classmethod
@@ -239,6 +248,9 @@ class StudioUpdatesSettings:
         return cls(
             allow_check=bool(data.get("allow_check", True)),
             pinned_version=str(data.get("pinned_version", "") or ""),
+            github_owner=str(data.get("github_owner", "") or ""),
+            github_repo=str(data.get("github_repo", "") or ""),
+            github_token=str(data.get("github_token", "") or ""),
         )
 
 
@@ -420,11 +432,17 @@ class FtrackConnectorSettings:
     api_user: str = ""
     api_key: str = ""
     project: str = ""
+    note_author_username: str = ""
+    task_status_name: str = ""
 
     def to_ftrack_config(self) -> Any | None:
         """Convert connector settings into an Ftrack runtime config object."""
 
-        from shader_health.integrations.ftrack.config import FtrackConfig
+        from shader_health.integrations.ftrack.config import (
+            DEFAULT_NOTE_AUTHOR_USERNAME,
+            DEFAULT_TASK_STATUS_NAME,
+            FtrackConfig,
+        )
 
         api_url = self.api_url.strip()
         api_user = self.api_user.strip()
@@ -432,11 +450,15 @@ class FtrackConnectorSettings:
         project = self.project.strip()
         if not api_url or not api_user or not api_key or not project:
             return None
+        note_author_username = self.note_author_username.strip() or DEFAULT_NOTE_AUTHOR_USERNAME
+        task_status_name = self.task_status_name.strip() or DEFAULT_TASK_STATUS_NAME
         return FtrackConfig(
             api_url=api_url,
             api_user=api_user,
             api_key=api_key,
             project=project,
+            note_author_username=note_author_username,
+            task_status_name=task_status_name,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -446,6 +468,8 @@ class FtrackConnectorSettings:
             "api_user": self.api_user,
             "api_key": self.api_key,
             "project": self.project,
+            "note_author_username": self.note_author_username,
+            "task_status_name": self.task_status_name,
         }
 
     @classmethod
@@ -458,6 +482,8 @@ class FtrackConnectorSettings:
             api_user=str(data.get("api_user", "") or ""),
             api_key=str(data.get("api_key", "") or ""),
             project=str(data.get("project", "") or ""),
+            note_author_username=str(data.get("note_author_username", "") or ""),
+            task_status_name=str(data.get("task_status_name", "") or ""),
         )
 
 
@@ -525,6 +551,9 @@ class CerebroConnectorSettings:
     api_user: str = ""
     api_password: str = ""
     project: str = ""
+    service_tools_path: str = ""
+    pause_status_name: str = "Pause"
+    set_pause_status_on_publish: bool = True
 
     def to_cerebro_config(self) -> Any | None:
         """Convert connector settings into a Cerebro runtime config object."""
@@ -542,6 +571,9 @@ class CerebroConnectorSettings:
             api_user=api_user,
             api_password=api_password,
             project=project,
+            service_tools_path=self.service_tools_path.strip(),
+            pause_status_name=self.pause_status_name.strip() or "Pause",
+            set_pause_status_on_publish=self.set_pause_status_on_publish,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -551,6 +583,9 @@ class CerebroConnectorSettings:
             "api_user": self.api_user,
             "api_password": self.api_password,
             "project": self.project,
+            "service_tools_path": self.service_tools_path,
+            "pause_status_name": self.pause_status_name,
+            "set_pause_status_on_publish": self.set_pause_status_on_publish,
         }
 
     @classmethod
@@ -563,6 +598,9 @@ class CerebroConnectorSettings:
             api_user=str(data.get("api_user", "") or ""),
             api_password=str(data.get("api_password", "") or ""),
             project=str(data.get("project", "") or ""),
+            service_tools_path=str(data.get("service_tools_path", "") or ""),
+            pause_status_name=str(data.get("pause_status_name", "Pause") or "Pause"),
+            set_pause_status_on_publish=bool(data.get("set_pause_status_on_publish", True)),
         )
 
 

@@ -4,12 +4,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from shader_health.integrations.cerebro.client import CerebroClient
+from shader_health.integrations.cerebro.adapter import (
+    probe_cerebro_runtime,
+)
+from shader_health.integrations.cerebro.client import (
+    CerebroClient,
+    cerebro_dependency_error_message,
+)
 from shader_health.integrations.cerebro.config import CerebroConfig
 from shader_health.integrations.trackers.base import TrackerPublishResult
 from shader_health.integrations.trackers.publish import (
     ValidationPublishPayload,
     format_validation_publish_summary,
+    scene_task_lookup_candidates,
+    scene_task_lookup_name,
 )
 from shader_health.studio_config import StudioConfig, resolve_cerebro_config
 
@@ -32,14 +40,41 @@ def _task_url_from_payload(payload: ValidationPublishPayload) -> str:
     return ""
 
 
-def build_task_url(project: str, scene_name: str) -> str:
-    """Build a Cerebro task locator from project and scene name."""
+def build_task_url(project: str, task_name: str) -> str:
+    """Build a Cerebro task locator from project and task name."""
 
     project_part = project.strip().strip("/")
-    scene_part = scene_name.strip().strip("/")
-    if not project_part or not scene_part:
+    task_part = task_name.strip().strip("/")
+    if not project_part or not task_part:
         return ""
-    return f"/{project_part}/{scene_part}"
+    return f"/{project_part}/{task_part}"
+
+
+def task_url_candidates(
+    config: CerebroConfig,
+    payload: ValidationPublishPayload,
+) -> tuple[str, ...]:
+    """Return Cerebro task locator paths to try for a validation payload."""
+
+    explicit_url = _task_url_from_payload(payload)
+    if explicit_url:
+        return (explicit_url,)
+
+    candidates: list[str] = []
+    seen: set[str] = set()
+    project_part = config.project.strip().strip("/")
+    for lookup_name in scene_task_lookup_candidates(payload.scene_name):
+        task_part = lookup_name.strip().strip("/")
+        if not task_part:
+            continue
+        for task_url in (
+            f"/{project_part}/{task_part}",
+            f"/{project_part}/{task_part}/",
+        ):
+            if task_url not in seen:
+                seen.add(task_url)
+                candidates.append(task_url)
+    return tuple(candidates)
 
 
 def resolve_task_id(
@@ -53,13 +88,69 @@ def resolve_task_id(
     if explicit_task_id is not None:
         return explicit_task_id
 
-    task_url = _task_url_from_payload(payload)
-    if not task_url:
-        task_url = build_task_url(config.project, payload.scene_name)
-    if not task_url:
-        return None
+    for task_url in task_url_candidates(config, payload):
+        task_id = client.resolve_task_id(task_url)
+        if task_id is not None:
+            # region agent log
+            try:
+                from shader_health._agent_debug_log import agent_debug_log
 
-    return client.resolve_task_id(task_url)
+                agent_debug_log(
+                    "C1",
+                    "cerebro.publish.resolve_task_id",
+                    "resolved task",
+                    data={"task_url": task_url, "task_id": task_id, "method": "url"},
+                    run_id="post-fix",
+                )
+            except ImportError:
+                pass
+            # endregion
+            return task_id
+
+    for lookup_name in scene_task_lookup_candidates(payload.scene_name):
+        task_id = client.resolve_task_in_project(config.project, lookup_name)
+        if task_id is not None:
+            # region agent log
+            try:
+                from shader_health._agent_debug_log import agent_debug_log
+
+                agent_debug_log(
+                    "C7",
+                    "cerebro.publish.resolve_task_id",
+                    "resolved task",
+                    data={
+                        "project": config.project,
+                        "task_name": lookup_name,
+                        "task_id": task_id,
+                        "method": "project_children",
+                    },
+                    run_id="post-fix",
+                )
+            except ImportError:
+                pass
+            # endregion
+            return task_id
+
+    # region agent log
+    try:
+        from shader_health._agent_debug_log import agent_debug_log
+
+        agent_debug_log(
+            "C1",
+            "cerebro.publish.resolve_task_id",
+            "task not found",
+            data={
+                "project": config.project,
+                "scene_name": payload.scene_name,
+                "task_urls": list(task_url_candidates(config, payload)),
+                "last_error": client.last_error,
+            },
+            run_id="post-fix",
+        )
+    except ImportError:
+        pass
+    # endregion
+    return None
 
 
 def publish_validation_summary(
@@ -74,21 +165,141 @@ def publish_validation_summary(
     if config is None:
         return TrackerPublishResult(published=False, skipped_reason="disabled")
 
+    if client_factory is None:
+        _module, import_error = probe_cerebro_runtime(
+            service_tools_path=config.service_tools_path,
+            server_url=config.normalized_server_url,
+        )
+        if _module is None:
+            return TrackerPublishResult(
+                published=False,
+                error_message=import_error or cerebro_dependency_error_message(),
+            )
+
     factory = client_factory or CerebroClient
     client = factory(config)
+    if not client.ping():
+        if client.last_error == "py_cerebro_missing":
+            _module, import_error = probe_cerebro_runtime(
+                service_tools_path=config.service_tools_path,
+                server_url=config.normalized_server_url,
+            )
+            return TrackerPublishResult(
+                published=False,
+                error_message=import_error or cerebro_dependency_error_message(),
+            )
+        if "Invalid credentials" in (client.last_error or ""):
+            return TrackerPublishResult(
+                published=False,
+                error_message=f"cerebro_auth_error: {client.last_error}",
+            )
+        return TrackerPublishResult(
+            published=False,
+            error_message=f"cerebro_connect_error: {client.last_error or 'connect_failed'}",
+        )
+
     task_id = resolve_task_id(client, config, payload)
     if task_id is None:
-        return TrackerPublishResult(published=False, skipped_reason="task_not_found")
+        tried = ", ".join(task_url_candidates(config, payload)) or "(none)"
+        root_tasks = client.list_root_task_names()
+        visible_projects = client.list_visible_project_names()
+        root_hint = ""
+        if visible_projects:
+            preview = ", ".join(visible_projects[:8])
+            root_hint = f" Visible Cerebro projects: {preview}."
+        elif root_tasks:
+            preview = ", ".join(root_tasks[:8])
+            root_hint = f" Visible Cerebro root tasks: {preview}."
+        else:
+            root_hint = (
+                " API user sees no projects/tasks — in Cerebro admin grant "
+                f"'{config.normalized_api_user}' visibility on project "
+                f"'{config.project}'."
+            )
+        # region agent log
+        try:
+            from shader_health._agent_debug_log import agent_debug_log
+
+            agent_debug_log(
+                "C6",
+                "cerebro.publish.publish_validation_summary",
+                "task not found",
+                data={
+                    "project": config.project,
+                    "scene_name": payload.scene_name,
+                    "task_urls": list(task_url_candidates(config, payload)),
+                    "root_tasks": list(root_tasks[:12]),
+                    "visible_projects": list(visible_projects[:12]),
+                },
+                run_id="post-fix",
+            )
+        except ImportError:
+            pass
+        # endregion
+        if client.last_error and client.last_error not in ("", "task_not_found"):
+            return TrackerPublishResult(
+                published=False,
+                error_message=f"cerebro_connect_error: {client.last_error}",
+            )
+        return TrackerPublishResult(
+            published=False,
+            skipped_reason="task_not_found",
+            error_message=(
+                "Create a Cerebro task named like the scene stem "
+                f"('{scene_task_lookup_name(payload.scene_name)}') under project "
+                f"'{config.project}'. Tried: {tried}.{root_hint}"
+            ),
+        )
 
     note = client.create_task_note(
         task_id=task_id,
         content=format_validation_publish_summary(payload),
     )
     if note is None:
-        return TrackerPublishResult(published=False, error_message="cerebro_api_error")
+        if client.last_error == "task_definition_missing":
+            return TrackerPublishResult(
+                published=False,
+                error_message="cerebro_api_error: task has no definition message for notes",
+            )
+        return TrackerPublishResult(
+            published=False,
+            error_message=f"cerebro_api_error: {client.last_error or 'note_create_failed'}",
+        )
 
+    metadata: dict[str, str] = {"task_id": str(task_id)}
     note_id = str(note.get("id", "") or "").strip()
-    metadata = {"note_id": note_id} if note_id else {}
+    if note_id:
+        metadata["note_id"] = note_id
+
+    if config.set_pause_status_on_publish and config.pause_status_name.strip():
+        status_set = client.set_task_status(task_id, config.pause_status_name)
+        # region agent log
+        try:
+            from shader_health._agent_debug_log import agent_debug_log
+
+            agent_debug_log(
+                "C8",
+                "cerebro.publish.publish_validation_summary",
+                "pause status",
+                data={
+                    "task_id": task_id,
+                    "status_name": config.pause_status_name,
+                    "status_set": status_set,
+                    "last_error": client.last_error,
+                    "available_statuses": list(
+                        getattr(client._database, "_last_status_available", ())[:12]
+                    ),
+                },
+                run_id="post-fix",
+            )
+        except ImportError:
+            pass
+        # endregion
+        if status_set:
+            metadata["task_status"] = config.pause_status_name
+        elif client.last_error:
+            metadata["task_status_error"] = client.last_error
+
     return TrackerPublishResult(
         published=True,
         external_url=note_id,

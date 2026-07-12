@@ -55,7 +55,6 @@ BUG_REPORT_PRIVACY_NOTICE = (
     "Full scene paths and environment dumps are not sent."
 )
 
-
 def build_bug_report_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -173,7 +172,6 @@ def build_bug_report_section(
     _set_bug_report_details_visible(details, config.bug_report.enabled)
     return section
 
-
 def read_bug_report_from_view(
     view: Any,
     qt_widgets: Any,
@@ -215,7 +213,6 @@ def read_bug_report_from_view(
             ),
         )
     )
-
 
 def update_bug_report_view(
     view: Any,
@@ -265,7 +262,6 @@ def update_bug_report_view(
         str(bug_report.max_reports_per_day),
     )
 
-
 def _on_bug_report_enabled_changed(
     qt_widgets: Any,
     section: Any,
@@ -280,7 +276,6 @@ def _on_bug_report_enabled_changed(
         on_enabled_changed(enabled)
     if on_settings_changed is not None:
         on_settings_changed()
-
 
 def _build_bug_report_field_row(
     qt_widgets: Any,
@@ -322,12 +317,10 @@ def _build_bug_report_field_row(
     row_layout.addStretch(1)
     return row
 
-
 def _set_bug_report_details_visible(details: Any, visible: bool) -> None:
     set_visible = getattr(details, "setVisible", None)
     if set_visible is not None:
         set_visible(visible)
-
 
 def _toggle_checked(
     view: Any,
@@ -342,7 +335,6 @@ def _toggle_checked(
     if is_checked is None:
         return default
     return bool(is_checked())
-
 
 def _positive_int(text: str, default: int) -> int:
     normalized = str(text or "").strip()

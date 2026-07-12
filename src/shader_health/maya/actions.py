@@ -22,7 +22,6 @@ class MayaActionResult:
     success: bool
     message: str
 
-
 def select_node(node_name: str) -> MayaActionResult:
     """Select a Maya dependency node by name."""
 
@@ -37,7 +36,6 @@ def select_node(node_name: str) -> MayaActionResult:
     cmds.select(normalized_node, replace=True)
     return MayaActionResult(True, f"Selected Maya node: {normalized_node}")
 
-
 def open_attribute_editor(node_name: str) -> MayaActionResult:
     """Select a Maya node and open the Attribute Editor."""
 
@@ -48,7 +46,6 @@ def open_attribute_editor(node_name: str) -> MayaActionResult:
     mel = _maya_mel()
     mel.eval("openAEWindow;")
     return MayaActionResult(True, f"Opened Attribute Editor for: {node_name.strip()}")
-
 
 def copy_path_to_clipboard(path: str) -> MayaActionResult:
     """Copy a file path or dependency path to the active Qt clipboard."""
@@ -64,7 +61,6 @@ def copy_path_to_clipboard(path: str) -> MayaActionResult:
 
     application.clipboard().setText(normalized_path)
     return MayaActionResult(True, f"Copied path: {normalized_path}")
-
 
 def reveal_file(path: str) -> MayaActionResult:
     """Reveal a file in the OS file browser where the platform supports it."""
@@ -85,7 +81,6 @@ def reveal_file(path: str) -> MayaActionResult:
     _popen(command)
     return MayaActionResult(True, f"Revealed file path: {normalized_path}")
 
-
 def _existing_reveal_target(target: Path) -> Optional[Path]:
     if target.exists():
         return target
@@ -93,7 +88,6 @@ def _existing_reveal_target(target: Path) -> Optional[Path]:
     if parent.exists():
         return parent
     return None
-
 
 def _reveal_command(target: Path) -> Optional[list[str]]:
     target_text = str(target)
@@ -108,14 +102,11 @@ def _reveal_command(target: Path) -> Optional[list[str]]:
         return ["xdg-open", str(directory)]
     return None
 
-
 def _maya_cmds() -> Any:
     return _maya_module("maya.cmds")
 
-
 def _maya_mel() -> Any:
     return _maya_module("maya.mel")
-
 
 def _maya_module(module_name: str) -> Any:
     import importlib
@@ -125,10 +116,8 @@ def _maya_module(module_name: str) -> Any:
     except ImportError as exc:
         raise RuntimeError("Maya navigation actions can only run inside Autodesk Maya.") from exc
 
-
 def _qt_widgets() -> Any:
     return load_qt_widgets()
-
 
 def _popen(command: Sequence[str]) -> None:
     subprocess.Popen(list(command))

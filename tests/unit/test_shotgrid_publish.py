@@ -143,7 +143,7 @@ def test_publish_validation_summary_creates_note_from_scene_lookup():
     assert any("/entity/shots" in url for url, _payload in requests)
     note_request = next(payload for url, payload in requests if payload and "note_links" in payload)
     assert note_request["note_links"] == [{"type": "Shot", "id": 34}]
-    assert "Shader Health validation summary" in str(note_request["content"])
+    assert "Health Validation Result" in str(note_request["content"])
 
 
 def test_publish_validation_summary_skips_when_entity_not_found():

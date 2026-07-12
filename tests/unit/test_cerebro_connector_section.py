@@ -37,6 +37,13 @@ def test_build_cerebro_connector_section_exposes_toggle_and_collapsed_details():
     )
 
     assert section.object_name == SETTINGS_CEREBRO_SECTION_OBJECT_NAME
+    hint = next(
+        child
+        for child in section.children
+        if getattr(child, "text", "").startswith("When enabled, Shader Health")
+    )
+    assert "Connection is tested when you save or edit Cerebro settings." in hint.text
+    assert len(hint.text) < 320
     toggle = _find(section, SETTINGS_CEREBRO_ENABLED_TOGGLE_OBJECT_NAME)
     details = _find(section, SETTINGS_CEREBRO_DETAILS_OBJECT_NAME)
     assert toggle.checked is False

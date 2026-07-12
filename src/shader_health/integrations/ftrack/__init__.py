@@ -3,6 +3,7 @@
 from shader_health.integrations.ftrack.client import (
     FtrackClient,
     FtrackClientError,
+    FtrackCreateResult,
     FtrackResponse,
     HttpRequest,
     HttpTransport,
@@ -22,6 +23,7 @@ from shader_health.integrations.trackers.base import TrackerPublishResult
 __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",
     "FtrackClient",
+    "FtrackCreateResult",
     "FtrackClientError",
     "FtrackConfig",
     "FtrackResponse",

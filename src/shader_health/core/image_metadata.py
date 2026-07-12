@@ -7,7 +7,6 @@ from typing import BinaryIO, Optional
 
 _EXR_MAGIC = 20000630
 
-
 def read_image_dimensions(path: str | Path) -> tuple[Optional[int], Optional[int]]:
     """Return width and height for common image formats, or (None, None)."""
 
@@ -36,7 +35,6 @@ def read_image_dimensions(path: str | Path) -> tuple[Optional[int], Optional[int
 
     return None, None
 
-
 def max_image_dimension(path: str | Path) -> Optional[int]:
     """Return max(width, height) when dimensions are known."""
 
@@ -44,7 +42,6 @@ def max_image_dimension(path: str | Path) -> Optional[int]:
     if width is None or height is None:
         return None
     return max(width, height)
-
 
 def _jpeg_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
     try:
@@ -70,7 +67,6 @@ def _jpeg_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
         return None, None
     return None, None
 
-
 def _webp_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
     try:
         with path.open("rb") as handle:
@@ -88,7 +84,6 @@ def _webp_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
     except OSError:
         return None, None
     return None, None
-
 
 def _exr_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
     """Read OpenEXR dataWindow/displayWindow without the OpenEXR library."""
@@ -129,7 +124,6 @@ def _exr_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
     except OSError:
         return None, None
     return None, None
-
 
 def _read_cstring(handle: BinaryIO) -> str:
     chars: list[int] = []

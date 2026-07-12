@@ -27,7 +27,6 @@ from shader_health.studio_config import (
 
 SlackClientFactory = Callable[[], SlackClient]
 
-
 def _scene_basename(scene_path: str) -> str:
     """Return a cross-platform scene filename from Maya/Windows or POSIX paths."""
 
@@ -37,7 +36,6 @@ def _scene_basename(scene_path: str) -> str:
     name = Path(normalized).name
     return name or "unsaved scene"
 
-
 @dataclass(frozen=True)
 class SlackNotificationResult:
     """Outcome from attempting to send Slack validation notifications."""
@@ -46,7 +44,6 @@ class SlackNotificationResult:
     skipped_reason: str = ""
     error_message: str = ""
     routes_sent: int = 0
-
 
 def validation_notification_context_from_run(result: Any) -> ValidationBlocksContext:
     """Build a notification context from a validation run result object."""
@@ -69,7 +66,6 @@ def validation_notification_context_from_run(result: Any) -> ValidationBlocksCon
         block_deadline=bool(getattr(health, "block_deadline", False)),
     )
 
-
 def matched_notify_events(
     settings: SlackConnectorSettings,
     *,
@@ -85,7 +81,6 @@ def matched_notify_events(
     if block_deadline and SLACK_NOTIFY_EVENT_BLOCK_DEADLINE in notify_on:
         events.append(SLACK_NOTIFY_EVENT_BLOCK_DEADLINE)
     return tuple(events)
-
 
 def should_send_slack_notification(
     settings: SlackConnectorSettings,
@@ -105,7 +100,6 @@ def should_send_slack_notification(
     if not matched:
         return False
     return bool(route_matched_events(settings, matched))
-
 
 def send_slack_validation_notification(
     studio_config: StudioConfig | None,
@@ -183,7 +177,6 @@ def send_slack_validation_notification(
         routes_sent=routes_sent,
         error_message="; ".join(errors),
     )
-
 
 def maybe_send_slack_validation_notification(
     studio_config: StudioConfig | None,

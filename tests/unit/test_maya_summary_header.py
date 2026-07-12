@@ -482,8 +482,8 @@ def test_summary_header_defaults_show_score_counts_blocks_and_profile_dropdown()
     assert _find(header, main_window.PUBLISH_BLOCK_LAMP_OBJECT_NAME) is not None
     assert _find(header, main_window.DEADLINE_BLOCK_LAMP_OBJECT_NAME) is not None
     assert _find(header, main_window.SCENE_NAME_LABEL_OBJECT_NAME).text == "Scene: (unsaved)"
-    assert _find(header, main_window.LAST_VALIDATED_LABEL_OBJECT_NAME).text == "Last validated: —"
-    assert _find(header, main_window.SCAN_SCOPE_LABEL_OBJECT_NAME).text == "Scope: —"
+    assert _find(header, main_window.LAST_VALIDATED_LABEL_OBJECT_NAME).text == "Last validated: вЂ”"
+    assert _find(header, main_window.SCAN_SCOPE_LABEL_OBJECT_NAME).text == "Scope: вЂ”"
     profile_dropdown = _find(header, main_window.PROFILE_DROPDOWN_OBJECT_NAME)
     asset_class_dropdown = _find(header, main_window.ASSET_CLASS_DROPDOWN_OBJECT_NAME)
     workflow_ids = [option.profile_id for option in main_window.DEFAULT_WORKFLOW_PROFILE_OPTIONS]
@@ -607,6 +607,7 @@ def test_validation_action_bar_groups_primary_pipeline_and_triage_buttons():
     assert _find(triage, main_window.OPEN_ATTR_EDITOR_BUTTON_OBJECT_NAME) is not None
     assert _find(triage, main_window.COPY_PATH_BUTTON_OBJECT_NAME) is not None
     assert _find(triage, main_window.REVEAL_FILE_BUTTON_OBJECT_NAME) is not None
+    assert _find(triage, main_window.CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME) is not None
     assert _find(triage, main_window.CREATE_RULE_DRAFT_BUTTON_OBJECT_NAME) is not None
 
 

@@ -24,7 +24,6 @@ _OPTIMIZABLE_EXTENSIONS = frozenset(
 )
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 
-
 def enrich_optimized_texture_metadata(
     dependency: FileDependencySnapshot,
 ) -> FileDependencySnapshot:
@@ -42,11 +41,9 @@ def enrich_optimized_texture_metadata(
 
     return _enrich_flat_tx_metadata(dependency)
 
-
 def _is_optimizable_source(dependency: FileDependencySnapshot) -> bool:
     extension = (dependency.extension or Path(dependency.resolved_path or "").suffix).lower()
     return extension in _OPTIMIZABLE_EXTENSIONS
-
 
 def _enrich_flat_tx_metadata(dependency: FileDependencySnapshot) -> FileDependencySnapshot:
     resolved = str(dependency.resolved_path).replace("\\", "/")
@@ -67,7 +64,6 @@ def _enrich_flat_tx_metadata(dependency: FileDependencySnapshot) -> FileDependen
         optimized_mtime_utc=optimized_mtime_utc,
         optimized_is_stale=optimized_is_stale,
     )
-
 
 def _enrich_udim_tx_metadata(dependency: FileDependencySnapshot) -> FileDependencySnapshot:
     resolved = str(dependency.resolved_path).replace("\\", "/")
@@ -106,7 +102,6 @@ def _enrich_udim_tx_metadata(dependency: FileDependencySnapshot) -> FileDependen
         optimized_is_stale=stale if optimized_tiles else None,
     )
 
-
 def _tx_candidates(resolved_path: str) -> list[str]:
     path = Path(resolved_path.replace("\\", "/"))
     stem = path.stem
@@ -122,7 +117,6 @@ def _tx_candidates(resolved_path: str) -> list[str]:
         candidates.append(str(tx_dir / f"{stem}.tx"))
     return candidates
 
-
 def _pick_existing_candidate(candidates: list[str]) -> Optional[str]:
     for candidate in candidates:
         if "<UDIM>" in candidate or "<udim>" in candidate:
@@ -133,7 +127,6 @@ def _pick_existing_candidate(candidates: list[str]) -> Optional[str]:
             return candidate
     return None
 
-
 def _udim_swap_extension(path: str, extension: str) -> str:
     normalized = path.replace("\\", "/")
     suffix = Path(normalized).suffix
@@ -141,17 +134,14 @@ def _udim_swap_extension(path: str, extension: str) -> str:
         return normalized
     return normalized[: -len(suffix)] + extension
 
-
 def _udim_glob_pattern(path: str) -> str:
     return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace(
         "<udim>",
         "[0-9][0-9][0-9][0-9]",
     )
 
-
 def _udim_files(path: str) -> list[Path]:
     return sorted(Path(item) for item in glob.glob(_udim_glob_pattern(path)))
-
 
 def _existing_udim_tiles(path: str) -> list[int]:
     tiles: set[int] = set()
@@ -161,7 +151,6 @@ def _existing_udim_tiles(path: str) -> list[int]:
             tiles.add(int(matches[-1]))
     return sorted(tiles)
 
-
 def _file_mtime_utc(path: str) -> Optional[str]:
     try:
         stat = Path(path).stat()
@@ -169,7 +158,6 @@ def _file_mtime_utc(path: str) -> Optional[str]:
         return None
     mtime = datetime.fromtimestamp(stat.st_mtime, timezone.utc)
     return mtime.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
 
 def _is_stale(source_mtime: Optional[str], optimized_mtime: Optional[str]) -> Optional[bool]:
     if source_mtime is None or optimized_mtime is None:
@@ -179,7 +167,6 @@ def _is_stale(source_mtime: Optional[str], optimized_mtime: Optional[str]) -> Op
     if source_ts is None or optimized_ts is None:
         return None
     return source_ts > optimized_ts
-
 
 def _parse_mtime(value: str) -> Optional[float]:
     text = value.strip()

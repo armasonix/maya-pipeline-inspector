@@ -16,34 +16,28 @@ JsonValue = Any
 
 SNAPSHOT_SCHEMA_VERSION = "1.0"
 
-
 def _as_dict(value: Optional[Mapping[str, Any]]) -> JsonDict:
     return dict(value or {})
-
 
 def _as_str_list(value: Optional[list[Any]]) -> list[str]:
     if value is None:
         return []
     return [str(item) for item in value]
 
-
 def _as_int_list(value: Optional[list[Any]]) -> list[int]:
     if value is None:
         return []
     return [int(item) for item in value]
-
 
 def _as_optional_bool(value: Any) -> Optional[bool]:
     if value is None:
         return None
     return bool(value)
 
-
 def _as_optional_int(value: Any) -> Optional[int]:
     if value is None:
         return None
     return int(value)
-
 
 def _as_optional_float(value: Any) -> Optional[float]:
     if value is None:
@@ -54,12 +48,10 @@ def _as_optional_float(value: Any) -> Optional[float]:
         return float(value)
     return None
 
-
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{label} must be a mapping, got {type(value).__name__}")
     return value
-
 
 @dataclass(frozen=True)
 class ImageInfo:
@@ -92,7 +84,6 @@ class ImageInfo:
             color_space=data.get("color_space"),
             compression=data.get("compression"),
         )
-
 
 @dataclass(frozen=True)
 class NodeSnapshot:
@@ -141,7 +132,6 @@ class NodeSnapshot:
             classification=_as_str_list(data.get("classification")),
         )
 
-
 @dataclass(frozen=True)
 class ConnectionSnapshot:
     """Directed connection between two node attributes."""
@@ -170,7 +160,6 @@ class ConnectionSnapshot:
             dst_attr=str(data.get("dst_attr", "")),
             semantic=data.get("semantic"),
         )
-
 
 @dataclass(frozen=True)
 class FileDependencySnapshot:
@@ -260,7 +249,6 @@ class FileDependencySnapshot:
             image_info=image_info,
         )
 
-
 @dataclass(frozen=True)
 class VrayMaterialMetadata:
     """V-Ray-specific metadata attached to a material during enrichment."""
@@ -295,7 +283,6 @@ class VrayMaterialMetadata:
             limit_attrs=limit_attrs,
         )
 
-
 @dataclass(frozen=True)
 class VraySceneMetadata:
     """V-Ray scene-level metadata derived from the scanned graph."""
@@ -321,7 +308,6 @@ class VraySceneMetadata:
             vray_material_count=int(data.get("vray_material_count", 0)),
             has_vray_materials=bool(data.get("has_vray_materials", False)),
         )
-
 
 @dataclass(frozen=True)
 class ArnoldMaterialMetadata:
@@ -360,7 +346,6 @@ class ArnoldMaterialMetadata:
             key_attrs=key_attrs,
         )
 
-
 @dataclass(frozen=True)
 class ArnoldSceneMetadata:
     """Arnold scene-level metadata derived from the scanned graph."""
@@ -395,7 +380,6 @@ class ArnoldSceneMetadata:
             stand_in_count=int(data.get("stand_in_count", 0)),
             has_stand_ins=bool(data.get("has_stand_ins", False)),
         )
-
 
 @dataclass(frozen=True)
 class ShaderComplexityMetadata:
@@ -435,7 +419,6 @@ class ShaderComplexityMetadata:
             farm_cost_score=float(data.get("farm_cost_score", 0.0)),
             farm_cost_hint=str(data.get("farm_cost_hint", "low")),
         )
-
 
 @dataclass(frozen=True)
 class DisplacementRiskMetadata:
@@ -491,7 +474,6 @@ class DisplacementRiskMetadata:
             risk_score=float(data.get("risk_score", 0.0)),
             risk_hint=str(data.get("risk_hint", "low")),
         )
-
 
 @dataclass(frozen=True)
 class MaterialSnapshot:
@@ -576,7 +558,6 @@ class MaterialSnapshot:
             arnold_metadata=arnold_metadata,
         )
 
-
 @dataclass(frozen=True)
 class ShadingEngineSnapshot:
     """Shading engine assignment and material connection summary."""
@@ -609,7 +590,6 @@ class ShadingEngineSnapshot:
             members=_as_str_list(data.get("members")),
         )
 
-
 @dataclass(frozen=True)
 class ReferenceSnapshot:
     """Referenced Maya file metadata needed for reference-safe validation."""
@@ -638,7 +618,6 @@ class ReferenceSnapshot:
             locked=bool(data.get("locked", False)),
             node_ids=_as_str_list(data.get("node_ids")),
         )
-
 
 @dataclass(frozen=True)
 class GraphSnapshot:

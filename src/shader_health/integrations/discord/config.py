@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
+USER_AGENT = "ShaderHealthInspector/0.5 (Maya; +https://github.com/ledorub/maya-shader-health-inspector)"
 
 
 @dataclass(frozen=True)

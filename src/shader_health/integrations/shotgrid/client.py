@@ -13,7 +13,6 @@ from shader_health.integrations.shotgrid.config import ShotGridConfig
 
 HttpTransport = Callable[["HttpRequest", float], "ShotGridResponse"]
 
-
 @dataclass(frozen=True)
 class HttpRequest:
     """Low-level HTTP request passed to a transport implementation."""
@@ -23,7 +22,6 @@ class HttpRequest:
     body: bytes | None
     headers: Mapping[str, str]
 
-
 @dataclass(frozen=True)
 class ShotGridResponse:
     """Normalized ShotGrid REST API response."""
@@ -32,10 +30,8 @@ class ShotGridResponse:
     body: str
     json_data: dict[str, Any] | list[Any] | None = None
 
-
 class ShotGridClientError(RuntimeError):
     """Raised when the ShotGrid API returns an unexpected response."""
-
 
 class ShotGridClient:
     """REST wrapper for ShotGrid auth, entity lookup, and note creation."""
@@ -195,7 +191,6 @@ class ShotGridClient:
             url = f"{url}?{query}"
         return url
 
-
 def default_http_transport(request: HttpRequest, timeout: float) -> ShotGridResponse:
     """Send an HTTP request using the Python standard library."""
 
@@ -221,7 +216,6 @@ def default_http_transport(request: HttpRequest, timeout: float) -> ShotGridResp
             json_data=_parse_json_body(body),
         )
 
-
 def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     text = body.strip()
     if not text or text[0] not in "{[":
@@ -233,7 +227,6 @@ def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     if isinstance(parsed, (dict, list)):
         return parsed
     return None
-
 
 def _extract_access_token(json_data: dict[str, Any] | list[Any] | None) -> str:
     if not isinstance(json_data, dict):
@@ -248,7 +241,6 @@ def _extract_access_token(json_data: dict[str, Any] | list[Any] | None) -> str:
         return token
     return ""
 
-
 def _extract_entity_rows(json_data: dict[str, Any] | list[Any] | None) -> list[dict[str, Any]]:
     if not isinstance(json_data, dict):
         return []
@@ -256,7 +248,6 @@ def _extract_entity_rows(json_data: dict[str, Any] | list[Any] | None) -> list[d
     if not isinstance(data, list):
         return []
     return [row for row in data if isinstance(row, dict)]
-
 
 def _extract_created_entity(json_data: dict[str, Any] | list[Any] | None) -> dict[str, Any] | None:
     if not isinstance(json_data, dict):

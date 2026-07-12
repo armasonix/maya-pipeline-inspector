@@ -6,7 +6,6 @@ from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
-
 @dataclass(frozen=True)
 class BugReportRelayConfig:
     """Connection defaults for a studio bug report relay endpoint."""

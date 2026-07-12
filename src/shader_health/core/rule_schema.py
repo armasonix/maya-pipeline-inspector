@@ -40,10 +40,8 @@ SCOPES = frozenset(
 FIX_RISKS = frozenset({"low", "medium", "high"})
 RESULT_STATUSES = frozenset({"passed", "failed", "skipped"})
 
-
 class RuleSchemaError(ValueError):
     """Raised when a rule definition is invalid."""
-
 
 @dataclass(frozen=True)
 class RulePolicy:
@@ -78,7 +76,6 @@ class RulePolicy:
         policy.validate()
         return policy
 
-
 @dataclass(frozen=True)
 class RuleMatch:
     """Rule target selection criteria."""
@@ -97,7 +94,6 @@ class RuleMatch:
         match = cls(criteria=dict(data))
         match.validate()
         return match
-
 
 @dataclass(frozen=True)
 class RuleCheck:
@@ -125,7 +121,6 @@ class RuleCheck:
         check = cls(type=check_type, params=params)
         check.validate()
         return check
-
 
 @dataclass(frozen=True)
 class RuleFix:
@@ -160,7 +155,6 @@ class RuleFix:
         fix = cls(type=fix_type, risk=risk, params=params)
         fix.validate()
         return fix
-
 
 @dataclass(frozen=True)
 class RuleDefinition:
@@ -265,7 +259,6 @@ class RuleDefinition:
         rule.validate()
         return rule
 
-
 @dataclass(frozen=True)
 class RuleResult:
     """Single validation result produced by one rule against one target."""
@@ -315,7 +308,6 @@ class RuleResult:
             "evidence": dict(self.evidence),
         }
 
-
 @dataclass(frozen=True)
 class ValidationSummary:
     """Aggregated validation result summary.
@@ -352,7 +344,6 @@ class ValidationSummary:
             "auto_fixable": self.auto_fixable,
         }
 
-
 def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
     """Compute severity counts and explicit block status from rule results."""
 
@@ -388,14 +379,12 @@ def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
         auto_fixable=auto_fixable,
     )
 
-
 @dataclass(frozen=True)
 class _TargetContext:
     kind: str
     target_id: str
     obj: object
     semantic: Optional[str] = None
-
 
 class ValidationEngine:
     """Evaluate rule definitions against a GraphSnapshot."""
@@ -924,7 +913,6 @@ class ValidationEngine:
             return obj.dst_node
         return None
 
-
 _REQUIRED_RULE_KEYS = frozenset(
     {
         "id",
@@ -942,7 +930,6 @@ _REQUIRED_RULE_KEYS = frozenset(
     }
 )
 
-
 def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
     semantics: dict[str, str] = {}
     for node in snapshot.nodes:
@@ -950,7 +937,6 @@ def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
         if isinstance(semantic, str) and semantic:
             semantics[node.id] = semantic
     return semantics
-
 
 def _default_material_assignments(
     snapshot: GraphSnapshot,
@@ -983,7 +969,6 @@ def _default_material_assignments(
                 }
             )
     return assignments
-
 
 def _duplicate_file_dependency_groups(
     snapshot: GraphSnapshot,
@@ -1018,7 +1003,6 @@ def _duplicate_file_dependency_groups(
                 }
             )
     return groups, scan_truncated
-
 
 def _duplicate_material_fingerprint_groups(
     snapshot: GraphSnapshot,
@@ -1055,11 +1039,9 @@ def _duplicate_material_fingerprint_groups(
         )
     return groups, scan_truncated, material_count, len(materials)
 
-
 def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
     path = dependency.resolved_path or dependency.raw_path
     return _normalize_path(path) if path else ""
-
 
 def _normalized_identifier_set(value: Any) -> set[str]:
     identifiers: set[str] = set()
@@ -1067,17 +1049,14 @@ def _normalized_identifier_set(value: Any) -> set[str]:
         identifiers.update(_identifier_candidates(item))
     return identifiers
 
-
 def _matches_identifier(value: Optional[str], identifiers: set[str]) -> bool:
     return bool(_identifier_candidates(value).intersection(identifiers))
-
 
 def _identifier_candidates(value: Optional[str]) -> set[str]:
     normalized = str(value or "").strip().lower()
     if not normalized:
         return set()
     return {normalized, normalized.rsplit(":", 1)[-1]}
-
 
 def _read_nested_value(obj: object, key: str) -> Any:
     current: Any = obj
@@ -1092,14 +1071,12 @@ def _read_nested_value(obj: object, key: str) -> Any:
             return None
     return current
 
-
 def _as_string_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
-
 
 def _as_float(value: Any) -> Optional[float]:
     if isinstance(value, bool) or value is None:
@@ -1109,7 +1086,6 @@ def _as_float(value: Any) -> Optional[float]:
     except (TypeError, ValueError):
         return None
 
-
 def _as_optional_int(value: Any) -> Optional[int]:
     if isinstance(value, bool) or value is None:
         return None
@@ -1117,7 +1093,6 @@ def _as_optional_int(value: Any) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
-
 
 def _path_policy_violations(
     dependency: FileDependencySnapshot,
@@ -1159,7 +1134,6 @@ def _path_policy_violations(
 
     return violations
 
-
 def _dependency_paths(dependency: FileDependencySnapshot) -> list[str]:
     return [
         path
@@ -1167,15 +1141,12 @@ def _dependency_paths(dependency: FileDependencySnapshot) -> list[str]:
         if path
     ]
 
-
 def _normalize_path(path: str) -> str:
     return path.replace("\\", "/").strip().rstrip("/").lower()
-
 
 def _is_local_drive_path(path: str) -> bool:
     normalized = path.replace("\\", "/").strip()
     return len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/"
-
 
 def _is_user_home_path(path: str) -> bool:
     normalized = _normalize_path(path)
@@ -1186,15 +1157,12 @@ def _is_user_home_path(path: str) -> bool:
         or _starts_with_drive_user_path(normalized)
     )
 
-
 def _starts_with_drive_user_path(path: str) -> bool:
     return len(path) >= 9 and path[1:9] == ":/users/"
-
 
 def _has_path_segment(path: str, segment: str) -> bool:
     parts = [part for part in _normalize_path(path).split("/") if part]
     return segment.lower() in parts
-
 
 def _is_temp_path(path: str) -> bool:
     normalized = _normalize_path(path)
@@ -1203,7 +1171,6 @@ def _is_temp_path(path: str) -> bool:
         or _has_path_segment(normalized, "tmp")
         or "/appdata/local/temp/" in f"/{normalized}/"
     )
-
 
 def _matches_allowed_prefix(paths: list[str], allowed_prefixes: Any) -> bool:
     prefixes = allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
@@ -1217,13 +1184,11 @@ def _matches_allowed_prefix(paths: list[str], allowed_prefixes: Any) -> bool:
             return True
     return False
 
-
 def _validate_required_rule_keys(data: Mapping[str, Any]) -> None:
     missing = sorted(key for key in _REQUIRED_RULE_KEYS if key not in data)
     if missing:
         joined = ", ".join(missing)
         raise RuleSchemaError(f"rule is missing required field(s): {joined}")
-
 
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):

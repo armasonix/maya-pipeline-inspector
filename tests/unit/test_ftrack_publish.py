@@ -91,6 +91,43 @@ def test_resolve_task_id_prefers_payload_metadata():
     assert captured == []
 
 
+def test_resolve_task_id_falls_back_to_scene_name_without_maya_suffix():
+    captured: list[str] = []
+
+    def transport(request: HttpRequest, timeout: float) -> FtrackResponse:
+        _ = timeout
+        captured.append(request.body.decode("utf-8"))
+        payload = json.loads(request.body.decode("utf-8"))
+        expression = str(payload[0]["expression"])
+        if "hero.ma" in expression:
+            return FtrackResponse(status_code=200, body="[]", json_data=[])
+        if 'name is "hero"' in expression:
+            return FtrackResponse(
+                status_code=200,
+                body='[{"action": "query", "data": [{"id": "task-42"}]}]',
+                json_data=[{"action": "query", "data": [{"id": "task-42"}]}],
+            )
+        return FtrackResponse(status_code=200, body="[]", json_data=[])
+
+    client = FtrackClient(
+        FtrackConfig(
+            api_url="https://studio.ftrackapp.com",
+            api_user="pipeline.bot",
+            api_key="secret",
+            project="Demo Project",
+        ),
+        transport=transport,
+    )
+
+    task_id = resolve_task_id(
+        client,
+        client.config,
+        _payload(scene_name="hero.ma"),
+    )
+
+    assert task_id == "task-42"
+
+
 def test_publish_validation_summary_creates_task_note_from_scene_lookup():
     requests: list[dict[str, object]] = []
 
@@ -99,10 +136,57 @@ def test_publish_validation_summary_creates_task_note_from_scene_lookup():
         payload = json.loads(request.body.decode("utf-8"))
         requests.append(payload[0])
         if payload[0]["action"] == "query":
+            expression = str(payload[0]["expression"])
+            if "from User where username" in expression:
+                return FtrackResponse(
+                    status_code=200,
+                    body='[{"action": "query", "data": [{"id": "bot-1"}]}]',
+                    json_data=[{"action": "query", "data": [{"id": "bot-1"}]}],
+                )
+            if "from Appointment" in expression:
+                return FtrackResponse(
+                    status_code=200,
+                    body='[{"action": "query", "data": [{"resource_id": "assignee-1"}]}]',
+                    json_data=[
+                        {"action": "query", "data": [{"resource_id": "assignee-1"}]}
+                    ],
+                )
+            if expression.startswith("select id from User"):
+                return FtrackResponse(
+                    status_code=200,
+                    body='[{"action": "query", "data": [{"id": "user-1"}]}]',
+                    json_data=[{"action": "query", "data": [{"id": "user-1"}]}],
+                )
+            if "from Status where" in expression:
+                return FtrackResponse(
+                    status_code=200,
+                    body='[{"action": "query", "data": [{"id": "status-1"}]}]',
+                    json_data=[{"action": "query", "data": [{"id": "status-1"}]}],
+                )
+            if "from Project where" in expression:
+                return FtrackResponse(
+                    status_code=200,
+                    body='[{"action": "query", "data": [{"id": "project-1"}]}]',
+                    json_data=[{"action": "query", "data": [{"id": "project-1"}]}],
+                )
             return FtrackResponse(
                 status_code=200,
-                body='[{"action": "query", "data": [{"id": "task-42"}]}]',
-                json_data=[{"action": "query", "data": [{"id": "task-42"}]}],
+                body=(
+                    '[{"action": "query", "data": '
+                    '[{"id": "task-42", "project_id": "project-1"}]}]'
+                ),
+                json_data=[
+                    {
+                        "action": "query",
+                        "data": [{"id": "task-42", "project_id": "project-1"}],
+                    }
+                ],
+            )
+        if payload[0]["action"] == "update":
+            return FtrackResponse(
+                status_code=200,
+                body='[{"action": "update", "data": {"id": "task-42"}}]',
+                json_data=[{"action": "update", "data": {"id": "task-42"}}],
             )
         return FtrackResponse(
             status_code=200,
@@ -122,13 +206,83 @@ def test_publish_validation_summary_creates_task_note_from_scene_lookup():
     assert result.published is True
     assert result.external_url == "note-7"
     assert result.metadata["note_id"] == "note-7"
-    assert requests[0]["action"] == "query"
-    assert requests[1]["action"] == "create"
-    assert "Shader Health validation summary" in str(requests[1]["data"])
+    assert result.metadata["task_status"] == "Pending Review"
+    assert requests[-1]["action"] == "update"
+    create_ops = [request for request in requests if request["action"] == "create"]
+    assert create_ops
+    assert "Health Validation Result" in str(create_ops[-1]["entity_data"])
+    assert "critical ⛔" in str(create_ops[-1]["entity_data"])
+
+
+def test_publish_validation_summary_reports_auth_error_for_batch_exception():
+    def transport(_request: HttpRequest, _timeout: float) -> FtrackResponse:
+        return FtrackResponse(
+            status_code=200,
+            body='[{"action": "query", "exception": {"message": "Invalid user credentials."}}]',
+            json_data=[
+                {"action": "query", "exception": {"message": "Invalid user credentials."}}
+            ],
+        )
+
+    result = publish_validation_summary(
+        _studio_config(_ftrack_settings(api_user="Pavel Kuzmenko")),
+        _payload(),
+        client_factory=lambda config: FtrackClient(config, transport=transport),
+    )
+
+    assert result.published is False
+    assert result.error_message is not None
+    assert result.error_message.startswith("ftrack_auth_error:")
+    assert "User name" in result.error_message
+
+
+def test_publish_validation_summary_reports_query_error_for_unexpected_token():
+    def transport(_request: HttpRequest, _timeout: float) -> FtrackResponse:
+        return FtrackResponse(
+            status_code=200,
+            body='[{"action": "query", "exception": {"message": "UnexpectedToken"}}]',
+            json_data=[{"action": "query", "exception": {"message": "UnexpectedToken"}}],
+        )
+
+    result = publish_validation_summary(
+        _studio_config(_ftrack_settings(api_user="armasonix")),
+        _payload(),
+        client_factory=lambda config: FtrackClient(config, transport=transport),
+    )
+
+    assert result.published is False
+    assert result.error_message == "ftrack_query_error: UnexpectedToken."
+
+
+def test_publish_validation_summary_skips_when_project_not_found():
+    def transport(_request: HttpRequest, _timeout: float) -> FtrackResponse:
+        return FtrackResponse(
+            status_code=200,
+            body='[{"action": "query", "data": []}]',
+            json_data=[{"action": "query", "data": []}],
+        )
+
+    result = publish_validation_summary(
+        _studio_config(_ftrack_settings(project="Missing Project")),
+        _payload(),
+        client_factory=lambda config: FtrackClient(config, transport=transport),
+    )
+
+    assert result.published is False
+    assert result.skipped_reason.startswith("project_not_found:")
 
 
 def test_publish_validation_summary_skips_when_task_not_found():
-    def transport(_request: HttpRequest, _timeout: float) -> FtrackResponse:
+    def transport(request: HttpRequest, timeout: float) -> FtrackResponse:
+        _ = timeout
+        payload = json.loads(request.body.decode("utf-8"))
+        expression = str(payload[0]["expression"])
+        if "from Project where" in expression:
+            return FtrackResponse(
+                status_code=200,
+                body='[{"action": "query", "data": [{"id": "project-1"}]}]',
+                json_data=[{"action": "query", "data": [{"id": "project-1"}]}],
+            )
         return FtrackResponse(
             status_code=200,
             body='[{"action": "query", "data": []}]',
@@ -142,7 +296,7 @@ def test_publish_validation_summary_skips_when_task_not_found():
     )
 
     assert result.published is False
-    assert result.skipped_reason == "task_not_found"
+    assert result.skipped_reason.startswith("task_not_found:")
 
 
 def test_maybe_publish_validation_summary_accepts_validation_run_result():

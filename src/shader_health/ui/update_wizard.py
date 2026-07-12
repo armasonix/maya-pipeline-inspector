@@ -1,20 +1,21 @@
 """Check for Updates wizard flow for the Maya panel."""
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from shader_health import __version__
+from shader_health.integrations.update.config import GitHubReleasesConfig
 from shader_health.integrations.update.download import (
     download_release_asset,
     select_update_asset,
 )
 from shader_health.integrations.update.github_releases import (
-    GitHubRelease,
     GitHubReleasesClient,
     GitHubReleasesClientError,
+    GitHubRelease,
     HttpTransport,
     UpdateCheckResult,
 )
@@ -62,6 +63,22 @@ UPDATE_WIZARD_STATUS_DOWNLOAD_FAILED = "Download failed: {error}"
 
 InstallHandler = Callable[[Path, GitHubRelease], "UpdateInstallOutcome"]
 ProcessUiCallback = Callable[[], None]
+
+
+class UpdateProgressController(Protocol):
+    """Minimal update wizard UI surface shared by dialog and headless flows."""
+
+    def set_close_enabled(self, enabled: bool) -> None: ...
+
+    def set_spinner_running(self, running: bool) -> None: ...
+
+    def set_active_stage(
+        self,
+        index: int,
+        *,
+        status_message: str | None = None,
+        step_descriptions: Sequence[str] | None = None,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -120,7 +137,7 @@ class UpdateWizardSession:
 
 
 def run_update_wizard_flow(
-    controller: UpdateProgressDialog,
+    controller: UpdateProgressController,
     *,
     installed_version: str = __version__,
     studio_config: StudioConfig | None = None,
@@ -134,7 +151,10 @@ def run_update_wizard_flow(
     """Advance the update dialog through check, download, install, and restart stages."""
 
     _refresh_ui = process_ui or (lambda: None)
-    client = releases_client or GitHubReleasesClient(transport=transport)
+    client = releases_client or GitHubReleasesClient(
+        github_config_from_studio(studio_config),
+        transport=transport,
+    )
     installer = install_handler or default_install_handler
     updates_policy = _updates_policy(studio_config)
 
@@ -372,6 +392,111 @@ def run_update_wizard_flow(
     )
 
 
+class _HeadlessUpdateProgress:
+    """No-op progress controller for Maya header update checks."""
+
+    def set_close_enabled(self, _enabled: bool) -> None:
+        return
+
+    def set_spinner_running(self, _running: bool) -> None:
+        return
+
+    def set_active_stage(
+        self,
+        _index: int,
+        *,
+        status_message: str | None = None,
+        step_descriptions: Sequence[str] | None = None,
+    ) -> None:
+        return
+
+
+def github_config_from_studio(studio_config: StudioConfig | None) -> GitHubReleasesConfig:
+    config = GitHubReleasesConfig()
+    if studio_config is None:
+        return config
+    updates = studio_config.updates
+    return config.with_overrides(
+        owner=(updates.github_owner or config.owner).strip(),
+        repo=(updates.github_repo or config.repo).strip(),
+        github_token=updates.github_token.strip(),
+    )
+
+
+def run_update_check_only(
+    *,
+    installed_version: str = __version__,
+    studio_config: StudioConfig | None = None,
+    transport: HttpTransport | None = None,
+    staging_root: Path | None = None,
+    install_handler: InstallHandler | None = None,
+    download_transport: Callable[[str, float], bytes] | None = None,
+) -> UpdateWizardResult:
+    """Run the update wizard without showing the progress dialog."""
+
+    releases_client = GitHubReleasesClient(
+        github_config_from_studio(studio_config),
+        transport=transport,
+    )
+    return run_update_wizard_flow(
+        _HeadlessUpdateProgress(),
+        installed_version=installed_version,
+        studio_config=studio_config,
+        releases_client=releases_client,
+        transport=transport,
+        staging_root=staging_root,
+        install_handler=install_handler,
+        download_transport=download_transport,
+        process_ui=lambda: None,
+    )
+
+
+def format_update_wizard_user_message(
+    result: UpdateWizardResult,
+    *,
+    installed_version: str = __version__,
+) -> str:
+    """Return a short user-facing summary for update check outcomes."""
+
+    if result.skipped_reason == "disabled":
+        return result.error_message or "Studio policy disables in-app update checks."
+    if result.up_to_date:
+        version = result.installed_version or installed_version
+        return f"Shader Health Inspector v{version} is already up to date."
+    if result.error_message:
+        return result.error_message
+    if result.completed and result.update_available:
+        return (
+            f"Update installed: v{result.installed_version} → v{result.latest_version}. "
+            "Save your scene, restart Maya, and reopen Shader Health Inspector."
+        )
+    return "Update check finished."
+
+
+def _raise_update_dialog(dialog: Any) -> None:
+    raise_dialog = getattr(dialog, "raise_", None)
+    if raise_dialog is not None:
+        raise_dialog()
+    activate = getattr(dialog, "activateWindow", None)
+    if activate is not None:
+        activate()
+
+
+def _configure_update_dialog(
+    dialog: Any,
+    qt_widgets: Any,
+    *,
+    parent: Any | None,
+) -> None:
+    from shader_health.ui.settings_widgets import configure_maya_modal_dialog
+
+    configure_maya_modal_dialog(dialog, qt_widgets)
+    set_parent = getattr(dialog, "setParent", None)
+    if parent is not None and set_parent is not None:
+        set_parent(parent)
+    _raise_update_dialog(dialog)
+
+
 def show_update_wizard(
     qt_widgets: Any,
     *,
@@ -385,47 +510,148 @@ def show_update_wizard(
 ) -> UpdateWizardSession:
     """Build the update dialog, run the wizard flow, and wait for the artist to close it."""
 
+    # region agent log
+    try:
+        from shader_health._agent_debug_log import agent_debug_log
+
+        agent_debug_log(
+            "U1",
+            "update_wizard.show_update_wizard",
+            "enter",
+            data={"installed_version": installed_version},
+            run_id="post-fix",
+        )
+    except ImportError:
+        pass
+    # endregion
+
     controller = UpdateProgressDialog.build(
         qt_widgets,
         installed_version=installed_version,
         status_message=UPDATE_WIZARD_STATUS_QUERY,
         active_stage_index=UPDATE_WIZARD_STAGE_QUERY,
     )
-    if parent is not None:
-        set_parent = getattr(controller.dialog, "setParent", None)
-        if set_parent is not None:
-            set_parent(parent)
-        window_modality = getattr(qt_widgets, "Qt", None)
-        if window_modality is not None:
-            application_modal = getattr(window_modality, "ApplicationModal", None)
-            set_modality = getattr(controller.dialog, "setWindowModality", None)
-            if application_modal is not None and set_modality is not None:
-                set_modality(application_modal)
-
-    show = getattr(controller.dialog, "show", None)
-    if show is not None:
-        show()
+    _configure_update_dialog(controller.dialog, qt_widgets, parent=parent)
 
     process_ui = _build_process_ui_callback(qt_widgets)
-    result = run_update_wizard_flow(
-        controller,
-        installed_version=installed_version,
-        studio_config=studio_config,
-        transport=transport,
-        staging_root=staging_root,
-        install_handler=install_handler,
-        download_transport=download_transport,
-        process_ui=process_ui,
-    )
+    result_container: dict[str, UpdateWizardResult] = {}
+
+    def _run_flow() -> None:
+        # region agent log
+        try:
+            from shader_health._agent_debug_log import agent_debug_log
+
+            agent_debug_log(
+                "U2",
+                "update_wizard.show_update_wizard",
+                "run flow",
+                data={"installed_version": installed_version},
+                run_id="post-fix",
+            )
+        except ImportError:
+            pass
+        # endregion
+        try:
+            result_container["result"] = run_update_wizard_flow(
+                controller,
+                installed_version=installed_version,
+                studio_config=studio_config,
+                transport=transport,
+                staging_root=staging_root,
+                install_handler=install_handler,
+                download_transport=download_transport,
+                process_ui=process_ui,
+            )
+        except Exception as exc:
+            message = f"Update check failed: {exc}"
+            controller.set_spinner_running(False)
+            controller.set_close_enabled(True)
+            controller.set_status_message(message)
+            result_container["result"] = UpdateWizardResult(
+                completed=False,
+                installed_version=installed_version,
+                error_message=message,
+            )
+            # region agent log
+            try:
+                from shader_health._agent_debug_log import agent_debug_log
+
+                agent_debug_log(
+                    "U3",
+                    "update_wizard.show_update_wizard",
+                    "flow exception",
+                    data={"error": str(exc)},
+                    run_id="post-fix",
+                )
+            except ImportError:
+                pass
+            # endregion
+            return
+
+        # region agent log
+        try:
+            from shader_health._agent_debug_log import agent_debug_log
+
+            result = result_container["result"]
+            agent_debug_log(
+                "U3",
+                "update_wizard.show_update_wizard",
+                "flow complete",
+                data={
+                    "completed": result.completed,
+                    "up_to_date": result.up_to_date,
+                    "skipped_reason": result.skipped_reason,
+                    "error_message": result.error_message,
+                },
+                run_id="post-fix",
+            )
+        except ImportError:
+            pass
+        # endregion
+
+    from shader_health.ui.settings_widgets import show_modal_dialog
+    from shader_health.ui.update_progress_dialog import UPDATE_PROGRESS_DIALOG_OBJECT_NAME
 
     exec_fn = getattr(controller.dialog, "exec_", None) or getattr(controller.dialog, "exec", None)
-    if exec_fn is not None:
-        exec_fn()
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+
+    if exec_fn is not None and single_shot is not None:
+        single_shot(0, _run_flow)
+        process_ui()
+        show_modal_dialog(
+            controller.dialog,
+            qt_widgets,
+            parent=parent,
+            singleton_key=UPDATE_PROGRESS_DIALOG_OBJECT_NAME,
+        )
+    elif exec_fn is not None:
+        _run_flow()
+        show_modal_dialog(
+            controller.dialog,
+            qt_widgets,
+            parent=parent,
+            singleton_key=UPDATE_PROGRESS_DIALOG_OBJECT_NAME,
+        )
+    else:
+        show = getattr(controller.dialog, "show", None)
+        if show is not None:
+            show()
+        process_ui()
+        _run_flow()
+
+    result = result_container.get("result")
+    if result is None:
+        result = UpdateWizardResult(
+            completed=False,
+            installed_version=installed_version,
+            error_message="update_wizard_did_not_run",
+        )
     return UpdateWizardSession(dialog=controller.dialog, result=result)
 
 
 def _finish_wizard(
-    controller: UpdateProgressDialog,
+    controller: UpdateProgressController,
     *,
     process_ui: ProcessUiCallback,
 ) -> None:

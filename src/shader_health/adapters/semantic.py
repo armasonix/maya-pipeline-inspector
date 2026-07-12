@@ -12,7 +12,6 @@ _DATA_SEMANTICS = frozenset(
     {"roughness", "metalness", "normal", "bump", "displacement", "mask", "opacity"}
 )
 
-
 @dataclass(frozen=True)
 class SemanticSlotResolution:
     """Resolved semantic label for a graph connection destination."""
@@ -27,7 +26,6 @@ class SemanticSlotResolution:
     @property
     def is_resolved(self) -> bool:
         return self.status == "resolved"
-
 
 class SemanticTextureSlotResolver:
     """Resolve connection destination plugs to semantic texture slots."""
@@ -109,7 +107,6 @@ class SemanticTextureSlotResolver:
                 matches.append((adapter.id, semantic))
         return matches
 
-
 def classify_semantic_data_kind(semantic: str) -> str:
     """Classify semantic texture slot as color, data, material, or unknown."""
 
@@ -121,10 +118,8 @@ def classify_semantic_data_kind(semantic: str) -> str:
         return "material"
     return "unknown"
 
-
 def _node_by_id(snapshot: GraphSnapshot) -> dict[str, NodeSnapshot]:
     return {node.id: node for node in snapshot.nodes}
-
 
 def _semantic_resolution(
     connection: ConnectionSnapshot,
@@ -142,7 +137,6 @@ def _semantic_resolution(
         adapter_id=adapter_id,
         reason=reason,
     )
-
 
 def _with_connection_semantic(
     connection: ConnectionSnapshot,

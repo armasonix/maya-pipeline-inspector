@@ -42,7 +42,6 @@ FIX_QUEUE_COLUMNS = (
 HIGH_RISK = "high"
 MEDIUM_RISK = "medium"
 
-
 @dataclass(frozen=True)
 class FixQueueRow:
     """Display row for the Safe Auto-Fix Queue."""
@@ -58,7 +57,6 @@ class FixQueueRow:
     blocked: bool = False
     requires_confirmation: bool = False
 
-
 @dataclass(frozen=True)
 class FixQueueActionCallbacks:
     """Optional callbacks for Safe Auto-Fix Queue buttons."""
@@ -66,7 +64,6 @@ class FixQueueActionCallbacks:
     on_apply_selected: Optional[Callable[[], None]] = None
     on_apply_safe: Optional[Callable[[], None]] = None
     on_export_fix_plan: Optional[Callable[[], None]] = None
-
 
 def build_fix_queue(
     qt_widgets: Any,
@@ -140,7 +137,6 @@ def build_fix_queue(
 
     return widget
 
-
 def populate_fix_queue(
     qt_widgets: Any,
     table: Any,
@@ -169,7 +165,6 @@ def populate_fix_queue(
                 make_read_only_item(qt_widgets, value),
             )
     _sync_fix_queue_table_height(table, len(rows))
-
 
 def fix_rows_from_table(
     table: Any,
@@ -208,7 +203,6 @@ def fix_rows_from_table(
         )
     return tuple(synced)
 
-
 def selected_from_table_item(item: Any) -> bool:
     """Return whether a legacy fix queue Select cell is checked."""
 
@@ -217,18 +211,15 @@ def selected_from_table_item(item: Any) -> bool:
     text = getattr(item, "text", lambda: "")()
     return str(text).strip().upper() == "YES"
 
-
 def checked_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     """Return queue rows the user marked with Select, including blocked rows."""
 
     return tuple(row for row in rows if row.selected)
 
-
 def selected_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     """Return selected queue rows that are not blocked."""
 
     return tuple(row for row in rows if row.selected and not row.blocked)
-
 
 def blocked_selection_message(rows: Sequence[FixQueueRow]) -> str:
     """Build a user-facing message when selected fixes are blocked."""
@@ -248,7 +239,6 @@ def blocked_selection_message(rows: Sequence[FixQueueRow]) -> str:
         + ". Locked nodes and unplannable path fixes cannot run."
     )
 
-
 def safe_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     """Return non-blocked low/medium risk rows that can be batch-applied."""
 
@@ -260,7 +250,6 @@ def safe_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
         and row.risk not in (HIGH_RISK, MEDIUM_RISK)
     )
 
-
 def risky_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
     """Return rows that require explicit confirmation before application."""
 
@@ -269,7 +258,6 @@ def risky_fix_rows(rows: Sequence[FixQueueRow]) -> tuple[FixQueueRow, ...]:
         for row in rows
         if not row.blocked and (row.requires_confirmation or row.risk == HIGH_RISK)
     )
-
 
 def fix_queue_row_cells(row: FixQueueRow) -> tuple[str, str, str, str, str, str]:
     """Return display cells in fix queue column order (excluding Select)."""
@@ -283,12 +271,10 @@ def fix_queue_row_cells(row: FixQueueRow) -> tuple[str, str, str, str, str, str]
         _yes_no(row.blocked),
     )
 
-
 def allows_batch_risky_confirmation(profile_id: str) -> bool:
     """Return whether the active profile may confirm risky fixes in one batch dialog."""
 
     return profile_id.strip() == SUPERVISOR_FULL_PROFILE_ID
-
 
 def risky_confirmation_text(
     rows: Sequence[FixQueueRow],
@@ -311,7 +297,6 @@ def risky_confirmation_text(
         )
     return f"Risky fixes require confirmation: {pending_count} pending."
 
-
 def update_risky_confirmation_label(
     label: Any,
     rows: Sequence[FixQueueRow],
@@ -323,7 +308,6 @@ def update_risky_confirmation_label(
     set_text = getattr(label, "setText", None)
     if set_text is not None:
         set_text(risky_confirmation_text(rows, selected_rows=selected_rows))
-
 
 def confirm_risky_fixes(
     qt_widgets: Any,
@@ -341,7 +325,6 @@ def confirm_risky_fixes(
         return _confirm_risky_fix_batch(qt_widgets, risky)
 
     return all(_confirm_single_risky_fix(qt_widgets, row) for row in risky)
-
 
 def _configure_fix_queue_table(table: Any, qt_widgets: Any) -> None:
     size_policy = getattr(qt_widgets, "QSizePolicy", None)
@@ -404,7 +387,6 @@ def _configure_fix_queue_table(table: Any, qt_widgets: Any) -> None:
         ):
             set_section_resize_mode(column_index, stretch)
 
-
 def _sync_fix_queue_table_height(table: Any, row_count: int) -> None:
     """Size the table to its row content so action buttons sit directly underneath."""
 
@@ -435,7 +417,6 @@ def _sync_fix_queue_table_height(table: Any, row_count: int) -> None:
                 setter(content_height)
                 break
 
-
 def _set_widget_expanding_horizontal(qt_widgets: Any, widget: Any) -> None:
     size_policy = getattr(qt_widgets, "QSizePolicy", None)
     set_size_policy = getattr(widget, "setSizePolicy", None)
@@ -445,7 +426,6 @@ def _set_widget_expanding_horizontal(qt_widgets: Any, widget: Any) -> None:
     preferred = getattr(size_policy, "Preferred", None)
     if expanding is not None and preferred is not None:
         set_size_policy(expanding, preferred)
-
 
 def _confirm_risky_fix_batch(qt_widgets: Any, risky: Sequence[FixQueueRow]) -> bool:
     message_box = qt_widgets.QMessageBox
@@ -457,7 +437,6 @@ def _confirm_risky_fix_batch(qt_widgets: Any, risky: Sequence[FixQueueRow]) -> b
         "These changes can affect render look or farm safety.\n\n" + "\n".join(lines)
     )
     return _message_box_confirmed(message_box, "Confirm Risky Fixes", message)
-
 
 def _confirm_single_risky_fix(qt_widgets: Any, row: FixQueueRow) -> bool:
     message_box = qt_widgets.QMessageBox
@@ -473,7 +452,6 @@ def _confirm_single_risky_fix(qt_widgets: Any, row: FixQueueRow) -> bool:
         default_no=True,
     )
 
-
 def _risky_fix_summary_line(row: FixQueueRow) -> str:
     risk_bits = [f"risk={row.risk}"]
     if row.requires_confirmation and row.risk != HIGH_RISK:
@@ -483,7 +461,6 @@ def _risky_fix_summary_line(row: FixQueueRow) -> str:
         f"[{risk_label}] {row.target_node}.{row.target_attr}: "
         f"{row.before_value} -> {row.after_value}"
     )
-
 
 def _message_box_confirmed(
     message_box: Any,
@@ -512,7 +489,6 @@ def _message_box_confirmed(
     reply = message_box.warning(None, title, message, yes | no, default)
     return reply == yes
 
-
 def _fix_queue_button(
     qt_widgets: Any,
     label: str,
@@ -526,7 +502,6 @@ def _fix_queue_button(
     _connect_button(button, callback)
     return button
 
-
 def _connect_button(button: Any, callback: Optional[Callable[[], None]]) -> None:
     if callback is None:
         return
@@ -534,7 +509,6 @@ def _connect_button(button: Any, callback: Optional[Callable[[], None]]) -> None
     connect = getattr(clicked, "connect", None)
     if connect is not None:
         connect(callback)
-
 
 def _yes_no(value: bool) -> str:
     return "YES" if value else "NO"

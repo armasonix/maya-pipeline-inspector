@@ -60,7 +60,6 @@ _SLACK_NOTIFY_CHECKBOX_OBJECT_NAMES = {
     )
 }
 
-
 def build_slack_connector_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -212,7 +211,6 @@ def build_slack_connector_section(
     section_layout.addWidget(hint)
     return section
 
-
 def read_slack_connector_from_view(view: Any, qt_widgets: Any) -> SlackConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_SLACK_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
@@ -240,7 +238,6 @@ def read_slack_connector_from_view(view: Any, qt_widgets: Any) -> SlackConnector
             SETTINGS_SLACK_INCLUDE_REPORT_LINK_CHECKBOX_OBJECT_NAME,
         ),
     )
-
 
 def update_slack_connector_view(
     view: Any,
@@ -287,17 +284,14 @@ def update_slack_connector_view(
         slack.include_report_link,
     )
 
-
 def get_slack_settings(connectors: ConnectorSettings) -> SlackConnectorSettings:
     return connectors.slack
-
 
 def apply_slack_settings(
     connectors: ConnectorSettings,
     settings: SlackConnectorSettings,
 ) -> ConnectorSettings:
     return replace(connectors, slack=settings)
-
 
 def _on_slack_enabled_changed(
     qt_widgets: Any,
@@ -310,7 +304,6 @@ def _on_slack_enabled_changed(
         _set_slack_details_visible(details, enabled)
     if on_enabled_changed is not None:
         on_enabled_changed(enabled)
-
 
 def _build_slack_field_row(
     qt_widgets: Any,
@@ -353,7 +346,6 @@ def _build_slack_field_row(
     row_layout.addWidget(field)
     row_layout.addStretch(1)
     return row
-
 
 def _set_slack_details_visible(details: Any, visible: bool) -> None:
     set_visible = getattr(details, "setVisible", None)

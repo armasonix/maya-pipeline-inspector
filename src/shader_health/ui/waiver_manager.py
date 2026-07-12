@@ -23,7 +23,6 @@ WAIVER_TABLE_COLUMNS = (
     "Expires",
 )
 
-
 @dataclass(frozen=True)
 class WaiverTableRow:
     """Display row for the waiver manager table."""
@@ -35,7 +34,6 @@ class WaiverTableRow:
     approved_by: str
     expires_at_utc: str
 
-
 @dataclass(frozen=True)
 class WaiverManagerCallbacks:
     """Optional callbacks for waiver manager UI actions."""
@@ -44,7 +42,6 @@ class WaiverManagerCallbacks:
     on_revoke_selected: Optional[Callable[[], None]] = None
     on_make_waive: Optional[Callable[[], None]] = None
     on_waiver_selected: Optional[Callable[[], None]] = None
-
 
 def build_waiver_manager(
     qt_widgets: Any,
@@ -114,7 +111,6 @@ def build_waiver_manager(
 
     return widget
 
-
 def waiver_rows_from_records(
     waivers: Sequence[WaiverRecord],
     *,
@@ -139,7 +135,6 @@ def waiver_rows_from_records(
         )
     return tuple(rows)
 
-
 def populate_waiver_table(
     qt_widgets: Any,
     table: Any,
@@ -151,7 +146,6 @@ def populate_waiver_table(
     for row_index, row in enumerate(rows):
         for column_index, value in enumerate(waiver_row_cells(row)):
             table.setItem(row_index, column_index, make_read_only_item(qt_widgets, value))
-
 
 def waiver_summary_text(
     rows: Sequence[WaiverTableRow],
@@ -174,7 +168,6 @@ def waiver_summary_text(
         )
     return f"{active_count} active waiver(s).{path_hint}"
 
-
 def waiver_row_cells(row: WaiverTableRow) -> tuple[str, str, str, str, str]:
     """Return display cells in waiver table column order."""
 
@@ -188,7 +181,6 @@ def waiver_row_cells(row: WaiverTableRow) -> tuple[str, str, str, str, str]:
         row.approved_by,
         row.expires_at_utc,
     )
-
 
 def _button(
     qt_widgets: Any,

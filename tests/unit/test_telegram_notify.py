@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
@@ -135,12 +136,13 @@ def test_format_validation_summary_message_includes_profile_overlay_and_counts()
         matched_events=("block_publish",),
     )
 
-    assert "Shader Health: Publish block" in message
-    assert "Scene: hero.ma" in message
-    assert "Profile: publish_strict+character" in message
-    assert "Scope: Scene" in message
-    assert "Health: 42/100" in message
-    assert "Issues: 2 critical, 1 error, 3 warning, 0 info" in message
+    assert "Health Validation · Publish block" in message
+    assert "📁 Scene: hero.ma" in message
+    assert "🎬 Profile: publish_strict+character" in message
+    assert "🎯 Scope: Scene" in message
+    assert "Health score: 42/100" in message
+    assert "🚨 2 critical" in message
+    assert "❌ 1 error" in message
 
 
 def test_send_telegram_validation_notification_skips_when_connector_disabled():
@@ -188,8 +190,9 @@ def test_send_telegram_validation_notification_posts_summary_on_publish_block():
     assert len(captured) == 1
     assert captured[0].method == "POST"
     assert captured[0].body is not None
-    assert b"Shader Health: Publish block" in captured[0].body
-    assert b"hero.ma" in captured[0].body
+    payload = json.loads(captured[0].body.decode("utf-8"))
+    assert "Health Validation · Publish block" in payload["text"]
+    assert "hero.ma" in payload["text"]
 
 
 def test_maybe_send_telegram_validation_notification_accepts_validation_run_result():

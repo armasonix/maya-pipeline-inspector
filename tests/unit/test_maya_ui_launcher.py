@@ -302,7 +302,7 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
     monkeypatch.setattr(
         ui_launcher,
         "_maybe_notify_validation",
-        lambda content_arg, result_arg: calls.append((content_arg, result_arg)),
+        lambda content_arg, _qt_widgets, result_arg: calls.append((content_arg, result_arg)),
     )
 
     ui_launcher._run_validation_job(
@@ -342,6 +342,6 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
         lambda _content: "studio-config",
     )
 
-    ui_launcher._maybe_notify_validation(content, result)
+    ui_launcher._maybe_notify_validation(content, object(), result)
 
     assert calls == [("studio-config", result)]

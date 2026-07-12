@@ -9,6 +9,7 @@ from shader_health.studio_config import (
 from shader_health.ui.studio_policy_section import (
     SETTINGS_ALLOW_CRITICAL_WAIVERS_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
+    SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
     SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,
     SETTINGS_MANIFEST_MAX_FINGERPRINT_CHANGES_INPUT_OBJECT_NAME,
     SETTINGS_MANIFEST_MAX_NEW_CHANGES_INPUT_OBJECT_NAME,
@@ -31,9 +32,13 @@ class FakeWidget:
         self.object_name: str | None = None
         self.children: list[object] = []
         self.layout: object | None = None
+        self.fixed_width: int | None = None
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
+
+    def setFixedWidth(self, width: int) -> None:
+        self.fixed_width = width
 
     def setLayout(self, layout: object) -> None:
         self.layout = layout
@@ -141,12 +146,56 @@ class FakeFormLayout:
         self.rows.append((label, field))
 
 
-class FakeHBoxLayout:
-    def __init__(self) -> None:
+class FakeGridLayout:
+    def __init__(self, parent: FakeWidget | None = None) -> None:
+        self.parent = parent
         self.widgets: list[object] = []
+        if parent is not None:
+            parent.layout = self
+            if parent not in self.widgets:
+                pass
 
-    def addWidget(self, widget: object) -> None:
+    def setContentsMargins(self, *_args: object) -> None:
+        return
+
+    def setHorizontalSpacing(self, _spacing: int) -> None:
+        return
+
+    def setVerticalSpacing(self, _spacing: int) -> None:
+        return
+
+    def setColumnStretch(self, _column: int, _stretch: int) -> None:
+        return
+
+    def addWidget(self, widget: object, _row: int, _column: int, *_args: object) -> None:
         self.widgets.append(widget)
+        if self.parent is not None and widget not in self.parent.children:
+            self.parent.children.append(widget)
+
+
+class FakeQt:
+    AlignLeft = 1
+    AlignVCenter = 2
+
+
+class FakeHBoxLayout:
+    def __init__(self, parent: FakeWidget | None = None) -> None:
+        self.parent = parent
+        self.widgets: list[object] = []
+        if parent is not None:
+            parent.layout = self
+
+    def setContentsMargins(self, *_args: object) -> None:
+        return
+
+    def setSpacing(self, _spacing: int) -> None:
+        return
+
+    def addWidget(self, widget: object, *_args: object) -> None:
+        self.widgets.append(widget)
+
+    def addSpacing(self, _spacing: int) -> None:
+        return
 
     def addStretch(self, _stretch: int = 0) -> None:
         return
@@ -199,6 +248,8 @@ class FakeQtWidgets:
     QFormLayout = FakeFormLayout
     QHBoxLayout = FakeHBoxLayout
     QVBoxLayout = FakeVBoxLayout
+    QGridLayout = FakeGridLayout
+    Qt = FakeQt
 
 
 def _find(root: FakeWidget, object_name: str) -> FakeWidget:
@@ -281,6 +332,7 @@ def test_read_studio_policy_from_view_reads_policy_fields():
     assert studio.pipeline.manifest_gate_defaults.block_on_new_textures is False
     assert studio.pipeline.pinned_workflow_profile_ids == ("publish_strict",)
     assert studio.pipeline.pinned_asset_class_profile_ids == ("asset_class_prop",)
+    assert studio.pipeline.extra_rules_folder == "D:/studio/extra_rules"
     assert studio.pipeline.extra_rules_folder == "D:/studio/extra_rules"
 
 

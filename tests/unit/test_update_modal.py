@@ -21,6 +21,8 @@ from shader_health.ui.update_progress_dialog import (
     update_progress_step_description_object_name,
 )
 from shader_health.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
+from shader_health.integrations.update.github_releases import GitHubReleasesResponse, HttpRequest
+from shader_health.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
 
 
 class FakeWidget:
@@ -142,18 +144,56 @@ class FakeDialog(FakeWidget):
         super().__init__()
         self.exec_called = False
         self.show_called = False
+        self.window_flags: object | None = None
 
     def exec_(self) -> int:
+        self.show()
         self.exec_called = True
+        FakeQTimer.run_pending()
         return 0
 
     def show(self) -> None:
         self.show_called = True
         self.visible = True
 
+    def setWindowFlags(self, flags: object) -> None:
+        self.window_flags = flags
+
+    def raise_(self) -> None:
+        return
+
+    def activateWindow(self) -> None:
+        return
+
+
+class FakeApplication:
+    def __init__(self) -> None:
+        self.process_events_calls = 0
+
+    def processEvents(self) -> None:
+        self.process_events_calls += 1
+
 
 class FakeQt:
-    ApplicationModal = "application-modal"
+    ApplicationModal = 32
+    Dialog = 2
+    WindowTitleHint = 4
+    WindowCloseButtonHint = 8
+
+
+class FakeQTimer:
+    _pending: list[object] = []
+
+    @classmethod
+    def singleShot(cls, _delay_ms: int, callback: object) -> None:
+        cls._pending.append(callback)
+
+    @classmethod
+    def run_pending(cls) -> None:
+        pending = cls._pending[:]
+        cls._pending.clear()
+        for callback in pending:
+            callback()
 
 
 class FakeQtWidgets:
@@ -165,6 +205,8 @@ class FakeQtWidgets:
     QHBoxLayout = FakeHBoxLayout
     QProgressBar = FakeProgressBar
     Qt = FakeQt
+    QApplication = FakeApplication
+    QTimer = FakeQTimer
 
 
 def _find(root: FakeWidget, object_name: str) -> FakeWidget:
@@ -227,7 +269,7 @@ def _github_transport(payload: dict[str, object]):
 
 def test_show_update_modal_shell_uses_modal_exec_and_parent():
     parent = FakeWidget()
-    dialog = show_update_modal_shell(
+    session = show_update_modal_shell(
         FakeQtWidgets,
         parent=parent,
         installed_version="0.5.0",
@@ -242,11 +284,13 @@ def test_show_update_modal_shell_uses_modal_exec_and_parent():
             }
         ),
     )
+    dialog = session.dialog
 
     assert dialog.exec_called is True
     assert dialog.show_called is True
     assert dialog.parent is parent
     assert dialog.modality == FakeQt.ApplicationModal
+    assert session.result.up_to_date is True
     assert UPDATE_WIZARD_STATUS_UP_TO_DATE.format(installed_version="0.5.0") in (
         _find(dialog, UPDATE_MODAL_STATUS_LABEL_OBJECT_NAME).text
     )

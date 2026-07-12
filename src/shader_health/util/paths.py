@@ -32,7 +32,6 @@ _STUDIO_REPLACE_TO_ROOT_ATTR = {
     "${STUDIO_TEXTURE_ROOT}": "texture_root",
 }
 
-
 def normalize_cli_path(path: str | Path) -> Path:
     """Convert Git Bash MSYS paths (/d/foo) to Windows paths on win32."""
 
@@ -49,12 +48,10 @@ def normalize_cli_path(path: str | Path) -> Path:
         return normalized
     return resolved
 
-
 def resolve_cli_path(path: str | Path) -> str:
     """Return a filesystem path string safe for ``open()`` in Windows Python."""
 
     return str(normalize_cli_path(path))
-
 
 def studio_variable_aliases(environment: StudioEnvironmentSettings) -> dict[str, str]:
     """Build the substitution map for studio environment path tokens."""
@@ -70,7 +67,6 @@ def studio_variable_aliases(environment: StudioEnvironmentSettings) -> dict[str,
         if normalized_name:
             aliases[normalized_name] = str(value or "")
     return aliases
-
 
 def resolve_studio_path(
     path: str,
@@ -101,7 +97,6 @@ def resolve_studio_path(
             break
     return resolved
 
-
 def studio_environment_is_configured(environment: StudioEnvironmentSettings) -> bool:
     """Return whether any studio path roots or aliases are configured."""
 
@@ -109,7 +104,6 @@ def studio_environment_is_configured(environment: StudioEnvironmentSettings) -> 
         if str(getattr(environment, field_name, "") or "").strip():
             return True
     return bool(environment.variable_aliases)
-
 
 def normalize_path_to_studio_tokens(
     path: str,
@@ -125,7 +119,6 @@ def normalize_path_to_studio_tokens(
         if normalized is not None:
             return normalized
     return None
-
 
 def effective_studio_normalize_target(
     replace_to: str,
@@ -146,7 +139,6 @@ def effective_studio_normalize_target(
         return studio_token
     return normalized
 
-
 def studio_normalize_prefixes(
     environment: StudioEnvironmentSettings,
 ) -> tuple[tuple[str, str], ...]:
@@ -158,7 +150,6 @@ def studio_normalize_prefixes(
         if root:
             prefixes.append((root, token))
     return tuple(prefixes)
-
 
 def replace_path_prefix(path: str, old_prefix: str, new_prefix: str) -> Optional[str]:
     """Replace a path prefix, preserving the remainder of the path."""
@@ -177,7 +168,6 @@ def replace_path_prefix(path: str, old_prefix: str, new_prefix: str) -> Optional
         suffix = path_norm[len(old_norm) :]
         return new_norm + suffix
     return None
-
 
 def builtin_studio_variable_names() -> tuple[str, ...]:
     """Return the built-in studio environment variable names."""

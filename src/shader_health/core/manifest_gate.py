@@ -7,7 +7,6 @@ from typing import Any, Optional
 
 JsonDict = dict[str, Any]
 
-
 @dataclass(frozen=True)
 class ManifestGatePolicy:
     """Policy thresholds for manifest regression gates."""
@@ -26,7 +25,6 @@ class ManifestGatePolicy:
             block_on_new_textures=bool(data.get("block_on_new_textures", True)),
         )
 
-
 @dataclass(frozen=True)
 class ManifestGateResult:
     blocked: bool
@@ -39,7 +37,6 @@ class ManifestGateResult:
             "reasons": list(self.reasons),
             "diff_summary": dict(self.diff_summary),
         }
-
 
 def evaluate_manifest_gate(
     old_manifest: Mapping[str, Any],
@@ -78,7 +75,6 @@ def evaluate_manifest_gate(
         diff_summary=summary if isinstance(summary, Mapping) else {},
     )
 
-
 def _fingerprint_change_count(changed: Any) -> int:
     if not isinstance(changed, list):
         return 0
@@ -90,7 +86,6 @@ def _fingerprint_change_count(changed: Any) -> int:
             if isinstance(change, Mapping) and change.get("field") == "graph_fingerprint":
                 count += 1
     return count
-
 
 def _new_texture_count(diff: Mapping[str, Any]) -> int:
     issues = diff.get("issues", {})

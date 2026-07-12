@@ -41,7 +41,6 @@ class HealthScore:
             "capped_by_blocking_critical": self.capped_by_blocking_critical,
         }
 
-
 def compute_health_score(results: Iterable[RuleResult]) -> HealthScore:
     """Compute a simple MVP health score from failed results.
 

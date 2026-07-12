@@ -41,7 +41,6 @@ UNDO_SUPPORTED_FIX_TYPES = frozenset(
     }
 )
 
-
 @dataclass(frozen=True)
 class FixAction:
     """Previewable, non-mutating safe-fix action produced by the planner."""
@@ -123,7 +122,6 @@ class FixAction:
             params=dict(params) if isinstance(params, Mapping) else {},
         )
 
-
 @dataclass(frozen=True)
 class FixPlan:
     """Collection of planned fix actions."""
@@ -152,7 +150,6 @@ class FixPlan:
             "actions": [action.to_dict() for action in self.actions],
         }
 
-
 def fix_plan_from_export(data: Mapping[str, Any]) -> FixPlan:
     """Load a fix plan from a deterministic export JSON payload."""
 
@@ -163,7 +160,6 @@ def fix_plan_from_export(data: Mapping[str, Any]) -> FixPlan:
         FixAction.from_dict(item) for item in raw_actions if isinstance(item, Mapping)
     )
     return FixPlan(actions=actions)
-
 
 def build_fix_plan(
     results: Iterable[RuleResult],
@@ -187,7 +183,6 @@ def build_fix_plan(
         actions.append(_build_action(result, rule, node_index))
 
     return FixPlan(actions=tuple(actions))
-
 
 def _build_action(
     result: RuleResult,
@@ -248,13 +243,11 @@ def _build_action(
         params=params,
     )
 
-
 def _target_attr(result: RuleResult, fix_params: Mapping[str, Any]) -> Optional[str]:
     attr = fix_params.get("attribute")
     if attr:
         return str(attr)
     return result.plug
-
 
 def _before_value(
     result: RuleResult,
@@ -266,7 +259,6 @@ def _before_value(
         if dependency_path:
             return dependency_path
     return result.current_value
-
 
 def _after_value(
     result: RuleResult,
@@ -315,7 +307,6 @@ def _after_value(
         return fix_params["path"]
     return result.expected_value
 
-
 def swap_texture_version_in_path(
     path: str,
     current_version: str,
@@ -337,7 +328,6 @@ def swap_texture_version_in_path(
     start, end = match.span()
     return path[:start] + replacement + path[end:]
 
-
 def _block_reasons(node: Optional[NodeSnapshot], risk: str) -> list[str]:
     reasons: list[str] = []
     if node is not None and node.locked:
@@ -346,23 +336,19 @@ def _block_reasons(node: Optional[NodeSnapshot], risk: str) -> list[str]:
         reasons.append(HIGH_RISK_BLOCK_REASON)
     return reasons
 
-
 def hard_block_reasons(block_reasons: Iterable[str]) -> list[str]:
     """Return block reasons that prevent application without override flags."""
 
     return [reason for reason in block_reasons if reason != HIGH_RISK_BLOCK_REASON]
-
 
 def _target_node_name(result: RuleResult, node: Optional[NodeSnapshot]) -> str:
     if node is not None:
         return node.full_name or node.name or node.id
     return result.node or result.target_id
 
-
 def _fix_id(result: RuleResult, fix_type: str) -> str:
     target = result.target_id or result.node or "scene"
     return f"{result.rule_id}:{target}:{fix_type}"
-
 
 def resolve_normalize_path_value(
     before_path: str,
@@ -421,7 +407,6 @@ def resolve_normalize_path_value(
         return planned_after.strip()
     return None
 
-
 def project_root_from_scene(scene_path: str) -> Optional[str]:
     """Best-effort project root for local path normalization."""
 
@@ -432,7 +417,6 @@ def project_root_from_scene(scene_path: str) -> Optional[str]:
         if (parent / "src" / "shader_health").is_dir():
             return str(parent).replace("\\", "/")
     return str(scene.parent).replace("\\", "/")
-
 
 def _normalize_to_asset_root_basename(before_path: str, replace_to: str) -> Optional[str]:
     """Map standalone local paths to ${ASSET_ROOT}/textures/<filename>."""
@@ -448,7 +432,6 @@ def _normalize_to_asset_root_basename(before_path: str, replace_to: str) -> Opti
         return None
     return f"{asset_root}/textures/{filename}"
 
-
 def _is_plannable_path_value(value: JsonValue) -> bool:
     if not isinstance(value, str):
         return False
@@ -457,12 +440,10 @@ def _is_plannable_path_value(value: JsonValue) -> bool:
         return False
     return normalized.casefold() not in UNPLANNABLE_EXPECTED_VALUES
 
-
 def _is_plannable_normalize(before_value: JsonValue, after_value: JsonValue) -> bool:
     if not _is_plannable_path_value(after_value):
         return False
     return str(before_value or "").strip() != str(after_value or "").strip()
-
 
 class _NodeIndex:
     def __init__(

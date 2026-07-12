@@ -14,6 +14,7 @@ from shader_health.studio_config import (
     save_studio_config,
 )
 from shader_health.ui import main_window
+from shader_health._agent_debug_log import agent_debug_log
 from shader_health.ui.bug_report_section import read_bug_report_from_view
 from shader_health.ui.farm_tab import (
     FARM_STATUS_LABEL_OBJECT_NAME,
@@ -68,9 +69,15 @@ from shader_health.ui.waiver_manager import (
 from shader_health.user_config import (
     UserPreferences,
     default_user_config_path,
+    enrich_user_preferences,
     load_user_config,
     merge_runtime_config,
     save_user_config,
+)
+from shader_health.maya.panel_session import (
+    load_runtime_configs_from_session,
+    remember_studio_config_path,
+    remember_user_config_path,
 )
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
@@ -82,6 +89,7 @@ USER_CONFIG_ATTR = "_shader_health_user_config"
 MERGED_RUNTIME_CONFIG_ATTR = "_shader_health_merged_runtime_config"
 SAVED_STUDIO_CONFIG_ATTR = "_shader_health_saved_studio_config"
 SAVED_USER_CONFIG_ATTR = "_shader_health_saved_user_config"
+SESSION_RULE_OVERRIDES_ATTR = "_shader_health_session_rule_overrides"
 SESSION_RULE_OVERRIDES_ATTR = "_shader_health_session_rule_overrides"
 
 _PANEL: Optional[Any] = None
@@ -180,10 +188,15 @@ def _create_dockable_panel() -> Any:
         )
         panel_state["content"] = content
         self._shader_health_content = content
+        content._shader_health_dock = self
         setattr(content, STUDIO_CONFIG_ATTR, studio_config)
         setattr(content, USER_CONFIG_ATTR, user_config)
         setattr(content, MERGED_RUNTIME_CONFIG_ATTR, merged_runtime)
         _set_saved_settings_baselines(content, studio_config, user_config)
+        if studio_config.config_path is not None:
+            remember_studio_config_path(studio_config.config_path)
+        if user_config.config_path is not None and Path(user_config.config_path).is_file():
+            remember_user_config_path(user_config.config_path)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
         _wire_fix_queue_actions(content, qt_widgets)
@@ -193,6 +206,9 @@ def _create_dockable_panel() -> Any:
         _wire_validate_splitter_persistence(content, qt_widgets)
         _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
+        from shader_health.ui.theme_loader import apply_panel_theme
+
+        apply_panel_theme(content, user_config.theme, dock=self)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
 
@@ -230,20 +246,93 @@ def _panel_navigation_callbacks(
 
 
 def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None:
-    from shader_health import __version__
-    from shader_health.studio_config import StudioConfig
-    from shader_health.ui.update_modal import show_update_modal_shell
+    from shader_health.ui.settings_widgets import try_reactivate_modal_dialog
 
-    studio_config = getattr(content, "_shader_health_studio_config", None)
-    if studio_config is not None and not isinstance(studio_config, StudioConfig):
-        studio_config = None
-
-    show_update_modal_shell(
-        qt_widgets,
-        parent=content,
-        installed_version=__version__,
-        studio_config=studio_config,
+    if try_reactivate_modal_dialog("shaderHealthInspectorCheckForUpdates"):
+        return
+    # region agent log
+    agent_debug_log(
+        "U0",
+        "ui_launcher._show_check_for_updates_modal_from_ui",
+        "button clicked",
+        data={},
+        run_id="post-fix",
     )
+    # endregion
+    try:
+        from shader_health import __version__
+        from shader_health.studio_config import StudioConfig
+        from shader_health.ui.update_wizard import (
+            format_update_wizard_user_message,
+            run_update_check_only,
+        )
+
+        studio_config = getattr(content, "_shader_health_studio_config", None)
+        if studio_config is not None and not isinstance(studio_config, StudioConfig):
+            studio_config = None
+
+        result = run_update_check_only(
+            installed_version=__version__,
+            studio_config=studio_config,
+        )
+        message = format_update_wizard_user_message(
+            result,
+            installed_version=__version__,
+        )
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            message.replace("\n", " "),
+        )
+        _show_information_dialog(
+            qt_widgets,
+            "Check for Updates",
+            message,
+            singleton_key="shaderHealthInspectorCheckForUpdates",
+        )
+        agent_debug_log(
+            "U4",
+            "ui_launcher._show_check_for_updates_modal_from_ui",
+            "completed",
+            data={
+                "message": message,
+                "completed": result.completed,
+                "error_message": result.error_message,
+            },
+            run_id="post-fix",
+        )
+    except Exception as exc:
+        agent_debug_log(
+            "U0",
+            "ui_launcher._show_check_for_updates_modal_from_ui",
+            "exception",
+            data={"error": str(exc)},
+            run_id="post-fix",
+        )
+        _show_information_dialog(
+            qt_widgets,
+            "Check for Updates",
+            f"Update check failed: {exc}",
+            singleton_key="shaderHealthInspectorCheckForUpdates",
+        )
+        raise
+
+
+def _maya_main_window_widget(qt_widgets: Any) -> Any | None:
+    try:
+        from maya import OpenMayaUI as omui  # type: ignore[import-not-found]
+        import shiboken2  # type: ignore[import-not-found]
+
+        main_window_ptr = omui.MQtUtil.mainWindow()
+        if main_window_ptr is None:
+            return None
+        widget_cls = getattr(qt_widgets, "QWidget", None)
+        if widget_cls is None:
+            return None
+        return shiboken2.wrapInstance(int(main_window_ptr), widget_cls)
+    except Exception:
+        return None
 
 
 def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -313,7 +402,7 @@ def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:
         content,
         qt_widgets,
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
-        "Could not open documentation URL. Check Settings → Basic → Documentation URL.",
+        "Could not open documentation URL. Check Settings в†’ Basic в†’ Documentation URL.",
     )
 
 
@@ -321,6 +410,12 @@ def _settings_action_callbacks(
     panel_state: dict[str, Any],
     qt_widgets: Any,
 ) -> SettingsActionCallbacks:
+    def content_fn() -> Any:
+        return _panel_content(panel_state)
+
+    def sync_connectors() -> None:
+        _sync_connectors_from_ui(content_fn(), qt_widgets)
+
     return SettingsActionCallbacks(
         on_back=lambda: _set_panel_view(_panel_content(panel_state), qt_widgets, settings=False),
         on_require_tx_changed=lambda enabled: _set_require_tx_derivatives(
@@ -333,10 +428,19 @@ def _settings_action_callbacks(
             qt_widgets,
             enabled,
         ),
-        on_deadline_settings_changed=lambda: _sync_deadline_connector_from_ui(
-            _panel_content(panel_state),
-            qt_widgets,
-        ),
+        on_deadline_settings_changed=sync_connectors,
+        on_telegram_enabled_changed=lambda _enabled: sync_connectors(),
+        on_telegram_settings_changed=sync_connectors,
+        on_discord_enabled_changed=lambda _enabled: sync_connectors(),
+        on_discord_settings_changed=sync_connectors,
+        on_slack_enabled_changed=lambda _enabled: sync_connectors(),
+        on_slack_settings_changed=sync_connectors,
+        on_ftrack_enabled_changed=lambda _enabled: sync_connectors(),
+        on_ftrack_settings_changed=sync_connectors,
+        on_shotgrid_enabled_changed=lambda _enabled: sync_connectors(),
+        on_shotgrid_settings_changed=sync_connectors,
+        on_cerebro_enabled_changed=lambda _enabled: sync_connectors(),
+        on_cerebro_settings_changed=sync_connectors,
         on_studio_environment_changed=lambda: _sync_studio_environment_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -374,6 +478,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_theme_changed=lambda: _apply_theme_preview_from_settings_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_open_rule_editor=lambda: _open_rule_editor_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -388,9 +496,7 @@ def _settings_action_callbacks(
 def _load_runtime_configs() -> tuple[StudioConfig, UserPreferences]:
     """Load studio and user config files for panel startup."""
 
-    studio_config = StudioConfig.default()
-    user_config = UserPreferences.default()
-    return studio_config, user_config
+    return load_runtime_configs_from_session()
 
 
 def _studio_config_for_content(content: Any) -> StudioConfig:
@@ -405,6 +511,188 @@ def _user_config_for_content(content: Any) -> UserPreferences:
     if isinstance(config, UserPreferences):
         return config
     return UserPreferences.default()
+
+
+def _session_rule_overrides_for_content(content: Any) -> dict[str, Any]:
+    overrides = getattr(content, SESSION_RULE_OVERRIDES_ATTR, None)
+    if isinstance(overrides, dict):
+        return overrides
+    return {}
+
+
+def _set_session_rule_overrides(content: Any, overrides: dict[str, Any]) -> None:
+    setattr(content, SESSION_RULE_OVERRIDES_ATTR, dict(overrides))
+
+
+def _open_rule_editor_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_browser import load_packaged_rules_catalog
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.rule_editor_dialog import (
+        RULE_EDITOR_DIALOG_OBJECT_NAME,
+        show_rule_editor_dialog,
+    )
+    from shader_health.ui.settings_widgets import try_reactivate_modal_dialog
+
+    # region agent log
+    agent_debug_log(
+        "R0",
+        "ui_launcher._open_rule_editor_from_ui",
+        "enter",
+        data={"content_is_none": content is None},
+        run_id="post-fix-v2",
+    )
+    # endregion
+    if content is None:
+        return
+    if try_reactivate_modal_dialog(RULE_EDITOR_DIALOG_OBJECT_NAME):
+        return
+
+    try:
+        user_config = _user_config_for_content(content)
+        catalog = load_packaged_rules_catalog(
+            extra_rule_paths=user_extra_rule_paths(user_config),
+        )
+        show_rule_editor_dialog(
+            qt_widgets,
+            catalog=catalog,
+            session_overrides=_session_rule_overrides_for_content(content),
+            on_save=lambda overrides: _set_session_rule_overrides(content, overrides),
+        )
+        agent_debug_log(
+            "R1",
+            "ui_launcher._open_rule_editor_from_ui",
+            "completed",
+            data={"catalog_count": len(catalog)},
+            run_id="post-fix",
+        )
+    except Exception as exc:
+        agent_debug_log(
+            "R0",
+            "ui_launcher._open_rule_editor_from_ui",
+            "exception",
+            data={"error": str(exc)},
+            run_id="post-fix",
+        )
+        _show_information_dialog(qt_widgets, "Rule Editor", f"Could not open Rule Editor: {exc}")
+        raise
+
+
+_open_rule_browser_from_ui = _open_rule_editor_from_ui
+
+
+def _studio_extra_rules_folder_for_content(content: Any) -> str:
+    studio_config = _studio_config_for_content(content)
+    return studio_config.pipeline.extra_rules_folder.strip()
+
+
+def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_wizard import known_rule_ids_for_authoring
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.new_rule_wizard_dialog import (
+        NEW_RULE_WIZARD_DIALOG_OBJECT_NAME,
+        show_new_rule_wizard_dialog,
+    )
+    from shader_health.ui.settings_widgets import try_reactivate_modal_dialog
+
+    # region agent log
+    agent_debug_log(
+        "R0",
+        "ui_launcher._open_new_rule_wizard_from_ui",
+        "enter",
+        data={"content_is_none": content is None},
+        run_id="post-fix-v2",
+    )
+    # endregion
+    if content is None:
+        return
+    if try_reactivate_modal_dialog(NEW_RULE_WIZARD_DIALOG_OBJECT_NAME):
+        return
+
+    try:
+        user_config = _user_config_for_content(content)
+        extra_paths = user_extra_rule_paths(user_config)
+        studio_folder = _studio_extra_rules_folder_for_content(content)
+        default_output = ""
+        if studio_folder:
+            default_output = str(Path(studio_folder) / "custom_rule.json")
+        elif extra_paths:
+            default_output = str(extra_paths[0] / "custom_rule.json")
+        show_new_rule_wizard_dialog(
+            qt_widgets,
+            known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
+            default_output_path=default_output,
+            studio_extra_rules_folder=studio_folder,
+        )
+        agent_debug_log(
+            "R1",
+            "ui_launcher._open_new_rule_wizard_from_ui",
+            "completed",
+            data={"studio_folder": studio_folder},
+            run_id="post-fix",
+        )
+    except Exception as exc:
+        agent_debug_log(
+            "R0",
+            "ui_launcher._open_new_rule_wizard_from_ui",
+            "exception",
+            data={"error": str(exc)},
+            run_id="post-fix",
+        )
+        _show_information_dialog(qt_widgets, "New Rule Wizard", f"Could not open New Rule: {exc}")
+        raise
+
+
+def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
+    from shader_health.core.rule_wizard import (
+        IncidentRuleExportContext,
+        build_draft_prefill_from_issue,
+        incident_rule_sidecar_path,
+        known_rule_ids_for_authoring,
+    )
+    from shader_health.runtime_preferences import user_extra_rule_paths
+    from shader_health.ui.new_rule_wizard_dialog import show_new_rule_wizard_dialog
+
+    if content is None:
+        return
+
+    issue = _selected_issue(content)
+    if issue is None:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            "Select a failed issue before creating a rule draft.",
+        )
+        return
+
+    rules = getattr(content, "_shader_health_rules", ())
+    rules_by_id = {rule.id: rule for rule in rules}
+    source_rule_id = str(getattr(issue, "rule_id", "") or "")
+    source_rule = rules_by_id.get(source_rule_id)
+    prefill = build_draft_prefill_from_issue(issue, source_rule)
+
+    user_config = _user_config_for_content(content)
+    extra_paths = user_extra_rule_paths(user_config)
+    studio_folder = _studio_extra_rules_folder_for_content(content)
+    default_output = ""
+    if studio_folder:
+        default_output = str(
+            incident_rule_sidecar_path(Path(studio_folder), prefill.draft_input.rule_id)
+        )
+    elif extra_paths:
+        default_output = str(extra_paths[0] / f"{prefill.draft_input.rule_id}.json")
+    show_new_rule_wizard_dialog(
+        qt_widgets,
+        parent=content,
+        known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
+        default_output_path=default_output,
+        prefill=prefill,
+        studio_extra_rules_folder=studio_folder,
+        export_context=IncidentRuleExportContext(
+            source_rule_id=source_rule_id,
+            scene_path=str(getattr(content, "_shader_health_scene_path", "") or ""),
+        ),
+    )
 
 
 def _session_rule_overrides_for_content(content: Any) -> dict[str, Any]:
@@ -536,7 +824,7 @@ def _disabled_farm_tab_state() -> FarmTabState:
         connection_reachable=False,
         status_message=(
             "Remote farm connector is disabled. Enable Thinkbox Deadline under "
-            "Settings → Connectors → Remote Farm."
+            "Settings в†’ Connectors в†’ Remote Farm."
         ),
     )
 
@@ -577,16 +865,89 @@ def _settings_dirty_state(content: Any, settings_view: Any, qt_widgets: Any):
 
 def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> None:
     setattr(content, STUDIO_CONFIG_ATTR, config)
+    setattr(
+        content,
+        MERGED_RUNTIME_CONFIG_ATTR,
+        merge_runtime_config(config, _user_config_for_content(content)),
+    )
     _refresh_settings_view(content, qt_widgets)
 
 
 def _set_user_config(content: Any, qt_widgets: Any, config: UserPreferences) -> None:
     setattr(content, USER_CONFIG_ATTR, config)
-    apply_user_preferences_to_panel(content, qt_widgets, config)
+    setattr(
+        content,
+        MERGED_RUNTIME_CONFIG_ATTR,
+        merge_runtime_config(_studio_config_for_content(content), config),
+    )
+    content._shader_health_settings_programmatic = True
+    try:
+        apply_user_preferences_to_panel(content, qt_widgets, config)
+    finally:
+        content._shader_health_settings_programmatic = False
     _refresh_settings_view(content, qt_widgets)
 
 
+def _apply_theme_preview_from_settings_ui(content: Any, qt_widgets: Any) -> None:
+    """Apply UI theme immediately without the settings refresh reentrancy guard."""
+
+    from shader_health.ui.basic_settings_section import (
+        SETTINGS_THEME_COMBO_OBJECT_NAME,
+        _THEME_OPTIONS,
+        _combo_data,
+    )
+    from shader_health.ui.settings_panel import SETTINGS_VIEW_OBJECT_NAME
+    from shader_health.ui.theme_loader import apply_panel_theme, normalize_theme
+
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    theme_combo = (
+        _find_child(settings_view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME)
+        if settings_view is not None
+        else None
+    )
+    theme = normalize_theme(_combo_data(theme_combo, options=_THEME_OPTIONS) or "classic")
+    previous = normalize_theme(getattr(content, "_shader_health_theme", "classic"))
+    agent_debug_log(
+        "H6",
+        "ui_launcher._apply_theme_preview_from_settings_ui",
+        "theme change callback fired",
+        {
+            "combo_found": theme_combo is not None,
+            "combo_theme": theme,
+            "previous_theme": previous,
+            "settings_programmatic": bool(
+                getattr(content, "_shader_health_settings_programmatic", False)
+            ),
+        },
+        run_id="post-fix",
+    )
+    if settings_view is None or theme_combo is None:
+        return
+    apply_panel_theme(
+        content,
+        theme,
+        dock=getattr(content, "_shader_health_dock", None),
+    )
+    current = _user_config_for_content(content)
+    setattr(content, USER_CONFIG_ATTR, current.with_updates(theme=theme))
+    agent_debug_log(
+        "H4",
+        "ui_launcher._apply_theme_preview_from_settings_ui",
+        "theme preview applied",
+        {"theme": theme, "previous_theme": previous},
+        run_id="post-fix",
+    )
+
+
 def _sync_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
+    if getattr(content, "_shader_health_settings_programmatic", False):
+        agent_debug_log(
+            "H1",
+            "ui_launcher._sync_user_preferences_from_ui",
+            "skipped reentrant user preferences sync",
+        )
+        return
+    agent_debug_log("H1", "ui_launcher._sync_user_preferences_from_ui", "enter")
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
         return
@@ -595,9 +956,20 @@ def _sync_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
         qt_widgets,
         base=_user_config_for_content(content),
     )
+    agent_debug_log(
+        "H2",
+        "ui_launcher._sync_user_preferences_from_ui",
+        "read user prefs",
+        {
+            "theme": updated.theme,
+            "default_profile_id": updated.default_profile_id,
+            "mayapy_path_len": len(updated.mayapy_path or ""),
+        },
+    )
     setattr(content, USER_CONFIG_ATTR, updated)
     apply_user_preferences_to_panel(content, qt_widgets, updated)
     _refresh_settings_view(content, qt_widgets)
+    agent_debug_log("H1", "ui_launcher._sync_user_preferences_from_ui", "exit")
 
 
 def _apply_user_preferences_to_panel(
@@ -609,17 +981,49 @@ def _apply_user_preferences_to_panel(
 
 
 def _refresh_settings_view(content: Any, qt_widgets: Any, *, status_message: str = "") -> None:
+    if getattr(content, "_shader_health_settings_programmatic", False):
+        agent_debug_log(
+            "H1",
+            "ui_launcher._refresh_settings_view",
+            "skipped nested settings refresh",
+        )
+        return
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
         return
-    update_settings_view(
-        settings_view,
-        qt_widgets,
-        config=_studio_config_for_content(content),
-        user_config=_user_config_for_content(content),
-        status_message=status_message,
-        dirty_state=_settings_dirty_state(content, settings_view, qt_widgets),
+    agent_debug_log("H1", "ui_launcher._refresh_settings_view", "enter")
+    studio_config = _studio_config_for_content(content)
+    user_config = _user_config_for_content(content)
+    agent_debug_log(
+        "H5",
+        "ui_launcher._refresh_settings_view",
+        "config snapshot",
+        {
+            "approved_by_len": len(
+                studio_config.pipeline.waiver_defaults.default_approved_by or ""
+            ),
+            "mayapy_path_len": len(user_config.mayapy_path or ""),
+        },
     )
+    content._shader_health_settings_programmatic = True
+    try:
+        update_settings_view(
+            settings_view,
+            qt_widgets,
+            config=studio_config,
+            user_config=user_config,
+            status_message=status_message,
+            dirty_state=_settings_dirty_state(content, settings_view, qt_widgets),
+        )
+    finally:
+        content._shader_health_settings_programmatic = False
+    dirty_state = _settings_dirty_state(content, settings_view, qt_widgets)
+    main_window.update_panel_header_unsaved_indicator(
+        content,
+        qt_widgets,
+        dirty=dirty_state.any_dirty,
+    )
+    agent_debug_log("H1", "ui_launcher._refresh_settings_view", "exit")
 
 
 def _set_panel_view(content: Any, qt_widgets: Any, *, settings: bool) -> None:
@@ -633,6 +1037,34 @@ def _set_panel_view(content: Any, qt_widgets: Any, *, settings: bool) -> None:
     set_current = getattr(stack, "setCurrentIndex", None)
     if set_current is not None:
         set_current(main_window.SETTINGS_VIEW_INDEX if settings else 0)
+    if settings:
+        _refresh_settings_view(content, qt_widgets)
+        _prepare_settings_interactive_state(content, qt_widgets)
+
+
+def _prepare_settings_interactive_state(content: Any, qt_widgets: Any) -> None:
+    from shader_health.ui.settings_panel import (
+        SETTINGS_VIEW_OBJECT_NAME,
+        prepare_settings_interactive_state,
+    )
+
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    prepare_settings_interactive_state(
+        settings_view,
+        qt_widgets,
+        _user_config_for_content(content),
+        on_preferences_changed=lambda: _sync_user_preferences_from_ui(content, qt_widgets),
+        on_theme_changed=lambda: _apply_theme_preview_from_settings_ui(content, qt_widgets),
+    )
+    agent_debug_log(
+        "H7",
+        "ui_launcher._prepare_settings_interactive_state",
+        "settings interactive state prepared",
+        {"theme": _user_config_for_content(content).theme},
+        run_id="post-fix",
+    )
 
 
 def _set_require_tx_derivatives(content: Any, qt_widgets: Any, enabled: bool) -> None:
@@ -657,6 +1089,15 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
     if settings_view is None:
         return
     updated = read_studio_policy_from_view(settings_view, qt_widgets, base=current)
+    agent_debug_log(
+        "H8",
+        "ui_launcher._sync_studio_policy_from_ui",
+        "read studio policy from UI",
+        {
+            "approved_by": updated.pipeline.waiver_defaults.default_approved_by,
+            "studio_name": updated.studio_name,
+        },
+    )
     _set_studio_config(content, qt_widgets, updated)
 
 
@@ -692,7 +1133,60 @@ def _sync_studio_environment_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_studio_config(content, qt_widgets, updated)
 
 
-def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
+def _ftrack_connection_status_message(studio_config: StudioConfig) -> str:
+    ftrack = studio_config.connectors.ftrack
+    if not ftrack.enabled:
+        return ""
+    if not (
+        ftrack.api_url.strip()
+        and ftrack.api_user.strip()
+        and ftrack.api_key.strip()
+    ):
+        return "Ftrack: enter API URL, user, and key to test the connection."
+    from shader_health.integrations.ftrack.verify import verify_ftrack_connection
+
+    result = verify_ftrack_connection(studio_config)
+    return f"Ftrack: {result.message}"
+
+
+def _cerebro_connection_status_message(studio_config: StudioConfig) -> str:
+    cerebro = studio_config.connectors.cerebro
+    if not cerebro.enabled:
+        return ""
+    if not (
+        cerebro.server_url.strip()
+        and cerebro.api_user.strip()
+        and cerebro.api_password.strip()
+    ):
+        return "Cerebro: enter Database host, API user, and access token to test the connection."
+    from shader_health.integrations.cerebro.verify import verify_cerebro_connection
+
+    result = verify_cerebro_connection(studio_config)
+    return f"Cerebro: {result.message}"
+
+
+def _verify_connectors_if_enabled(content: Any, qt_widgets: Any) -> None:
+    studio_config = _studio_config_for_content(content)
+    messages = [
+        message
+        for message in (
+            _ftrack_connection_status_message(studio_config),
+            _cerebro_connection_status_message(studio_config),
+        )
+        if message
+    ]
+    if not messages:
+        return
+    _set_settings_status(content, qt_widgets, " ".join(messages))
+
+
+def _verify_ftrack_connector_if_enabled(content: Any, qt_widgets: Any) -> None:
+    _verify_connectors_if_enabled(content, qt_widgets)
+
+
+def _sync_connectors_from_ui(content: Any, qt_widgets: Any) -> None:
+    """Read all connector sections from Settings and update in-session studio config."""
+
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
@@ -703,11 +1197,23 @@ def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
         base=current.connectors,
     )
     updated = current.with_updates(connectors=connectors)
-    _set_studio_config(content, qt_widgets, updated)
+    setattr(content, STUDIO_CONFIG_ATTR, updated)
     _refresh_farm_tab(content, qt_widgets)
+    _refresh_settings_view(content, qt_widgets)
+    _verify_ftrack_connector_if_enabled(content, qt_widgets)
+
+
+def _sync_deadline_connector_from_ui(content: Any, qt_widgets: Any) -> None:
+    _sync_connectors_from_ui(content, qt_widgets)
 
 
 def _set_deadline_connector_enabled(content: Any, qt_widgets: Any, enabled: bool) -> None:
+    agent_debug_log(
+        "H3",
+        "ui_launcher._set_deadline_connector_enabled",
+        "enter",
+        {"enabled": enabled},
+    )
     _sync_deadline_connector_from_ui(content, qt_widgets)
     _set_settings_status(
         content,
@@ -734,6 +1240,15 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_bug_report_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
     path = _pick_settings_save_path(qt_widgets, config.config_path)
+    agent_debug_log(
+        "H8",
+        "ui_launcher._save_studio_settings_from_ui",
+        "persist studio config",
+        {
+            "approved_by": config.pipeline.waiver_defaults.default_approved_by,
+            "config_path": str(config.config_path or path or ""),
+        },
+    )
     if path is None:
         return
     try:
@@ -742,7 +1257,9 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
         _set_settings_status(content, qt_widgets, f"Save failed: {exc}")
         return
     _set_studio_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    remember_studio_config_path(saved_path)
     _commit_saved_settings_baselines(content)
+    ftrack_note = _ftrack_connection_status_message(config.with_updates(config_path=saved_path))
     _set_settings_status(
         content,
         qt_widgets,
@@ -750,6 +1267,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
             f"Studio settings saved to {saved_path}. "
             "Point other machines at this file via Load Studio Config or "
             "SHADER_HEALTH_STUDIO_CONFIG."
+            f"{ftrack_note}"
         ),
     )
 
@@ -758,12 +1276,22 @@ def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_user_preferences_from_ui(content, qt_widgets)
     config = _user_config_for_content(content)
     path = config.config_path or default_user_config_path()
+    agent_debug_log(
+        "H8",
+        "ui_launcher._save_user_preferences_from_ui",
+        "persist user config",
+        {
+            "mayapy_path_len": len(config.mayapy_path or ""),
+            "config_path": str(path),
+        },
+    )
     try:
         saved_path = save_user_config(path, config.with_updates(config_path=path))
     except OSError as exc:
         _set_settings_status(content, qt_widgets, f"User save failed: {exc}")
         return
     _set_user_config(content, qt_widgets, config.with_updates(config_path=saved_path))
+    remember_user_config_path(saved_path)
     _commit_saved_settings_baselines(content)
     _set_settings_status(
         content,
@@ -781,7 +1309,8 @@ def _load_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
     except (OSError, ValueError) as exc:
         _set_settings_status(content, qt_widgets, f"User load failed: {exc}")
         return
-    _set_user_config(content, qt_widgets, loaded)
+    remember_user_config_path(path)
+    _set_user_config(content, qt_widgets, enrich_user_preferences(loaded))
     _commit_saved_settings_baselines(content)
     _set_settings_status(
         content,
@@ -799,6 +1328,20 @@ def _load_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     except (OSError, ValueError) as exc:
         _set_settings_status(content, qt_widgets, f"Load failed: {exc}")
         return
+    loaded = loaded.with_updates(config_path=path.resolve())
+    remember_studio_config_path(path.resolve())
+    agent_debug_log(
+        "L1",
+        "ui_launcher._load_studio_settings_from_ui",
+        "loaded studio config",
+        {
+            "path": str(path),
+            "ftrack_enabled": loaded.connectors.ftrack.enabled,
+            "ftrack_project": loaded.connectors.ftrack.project,
+            "slack_enabled": loaded.connectors.slack.enabled,
+        },
+        run_id="post-fix",
+    )
     _set_studio_config(content, qt_widgets, loaded)
     _refresh_farm_tab(content, qt_widgets)
     _commit_saved_settings_baselines(content)
@@ -1054,7 +1597,7 @@ def _send_to_tracker_from_ui() -> None:
     validation_result = getattr(content, "_shader_health_last_validation_result", None)
     if validation_result is None:
         qt_widgets = load_qt_widgets()
-        message = "Send to Tracker skipped — run Validate Scene first."
+        message = "Send to Tracker skipped вЂ” run Validate Scene first."
         print(message)
         _set_reports_status_label(content, qt_widgets, message)
         return
@@ -1064,11 +1607,20 @@ def _send_to_tracker_from_ui() -> None:
         publish_validation_to_first_tracker,
     )
 
-    outcome = publish_validation_to_first_tracker(
-        _studio_config_for_content(content),
-        validation_result,
-    )
-    message = format_tracker_publish_status(outcome)
+    try:
+        qt_widgets = load_qt_widgets()
+        _sync_connectors_from_ui(content, qt_widgets)
+        outcome = publish_validation_to_first_tracker(
+            _studio_config_for_content(content),
+            validation_result,
+        )
+        message = format_tracker_publish_status(outcome)
+    except Exception as exc:
+        message = f"Send to Tracker failed: {exc}"
+        print(message)
+        import traceback
+
+        traceback.print_exc()
     print(message)
     qt_widgets = load_qt_widgets()
     scanned_at_utc = getattr(content, "_shader_health_last_validated_at", "")
@@ -1287,14 +1839,14 @@ def _run_validation_job(
     content._shader_health_scan_scope = scan_scope
     _populate_validation_result(content, qt_widgets, result)
     _update_validation_chrome_labels(content, qt_widgets, result)
-    _maybe_notify_validation(content, result)
+    _maybe_notify_validation(content, qt_widgets, result)
     if post_validate is not None:
         post_validate(content, qt_widgets, result)
     else:
         print(result.message)
 
 
-def _maybe_notify_validation(content: Any, result: Any) -> None:
+def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None:
     """Send configured validation notifications without interrupting the Maya UI flow."""
 
     try:
@@ -1303,13 +1855,97 @@ def _maybe_notify_validation(content: Any, result: Any) -> None:
             report_validation_notification_outcomes,
         )
 
+        studio_config = _studio_config_for_content(content)
+        health = getattr(result, "health_score", None)
+        connectors = getattr(studio_config, "connectors", None)
+        discord = getattr(connectors, "discord", None) if connectors is not None else None
+        agent_debug_log(
+            "D1",
+            "ui_launcher._maybe_notify_validation",
+            "dispatch notifications",
+            {
+                "discord_enabled": bool(getattr(discord, "enabled", False)),
+                "discord_notify_on": list(getattr(discord, "notify_on", ())),
+                "block_publish": bool(getattr(health, "block_publish", False)),
+                "block_deadline": bool(getattr(health, "block_deadline", False)),
+            },
+        )
         dispatch_result = dispatch_validation_notifications(
-            _studio_config_for_content(content),
+            studio_config,
             result,
         )
         report_validation_notification_outcomes(dispatch_result)
+        _append_validation_notification_status(content, qt_widgets, dispatch_result)
     except Exception as exc:  # noqa: BLE001
         print(f"Validation notification dispatch failed: {exc}")
+
+
+def _append_validation_notification_status(
+    content: Any,
+    qt_widgets: Any,
+    dispatch_result: Any,
+) -> None:
+    """Mirror connector notification outcomes on the Validate status label."""
+
+    from shader_health.integrations.notify.dispatcher import (
+        ValidationNotificationDispatchResult,
+    )
+
+    if not isinstance(dispatch_result, ValidationNotificationDispatchResult):
+        return
+
+    lines: list[str] = []
+    for outcome in dispatch_result.outcomes:
+        display_name = outcome.connector_id.title()
+        if outcome.sent:
+            lines.append(f"{display_name}: notification sent.")
+            agent_debug_log(
+                "D1",
+                "ui_launcher._append_validation_notification_status",
+                "notification sent",
+                {"connector": outcome.connector_id},
+                run_id="post-fix",
+            )
+        elif outcome.error_message:
+            lines.append(f"{display_name}: notification failed ({outcome.error_message}).")
+            agent_debug_log(
+                "D1",
+                "ui_launcher._append_validation_notification_status",
+                "notification failed",
+                {
+                    "connector": outcome.connector_id,
+                    "error": outcome.error_message,
+                },
+                run_id="post-fix",
+            )
+        elif outcome.skipped_reason:
+            lines.append(f"{display_name}: notification skipped ({outcome.skipped_reason}).")
+            agent_debug_log(
+                "D1",
+                "ui_launcher._append_validation_notification_status",
+                "notification skipped",
+                {
+                    "connector": outcome.connector_id,
+                    "reason": outcome.skipped_reason,
+                },
+                run_id="post-fix",
+            )
+    if not lines:
+        return
+    status_label = _find_child(
+        content,
+        qt_widgets.QLabel,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+    )
+    if status_label is None:
+        return
+    text_fn = getattr(status_label, "text", None)
+    set_text = getattr(status_label, "setText", None)
+    if text_fn is None or set_text is None:
+        return
+    current = str(text_fn()).strip()
+    suffix = " ".join(lines)
+    set_text(f"{current} {suffix}".strip() if current else suffix)
 
 
 def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:
@@ -1432,7 +2068,7 @@ def _run_farm_preflight_from_ui(content: Any, qt_widgets: Any) -> None:
     content._shader_health_scan_scope = "scene"
     _populate_validation_result(content, qt_widgets, validation)
     _update_validation_chrome_labels(content, qt_widgets, validation)
-    _maybe_notify_validation(content, validation)
+    _maybe_notify_validation(content, qt_widgets, validation)
     connection_state = getattr(content, "_shader_health_farm_tab_state", None)
     result = run_farm_preflight_action(
         summary=getattr(validation, "summary", None),
@@ -1602,7 +2238,7 @@ def _manifest_gate_from_ui(content: Any, qt_widgets: Any) -> None:
         _show_information_dialog(
             qt_widgets,
             "Manifest Gate",
-            "No approved manifest sidecar found. Use Reports → Export Shader Manifest first.",
+            "No approved manifest sidecar found. Use Reports в†’ Export Shader Manifest first.",
         )
         return
 
@@ -1636,13 +2272,21 @@ def _manifest_gate_from_ui(content: Any, qt_widgets: Any) -> None:
     print(message)
 
 
-def _show_information_dialog(qt_widgets: Any, title: str, message: str) -> None:
-    message_box = getattr(qt_widgets, "QMessageBox", None)
-    if message_box is None:
-        return
-    information = getattr(message_box, "information", None)
-    if information is not None:
-        information(None, title, message)
+def _show_information_dialog(
+    qt_widgets: Any,
+    title: str,
+    message: str,
+    *,
+    singleton_key: str | None = None,
+) -> None:
+    from shader_health.ui.settings_widgets import show_maya_information_dialog
+
+    show_maya_information_dialog(
+        qt_widgets,
+        title,
+        message,
+        singleton_key=singleton_key,
+    )
 
 
 def _revalidate_with_current_scope(content: Any, qt_widgets: Any) -> None:
@@ -1683,6 +2327,12 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
 
     issue = _selected_issue(content)
     if issue is None:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            "Make Waive: select an issue in the table first.",
+        )
         return
     try:
         if action == "select_node":
@@ -1730,7 +2380,22 @@ def _waive_selected_issue_from_ui(content: Any, qt_widgets: Any) -> None:
     from shader_health.maya import commands
 
     issue = _selected_issue(content)
+    agent_debug_log(
+        "H5",
+        "ui_launcher._waive_selected_issue_from_ui",
+        "make waive invoked",
+        {
+            "issue_rule_id": str(getattr(issue, "rule_id", "") or "") if issue else "",
+            "issue_is_none": issue is None,
+        },
+    )
     if issue is None:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            "Make Waive: select an issue in the table first.",
+        )
         return
     try:
         result = commands.waive_issue_action(
@@ -1848,7 +2513,7 @@ def _resolution_probe_hint(snapshot: Any, asset_class_id: str) -> str:
     sample = ", ".join(unprobed[:2])
     suffix = f" (+{len(unprobed) - 2} more)" if len(unprobed) > 2 else ""
     return (
-        f" Resolution skipped for {len(unprobed)} texture(s) — format not probed or unreadable:"
+        f" Resolution skipped for {len(unprobed)} texture(s) вЂ” format not probed or unreadable:"
         f" {sample}{suffix}."
     )
 
@@ -2608,7 +3273,7 @@ def _reference_safety_text(content: Any, issue: Any, fix_action: Any) -> str:
         blocked_here = blocked or "target_locked" in block_reasons
         suffix = " Fix blocked in this scene." if blocked_here else ""
         return f"Reference safety: locked node.{suffix}"
-    return "Reference safety: local node — safe fixes may apply when not blocked by risk policy."
+    return "Reference safety: local node вЂ” safe fixes may apply when not blocked by risk policy."
 
 
 def _fix_description_text(issue: Any, fix_action: Any) -> str:
@@ -2908,10 +3573,9 @@ def _reset_panel_state(
 
 
 def _find_child(content: Any, widget_type: Any, object_name: str) -> Any:
-    finder = getattr(content, "findChild", None)
-    if finder is None:
-        return None
-    return finder(widget_type, object_name)
+    from shader_health.ui.settings_widgets import find_child
+
+    return find_child(content, widget_type, object_name)
 
 
 def _set_label_text(content: Any, qt_widgets: Any, object_name: str, text: str) -> None:
@@ -2968,7 +3632,7 @@ def _workspace_control_exists(cmds: Any) -> bool:
 
 def _maya_cmds() -> Any:
     try:
-        from maya import cmds  # type: ignore[import-not-found]
+        from maya import cmds
     except ImportError as exc:
         raise RuntimeError("Maya UI can only be launched inside Autodesk Maya.") from exc
     return cmds

@@ -394,6 +394,18 @@ def rules_validate_command(args: argparse.Namespace) -> int:
     return validate_rule_paths(paths, quiet=bool(args.quiet))
 
 
+def rules_command(args: argparse.Namespace) -> int:
+    if args.rules_command == "validate":
+        return rules_validate_command(args)
+    print("Configuration error: rules subcommand required (validate).", file=sys.stderr)
+    return EXIT_CONFIG_ERROR
+
+
+def rules_validate_command(args: argparse.Namespace) -> int:
+    paths = tuple(_cli_path(path) for path in args.paths) if args.paths else (DEFAULT_RULE_ROOT,)
+    return validate_rule_paths(paths, quiet=bool(args.quiet))
+
+
 def diff_command(args: argparse.Namespace) -> int:
     exit_code = execute_manifest_diff(
         _cli_path(args.old_manifest),
