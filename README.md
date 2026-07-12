@@ -4,7 +4,7 @@ Production material QA framework for Maya pipelines.
 
 Built to prevent render-time material failures by detecting missing textures, outdated maps, wrong color space, broken UDIMs, unsafe paths, displacement risk, and renderer-specific shader issues before assets reach publish or the render farm.
 
-**Status:** **v0.4.0 shipped** (2026-07-08) — GUI-first Farm tab, Deadline 10 on-prem integration, render-risk depth, studio settings  
+**Status:** **v0.5.0 shipped** (2026-07-12) — studio settings hub, notifications & task trackers, rule authoring, incident-to-rule, auto-update  
 **Primary DCC:** Autodesk Maya  
 **Initial renderer targets:** Common Maya, V-Ray, Arnold  
 **Future renderer targets:** RenderMan, Redshift, USD / MaterialX
@@ -116,6 +116,19 @@ Intentional issue categories:
 
 Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_scene/README.md)
 
+## Current capabilities (v0.5)
+
+- Everything in v0.4, plus:
+- **Settings hub** — Basic / Advanced / Studio Environment / Studio / Connectors / Bug Report tabs; user prefs + studio config schema 2.0 ([ADR 0007](docs/adr/0007-settings-and-connectors-architecture.md)).
+- **Notifications** — Telegram, Discord, Slack connectors with dispatcher routing.
+- **Task trackers** — Ftrack, ShotGrid, Cerebro; **Send to Tracker** from Reports tab.
+- **Bug Report** — studio HTTPS relay client and payload schema.
+- **Check for Updates** — GitHub Releases wizard with safe install and rollback.
+- **Rule authoring** — rule browser, new rule wizard, incident-to-rule draft export; `shader_health rules validate`.
+- Headless **`--studio-config`** for farm/CI studio policy.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.5.0 release notes.
+
 ## Current capabilities (v0.4)
 
 - Everything in v0.3, plus:
@@ -161,7 +174,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.2.0 release notes.
 - Dockable Maya panel with issue table, filters, details, and safe fix queue.
 - Headless validation command and Deadline preflight example.
 
-Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.4 shipped · v0.3 plan in [`docs/V0_3_DEVELOPMENT_PLAN.md`](docs/V0_3_DEVELOPMENT_PLAN.md)
+Roadmap: [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) (§27) · v0.5 shipped · v0.5 plan in [`docs/V0_5_DEVELOPMENT_PLAN.md`](docs/V0_5_DEVELOPMENT_PLAN.md)
 
 ## Install in Maya
 
@@ -232,6 +245,7 @@ The package uses a `src` layout so imports during tests match installed-package 
 - [`docs/SNAPSHOT_SCHEMA.md`](docs/SNAPSHOT_SCHEMA.md) — snapshot contract
 - [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
 - [`docs/integrations/auto_update.md`](docs/integrations/auto_update.md) — Check for Updates wizard, module vs pip paths, restart checklist (v0.5)
+- [`docs/integrations/bug_report_relay.md`](docs/integrations/bug_report_relay.md) — Bug Report relay server contract (v0.5)
 - [`docs/integrations/publish_submit_preflight.md`](docs/integrations/publish_submit_preflight.md) — publish preflight hook
 - [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) — Maya module and `pip` install guide
 - [`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md) — custom rules and profile overrides
