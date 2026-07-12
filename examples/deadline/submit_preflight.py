@@ -38,7 +38,9 @@ __all__ = [
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run Pipeline Inspector before Deadline submission.")
+    parser = argparse.ArgumentParser(
+        description="Run Pipeline Inspector before Deadline submission."
+    )
     parser.add_argument("scene_path", type=Path)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--profile", type=Path, required=True)
