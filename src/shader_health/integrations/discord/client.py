@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from shader_health.integrations.discord.config import DiscordConfig, USER_AGENT
+from shader_health.integrations.discord.config import USER_AGENT, DiscordConfig
 
 HttpTransport = Callable[["HttpRequest", float], "DiscordResponse"]
 

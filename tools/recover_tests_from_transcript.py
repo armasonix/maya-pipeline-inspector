@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -271,8 +270,10 @@ def main() -> int:
         current_tests = count_tests(current_content)
         current_lines = len(current_content.splitlines()) if current_content else 0
 
+        write_count = sum(1 for e in events if e.kind == "write")
+        replace_count = sum(1 for e in events if e.kind == "replace")
         print(f"--- {suffix} ---")
-        print(f"Events: {len(events)} (writes={sum(1 for e in events if e.kind == 'write')}, replaces={sum(1 for e in events if e.kind == 'replace')})")
+        print(f"Events: {len(events)} (writes={write_count}, replaces={replace_count})")
 
         if content is None:
             print(f"Recovery: FAILED ({'; '.join(notes)})")

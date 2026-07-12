@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from shader_health.studio_config import STUDIO_CONFIG_FILENAME, discover_studio_config_path
-from shader_health.user_config import USER_CONFIG_DIRNAME, USER_CONFIG_FILENAME, discover_user_config_path
+from shader_health.user_config import (
+    USER_CONFIG_DIRNAME,
+    USER_CONFIG_FILENAME,
+    discover_user_config_path,
+)
 
 INSTALL_DIRS = ("maya_module", "src")
 UPDATE_BACKUP_DIRNAME = "backups"

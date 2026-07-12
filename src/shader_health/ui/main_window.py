@@ -254,7 +254,6 @@ class IssueDetailsActionCallbacks:
     on_copy_path: Optional[Callable[[], None]] = None
     on_reveal_file: Optional[Callable[[], None]] = None
     on_create_rule_draft: Optional[Callable[[], None]] = None
-    on_create_rule_draft: Optional[Callable[[], None]] = None
 
 
 def build_main_widget(

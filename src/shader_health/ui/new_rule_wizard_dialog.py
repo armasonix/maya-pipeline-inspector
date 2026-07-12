@@ -8,10 +8,10 @@ from typing import Any
 
 from shader_health.core.rule_schema import SEVERITIES
 from shader_health.core.rule_wizard import (
+    OPTIONAL_RULE_DRAFT_FIELDS,
     IncidentRuleExportContext,
     IssueRuleDraftPrefill,
     NewRuleDraftInput,
-    OPTIONAL_RULE_DRAFT_FIELDS,
     RuleDraftValidationResult,
     RuleTemplateSpec,
     build_rule_draft,

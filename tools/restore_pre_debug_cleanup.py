@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -125,7 +124,9 @@ def extract_events_from_line(
     return events
 
 
-def reconstruct(events: list[Event], *, base_content: str | None = None) -> tuple[str | None, list[str]]:
+def reconstruct(
+    events: list[Event], *, base_content: str | None = None
+) -> tuple[str | None, list[str]]:
     if not events:
         return None, ["no events"]
     ordered = sorted(events, key=lambda e: (e.line_no, e.idx))
@@ -189,7 +190,9 @@ def find_cutoff_line(transcript_files: list[Path]) -> int:
     return 10**9
 
 
-def collect_events(transcript_root: Path, repo_root: Path, cutoff_line: int) -> dict[Path, list[Event]]:
+def collect_events(
+    transcript_root: Path, repo_root: Path, cutoff_line: int
+) -> dict[Path, list[Event]]:
     by_path: dict[Path, list[Event]] = {}
     idx = 0
     files = sorted(transcript_root.rglob("*.jsonl"), key=lambda p: (p.stat().st_mtime, str(p)))
@@ -245,7 +248,9 @@ def main() -> int:
         if rel_path.parts[0] in {".pytest_cache", ".mypy_cache", ".ruff_cache", "__pycache__"}:
             skipped += 1
             continue
-        content, notes = reconstruct(by_path[rel_path], base_content=git_head_content(repo_root, rel_path))
+        content, notes = reconstruct(
+            by_path[rel_path], base_content=git_head_content(repo_root, rel_path)
+        )
         if content is None:
             report.append(f"SKIP {rel_path}: no content")
             continue

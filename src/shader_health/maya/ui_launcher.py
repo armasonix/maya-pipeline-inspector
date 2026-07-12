@@ -6,6 +6,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional
 
+from shader_health._agent_debug_log import agent_debug_log
+from shader_health.maya.panel_session import (
+    load_runtime_configs_from_session,
+    remember_studio_config_path,
+    remember_user_config_path,
+)
 from shader_health.studio_config import (
     STUDIO_CONFIG_FILENAME,
     StudioConfig,
@@ -14,7 +20,6 @@ from shader_health.studio_config import (
     save_studio_config,
 )
 from shader_health.ui import main_window
-from shader_health._agent_debug_log import agent_debug_log
 from shader_health.ui.bug_report_section import read_bug_report_from_view
 from shader_health.ui.farm_tab import (
     FARM_STATUS_LABEL_OBJECT_NAME,
@@ -73,11 +78,6 @@ from shader_health.user_config import (
     load_user_config,
     merge_runtime_config,
     save_user_config,
-)
-from shader_health.maya.panel_session import (
-    load_runtime_configs_from_session,
-    remember_studio_config_path,
-    remember_user_config_path,
 )
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
@@ -321,8 +321,8 @@ def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None
 
 def _maya_main_window_widget(qt_widgets: Any) -> Any | None:
     try:
-        from maya import OpenMayaUI as omui  # type: ignore[import-not-found]
         import shiboken2  # type: ignore[import-not-found]
+        from maya import OpenMayaUI as omui  # type: ignore[import-not-found]
 
         main_window_ptr = omui.MQtUtil.mainWindow()
         if main_window_ptr is None:
@@ -695,124 +695,6 @@ def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
     )
 
 
-def _session_rule_overrides_for_content(content: Any) -> dict[str, Any]:
-    overrides = getattr(content, SESSION_RULE_OVERRIDES_ATTR, None)
-    if isinstance(overrides, dict):
-        return overrides
-    return {}
-
-
-def _set_session_rule_overrides(content: Any, overrides: dict[str, Any]) -> None:
-    setattr(content, SESSION_RULE_OVERRIDES_ATTR, dict(overrides))
-
-
-def _open_rule_editor_from_ui(content: Any, qt_widgets: Any) -> None:
-    from shader_health.core.rule_browser import load_packaged_rules_catalog
-    from shader_health.runtime_preferences import user_extra_rule_paths
-    from shader_health.ui.rule_editor_dialog import show_rule_editor_dialog
-
-    if content is None:
-        return
-
-    user_config = _user_config_for_content(content)
-    catalog = load_packaged_rules_catalog(
-        extra_rule_paths=user_extra_rule_paths(user_config),
-    )
-    show_rule_editor_dialog(
-        qt_widgets,
-        parent=content,
-        catalog=catalog,
-        session_overrides=_session_rule_overrides_for_content(content),
-        on_save=lambda overrides: _set_session_rule_overrides(content, overrides),
-    )
-
-
-_open_rule_browser_from_ui = _open_rule_editor_from_ui
-
-
-def _studio_extra_rules_folder_for_content(content: Any) -> str:
-    studio_config = _studio_config_for_content(content)
-    return studio_config.pipeline.extra_rules_folder.strip()
-
-
-def _open_new_rule_wizard_from_ui(content: Any, qt_widgets: Any) -> None:
-    from shader_health.core.rule_wizard import known_rule_ids_for_authoring
-    from shader_health.runtime_preferences import user_extra_rule_paths
-    from shader_health.ui.new_rule_wizard_dialog import show_new_rule_wizard_dialog
-
-    if content is None:
-        return
-
-    user_config = _user_config_for_content(content)
-    extra_paths = user_extra_rule_paths(user_config)
-    studio_folder = _studio_extra_rules_folder_for_content(content)
-    default_output = ""
-    if studio_folder:
-        default_output = str(Path(studio_folder) / "custom_rule.json")
-    elif extra_paths:
-        default_output = str(extra_paths[0] / "custom_rule.json")
-    show_new_rule_wizard_dialog(
-        qt_widgets,
-        parent=content,
-        known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
-        default_output_path=default_output,
-        studio_extra_rules_folder=studio_folder,
-    )
-
-
-def _create_rule_draft_from_issue_ui(content: Any, qt_widgets: Any) -> None:
-    from shader_health.core.rule_wizard import (
-        IncidentRuleExportContext,
-        build_draft_prefill_from_issue,
-        incident_rule_sidecar_path,
-        known_rule_ids_for_authoring,
-    )
-    from shader_health.runtime_preferences import user_extra_rule_paths
-    from shader_health.ui.new_rule_wizard_dialog import show_new_rule_wizard_dialog
-
-    if content is None:
-        return
-
-    issue = _selected_issue(content)
-    if issue is None:
-        _set_label_text(
-            content,
-            qt_widgets,
-            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
-            "Select a failed issue before creating a rule draft.",
-        )
-        return
-
-    rules = getattr(content, "_shader_health_rules", ())
-    rules_by_id = {rule.id: rule for rule in rules}
-    source_rule_id = str(getattr(issue, "rule_id", "") or "")
-    source_rule = rules_by_id.get(source_rule_id)
-    prefill = build_draft_prefill_from_issue(issue, source_rule)
-
-    user_config = _user_config_for_content(content)
-    extra_paths = user_extra_rule_paths(user_config)
-    studio_folder = _studio_extra_rules_folder_for_content(content)
-    default_output = ""
-    if studio_folder:
-        default_output = str(
-            incident_rule_sidecar_path(Path(studio_folder), prefill.draft_input.rule_id)
-        )
-    elif extra_paths:
-        default_output = str(extra_paths[0] / f"{prefill.draft_input.rule_id}.json")
-    show_new_rule_wizard_dialog(
-        qt_widgets,
-        parent=content,
-        known_rule_ids=known_rule_ids_for_authoring(extra_rule_paths=extra_paths),
-        default_output_path=default_output,
-        prefill=prefill,
-        studio_extra_rules_folder=studio_folder,
-        export_context=IncidentRuleExportContext(
-            source_rule_id=source_rule_id,
-            scene_path=str(getattr(content, "_shader_health_scene_path", "") or ""),
-        ),
-    )
-
-
 def _deadline_config_for_content(content: Any) -> Any:
     return resolve_deadline_config(_studio_config_for_content(content))
 
@@ -892,8 +774,8 @@ def _apply_theme_preview_from_settings_ui(content: Any, qt_widgets: Any) -> None
     """Apply UI theme immediately without the settings refresh reentrancy guard."""
 
     from shader_health.ui.basic_settings_section import (
-        SETTINGS_THEME_COMBO_OBJECT_NAME,
         _THEME_OPTIONS,
+        SETTINGS_THEME_COMBO_OBJECT_NAME,
         _combo_data,
     )
     from shader_health.ui.settings_panel import SETTINGS_VIEW_OBJECT_NAME

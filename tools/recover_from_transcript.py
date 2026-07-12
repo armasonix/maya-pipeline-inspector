@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 TARGET_SUFFIXES = [
     "cerebro/adapter.py",
     "test_cerebro_adapter.py",
@@ -205,7 +204,9 @@ def write_recovered(output_root: Path, suffix: str, content: str) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Recover file contents from Cursor transcript JSONL.")
+    parser = argparse.ArgumentParser(
+        description="Recover file contents from Cursor transcript JSONL.",
+    )
     parser.add_argument("--transcript", required=True, help="Path to transcript JSONL.")
     parser.add_argument("--output-root", required=True, help="Recovery output root directory.")
     args = parser.parse_args()

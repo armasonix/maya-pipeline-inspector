@@ -21,8 +21,6 @@ from shader_health.ui.update_progress_dialog import (
     update_progress_step_description_object_name,
 )
 from shader_health.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
-from shader_health.integrations.update.github_releases import GitHubReleasesResponse, HttpRequest
-from shader_health.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
 
 
 class FakeWidget:

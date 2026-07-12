@@ -2,6 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests.unit.test_advanced_settings_section import (
+    FakeFormLayout,
+    FakeHBoxLayout,
+    FakeLabel,
+    FakeLineEdit,
+    FakePushButton,
+    FakeSignal,
+    FakeVBoxLayout,
+    FakeWidget,
+)
+from tests.unit.test_telegram_connector_section import _find
+
 from shader_health.core.rule_browser import load_packaged_rules_catalog
 from shader_health.core.rule_schema import RuleResult
 from shader_health.core.rule_wizard import (
@@ -16,17 +28,6 @@ from shader_health.ui.new_rule_wizard_dialog import (
     NEW_RULE_WIZARD_STATUS_LABEL_OBJECT_NAME,
     NewRuleWizardDialog,
 )
-from tests.unit.test_advanced_settings_section import (
-    FakeFormLayout,
-    FakeHBoxLayout,
-    FakeLabel,
-    FakeLineEdit,
-    FakePushButton,
-    FakeSignal,
-    FakeVBoxLayout,
-    FakeWidget,
-)
-from tests.unit.test_telegram_connector_section import _find
 
 
 class VisibleFakeLabel(FakeLabel):

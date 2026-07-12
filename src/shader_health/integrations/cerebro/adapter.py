@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from shader_health.integrations.cerebro.config import (
-    CerebroConfig,
     DEFAULT_TOKEN_CLIENT_TYPE,
+    CerebroConfig,
     cerebro_auth_hint,
     is_cerebro_rpc_url,
     is_placeholder_db_host,

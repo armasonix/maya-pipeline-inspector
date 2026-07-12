@@ -5,6 +5,13 @@ from collections.abc import Callable
 from typing import Any
 
 from shader_health._agent_debug_log import agent_debug_log
+from shader_health.integrations.ftrack.client import FtrackClient
+from shader_health.integrations.ftrack.config import FtrackConfig
+from shader_health.integrations.ftrack.helpers import (
+    ftrack_username_hint,
+    is_auth_exception,
+    sample_project_names,
+)
 from shader_health.integrations.ftrack.queries import (
     list_projects_expression,
     project_by_full_name_expression,
@@ -12,13 +19,6 @@ from shader_health.integrations.ftrack.queries import (
     task_by_name_expression,
     task_by_project_id_expression,
     task_by_project_name_expression,
-)
-from shader_health.integrations.ftrack.client import FtrackClient
-from shader_health.integrations.ftrack.config import FtrackConfig
-from shader_health.integrations.ftrack.helpers import (
-    ftrack_username_hint,
-    is_auth_exception,
-    sample_project_names,
 )
 from shader_health.integrations.trackers.base import TrackerPublishResult
 from shader_health.integrations.trackers.publish import (

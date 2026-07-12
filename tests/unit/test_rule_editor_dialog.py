@@ -1,13 +1,5 @@
 from __future__ import annotations
 
-from shader_health.core.rule_browser import load_packaged_rules_catalog
-from shader_health.ui.rule_editor_dialog import (
-    RULE_BROWSER_LIST_OBJECT_NAME,
-    RULE_EDITOR_DIALOG_OBJECT_NAME,
-    RULE_EDITOR_SAVE_BUTTON_OBJECT_NAME,
-    RULE_EDITOR_STATUS_LABEL_OBJECT_NAME,
-    RuleEditorDialog,
-)
 from tests.unit.test_advanced_settings_section import (
     FakeFormLayout,
     FakeHBoxLayout,
@@ -19,6 +11,15 @@ from tests.unit.test_advanced_settings_section import (
     FakeWidget,
 )
 from tests.unit.test_telegram_connector_section import _find
+
+from shader_health.core.rule_browser import load_packaged_rules_catalog
+from shader_health.ui.rule_editor_dialog import (
+    RULE_BROWSER_LIST_OBJECT_NAME,
+    RULE_EDITOR_DIALOG_OBJECT_NAME,
+    RULE_EDITOR_SAVE_BUTTON_OBJECT_NAME,
+    RULE_EDITOR_STATUS_LABEL_OBJECT_NAME,
+    RuleEditorDialog,
+)
 
 
 class FakeListWidgetItem(FakeWidget):

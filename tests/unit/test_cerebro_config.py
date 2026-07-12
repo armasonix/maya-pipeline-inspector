@@ -47,8 +47,8 @@ def test_is_cerebro_rpc_url_detects_server_api_url():
 
 def test_default_database_port_factory_uses_http_adapter_for_rpc_url():
     from shader_health.integrations.cerebro.adapter import (
-        PycerebroHttpDatabaseAdapter,
         PyCerebroDatabaseAdapter,
+        PycerebroHttpDatabaseAdapter,
         default_database_port_factory,
     )
 

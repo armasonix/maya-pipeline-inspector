@@ -116,9 +116,6 @@ class SettingsActionCallbacks:
     on_open_rule_editor: Optional[Callable[[], None]] = None
     on_open_new_rule_wizard: Optional[Callable[[], None]] = None
     on_open_rule_browser: Optional[Callable[[], None]] = None
-    on_open_rule_editor: Optional[Callable[[], None]] = None
-    on_open_new_rule_wizard: Optional[Callable[[], None]] = None
-    on_open_rule_browser: Optional[Callable[[], None]] = None
 
 
 def build_settings_view(

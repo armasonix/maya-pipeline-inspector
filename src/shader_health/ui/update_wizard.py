@@ -13,9 +13,9 @@ from shader_health.integrations.update.download import (
     select_update_asset,
 )
 from shader_health.integrations.update.github_releases import (
+    GitHubRelease,
     GitHubReleasesClient,
     GitHubReleasesClientError,
-    GitHubRelease,
     HttpTransport,
     UpdateCheckResult,
 )

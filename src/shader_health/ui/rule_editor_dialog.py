@@ -1,8 +1,6 @@
 """Rule browser and safe field editor dialog for packaged rules."""
 from __future__ import annotations
 
-from shader_health.core.rule_pack_validation import RuleValidationFailure
-
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
