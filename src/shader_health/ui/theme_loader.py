@@ -5,7 +5,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from shader_health._agent_debug_log import agent_debug_log
 from shader_health.ui.main_window import PANEL_OBJECT_NAME
 from shader_health.user_config import SUPPORTED_USER_THEMES
 
@@ -163,21 +162,6 @@ def apply_panel_theme(content: Any, theme: str, *, dock: Any | None = None) -> s
     normalized = normalize_theme(theme)
     stylesheet = load_theme_stylesheet(normalized)
     root = dock if dock is not None else _theme_root_widget(content)
-    previous_theme = getattr(content, "_shader_health_theme", "")
-    agent_debug_log(
-        "H4",
-        "theme_loader.apply_panel_theme",
-        "apply theme",
-        {
-            "theme": normalized,
-            "previous_theme": previous_theme,
-            "stylesheet_chars": len(stylesheet),
-            "root_object_name": _widget_object_name(root),
-            "content_object_name": _widget_object_name(content),
-            "dock_passed": dock is not None,
-        },
-        run_id="post-fix",
-    )
     _apply_stylesheet(root, stylesheet)
     _apply_palette_theme(root, normalized)
     if root is not content:

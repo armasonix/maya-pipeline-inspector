@@ -7,19 +7,19 @@
         "pHelixShape1"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:44d14ccd7cf3f932cdbc2ba984cb9ea727b92162531b8fd2744195ef468c3c82",
+      "graph_fingerprint": "sha256:08d192e52e599c2c66e89c8c7e24be33abe6c36eee1e51988fc426f8ec1bc5be",
       "graph_node_count": 6,
       "issues": {
         "critical": 2,
         "error": 3,
-        "failed": 7,
+        "failed": 6,
         "rule_ids": [
           "common.texture.colorspace.color_managed",
-          "common.texture.optimized.exists",
           "common.texture.path.local_drive",
-          "common.texture.path.project_root"
+          "common.texture.path.project_root",
+          "common.texture.version.latest"
         ],
-        "warning": 2
+        "warning": 1
       },
       "name": "VRayMtl1",
       "node_id": "node:VRayMtl1",
@@ -34,16 +34,16 @@
           "extension": ".exr",
           "is_udim": false,
           "latest_version": "002",
-          "max_dimension": 8192,
+          "max_dimension": 512,
           "missing_udim_tiles": [],
           "node_id": "node:demo_albedo_v001_2",
           "node_name": "demo_albedo_v001_2",
-          "raw_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
-          "resolved_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+          "raw_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
           "semantic": "base_color",
           "type_name": "file",
           "udim_tiles": [],
-          "version": "002"
+          "version": "001"
         },
         {
           "attr": "fileTextureName",
@@ -70,22 +70,21 @@
         "mesh_displacement_risk_GEOShape"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:3a8974cc4c3046619ffda7d5f025341f813fd20e25e7161f57e21091f7944e3c",
+      "graph_fingerprint": "sha256:68d89180845ad4ef510c366373c14615e8492f747023d9babbe7fa54f5df0fba",
       "graph_node_count": 7,
       "issues": {
         "critical": 2,
         "error": 2,
-        "failed": 10,
+        "failed": 8,
         "rule_ids": [
           "common.displacement.subdivision.enabled",
-          "common.texture.optimized.exists",
           "common.texture.path.local_drive",
           "common.texture.path.project_root",
           "vray.material.displacement_force.warning",
           "vray.material.displacement_linked.info",
           "vray.material.displacement_review.warning"
         ],
-        "warning": 5
+        "warning": 3
       },
       "name": "demo_displacement_risk_MTL",
       "node_id": "node:demo_displacement_risk_MTL",
@@ -119,15 +118,17 @@
         "mesh_local_path_GEOShape"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:7b56e99e1f8a5209fb6e67b4e4aab81135fef101b1893184a0c0605939fa59ee",
+      "graph_fingerprint": "sha256:2698c2338c2e632711717e2445f1738bc19f2ff24b822baa3535f0866ae39bf3",
       "graph_node_count": 4,
       "issues": {
-        "critical": 1,
-        "error": 1,
-        "failed": 2,
+        "critical": 2,
+        "error": 2,
+        "failed": 4,
         "rule_ids": [
           "common.texture.colorspace.color_managed",
-          "common.texture.missing"
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root",
+          "common.texture.path.user_location"
         ],
         "warning": 0
       },
@@ -140,16 +141,16 @@
       "textures": [
         {
           "attr": "fileTextureName",
-          "exists": false,
+          "exists": true,
           "extension": ".exr",
           "is_udim": false,
           "latest_version": null,
-          "max_dimension": null,
+          "max_dimension": 512,
           "missing_udim_tiles": [],
           "node_id": "node:local_only_texture_1",
           "node_name": "local_only_texture_1",
-          "raw_path": "${ASSET_ROOT}/textures/local_only_texture.exr",
-          "resolved_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/local_only_texture.exr",
+          "raw_path": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "resolved_path": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
           "semantic": "base_color",
           "type_name": "file",
           "udim_tiles": [],
@@ -163,15 +164,17 @@
         "mesh_missing_texture_GEOShape"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:6e8a54f8e87784a78742e2e81aac556ad4b52921febbaabcdfa5c1cd80bae3a2",
+      "graph_fingerprint": "sha256:9ecedf91b9bf0622672cb8266429d305db2f5e1f06937c18a2e748a40e5044b3",
       "graph_node_count": 4,
       "issues": {
-        "critical": 1,
-        "error": 1,
-        "failed": 2,
+        "critical": 2,
+        "error": 2,
+        "failed": 4,
         "rule_ids": [
           "common.texture.colorspace.color_managed",
-          "common.texture.missing"
+          "common.texture.missing",
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root"
         ],
         "warning": 0
       },
@@ -192,8 +195,8 @@
           "missing_udim_tiles": [],
           "node_id": "node:demo_albedo_v001_1",
           "node_name": "demo_albedo_v001_1",
-          "raw_path": "${ASSET_ROOT}/textures/DOES_NOT_EXIST_missing_albedo.exr",
-          "resolved_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "raw_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
           "semantic": "base_color",
           "type_name": "file",
           "udim_tiles": [],
@@ -207,20 +210,18 @@
         "mesh_missing_udim_GEOShape"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:feb28c1866384abeddd983d5f497bd11f8ca53869e8751b1f83ecd883908d589",
+      "graph_fingerprint": "sha256:acd0464424f2137f54570ab99e2a97d3c5975178fea16f8785103c3606daf129",
       "graph_node_count": 4,
       "issues": {
         "critical": 2,
         "error": 1,
-        "failed": 5,
+        "failed": 3,
         "rule_ids": [
-          "common.texture.optimized.exists",
-          "common.texture.optimized.udim_tx.missing",
           "common.texture.path.local_drive",
           "common.texture.path.project_root",
           "common.texture.udim.missing_tiles"
         ],
-        "warning": 2
+        "warning": 0
       },
       "name": "demo_missing_udim_MTL",
       "node_id": "node:demo_missing_udim_MTL",
@@ -282,19 +283,18 @@
         "pPlatonicShape1"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:4df3d663cd348d8d0a9e560b1f6e65eee3bcdea24f7c65d47b41dfa159dc16a3",
+      "graph_fingerprint": "sha256:b7b72bfafc01ca0a88959752b806cebe7103c77cfb35ce2ab46e7ef9be10854d",
       "graph_node_count": 4,
       "issues": {
         "critical": 1,
         "error": 2,
-        "failed": 4,
+        "failed": 3,
         "rule_ids": [
           "common.texture.colorspace.color_managed",
-          "common.texture.optimized.exists",
           "common.texture.path.local_drive",
           "common.texture.path.project_root"
         ],
-        "warning": 1
+        "warning": 0
       },
       "name": "demo_overResolution_texture_MTL",
       "node_id": "node:demo_overResolution_texture_MTL",
@@ -328,18 +328,17 @@
         "mesh_wrong_colorspace_GEOShape"
       ],
       "graph_depth": 2,
-      "graph_fingerprint": "sha256:5de1ae2937168cd3be11d68f85c5731c4b85bb30dd831678a68f6281d384609f",
+      "graph_fingerprint": "sha256:29392fed6b9ffc420d1247871d9407a6f6e2558bda5a1f34abc694afdeae6d4f",
       "graph_node_count": 4,
       "issues": {
         "critical": 1,
         "error": 1,
-        "failed": 3,
+        "failed": 2,
         "rule_ids": [
-          "common.texture.optimized.exists",
           "common.texture.path.local_drive",
           "common.texture.path.project_root"
         ],
-        "warning": 1
+        "warning": 0
       },
       "name": "demo_wrong_colorspace_MTL",
       "node_id": "node:demo_wrong_colorspace_MTL",
@@ -417,7 +416,7 @@
   ],
   "renderer": "vray",
   "scan_scope": "scene",
-  "scanned_at_utc": "2026-07-11T09:58:38Z",
+  "scanned_at_utc": "2026-07-12T13:06:53Z",
   "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
   "snapshot_schema_version": "1.0"
 }

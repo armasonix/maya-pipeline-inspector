@@ -6,33 +6,6 @@
     "deadline": true,
     "publish": true
   },
-  "fix_audit": {
-    "applied_at_utc": "2026-07-11T09:58:38Z",
-    "applied_count": 0,
-    "blocked_count": 1,
-    "failed_count": 0,
-    "profile_id": "publish_strict",
-    "records": [
-      {
-        "after_value": "${ASSET_ROOT}/textures/local_only_texture.exr",
-        "applied": false,
-        "before_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
-        "block_reasons": [
-          "invalid_normalize_path"
-        ],
-        "blocked": true,
-        "fix_id": "common.texture.path.project_root:node:local_only_texture_1:normalize_path",
-        "fix_type": "normalize_path",
-        "message": "Fix blocked.",
-        "rule_id": "common.texture.path.project_root",
-        "target_attr": "fileTextureName",
-        "target_node": "local_only_texture_1"
-      }
-    ],
-    "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
-    "total": 1,
-    "undo_chunk_name": "Shader Health Apply Fixes"
-  },
   "health_score": 0,
   "report_schema_version": "1.0",
   "results": [
@@ -90,9 +63,9 @@
       "block_publish": false,
       "current_value": 4.0,
       "evidence": {
-        "max": 6.0
+        "max": 8.0
       },
-      "expected_value": 6.0,
+      "expected_value": 8.0,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_displacement_risk_MTL",
@@ -111,7 +84,7 @@
     {
       "auto_fix_available": false,
       "block_deadline": false,
-      "block_publish": true,
+      "block_publish": false,
       "current_value": true,
       "evidence": {},
       "expected_value": false,
@@ -158,9 +131,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "VRayMtl1",
@@ -182,9 +155,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_displacement_risk_MTL",
@@ -206,9 +179,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_local_path_MTL",
@@ -230,9 +203,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
@@ -254,9 +227,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_udim_MTL",
@@ -278,9 +251,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_orphan_unused_MTL",
@@ -302,9 +275,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_overResolution_texture_MTL",
@@ -326,9 +299,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_wrong_colorspace_MTL",
@@ -350,9 +323,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -374,9 +347,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 3.0
+        "max": 4.0
       },
-      "expected_value": 3,
+      "expected_value": 4,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -398,9 +371,9 @@
       "block_publish": false,
       "current_value": 4.75,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "VRayMtl1",
@@ -422,9 +395,9 @@
       "block_publish": false,
       "current_value": 6.0,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_displacement_risk_MTL",
@@ -446,9 +419,9 @@
       "block_publish": false,
       "current_value": 3.5,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_local_path_MTL",
@@ -470,9 +443,9 @@
       "block_publish": false,
       "current_value": 3.5,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
@@ -494,9 +467,9 @@
       "block_publish": false,
       "current_value": 3.5,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_udim_MTL",
@@ -518,9 +491,9 @@
       "block_publish": false,
       "current_value": 1.25,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_orphan_unused_MTL",
@@ -542,9 +515,9 @@
       "block_publish": false,
       "current_value": 3.5,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_overResolution_texture_MTL",
@@ -566,9 +539,9 @@
       "block_publish": false,
       "current_value": 3.5,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_wrong_colorspace_MTL",
@@ -590,9 +563,9 @@
       "block_publish": false,
       "current_value": 1.0,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -614,9 +587,9 @@
       "block_publish": false,
       "current_value": 1.0,
       "evidence": {
-        "max": 16.0
+        "max": 18.0
       },
-      "expected_value": 16,
+      "expected_value": 18,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -638,9 +611,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "VRayMtl1",
@@ -662,9 +635,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_displacement_risk_MTL",
@@ -686,9 +659,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_local_path_MTL",
@@ -710,9 +683,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
@@ -734,9 +707,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_udim_MTL",
@@ -758,9 +731,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_orphan_unused_MTL",
@@ -782,9 +755,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_overResolution_texture_MTL",
@@ -806,9 +779,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_wrong_colorspace_MTL",
@@ -830,9 +803,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -854,9 +827,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 8.0
+        "max": 10.0
       },
-      "expected_value": 8,
+      "expected_value": 10,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -878,9 +851,9 @@
       "block_publish": false,
       "current_value": 6,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "VRayMtl1",
@@ -902,9 +875,9 @@
       "block_publish": false,
       "current_value": 7,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_displacement_risk_MTL",
@@ -926,9 +899,9 @@
       "block_publish": false,
       "current_value": 4,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_local_path_MTL",
@@ -950,9 +923,9 @@
       "block_publish": false,
       "current_value": 4,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
@@ -974,9 +947,9 @@
       "block_publish": false,
       "current_value": 4,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_udim_MTL",
@@ -998,9 +971,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_orphan_unused_MTL",
@@ -1022,9 +995,9 @@
       "block_publish": false,
       "current_value": 4,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_overResolution_texture_MTL",
@@ -1046,9 +1019,9 @@
       "block_publish": false,
       "current_value": 4,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_wrong_colorspace_MTL",
@@ -1070,9 +1043,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -1094,9 +1067,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 48.0
+        "max": 64.0
       },
-      "expected_value": 48,
+      "expected_value": 64,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -1118,9 +1091,9 @@
       "block_publish": false,
       "current_value": 2,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "VRayMtl1",
@@ -1142,9 +1115,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_displacement_risk_MTL",
@@ -1166,9 +1139,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_local_path_MTL",
@@ -1190,9 +1163,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
@@ -1214,9 +1187,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_missing_udim_MTL",
@@ -1238,9 +1211,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_orphan_unused_MTL",
@@ -1262,9 +1235,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_overResolution_texture_MTL",
@@ -1286,9 +1259,9 @@
       "block_publish": false,
       "current_value": 1,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "demo_wrong_colorspace_MTL",
@@ -1310,9 +1283,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -1334,9 +1307,9 @@
       "block_publish": false,
       "current_value": 0,
       "evidence": {
-        "max": 16.0
+        "max": 24.0
       },
-      "expected_value": 16,
+      "expected_value": 24,
       "fix_id": null,
       "graph_trace": [],
       "material": "standardSurface1",
@@ -2156,17 +2129,9 @@
       "auto_fix_available": false,
       "block_deadline": false,
       "block_publish": false,
-      "current_value": 2,
+      "current_value": 1,
       "evidence": {
         "duplicate_groups": [
-          {
-            "count": 2,
-            "node_ids": [
-              "node:demo_albedo_v001_2",
-              "node:demo_albedo_v002_2"
-            ],
-            "path": "d:/workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr"
-          },
           {
             "count": 2,
             "node_ids": [
@@ -2209,7 +2174,7 @@
       "auto_fix_available": false,
       "block_deadline": false,
       "block_publish": true,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
       "evidence": {},
       "expected_value": "existing file",
       "fix_id": null,
@@ -2231,7 +2196,7 @@
       "auto_fix_available": false,
       "block_deadline": false,
       "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
       "evidence": {},
       "expected_value": "existing file",
       "fix_id": null,
@@ -2384,8 +2349,8 @@
     {
       "auto_fix_available": false,
       "block_deadline": false,
-      "block_publish": true,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/local_only_texture.exr",
+      "block_publish": false,
+      "current_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
       "evidence": {},
       "expected_value": "existing file",
       "fix_id": null,
@@ -2397,7 +2362,7 @@
       "plug": "fileTextureName",
       "rule_id": "common.texture.missing",
       "severity": "critical",
-      "status": "failed",
+      "status": "passed",
       "target_id": "node:local_only_texture_1",
       "target_kind": "file_dependency",
       "title": "Texture file must exist",
@@ -2406,154 +2371,24 @@
     {
       "auto_fix_available": false,
       "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
+      "block_publish": false,
+      "current_value": null,
+      "evidence": {
+        "reason": "rule_disabled"
+      },
+      "expected_value": null,
       "fix_id": null,
       "graph_trace": [],
-      "material": "VRayMtl1",
+      "material": null,
       "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_albedo_v001_2",
+      "node": null,
       "owner": "pipeline_td",
-      "plug": "optimized_exists",
+      "plug": null,
       "rule_id": "common.texture.optimized.exists",
       "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_albedo_v001_2",
-      "target_kind": "file_dependency",
-      "title": "Optimized texture derivative should exist for raster sources",
-      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
-    },
-    {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
-      "fix_id": null,
-      "graph_trace": [],
-      "material": "demo_overResolution_texture_MTL",
-      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_albedo_v002_2",
-      "owner": "pipeline_td",
-      "plug": "optimized_exists",
-      "rule_id": "common.texture.optimized.exists",
-      "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_albedo_v002_2",
-      "target_kind": "file_dependency",
-      "title": "Optimized texture derivative should exist for raster sources",
-      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
-    },
-    {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
-      "fix_id": null,
-      "graph_trace": [],
-      "material": "demo_displacement_risk_MTL",
-      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_displacement_v001_1",
-      "owner": "pipeline_td",
-      "plug": "optimized_exists",
-      "rule_id": "common.texture.optimized.exists",
-      "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_displacement_v001_1",
-      "target_kind": "file_dependency",
-      "title": "Optimized texture derivative should exist for raster sources",
-      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
-    },
-    {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
-      "fix_id": null,
-      "graph_trace": [],
-      "material": "demo_displacement_risk_MTL",
-      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_normal_v001_1",
-      "owner": "pipeline_td",
-      "plug": "optimized_exists",
-      "rule_id": "common.texture.optimized.exists",
-      "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_normal_v001_1",
-      "target_kind": "file_dependency",
-      "title": "Optimized texture derivative should exist for raster sources",
-      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
-    },
-    {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
-      "fix_id": null,
-      "graph_trace": [],
-      "material": "demo_wrong_colorspace_MTL",
-      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_roughness_v001_1",
-      "owner": "pipeline_td",
-      "plug": "optimized_exists",
-      "rule_id": "common.texture.optimized.exists",
-      "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_roughness_v001_1",
-      "target_kind": "file_dependency",
-      "title": "Optimized texture derivative should exist for raster sources",
-      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
-    },
-    {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
-      "fix_id": null,
-      "graph_trace": [],
-      "material": "demo_missing_udim_MTL",
-      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_roughness_v001_2",
-      "owner": "pipeline_td",
-      "plug": "optimized_exists",
-      "rule_id": "common.texture.optimized.exists",
-      "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_roughness_v001_2",
-      "target_kind": "file_dependency",
-      "title": "Optimized texture derivative should exist for raster sources",
-      "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
-    },
-    {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": true,
-      "current_value": false,
-      "evidence": {},
-      "expected_value": true,
-      "fix_id": null,
-      "graph_trace": [],
-      "material": "VRayMtl1",
-      "message": "Optimized texture derivative (.tx) is missing for a raster source texture.",
-      "node": "node:demo_roughness_v001_3",
-      "owner": "pipeline_td",
-      "plug": "optimized_exists",
-      "rule_id": "common.texture.optimized.exists",
-      "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_roughness_v001_3",
-      "target_kind": "file_dependency",
+      "status": "skipped",
+      "target_id": "",
+      "target_kind": "",
       "title": "Optimized texture derivative should exist for raster sources",
       "why": "Missing .tx derivatives increase render startup cost, texture IO, and farm memory pressure. Raster sources should have a matching optimized derivative when policy tracks them."
     },
@@ -2563,7 +2398,7 @@
       "block_publish": false,
       "current_value": null,
       "evidence": {
-        "reason": "no_matching_targets"
+        "reason": "rule_disabled"
       },
       "expected_value": null,
       "fix_id": null,
@@ -2584,35 +2419,39 @@
     {
       "auto_fix_available": false,
       "block_deadline": false,
-      "block_publish": true,
-      "current_value": 2,
+      "block_publish": false,
+      "current_value": null,
       "evidence": {
-        "max": 0.0
+        "reason": "rule_disabled"
       },
-      "expected_value": 0,
+      "expected_value": null,
       "fix_id": null,
       "graph_trace": [],
-      "material": "demo_missing_udim_MTL",
+      "material": null,
       "message": "One or more UDIM .tx tiles are missing for a raster UDIM source texture.",
-      "node": "node:demo_roughness_v001_2",
+      "node": null,
       "owner": "pipeline_td",
-      "plug": "optimized_missing_udim_tiles",
+      "plug": null,
       "rule_id": "common.texture.optimized.udim_tx.missing",
       "severity": "warning",
-      "status": "failed",
-      "target_id": "node:demo_roughness_v001_2",
-      "target_kind": "file_dependency",
+      "status": "skipped",
+      "target_id": "",
+      "target_kind": "",
       "title": "UDIM optimized texture tiles should exist",
       "why": "Partial UDIM .tx coverage causes farm renders to fall back to heavy source tiles or fail tile lookup. All published UDIM source tiles should have matching .tx tiles."
     },
     {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
-      "evidence": {},
+      "auto_fix_available": true,
+      "block_deadline": true,
+      "block_publish": true,
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+      "evidence": {
+        "violations": [
+          "local_drive"
+        ]
+      },
       "expected_value": "path policy compliant",
-      "fix_id": null,
+      "fix_id": "normalize_path",
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
       "message": "Texture path points to a local drive and may not resolve on the farm.",
@@ -2621,7 +2460,7 @@
       "plug": "fileTextureName",
       "rule_id": "common.texture.path.local_drive",
       "severity": "critical",
-      "status": "passed",
+      "status": "failed",
       "target_id": "node:demo_albedo_v001_1",
       "target_kind": "file_dependency",
       "title": "Texture path must not use a local drive root",
@@ -2631,7 +2470,7 @@
       "auto_fix_available": true,
       "block_deadline": true,
       "block_publish": true,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
       "evidence": {
         "violations": [
           "local_drive"
@@ -2810,13 +2649,17 @@
       "why": "Local drive paths are machine-specific. Render farm workers and other artists may not be able to resolve them, causing missing textures or inconsistent renders."
     },
     {
-      "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/local_only_texture.exr",
-      "evidence": {},
+      "auto_fix_available": true,
+      "block_deadline": true,
+      "block_publish": true,
+      "current_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+      "evidence": {
+        "violations": [
+          "local_drive"
+        ]
+      },
       "expected_value": "path policy compliant",
-      "fix_id": null,
+      "fix_id": "normalize_path",
       "graph_trace": [],
       "material": "demo_local_path_MTL",
       "message": "Texture path points to a local drive and may not resolve on the farm.",
@@ -2825,20 +2668,24 @@
       "plug": "fileTextureName",
       "rule_id": "common.texture.path.local_drive",
       "severity": "critical",
-      "status": "passed",
+      "status": "failed",
       "target_id": "node:local_only_texture_1",
       "target_kind": "file_dependency",
       "title": "Texture path must not use a local drive root",
       "why": "Local drive paths are machine-specific. Render farm workers and other artists may not be able to resolve them, causing missing textures or inconsistent renders."
     },
     {
-      "auto_fix_available": false,
+      "auto_fix_available": true,
       "block_deadline": false,
-      "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
-      "evidence": {},
+      "block_publish": true,
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+      "evidence": {
+        "violations": [
+          "outside_project_root"
+        ]
+      },
       "expected_value": "path policy compliant",
-      "fix_id": null,
+      "fix_id": "normalize_path",
       "graph_trace": [],
       "material": "demo_missing_texture_MTL",
       "message": "Texture path is outside the approved project texture roots.",
@@ -2847,7 +2694,7 @@
       "plug": "fileTextureName",
       "rule_id": "common.texture.path.project_root",
       "severity": "error",
-      "status": "passed",
+      "status": "failed",
       "target_id": "node:demo_albedo_v001_1",
       "target_kind": "file_dependency",
       "title": "Texture path must use an approved project root",
@@ -2857,7 +2704,7 @@
       "auto_fix_available": true,
       "block_deadline": false,
       "block_publish": true,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
       "evidence": {
         "violations": [
           "outside_project_root"
@@ -3036,13 +2883,17 @@
       "why": "Project-rooted paths keep scene dependencies portable between artists, publish tools, and render farm workers. Paths outside approved roots are harder to audit and reproduce."
     },
     {
-      "auto_fix_available": false,
+      "auto_fix_available": true,
       "block_deadline": false,
-      "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/local_only_texture.exr",
-      "evidence": {},
+      "block_publish": true,
+      "current_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+      "evidence": {
+        "violations": [
+          "outside_project_root"
+        ]
+      },
       "expected_value": "path policy compliant",
-      "fix_id": null,
+      "fix_id": "normalize_path",
       "graph_trace": [],
       "material": "demo_local_path_MTL",
       "message": "Texture path is outside the approved project texture roots.",
@@ -3051,7 +2902,7 @@
       "plug": "fileTextureName",
       "rule_id": "common.texture.path.project_root",
       "severity": "error",
-      "status": "passed",
+      "status": "failed",
       "target_id": "node:local_only_texture_1",
       "target_kind": "file_dependency",
       "title": "Texture path must use an approved project root",
@@ -3061,7 +2912,7 @@
       "auto_fix_available": false,
       "block_deadline": false,
       "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
       "evidence": {},
       "expected_value": "path policy compliant",
       "fix_id": null,
@@ -3083,7 +2934,7 @@
       "auto_fix_available": false,
       "block_deadline": false,
       "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
       "evidence": {},
       "expected_value": "path policy compliant",
       "fix_id": null,
@@ -3235,10 +3086,14 @@
     },
     {
       "auto_fix_available": false,
-      "block_deadline": false,
-      "block_publish": false,
-      "current_value": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures/local_only_texture.exr",
-      "evidence": {},
+      "block_deadline": true,
+      "block_publish": true,
+      "current_value": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+      "evidence": {
+        "violations": [
+          "user_home"
+        ]
+      },
       "expected_value": "path policy compliant",
       "fix_id": null,
       "graph_trace": [],
@@ -3249,7 +3104,7 @@
       "plug": "fileTextureName",
       "rule_id": "common.texture.path.user_location",
       "severity": "critical",
-      "status": "passed",
+      "status": "failed",
       "target_id": "node:local_only_texture_1",
       "target_kind": "file_dependency",
       "title": "Texture path must not use a user-local folder",
@@ -3376,15 +3231,15 @@
       "why": "Keeping texture dependencies on the latest approved version helps keep publishes consistent with current lookdev handoff."
     },
     {
-      "auto_fix_available": false,
+      "auto_fix_available": true,
       "block_deadline": false,
       "block_publish": false,
-      "current_value": "002",
+      "current_value": "001",
       "evidence": {
         "latest_version": "002"
       },
       "expected_value": "002",
-      "fix_id": null,
+      "fix_id": "relink_path",
       "graph_trace": [],
       "material": "VRayMtl1",
       "message": "Texture dependency is not using the latest detected version.",
@@ -3393,7 +3248,7 @@
       "plug": "version",
       "rule_id": "common.texture.version.latest",
       "severity": "warning",
-      "status": "passed",
+      "status": "failed",
       "target_id": "node:demo_albedo_v001_2",
       "target_kind": "file_dependency",
       "title": "Texture version should be latest available",
@@ -3594,7 +3449,7 @@
     {
       "auto_fix_available": false,
       "block_deadline": false,
-      "block_publish": true,
+      "block_publish": false,
       "current_value": true,
       "evidence": {},
       "expected_value": false,
@@ -3758,7 +3613,7 @@
     {
       "auto_fix_available": false,
       "block_deadline": false,
-      "block_publish": true,
+      "block_publish": false,
       "current_value": true,
       "evidence": {},
       "expected_value": false,
@@ -4240,38 +4095,38 @@
     }
   ],
   "score": {
-    "auto_fixable": 14,
+    "auto_fixable": 19,
     "block_deadline": true,
     "block_publish": true,
     "capped_by_blocking_critical": true,
-    "critical": 10,
-    "error": 11,
+    "critical": 12,
+    "error": 13,
     "info": 1,
-    "raw_score": -302,
+    "raw_score": -351,
     "score": 0,
-    "warning": 14
+    "warning": 7
   },
   "snapshot": {
     "maya_version": "2024",
     "renderer": "vray",
     "scan_scope": "scene",
-    "scanned_at_utc": "2026-07-11T09:58:38Z",
+    "scanned_at_utc": "2026-07-12T13:06:53Z",
     "scene_path": "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/shader_health_demo_broken.ma",
     "schema_version": "1.0"
   },
   "snapshot_schema_version": "1.0",
   "status": "failed",
   "summary": {
-    "auto_fixable": 14,
+    "auto_fixable": 19,
     "block_deadline": true,
     "block_publish": true,
     "critical": 34,
     "error": 16,
-    "failed": 36,
+    "failed": 33,
     "info": 10,
-    "passed": 125,
-    "skipped": 8,
-    "total": 174,
-    "warning": 114
+    "passed": 120,
+    "skipped": 10,
+    "total": 168,
+    "warning": 108
   }
 }

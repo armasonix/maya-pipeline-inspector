@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from shader_health._agent_debug_log import agent_debug_log
 from shader_health.integrations.ftrack.client import FtrackClient
 from shader_health.integrations.ftrack.config import FtrackConfig
 from shader_health.integrations.ftrack.helpers import (
@@ -69,29 +68,8 @@ def _resolve_project_id(client: FtrackClient, project_name: str) -> tuple[str | 
         if exception_message:
             last_exception = exception_message
         if status_code != 200:
-            agent_debug_log(
-                "F1",
-                "ftrack.publish._resolve_project_id",
-                "project query failed",
-                {
-                    "expression": expression,
-                    "status_code": status_code,
-                    "exception_snippet": exception_message[:240],
-                },
-                run_id="post-fix",
-            )
             continue
         if exception_message:
-            agent_debug_log(
-                "F1",
-                "ftrack.publish._resolve_project_id",
-                "project query batch exception",
-                {
-                    "expression": expression,
-                    "exception_snippet": exception_message[:240],
-                },
-                run_id="post-fix",
-            )
             if is_auth_exception(exception_message):
                 return None, status_code, exception_message
             continue
@@ -117,27 +95,8 @@ def _resolve_project_id(client: FtrackClient, project_name: str) -> tuple[str | 
         for field in ("name", "full_name"):
             value = str(row.get(field, "") or "").strip()
             if value.casefold() == target:
-                agent_debug_log(
-                    "F1",
-                    "ftrack.publish._resolve_project_id",
-                    "matched project from listing",
-                    {"matched_field": field, "project_id": project_id},
-                    run_id="post-fix",
-                )
                 return project_id, status_code, ""
 
-    sample_names = _sample_project_names(rows)
-    agent_debug_log(
-        "F1",
-        "ftrack.publish._resolve_project_id",
-        "project not found",
-        {
-            "requested_project": project_name,
-            "sample_project_names": sample_names,
-            "project_count": len(rows),
-        },
-        run_id="post-fix",
-    )
     return None, last_status, last_exception
 
 
@@ -147,40 +106,9 @@ def _query_tasks(
 ) -> tuple[list[dict[str, Any]], int]:
     rows, status_code, exception_message = client.query_rows(expression)
     if status_code != 200:
-        agent_debug_log(
-            "F1",
-            "ftrack.publish._query_tasks",
-            "task query failed",
-            {
-                "expression": expression,
-                "status_code": status_code,
-                "exception_snippet": exception_message[:240],
-            },
-            run_id="post-fix",
-        )
         return [], status_code
     if exception_message:
-        agent_debug_log(
-            "F1",
-            "ftrack.publish._query_tasks",
-            "task query batch exception",
-            {
-                "expression": expression,
-                "exception_snippet": exception_message[:240],
-            },
-            run_id="post-fix",
-        )
         return [], status_code
-    agent_debug_log(
-        "F1",
-        "ftrack.publish._query_tasks",
-        "task query complete",
-        {
-            "expression": expression,
-            "match_count": len(rows),
-        },
-        run_id="post-fix",
-    )
     return rows, status_code
 
 
@@ -230,14 +158,6 @@ def resolve_task_id(
             if task_id:
                 return task_id
 
-    if project_id is None and project_status == 200:
-        agent_debug_log(
-            "F1",
-            "ftrack.publish.resolve_task_id",
-            "project not found",
-            {"project": config.project},
-            run_id="post-fix",
-        )
     return None
 
 
@@ -355,19 +275,7 @@ def publish_validation_summary(
         task_id=task_id,
         status_name=config.task_status_name,
     )
-    if status_result.exception_message:
-        agent_debug_log(
-            "F4",
-            "ftrack.publish.publish_validation_summary",
-            "task status update skipped",
-            {
-                "task_id": task_id,
-                "status_name": config.task_status_name,
-                "exception_snippet": status_result.exception_message[:240],
-            },
-            run_id="post-fix",
-        )
-    else:
+    if not status_result.exception_message:
         metadata["task_status"] = config.task_status_name
 
     return TrackerPublishResult(

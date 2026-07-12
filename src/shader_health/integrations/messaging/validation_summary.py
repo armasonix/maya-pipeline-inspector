@@ -218,25 +218,6 @@ def render_validation_summary_text(
             lines.extend(["", f"📎 Report: {data.report_path}"])
 
     text = "\n".join(lines)
-    # region agent log
-    try:
-        from shader_health._agent_debug_log import agent_debug_log
-
-        agent_debug_log(
-            "M2",
-            "validation_summary.render_validation_summary_text",
-            "rendered summary",
-            data={
-                "platform": platform,
-                "headline": data.headline if platform == "chat" else FTRACK_HEADLINE,
-                "line_count": len(lines),
-                "preview": text[:320],
-            },
-            run_id="post-fix-v2",
-        )
-    except ImportError:
-        pass
-    # endregion
     return text
 
 

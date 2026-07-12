@@ -50,45 +50,10 @@ class PycerebroHttpDatabaseAdapter:
         auth_errors: list[str] = []
         last_exc: BaseException | None = None
 
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "C5",
-                "cerebro.adapter.http_connect",
-                "auth attempt",
-                data={
-                    "transport": "http_jsonrpc",
-                    "rpc_url_host": self._config.db_host,
-                    "api_user_len": len(api_user),
-                    "token_len": len(api_password),
-                    "api_user_looks_like_api_account": _looks_like_api_user_email(api_user),
-                },
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=Warning)
             try:
                 self._database.connect_from_long_token(api_password, rpc_url)
-                # region agent log
-                try:
-                    from shader_health._agent_debug_log import agent_debug_log
-
-                    agent_debug_log(
-                        "C5",
-                        "cerebro.adapter.http_connect",
-                        "auth ok",
-                        data={"auth_method": "sessionStartLToken"},
-                        run_id="post-fix",
-                    )
-                except ImportError:
-                    pass
-                # endregion
                 return True
             except Exception as exc:
                 last_exc = exc
@@ -96,39 +61,11 @@ class PycerebroHttpDatabaseAdapter:
 
             try:
                 self._database.connect(api_user, api_password, rpc_url)
-                # region agent log
-                try:
-                    from shader_health._agent_debug_log import agent_debug_log
-
-                    agent_debug_log(
-                        "C5",
-                        "cerebro.adapter.http_connect",
-                        "auth ok",
-                        data={"auth_method": "sessionDirectStart"},
-                        run_id="post-fix",
-                    )
-                except ImportError:
-                    pass
-                # endregion
                 return True
             except Exception as exc:
                 last_exc = exc
                 auth_errors.append(f"sessionDirectStart: {exc}")
 
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "C5",
-                "cerebro.adapter.http_connect",
-                "auth failed",
-                data={"errors": auth_errors},
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
         raise RuntimeError(_format_auth_failure_message(api_user, auth_errors)) from last_exc
 
     def task_by_url(self, task_url: str) -> int | None:
@@ -182,8 +119,7 @@ class PycerebroHttpDatabaseAdapter:
         dbtypes = _import_pycerebro_dbtypes(
             service_tools_path=self._config.service_tools_path,
         )
-        task_id, _debug = _resolve_task_in_project(database, dbtypes, project, task_name)
-        _log_resolve_task_in_project(project, task_name, task_id, _debug)
+        task_id, _ = _resolve_task_in_project(database, dbtypes, project, task_name)
         return task_id
 
     def list_visible_project_names(self) -> tuple[str, ...]:
@@ -213,7 +149,6 @@ class PyCerebroDatabaseAdapter:
         api_password = normalize_cerebro_field(password or self._config.api_password)
         server_url = self._config.normalized_server_url
         db_host = self._config.db_host
-        endpoint_source = self._config.server_endpoint_source
         auth_errors: list[str] = []
 
         if is_placeholder_db_host(db_host):
@@ -224,44 +159,8 @@ class PyCerebroDatabaseAdapter:
                 "db5.cerebrohq.com:45432."
             )
 
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "C4",
-                "cerebro.adapter.connect",
-                "auth attempt",
-                data={
-                    "db_host": db_host,
-                    "db_port": self._config.resolved_db_port,
-                    "endpoint_source": endpoint_source,
-                    "api_user_len": len(api_user),
-                    "token_len": len(api_password),
-                    "api_user_looks_like_api_account": _looks_like_api_user_email(api_user),
-                },
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
-
         try:
             self._database.connect(api_user, api_password)
-            # region agent log
-            try:
-                from shader_health._agent_debug_log import agent_debug_log
-
-                agent_debug_log(
-                    "C4",
-                    "cerebro.adapter.connect",
-                    "auth ok",
-                    data={"auth_method": "webStart"},
-                    run_id="post-fix",
-                )
-            except ImportError:
-                pass
-            # endregion
             return True
         except Exception as exc:
             auth_errors.append(f"webStart: {exc}")
@@ -270,41 +169,9 @@ class PyCerebroDatabaseAdapter:
 
         try:
             self._database.connect_from_long_token(api_password, DEFAULT_TOKEN_CLIENT_TYPE)
-            # region agent log
-            try:
-                from shader_health._agent_debug_log import agent_debug_log
-
-                agent_debug_log(
-                    "C4",
-                    "cerebro.adapter.connect",
-                    "auth ok",
-                    data={"auth_method": "webStartBySID"},
-                    run_id="post-fix",
-                )
-            except ImportError:
-                pass
-            # endregion
             return True
         except Exception as token_exc:
             auth_errors.append(f"webStartBySID: {token_exc}")
-            # region agent log
-            try:
-                from shader_health._agent_debug_log import agent_debug_log
-
-                agent_debug_log(
-                    "C4",
-                    "cerebro.adapter.connect",
-                    "auth failed",
-                    data={
-                        "endpoint_source": endpoint_source,
-                        "api_user_looks_like_api_account": _looks_like_api_user_email(api_user),
-                        "errors": auth_errors,
-                    },
-                    run_id="post-fix",
-                )
-            except ImportError:
-                pass
-            # endregion
             raise RuntimeError(_format_auth_failure_message(api_user, auth_errors)) from token_exc
 
     def task_by_url(self, task_url: str) -> int | None:
@@ -349,8 +216,7 @@ class PyCerebroDatabaseAdapter:
         dbtypes = _import_py_cerebro_dbtypes(
             service_tools_path=self._config.service_tools_path,
         )
-        task_id, _debug = _resolve_task_in_project(database, dbtypes, project, task_name)
-        _log_resolve_task_in_project(project, task_name, task_id, _debug)
+        task_id, _ = _resolve_task_in_project(database, dbtypes, project, task_name)
         return task_id
 
     def list_visible_project_names(self) -> tuple[str, ...]:
@@ -597,33 +463,6 @@ def _find_descendant_task_by_name(
             if depth + 1 < max_depth:
                 queue.append((child_id, depth + 1))
     return None, matched_urls
-
-
-def _log_resolve_task_in_project(
-    project: str,
-    task_name: str,
-    task_id: int | None,
-    debug: dict[str, Any],
-) -> None:
-    # region agent log
-    try:
-        from shader_health._agent_debug_log import agent_debug_log
-
-        agent_debug_log(
-            "C7",
-            "cerebro.adapter.resolve_task_in_project",
-            "resolved task" if task_id is not None else "resolve failed",
-            data={
-                **debug,
-                "project": project,
-                "task_name": task_name,
-                "task_id": task_id,
-            },
-            run_id="post-fix",
-        )
-    except ImportError:
-        pass
-    # endregion
 
 
 def _resolve_task_in_project(
@@ -939,24 +778,6 @@ def probe_py_cerebro_import(
 
     module, error = _try_import_py_cerebro_database_module()
     if module is not None:
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "C3",
-                "cerebro.adapter.probe_py_cerebro_import",
-                "import ok",
-                data={
-                    "service_tools_path": configured_path,
-                    "sys_paths": list(sys_paths),
-                    "python": sys.version,
-                },
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
         return module, ""
 
     if _is_psycopg2_error(error):
@@ -1017,26 +838,6 @@ def _import_py_cerebro_database(
     module, error = probe_py_cerebro_import(service_tools_path=service_tools_path)
     if module is not None:
         return module
-    # region agent log
-    try:
-        from shader_health._agent_debug_log import agent_debug_log
-
-        agent_debug_log(
-            "C3",
-            "cerebro.adapter.probe_py_cerebro_import",
-            "import failed",
-            data={
-                "service_tools_path": service_tools_path.strip(),
-                "sys_paths": list(cerebro_core_sys_paths(service_tools_path)),
-                "bundled_psycopg2_skipped": bundled_psycopg2_sys_path(service_tools_path),
-                "error": error,
-                "python": sys.version,
-            },
-            run_id="post-fix",
-        )
-    except ImportError:
-        pass
-    # endregion
     if raise_on_missing:
         raise PyCerebroNotInstalledError(error or PY_CEREBRO_MISSING_MESSAGE)
     return None

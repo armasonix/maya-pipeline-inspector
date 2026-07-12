@@ -353,18 +353,6 @@ def update_pipeline_settings_view(
     pipeline: PipelineSettings,
 ) -> None:
     """Refresh pipeline policy controls from studio config."""
-    # region agent log
-    from shader_health._agent_debug_log import agent_debug_log
-
-    agent_debug_log(
-        "H4",
-        "studio_policy_section.update_pipeline_settings_view",
-        "refresh pipeline fields",
-        {
-            "default_approved_by_len": len(pipeline.waiver_defaults.default_approved_by or ""),
-        },
-    )
-    # endregion
 
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
     if toggle is not None:

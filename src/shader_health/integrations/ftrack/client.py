@@ -9,7 +9,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from shader_health._agent_debug_log import agent_debug_log
 from shader_health.integrations.ftrack.config import FtrackConfig
 from shader_health.integrations.ftrack.queries import (
     ping_user_expression,
@@ -104,20 +103,6 @@ class FtrackClient:
 
         response = self.query_response(expression)
         rows, exception_message = _extract_query_rows(response.json_data)
-        agent_debug_log(
-            "F2",
-            "ftrack.client.query_rows",
-            "batch query result",
-            {
-                "expression": expression[:120],
-                "status_code": response.status_code,
-                "row_count": len(rows),
-                "has_exception": bool(exception_message),
-                "exception_snippet": exception_message[:240],
-                "api_user_has_space": " " in self._config.api_user,
-            },
-            run_id="post-fix",
-        )
         return rows, response.status_code, exception_message
 
     def query(self, expression: str) -> list[dict[str, Any]]:
@@ -173,22 +158,6 @@ class FtrackClient:
 
         response = self.request(operations)
         entity, exception_message = _extract_batch_operation(response.json_data)
-        agent_debug_log(
-            "F3",
-            "ftrack.client.create_task_note",
-            "batch create result",
-            {
-                "status_code": response.status_code,
-                "task_id": task_id,
-                "author_id": author_id,
-                "recipient_count": len(recipient_ids),
-                "has_entity": entity is not None,
-                "has_exception": bool(exception_message),
-                "exception_snippet": exception_message[:240],
-                "body_snippet": response.body[:400],
-            },
-            run_id="post-fix",
-        )
         if response.status_code != 200:
             return FtrackCreateResult(
                 entity=None,
@@ -223,17 +192,6 @@ class FtrackClient:
         )
         if status_code != 200 or exception_message or not rows:
             message = exception_message or f"status_not_found: {normalized_status}"
-            agent_debug_log(
-                "F4",
-                "ftrack.client.update_task_status",
-                "status lookup failed",
-                {
-                    "status_name": normalized_status,
-                    "status_code": status_code,
-                    "exception_snippet": message[:240],
-                },
-                run_id="post-fix",
-            )
             return FtrackCreateResult(
                 entity=None,
                 status_code=status_code,
@@ -259,20 +217,6 @@ class FtrackClient:
             ]
         )
         entity, exception_message = _extract_batch_operation(response.json_data)
-        agent_debug_log(
-            "F4",
-            "ftrack.client.update_task_status",
-            "task status update result",
-            {
-                "task_id": task_id,
-                "status_name": normalized_status,
-                "status_id": status_id,
-                "status_code": response.status_code,
-                "has_exception": bool(exception_message),
-                "exception_snippet": exception_message[:240],
-            },
-            run_id="post-fix",
-        )
         if response.status_code != 200:
             return FtrackCreateResult(
                 entity=None,
@@ -308,13 +252,6 @@ class FtrackClient:
                 continue
             author_id = str(rows[0].get("id", "") or "").strip()
             if author_id:
-                agent_debug_log(
-                    "F3",
-                    "ftrack.client._resolve_note_author_id",
-                    "resolved note author",
-                    {"username": username, "author_id": author_id},
-                    run_id="post-fix",
-                )
                 return author_id
         return ""
 
@@ -323,17 +260,6 @@ class FtrackClient:
             task_assignees_expression(task_id)
         )
         if status_code != 200 or exception_message:
-            agent_debug_log(
-                "F3",
-                "ftrack.client._task_assignee_resource_ids",
-                "assignee lookup failed",
-                {
-                    "task_id": task_id,
-                    "status_code": status_code,
-                    "exception_snippet": exception_message[:240],
-                },
-                run_id="post-fix",
-            )
             return ()
 
         assignee_ids: list[str] = []
@@ -344,13 +270,6 @@ class FtrackClient:
                 continue
             seen.add(resource_id)
             assignee_ids.append(resource_id)
-        agent_debug_log(
-            "F3",
-            "ftrack.client._task_assignee_resource_ids",
-            "resolved task assignees",
-            {"task_id": task_id, "assignee_count": len(assignee_ids)},
-            run_id="post-fix",
-        )
         return tuple(assignee_ids)
 
     def _current_user_id(self) -> str:

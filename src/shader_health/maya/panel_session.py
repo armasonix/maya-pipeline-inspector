@@ -5,7 +5,6 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from shader_health._agent_debug_log import agent_debug_log
 from shader_health.studio_config import (
     StudioConfig,
     discover_studio_config_path,
@@ -96,18 +95,6 @@ def load_runtime_configs_from_session() -> tuple[StudioConfig, UserPreferences]:
     session = load_panel_session()
     studio_config = _load_studio_config(session.studio_config_path)
     user_config = _load_user_config(session.user_config_path)
-    agent_debug_log(
-        "H5",
-        "panel_session.load_runtime_configs_from_session",
-        "loaded runtime configs",
-        {
-            "studio_config_path": session.studio_config_path,
-            "user_config_path": session.user_config_path or str(user_config.config_path),
-            "theme": user_config.theme,
-            "mayapy_path_len": len(user_config.mayapy_path or ""),
-        },
-        run_id="post-fix",
-    )
     return studio_config, user_config
 
 

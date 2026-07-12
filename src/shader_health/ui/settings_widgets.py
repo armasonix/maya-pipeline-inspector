@@ -137,18 +137,6 @@ def try_reactivate_modal_dialog(singleton_key: str) -> bool:
     if existing is None or not _dialog_is_visible(existing):
         return False
 
-    # region agent log
-    from shader_health._agent_debug_log import agent_debug_log
-
-    agent_debug_log(
-        "B",
-        "settings_widgets.try_reactivate_modal_dialog",
-        "reactivate",
-        data={"singleton_key": singleton_key},
-        run_id="post-fix-v2",
-    )
-    # endregion
-
     _raise_dialog(existing)
     return True
 
@@ -178,36 +166,9 @@ def show_modal_dialog(
 ) -> None:
     """Show a modal dialog as a Maya-safe top-level window."""
 
-    # region agent log
-    from shader_health._agent_debug_log import agent_debug_log
-
-    agent_debug_log(
-        "A",
-        "settings_widgets.show_modal_dialog",
-        "enter",
-        data={
-            "parent_is_none": parent is None,
-            "singleton_key": singleton_key,
-            "reactivate_existing": bool(
-                singleton_key
-                and singleton_key in _ACTIVE_MAYA_MODAL_DIALOGS
-                and _dialog_is_visible(_ACTIVE_MAYA_MODAL_DIALOGS[singleton_key])
-            ),
-        },
-        run_id="post-fix-v2",
-    )
-    # endregion
-
     if singleton_key:
         existing = _ACTIVE_MAYA_MODAL_DIALOGS.get(singleton_key)
         if existing is not None and _dialog_is_visible(existing):
-            agent_debug_log(
-                "B",
-                "settings_widgets.show_modal_dialog",
-                "reactivate",
-                data={"singleton_key": singleton_key},
-                run_id="post-fix-v2",
-            )
             _raise_dialog(existing)
             return
 
@@ -424,20 +385,6 @@ def set_line_edit_text(
     text: str,
 ) -> None:
     field = find_child(view, qt_widgets.QLineEdit, object_name)
-    # region agent log
-    from shader_health._agent_debug_log import agent_debug_log
-
-    agent_debug_log(
-        "H2",
-        "settings_widgets.set_line_edit_text",
-        "apply line edit value",
-        {
-            "object_name": object_name,
-            "found": field is not None,
-            "text_len": len(str(text or "")),
-        },
-    )
-    # endregion
     if field is None:
         return
     set_text = getattr(field, "setText", None)
@@ -454,16 +401,6 @@ def line_edit_text(
 ) -> str:
     field = find_child(view, qt_widgets.QLineEdit, object_name)
     if field is None:
-        # region agent log
-        from shader_health._agent_debug_log import agent_debug_log
-
-        agent_debug_log(
-            "H6",
-            "settings_widgets.line_edit_text",
-            "line edit widget not found",
-            {"object_name": object_name, "used_fallback": fallback is not None},
-        )
-        # endregion
         return "" if fallback is None else fallback
     text_fn = getattr(field, "text", None)
     if text_fn is None:

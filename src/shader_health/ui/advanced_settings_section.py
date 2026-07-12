@@ -189,19 +189,6 @@ def update_advanced_settings_view(
     user_config: UserPreferences,
 ) -> None:
     """Refresh Advanced tab controls from user preferences."""
-    # region agent log
-    from shader_health._agent_debug_log import agent_debug_log
-
-    agent_debug_log(
-        "H3",
-        "advanced_settings_section.update_advanced_settings_view",
-        "refresh advanced tab",
-        {
-            "mayapy_path_len": len(user_config.mayapy_path or ""),
-            "max_issues": user_config.max_issues_displayed,
-        },
-    )
-    # endregion
 
     extra_paths_input = find_child(
         view,

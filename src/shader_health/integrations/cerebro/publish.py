@@ -91,65 +91,13 @@ def resolve_task_id(
     for task_url in task_url_candidates(config, payload):
         task_id = client.resolve_task_id(task_url)
         if task_id is not None:
-            # region agent log
-            try:
-                from shader_health._agent_debug_log import agent_debug_log
-
-                agent_debug_log(
-                    "C1",
-                    "cerebro.publish.resolve_task_id",
-                    "resolved task",
-                    data={"task_url": task_url, "task_id": task_id, "method": "url"},
-                    run_id="post-fix",
-                )
-            except ImportError:
-                pass
-            # endregion
             return task_id
 
     for lookup_name in scene_task_lookup_candidates(payload.scene_name):
         task_id = client.resolve_task_in_project(config.project, lookup_name)
         if task_id is not None:
-            # region agent log
-            try:
-                from shader_health._agent_debug_log import agent_debug_log
-
-                agent_debug_log(
-                    "C7",
-                    "cerebro.publish.resolve_task_id",
-                    "resolved task",
-                    data={
-                        "project": config.project,
-                        "task_name": lookup_name,
-                        "task_id": task_id,
-                        "method": "project_children",
-                    },
-                    run_id="post-fix",
-                )
-            except ImportError:
-                pass
-            # endregion
             return task_id
 
-    # region agent log
-    try:
-        from shader_health._agent_debug_log import agent_debug_log
-
-        agent_debug_log(
-            "C1",
-            "cerebro.publish.resolve_task_id",
-            "task not found",
-            data={
-                "project": config.project,
-                "scene_name": payload.scene_name,
-                "task_urls": list(task_url_candidates(config, payload)),
-                "last_error": client.last_error,
-            },
-            run_id="post-fix",
-        )
-    except ImportError:
-        pass
-    # endregion
     return None
 
 
@@ -216,26 +164,6 @@ def publish_validation_summary(
                 f"'{config.normalized_api_user}' visibility on project "
                 f"'{config.project}'."
             )
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "C6",
-                "cerebro.publish.publish_validation_summary",
-                "task not found",
-                data={
-                    "project": config.project,
-                    "scene_name": payload.scene_name,
-                    "task_urls": list(task_url_candidates(config, payload)),
-                    "root_tasks": list(root_tasks[:12]),
-                    "visible_projects": list(visible_projects[:12]),
-                },
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
         if client.last_error and client.last_error not in ("", "task_not_found"):
             return TrackerPublishResult(
                 published=False,
@@ -273,28 +201,6 @@ def publish_validation_summary(
 
     if config.set_pause_status_on_publish and config.pause_status_name.strip():
         status_set = client.set_task_status(task_id, config.pause_status_name)
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "C8",
-                "cerebro.publish.publish_validation_summary",
-                "pause status",
-                data={
-                    "task_id": task_id,
-                    "status_name": config.pause_status_name,
-                    "status_set": status_set,
-                    "last_error": client.last_error,
-                    "available_statuses": list(
-                        getattr(client._database, "_last_status_available", ())[:12]
-                    ),
-                },
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
         if status_set:
             metadata["task_status"] = config.pause_status_name
         elif client.last_error:

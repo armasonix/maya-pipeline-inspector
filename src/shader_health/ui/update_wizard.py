@@ -510,21 +510,6 @@ def show_update_wizard(
 ) -> UpdateWizardSession:
     """Build the update dialog, run the wizard flow, and wait for the artist to close it."""
 
-    # region agent log
-    try:
-        from shader_health._agent_debug_log import agent_debug_log
-
-        agent_debug_log(
-            "U1",
-            "update_wizard.show_update_wizard",
-            "enter",
-            data={"installed_version": installed_version},
-            run_id="post-fix",
-        )
-    except ImportError:
-        pass
-    # endregion
-
     controller = UpdateProgressDialog.build(
         qt_widgets,
         installed_version=installed_version,
@@ -537,20 +522,6 @@ def show_update_wizard(
     result_container: dict[str, UpdateWizardResult] = {}
 
     def _run_flow() -> None:
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            agent_debug_log(
-                "U2",
-                "update_wizard.show_update_wizard",
-                "run flow",
-                data={"installed_version": installed_version},
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
         try:
             result_container["result"] = run_update_wizard_flow(
                 controller,
@@ -572,42 +543,7 @@ def show_update_wizard(
                 installed_version=installed_version,
                 error_message=message,
             )
-            # region agent log
-            try:
-                from shader_health._agent_debug_log import agent_debug_log
-
-                agent_debug_log(
-                    "U3",
-                    "update_wizard.show_update_wizard",
-                    "flow exception",
-                    data={"error": str(exc)},
-                    run_id="post-fix",
-                )
-            except ImportError:
-                pass
-            # endregion
             return
-
-        # region agent log
-        try:
-            from shader_health._agent_debug_log import agent_debug_log
-
-            result = result_container["result"]
-            agent_debug_log(
-                "U3",
-                "update_wizard.show_update_wizard",
-                "flow complete",
-                data={
-                    "completed": result.completed,
-                    "up_to_date": result.up_to_date,
-                    "skipped_reason": result.skipped_reason,
-                    "error_message": result.error_message,
-                },
-                run_id="post-fix",
-            )
-        except ImportError:
-            pass
-        # endregion
 
     from shader_health.ui.settings_widgets import show_modal_dialog
     from shader_health.ui.update_progress_dialog import UPDATE_PROGRESS_DIALOG_OBJECT_NAME
