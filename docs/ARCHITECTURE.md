@@ -2,7 +2,7 @@
 
 Maya Shader Health Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
 
-Status: **v0.4.0 shipped** (2026-07-08). GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Maya dockable panel is the primary surface; CLI, reports, and Deadline hooks are integration surfaces on the same validation pipeline.
+Status: **v0.5.0 shipped** (2026-07-12). GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); settings and connectors hub ([ADR 0007](adr/0007-settings-and-connectors-architecture.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Maya dockable panel is the primary surface; CLI, reports, Deadline, notifications, and tracker hooks are integration surfaces on the same validation pipeline.
 
 ## Goals
 

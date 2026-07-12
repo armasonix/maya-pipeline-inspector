@@ -1,6 +1,6 @@
 # Maya Shader Health Inspector — Production Development Plan
 
-> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4.0 shipped** (2026-07-08). **v0.5+** — see [§27](#27-roadmap). v0.3 detail: [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md) (Milestones 15–21, Issues #071–#090).
+> **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4.0 shipped** (2026-07-08). **v0.5.0 shipped** (2026-07-12). **v1.0+** — see [§27](#27-roadmap). v0.5 detail: [V0_5_DEVELOPMENT_PLAN.md](V0_5_DEVELOPMENT_PLAN.md) (Milestones 29–41, Issues #113–#164).
 
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
 **Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
@@ -2172,14 +2172,21 @@ Delivered (Milestones 23–28, Issues #119–#145):
 - Settings screen, `shader_health_studio.json`, Require `.tx` toggle, Thinkbox Deadline connector (Remote Farm ↔ Farm tab).
 - UX Wave 1: Issue Details polish, double-click select node, splitter persistence.
 
-### v0.5 — Rule Authoring and Incident Workflow
+### v0.5 — Studio Settings Hub, Connectors, Rule Authoring & Incident Workflow (shipped)
 
-**Theme:** Studio customization without hand-editing JSON for every change.
+**Tag:** `v0.5.0` (2026-07-12)
 
-- Rule Authoring UI.
-- Incident-to-Rule workflow.
-- Rule pack validation tooling.
-- Studio override documentation improvements beyond v0.2 guides.
+Delivered (Milestones 29–41, Issues #113–#164):
+
+- ADR 0007 — two-layer config (studio + user), connector registry, secret handling.
+- Studio config schema 2.0; save/load split; headless `--studio-config`.
+- Settings tabs: Basic (themes), Advanced, Studio Environment (path substitution), Studio policy, Connectors, Bug Report.
+- Notifications: Telegram, Discord, Slack + dispatcher service.
+- Task trackers: Ftrack, ShotGrid, Cerebro; Reports **Send to Tracker**.
+- Bug Report relay client, payload schema, and studio relay specification.
+- GitHub Releases auto-update wizard with rollback backup.
+- Rule browser, new rule wizard, incident-to-rule draft export; `shader_health rules validate`.
+- Studio overrides documentation refresh for v0.5 settings and connectors.
 
 ### v1.0 — Production Ready Public Release
 

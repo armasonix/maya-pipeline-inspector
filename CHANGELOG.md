@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-12
+
+**Maya Shader Health Inspector v0.5 — Studio Settings Hub, Connectors, Rule Authoring & Incident Workflow**
+
+Extends v0.4 with a two-layer configuration model (studio + user preferences), connector registry for notifications and task trackers, Bug Report relay, GitHub Releases auto-update, GUI rule authoring, and incident-to-rule workflow.
+
+### Added
+
+#### Settings and configuration architecture (M29)
+
+- [ADR 0007](docs/adr/0007-settings-and-connectors-architecture.md) — settings and connectors architecture (studio vs user layers, connector registry, secret handling).
+- Studio config **schema 2.0** migration for `shader_health_studio.json`.
+- Connector registry with Deadline refactor onto shared integration pattern.
+- Settings tab model expansion; **save/load split** for studio vs user config files.
+- Headless CLI **`--studio-config`** support (studio policy in farm/CI jobs).
+
+#### Settings UI — Basic, Advanced, Studio (M30–M31)
+
+- **Basic** tab: default profile, asset class, UI theme (**Classic / Dark**), persistent user preferences.
+- **Advanced** tab: extra rule paths, pipeline defaults, rule editor entry point.
+- **Studio Environment** tab: path substitution constants wired into `normalize_path` and snapshot enrichment.
+- **Studio** tab policy fields expansion (Require `.tx`, connector toggles, updates policy).
+- Settings dirty-state banner and status messaging; header layout tests and tooltips.
+- [`docs/STUDIO_OVERRIDES.md`](docs/STUDIO_OVERRIDES.md) — v0.5 settings, connectors, and deploy guidance.
+
+#### Notifications (M33)
+
+- **Telegram**, **Discord**, and **Slack** connector packages with Settings UI.
+- Notification dispatcher service with channel routing and event hooks.
+- Integration guides under [`docs/integrations/`](docs/integrations/).
+
+#### Task trackers (M34)
+
+- Task tracker connector base and publish DTO.
+- **Ftrack**, **ShotGrid**, and **Cerebro** connector clients and Settings UI.
+- **Reports → Send to Tracker** action with validation summary publish flow.
+- Slack thread context enrichment from tracker metadata.
+
+#### Bug report relay (M35)
+
+- **Bug Report** Settings tab and HTTPS relay client with payload schema v1.0.
+- Spam/abuse controls and maintainer email notification contract.
+- [`docs/integrations/bug_report_relay.md`](docs/integrations/bug_report_relay.md) — relay server specification for studio TDs.
+
+#### Auto-update (M36)
+
+- GitHub Releases update client and semver comparison.
+- **Check for Updates** wizard with progress dialog, safe install, and rollback backup.
+- [`docs/integrations/auto_update.md`](docs/integrations/auto_update.md) — module vs pip paths and Maya restart checklist.
+
+#### Rule authoring and incident workflow (M37)
+
+- Rule browser and safe field editor MVP.
+- **New Rule Wizard** from template; rule editor entry from Settings → Advanced.
+- **Create rule draft from issue details** and export incident rule draft to studio `extra_rules`.
+- [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) — incident-to-rule workflow documentation.
+- Headless **`shader_health rules validate`** subcommand for rule pack QA.
+
+#### Header polish (M32)
+
+- Documentation header button placeholder.
+- Panel header version display and layout test coverage.
+
+### Changed
+
+- Deadline connector refactored to shared connector registry pattern (behavior unchanged for Farm tab).
+- Studio path substitution applies during path normalization and enrichment (not only at fix time).
+- User preferences drive UI defaults (profile, asset class, theme) at panel startup.
+
+### Fixed
+
+- Platform-aware bundled dependency paths in Cerebro adapter tests (Linux CI).
+- Cross-platform mayapy path inference in user preferences (`Path.stem` vs hardcoded `.exe`).
+- Mypy `pycerebro.*` missing-import override aligned with `py_cerebro.*`.
+
+### Known limitations (v0.5)
+
+- User preferences (`shader_health_user.json`) are **not** loaded in headless CLI — studio config only.
+- Bug Report requires a studio-hosted HTTPS relay; no built-in SaaS backend.
+- Notification and tracker connectors need studio-supplied credentials in `shader_health_studio.json`.
+- Rule editor is an MVP — complex rule JSON may still require hand-editing or TD review.
+- Cerebro cloud API requires optional `pycerebro` / `py_cerebro` from Cerebro service-tools.
+- Native `.mll` binaries are built locally or attached to releases; repo ships CMake scaffolding only.
+- Maya integration CI requires a self-hosted runner with `mayapy`.
+
+### Install
+
+Same as v0.4 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
+**Planning for v1.0+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md).
+
 ## [0.4.0] - 2026-07-08
 
 **Maya Shader Health Inspector v0.4 — GUI-First Farm Integration & Render Risk Depth**
@@ -316,6 +407,7 @@ python -m shader_health validate examples/broken_scene/shader_health_demo_broken
 - Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Deadline preflight: [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md)
 
+[0.5.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.5.0
 [0.4.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.4.0
 [0.3.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.3.0
 [0.2.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.2.0
