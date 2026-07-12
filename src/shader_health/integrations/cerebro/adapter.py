@@ -815,7 +815,7 @@ def _import_pycerebro_database(
 
 def _import_pycerebro_dbtypes(*, service_tools_path: str = "") -> Any:
     _prepend_service_tools_paths(cerebro_core_sys_paths(service_tools_path))
-    from pycerebro import dbtypes  # type: ignore[import-untyped]
+    from pycerebro import dbtypes
 
     return dbtypes
 

@@ -82,3 +82,7 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = "py_cerebro.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pycerebro.*"
+ignore_missing_imports = true
