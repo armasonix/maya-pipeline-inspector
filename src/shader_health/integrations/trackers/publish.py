@@ -9,6 +9,9 @@ from typing import Any
 SLACK_THREAD_TS_METADATA_KEYS: tuple[str, ...] = ("thread_ts", "slack_thread_ts")
 
 
+_MAYA_SCENE_SUFFIXES: tuple[str, ...] = (".ma", ".mb")
+
+
 def scene_basename(scene_path: str) -> str:
     """Return a cross-platform scene filename from Maya/Windows or POSIX paths."""
 
@@ -17,6 +20,31 @@ def scene_basename(scene_path: str) -> str:
     normalized = scene_path.replace("\\", "/").rstrip("/")
     name = Path(normalized).name
     return name or "unsaved scene"
+
+
+def scene_task_lookup_name(scene_name: str) -> str:
+    """Return a tracker task lookup name with Maya scene suffixes removed."""
+
+    normalized = str(scene_name or "").strip()
+    if not normalized:
+        return normalized
+    lower = normalized.lower()
+    for suffix in _MAYA_SCENE_SUFFIXES:
+        if lower.endswith(suffix):
+            return normalized[: -len(suffix)]
+    return normalized
+
+
+def scene_task_lookup_candidates(scene_name: str) -> tuple[str, ...]:
+    """Return scene names to try when resolving a tracker task from a Maya scene."""
+
+    primary = str(scene_name or "").strip()
+    if not primary:
+        return ()
+    stem = scene_task_lookup_name(primary)
+    if stem and stem != primary:
+        return (stem, primary)
+    return (primary,)
 
 
 @dataclass(frozen=True)
@@ -120,23 +148,8 @@ def validation_publish_payload_from_run(
 def format_validation_publish_summary(payload: ValidationPublishPayload) -> str:
     """Format a tracker-neutral validation summary message."""
 
-    scope_label = payload.scan_scope.title() if payload.scan_scope else "Scene"
-    lines = [
-        f"Shader Health validation summary ({payload.block_status_label()})",
-        f"Scene: {payload.scene_name}",
-        f"Profile: {payload.profile_label()}",
-        f"Scope: {scope_label}",
-        f"Health: {payload.health_score}/100",
-        (
-            "Issues: "
-            f"{payload.critical_count} critical, "
-            f"{payload.error_count} error, "
-            f"{payload.warning_count} warning, "
-            f"{payload.info_count} info"
-        ),
-    ]
-    if payload.validated_at_utc:
-        lines.append(f"Validated at: {payload.validated_at_utc}")
-    if payload.report_path:
-        lines.append(f"Report: {payload.report_path}")
-    return "\n".join(lines)
+    from shader_health.integrations.messaging.validation_summary import (
+        render_validation_summary_from_payload,
+    )
+
+    return render_validation_summary_from_payload(payload, platform="ftrack")

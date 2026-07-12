@@ -16,10 +16,8 @@ EXIT_INPUT_ERROR = 4
 
 JsonDict = dict[str, Any]
 
-
 class ManifestDiffInputError(Exception):
     """Raised when manifest diff inputs are missing or invalid."""
-
 
 def build_manifest_diff_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -41,7 +39,6 @@ def build_manifest_diff_parser() -> argparse.ArgumentParser:
     )
     return parser
 
-
 def run_manifest_diff(argv: Optional[Sequence[str]] = None) -> int:
     """Parse argv and execute a manifest diff command."""
 
@@ -52,7 +49,6 @@ def run_manifest_diff(argv: Optional[Sequence[str]] = None) -> int:
         out_path=args.out,
         html_path=args.html,
     )
-
 
 def execute_manifest_diff(
     old_manifest_path: Path,
@@ -84,7 +80,6 @@ def execute_manifest_diff(
 
     return EXIT_OK
 
-
 def write_manifest_diff_outputs(
     old_manifest: Mapping[str, Any],
     new_manifest: Mapping[str, Any],
@@ -102,7 +97,6 @@ def write_manifest_diff_outputs(
     )
     write_html_manifest_diff(html_path, diff_payload)
     return diff_payload
-
 
 def load_manifest_json(path: Path) -> JsonDict:
     if not path.is_file():

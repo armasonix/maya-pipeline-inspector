@@ -93,6 +93,8 @@ def test_rule_editor_dialog_builds_catalog_list():
     assert controller.dialog.object_name == RULE_EDITOR_DIALOG_OBJECT_NAME
     assert len(controller.rule_list.items) == 3
     _find(controller.dialog, RULE_BROWSER_LIST_OBJECT_NAME)
+    assert controller.rule_list.currentRowChanged.handlers
+    hash(controller.rule_list.currentRowChanged.handlers[0])
 
 
 def test_rule_editor_dialog_apply_saves_session_override():

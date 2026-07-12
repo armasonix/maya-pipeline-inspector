@@ -14,8 +14,15 @@ if str(SRC_ROOT) not in sys.path:
 from shader_health.core.rule_loader import DEFAULT_RULE_ROOT  # noqa: E402
 from shader_health.core.rule_pack_validation import (  # noqa: E402
     RuleValidationFailure,
+    collect_rule_ids,
+    find_json_files,
+    iter_rule_objects,
+    load_json_file,
     validate_paths,
+    validate_rule_file,
+    validate_rule_object,
 )
+from shader_health.rules_cli import validate_rule_paths  # noqa: E402
 
 __all__ = [
     "DEFAULT_RULE_ROOT",
@@ -27,16 +34,8 @@ __all__ = [
     "validate_paths",
     "validate_rule_file",
     "validate_rule_object",
+    "validate_rule_paths",
 ]
-
-from shader_health.core.rule_pack_validation import (  # noqa: E402
-    collect_rule_ids,
-    find_json_files,
-    iter_rule_objects,
-    load_json_file,
-    validate_rule_file,
-    validate_rule_object,
-)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -60,16 +59,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
-
-    try:
-        file_count, rule_count = validate_paths(args.paths)
-    except RuleValidationFailure as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-
-    if not args.quiet:
-        print(f"Validated {rule_count} rule(s) from {file_count} file(s).")
-    return 0
+    return validate_rule_paths(tuple(args.paths), quiet=bool(args.quiet))
 
 
 if __name__ == "__main__":

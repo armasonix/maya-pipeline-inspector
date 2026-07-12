@@ -125,26 +125,15 @@ def format_validation_summary_message(
 ) -> str:
     """Format the Telegram validation summary message."""
 
+    from shader_health.integrations.messaging.validation_summary import (
+        render_validation_summary_from_context,
+    )
+
     event_labels = ", ".join(_EVENT_LABELS.get(event, event) for event in matched_events)
-    profile_label = context.profile_id or "unknown"
-    if context.asset_class_id:
-        profile_label = f"{profile_label}+{context.asset_class_id}"
-    scope_label = context.scan_scope.title() if context.scan_scope else "Scene"
-    return "\n".join(
-        (
-            f"Shader Health: {event_labels}",
-            f"Scene: {context.scene_name}",
-            f"Profile: {profile_label}",
-            f"Scope: {scope_label}",
-            f"Health: {context.health_score}/100",
-            (
-                "Issues: "
-                f"{context.critical_count} critical, "
-                f"{context.error_count} error, "
-                f"{context.warning_count} warning, "
-                f"{context.info_count} info"
-            ),
-        )
+    return render_validation_summary_from_context(
+        context,
+        platform="chat",
+        event_labels=event_labels,
     )
 
 

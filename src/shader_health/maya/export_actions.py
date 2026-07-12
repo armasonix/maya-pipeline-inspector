@@ -21,7 +21,6 @@ from shader_health.reports.manifest_diff_cli import (
 
 SnapshotProvider = Callable[[], GraphSnapshot]
 
-
 @dataclass(frozen=True)
 class ExportActionResult:
     """Result returned by report export actions."""
@@ -30,7 +29,6 @@ class ExportActionResult:
     path: str
     succeeded: bool
     message: str
-
 
 def export_json_report(
     path: Optional[str | Path] = None,
@@ -52,7 +50,6 @@ def export_json_report(
     )
     return _result("export_json_report", written_path, "JSON report exported.")
 
-
 def export_html_report(
     path: Optional[str | Path] = None,
     *,
@@ -66,7 +63,6 @@ def export_html_report(
     output_path = _output_path(path, export_snapshot, suffix="report", extension="html")
     written_path = write_html_report(output_path, export_snapshot, results)
     return _result("export_html_report", written_path, "HTML report exported.")
-
 
 def export_shader_manifest(
     path: Optional[str | Path] = None,
@@ -88,7 +84,6 @@ def export_shader_manifest(
     )
     return _result("export_shader_manifest", written_path, "Shader manifest exported.")
 
-
 def export_fix_plan(
     path: Optional[str | Path] = None,
     *,
@@ -108,7 +103,6 @@ def export_fix_plan(
         profile_id=profile_id,
     )
     return _result("export_fix_plan", written_path, "Fix plan exported.")
-
 
 def export_manifest_diff(
     baseline_manifest_path: str | Path,
@@ -159,7 +153,6 @@ def export_manifest_diff(
         ),
     )
 
-
 def _snapshot(
     snapshot: Optional[GraphSnapshot],
     snapshot_provider: Optional[SnapshotProvider],
@@ -169,7 +162,6 @@ def _snapshot(
     if snapshot_provider is not None:
         return snapshot_provider()
     return scan_scene()
-
 
 def _output_path(
     path: Optional[str | Path],
@@ -189,7 +181,6 @@ def _output_path(
         output_dir = Path.cwd()
         scene_stem = "untitled_scene"
     return output_dir / f"{scene_stem}_shader_health_{suffix}.{extension}"
-
 
 def _result(action: str, path: Path, message: str) -> ExportActionResult:
     return ExportActionResult(

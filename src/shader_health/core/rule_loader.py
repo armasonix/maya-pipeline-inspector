@@ -39,10 +39,8 @@ _POLICY_OVERRIDE_KEYS = frozenset(
     }
 )
 
-
 class RuleLoadError(ValueError):
     """Raised when rule packs or profiles cannot be loaded."""
-
 
 @dataclass(frozen=True)
 class RuleOverride:
@@ -124,7 +122,6 @@ class RuleOverride:
         updated.validate()
         return updated
 
-
 @dataclass(frozen=True)
 class ProfileDefinition:
     """Profile definition containing rule overrides."""
@@ -160,11 +157,9 @@ class ProfileDefinition:
             manifest_diff_policy=policy,
         )
 
-
 def load_profile(path: Path) -> ProfileDefinition:
     payload = _load_json(path)
     return ProfileDefinition.from_dict(_require_mapping(payload, path))
-
 
 def load_rule_file(path: Path) -> list[RuleDefinition]:
     payload = _load_json(path)
@@ -176,7 +171,6 @@ def load_rule_file(path: Path) -> list[RuleDefinition]:
             raise RuleLoadError(f"{path}: rule #{index}: {exc}") from exc
     return rules
 
-
 def load_rules_from_path(path: Path) -> list[RuleDefinition]:
     if path.is_file():
         return load_rule_file(path)
@@ -186,7 +180,6 @@ def load_rules_from_path(path: Path) -> list[RuleDefinition]:
             rules.extend(load_rule_file(rule_file))
         return rules
     raise RuleLoadError(f"Rule path does not exist: {path}")
-
 
 def build_rule_search_paths(
     rule_root: Path = DEFAULT_RULE_ROOT,
@@ -213,7 +206,6 @@ def build_rule_search_paths(
     paths.extend(sorted(extra_rule_paths))
     return paths
 
-
 def load_rule_stack(
     rule_root: Path = DEFAULT_RULE_ROOT,
     renderer_ids: Iterable[str] = (),
@@ -239,7 +231,6 @@ def load_rule_stack(
 
     return apply_profile_overrides(rules, load_profile(profile_path))
 
-
 def apply_profile_overrides(
     rules: Iterable[RuleDefinition],
     profile: ProfileDefinition,
@@ -249,7 +240,6 @@ def apply_profile_overrides(
         override = profile.rule_overrides.get(rule.id)
         resolved.append(rule if override is None else override.apply(rule))
     return resolved
-
 
 def validate_profile_overrides(
     profile: ProfileDefinition,
@@ -261,7 +251,6 @@ def validate_profile_overrides(
             f"profile {profile.id!r} references unknown rule(s): {', '.join(unknown)}"
         )
 
-
 def _load_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -269,7 +258,6 @@ def _load_json(path: Path) -> Any:
         raise RuleLoadError(f"{path}: invalid JSON: {exc}") from exc
     except OSError as exc:
         raise RuleLoadError(f"{path}: cannot read file: {exc}") from exc
-
 
 def _iter_rule_objects(payload: Any, path: Path) -> list[Mapping[str, Any]]:
     if isinstance(payload, Mapping):
@@ -285,7 +273,6 @@ def _iter_rule_objects(payload: Any, path: Path) -> list[Mapping[str, Any]]:
         return [_require_mapping(item, path) for item in payload]
 
     raise RuleLoadError(f"{path}: root must be an object, a list, or an object with 'rules'")
-
 
 def _require_mapping(value: Any, label: object) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):

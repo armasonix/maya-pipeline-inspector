@@ -10,7 +10,6 @@ from typing import Any, Callable
 
 HttpTransport = Callable[["HttpRequest", float], "SlackResponse"]
 
-
 @dataclass(frozen=True)
 class HttpRequest:
     """Low-level HTTP request passed to a transport implementation."""
@@ -20,7 +19,6 @@ class HttpRequest:
     body: bytes | None
     headers: Mapping[str, str]
 
-
 @dataclass(frozen=True)
 class SlackResponse:
     """Normalized Slack incoming webhook response."""
@@ -29,10 +27,8 @@ class SlackResponse:
     body: str
     json_data: dict[str, Any] | list[Any] | None = None
 
-
 class SlackClientError(RuntimeError):
     """Raised when the Slack incoming webhook returns an unexpected response."""
-
 
 class SlackClient:
     """REST wrapper for Slack incoming webhook endpoints."""
@@ -86,7 +82,6 @@ class SlackClient:
 
         return self.request(webhook_url, payload=dict(payload))
 
-
 def default_http_transport(request: HttpRequest, timeout: float) -> SlackResponse:
     """Send an HTTP request using the Python standard library."""
 
@@ -111,7 +106,6 @@ def default_http_transport(request: HttpRequest, timeout: float) -> SlackRespons
             body=body,
             json_data=_parse_json_body(body),
         )
-
 
 def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     text = body.strip()

@@ -12,7 +12,7 @@ from typing import Any, Optional
 from shader_health.core import GraphSnapshot, RuleLoadError
 from shader_health.core.fix_plan import FixPlan, fix_plan_from_export
 from shader_health.core.manifest_gate import evaluate_manifest_gate
-from shader_health.core.rule_loader import load_profile
+from shader_health.core.rule_loader import DEFAULT_RULE_ROOT, load_profile
 from shader_health.maya.validation_pipeline import (
     DEFAULT_PROFILE_ID,
     fix_audit_sidecar_path_for_scene,
@@ -29,6 +29,7 @@ from shader_health.reports.manifest_diff_cli import (
     execute_manifest_diff,
     load_manifest_json,
 )
+from shader_health.rules_cli import validate_rule_paths
 from shader_health.studio_config import resolve_studio_config_for_headless
 from shader_health.util.paths import normalize_cli_path
 
@@ -75,6 +76,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return manifest_command(args)
     if args.command == "apply-fixes":
         return apply_fixes_command(args)
+    if args.command == "rules":
+        return rules_command(args)
     parser.print_help()
     return EXIT_CONFIG_ERROR
 
@@ -217,6 +220,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Plan fixes without mutating the scene.",
     )
     _add_asset_class_argument(apply_fixes)
+    rules = subparsers.add_parser(
+        "rules",
+        help="Rule pack validation tooling.",
+    )
+    rules_subparsers = rules.add_subparsers(dest="rules_command")
+    rules_validate = rules_subparsers.add_parser(
+        "validate",
+        help="Validate JSON rule packs against the RuleDefinition schema.",
+    )
+    rules_validate.add_argument(
+        "paths",
+        nargs="*",
+        help="Rule file or directory paths. Defaults to packaged rules.",
+    )
+    rules_validate.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Only print errors.",
+    )
     return parser
 
 
@@ -358,6 +380,18 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"Runtime error: {exc}", file=sys.stderr)
         return EXIT_RUNTIME_ERROR
+
+
+def rules_command(args: argparse.Namespace) -> int:
+    if args.rules_command == "validate":
+        return rules_validate_command(args)
+    print("Configuration error: rules subcommand required (validate).", file=sys.stderr)
+    return EXIT_CONFIG_ERROR
+
+
+def rules_validate_command(args: argparse.Namespace) -> int:
+    paths = tuple(_cli_path(path) for path in args.paths) if args.paths else (DEFAULT_RULE_ROOT,)
+    return validate_rule_paths(paths, quiet=bool(args.quiet))
 
 
 def diff_command(args: argparse.Namespace) -> int:

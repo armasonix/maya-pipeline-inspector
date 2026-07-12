@@ -18,7 +18,6 @@ DEFAULT_SETTINGS_STATUS_MESSAGE = (
     "Save studio policy and connectors separately from per-user preferences."
 )
 
-
 @dataclass(frozen=True)
 class SettingsDirtyState:
     """Tracks whether studio or user settings differ from the last saved baseline."""
@@ -29,7 +28,6 @@ class SettingsDirtyState:
     @property
     def any_dirty(self) -> bool:
         return self.studio_dirty or self.user_dirty
-
 
 def dirty_indicator_text(state: SettingsDirtyState) -> str:
     """Return banner text for unsaved settings, or an empty string when clean."""
@@ -45,18 +43,15 @@ def dirty_indicator_text(state: SettingsDirtyState) -> str:
         return f"Unsaved changes: {parts[0]}."
     return f"Unsaved changes: {parts[0]} and {parts[1]}."
 
-
 def studio_config_content_equal(left: StudioConfig, right: StudioConfig) -> bool:
     """Compare studio settings ignoring the loaded file path metadata."""
 
     return left.to_dict() == right.to_dict()
 
-
 def user_preferences_content_equal(left: UserPreferences, right: UserPreferences) -> bool:
     """Compare user preference fields ignoring config path metadata."""
 
     return left.normalized().to_dict() == right.normalized().to_dict()
-
 
 def studio_config_from_settings_view(
     view: Any,
@@ -89,7 +84,6 @@ def studio_config_from_settings_view(
         ),
     )
 
-
 def evaluate_settings_dirty_state(
     *,
     current_studio: StudioConfig,
@@ -103,7 +97,6 @@ def evaluate_settings_dirty_state(
         studio_dirty=not studio_config_content_equal(current_studio, saved_studio),
         user_dirty=not user_preferences_content_equal(current_user, saved_user),
     )
-
 
 def evaluate_settings_dirty_state_from_view(
     view: Any,
@@ -127,7 +120,6 @@ def evaluate_settings_dirty_state_from_view(
         current_user=current_user,
         saved_user=saved_user,
     )
-
 
 def connectors_match_saved(
     current: ConnectorSettings,

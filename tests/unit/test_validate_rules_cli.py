@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from shader_health import cli
 from shader_health.core import (
     RuleLoadError,
     apply_profile_overrides,
@@ -96,6 +97,42 @@ def test_validate_rules_cli_default_rule_pack_path_is_valid():
     assert "Validated" in result.stdout
     assert "rule(s)" in result.stdout
     assert result.stderr == ""
+
+
+def test_shader_health_rules_validate_accepts_valid_fixture(capsys):
+    code = cli.main(["rules", "validate", str(VALID_RULES)])
+
+    captured = capsys.readouterr()
+    assert code == cli.EXIT_OK
+    assert "Validated 1 rule(s) from 1 file(s)." in captured.out
+    assert captured.err == ""
+
+
+def test_shader_health_rules_validate_rejects_invalid_fixture(capsys):
+    code = cli.main(["rules", "validate", str(INVALID_RULES)])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "missing_why.json" in captured.err
+    assert "missing required field(s): why" in captured.err
+
+
+def test_shader_health_rules_validate_defaults_to_packaged_rules(capsys):
+    code = cli.main(["rules", "validate"])
+
+    captured = capsys.readouterr()
+    assert code == cli.EXIT_OK
+    assert "Validated" in captured.out
+    assert "rule(s)" in captured.out
+    assert captured.err == ""
+
+
+def test_shader_health_rules_without_subcommand_returns_config_error(capsys):
+    code = cli.main(["rules"])
+
+    captured = capsys.readouterr()
+    assert code == cli.EXIT_CONFIG_ERROR
+    assert "rules subcommand required" in captured.err
 
 
 def test_rule_search_paths_are_deterministic(tmp_path):

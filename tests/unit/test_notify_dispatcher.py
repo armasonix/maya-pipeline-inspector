@@ -113,6 +113,7 @@ def test_report_validation_notification_outcomes_prints_sent_and_failed_messages
     assert messages == [
         "Telegram notification sent.",
         "Discord notification failed: HTTP 500",
+        "Slack notification skipped: disabled",
     ]
 
 

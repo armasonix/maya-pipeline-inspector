@@ -34,7 +34,6 @@ _RISK_HINT_BANDS = (
     ("high", 10.0),
 )
 
-
 def enrich_displacement_metadata(snapshot: GraphSnapshot) -> GraphSnapshot:
     """Attach displacement risk metadata to every material in the snapshot."""
 
@@ -52,7 +51,6 @@ def enrich_displacement_metadata(snapshot: GraphSnapshot) -> GraphSnapshot:
         for material in snapshot.materials
     ]
     return replace(snapshot, materials=materials)
-
 
 def _profile_material_displacement(
     material: MaterialSnapshot,
@@ -106,7 +104,6 @@ def _profile_material_displacement(
         ),
     )
 
-
 def _incoming_by_destination(
     connections: Iterable[ConnectionSnapshot],
 ) -> dict[str, list[str]]:
@@ -114,7 +111,6 @@ def _incoming_by_destination(
     for connection in connections:
         incoming.setdefault(connection.dst_node, []).append(connection.src_node)
     return incoming
-
 
 def _collect_displacement_node_ids(
     material: MaterialSnapshot,
@@ -136,7 +132,6 @@ def _collect_displacement_node_ids(
             node_ids.append(displacement_id)
     return node_ids
 
-
 def _max_displacement_amount(
     displacement_node_ids: list[str],
     nodes_by_id: Mapping[str, NodeSnapshot],
@@ -153,7 +148,6 @@ def _max_displacement_amount(
         return None
     return max(amounts)
 
-
 def _read_amount(attrs: Mapping[str, Any]) -> Optional[float]:
     for key in _AMOUNT_ATTR_KEYS:
         value = attrs.get(key)
@@ -162,7 +156,6 @@ def _read_amount(attrs: Mapping[str, Any]) -> Optional[float]:
         if isinstance(value, (int, float)):
             return float(value)
     return None
-
 
 def _displacement_texture_linked(
     displacement_node_ids: list[str],
@@ -185,7 +178,6 @@ def _displacement_texture_linked(
                 return True
     return False
 
-
 def _upstream_texture_nodes(
     start_node_id: str,
     incoming: Mapping[str, list[str]],
@@ -205,7 +197,6 @@ def _upstream_texture_nodes(
             continue
         stack.extend(incoming.get(node_id, ()))
     return found
-
 
 def _aggregate_bounds(
     displacement_node_ids: list[str],
@@ -230,7 +221,6 @@ def _aggregate_bounds(
         max(maxes) if maxes else None,
     )
 
-
 def _read_attr_float(attrs: Mapping[str, Any], keys: tuple[str, ...]) -> Optional[float]:
     for key in keys:
         value = attrs.get(key)
@@ -239,7 +229,6 @@ def _read_attr_float(attrs: Mapping[str, Any], keys: tuple[str, ...]) -> Optiona
         if isinstance(value, (int, float)):
             return float(value)
     return None
-
 
 def _material_subdivision_enabled(
     material: MaterialSnapshot,
@@ -261,7 +250,6 @@ def _material_subdivision_enabled(
         if isinstance(value, str) and value.strip().lower() in {"1", "true", "yes", "on"}:
             return True
     return False
-
 
 def _renderer_flags(
     material: MaterialSnapshot,
@@ -293,7 +281,6 @@ def _renderer_flags(
             flags.setdefault("renderer_family", "arnold")
     return flags
 
-
 def _risk_score(
     *,
     has_displacement: bool,
@@ -320,7 +307,6 @@ def _risk_score(
 
     rounded = round(score, 2)
     return rounded, _risk_hint(rounded)
-
 
 def _risk_hint(score: float) -> str:
     for hint, upper_bound in _RISK_HINT_BANDS:

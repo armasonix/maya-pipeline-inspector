@@ -169,8 +169,8 @@ def test_send_discord_validation_notification_posts_embed_on_publish_block():
     assert captured[0].method == "POST"
     assert captured[0].body is not None
     payload = json.loads(captured[0].body.decode("utf-8"))
-    assert payload["embeds"][0]["title"] == "Shader Health: Publish block"
-    assert payload["embeds"][0]["fields"][0]["value"] == "hero.ma"
+    assert payload["embeds"][0]["title"] == "🔍 Health Validation · Publish block"
+    assert "hero.ma" in payload["embeds"][0]["description"]
 
 
 def test_maybe_send_discord_validation_notification_accepts_validation_run_result():

@@ -19,6 +19,7 @@ class GitHubReleasesConfig:
     api_base_url: str = DEFAULT_API_BASE_URL
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     user_agent: str = "maya-shader-health-inspector"
+    github_token: str = ""
 
     def with_overrides(self, **kwargs: Any) -> GitHubReleasesConfig:
         """Return a copy with selected fields replaced."""
@@ -29,3 +30,8 @@ class GitHubReleasesConfig:
     def latest_release_url(self) -> str:
         base = self.api_base_url.rstrip("/")
         return f"{base}/repos/{self.owner}/{self.repo}/releases/latest"
+
+    @property
+    def releases_url(self) -> str:
+        base = self.api_base_url.rstrip("/")
+        return f"{base}/repos/{self.owner}/{self.repo}/releases?per_page=10"

@@ -50,7 +50,6 @@ _DEADLINE_FIELD_MAYAPY_WIDTH = 292
 _DEADLINE_FIELD_SMALL_WIDTH = 96
 _DEADLINE_COLUMNS_GAP = 14
 
-
 def build_deadline_connector_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -254,7 +253,6 @@ def build_deadline_connector_section(
     section_layout.addWidget(hint)
     return section
 
-
 def read_deadline_connector_from_view(view: Any, qt_widgets: Any) -> DeadlineConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
@@ -287,7 +285,6 @@ def read_deadline_connector_from_view(view: Any, qt_widgets: Any) -> DeadlineCon
         group=line_edit_text(view, qt_widgets, SETTINGS_DEADLINE_GROUP_INPUT_OBJECT_NAME),
         user_name=line_edit_text(view, qt_widgets, SETTINGS_DEADLINE_USER_INPUT_OBJECT_NAME),
     )
-
 
 def update_deadline_connector_view(
     view: Any,
@@ -369,17 +366,14 @@ def update_deadline_connector_view(
         deadline.user_name,
     )
 
-
 def get_deadline_settings(connectors: ConnectorSettings) -> DeadlineConnectorSettings:
     return connectors.deadline
-
 
 def apply_deadline_settings(
     connectors: ConnectorSettings,
     settings: DeadlineConnectorSettings,
 ) -> ConnectorSettings:
     return replace(connectors, deadline=settings)
-
 
 def _on_deadline_enabled_changed(
     qt_widgets: Any,
@@ -393,7 +387,6 @@ def _on_deadline_enabled_changed(
     if on_enabled_changed is not None:
         on_enabled_changed(enabled)
 
-
 def _create_deadline_grid_layout(qt_widgets: Any, parent: Any) -> Any:
     grid_layout = qt_widgets.QGridLayout(parent)
     set_grid_margins = getattr(grid_layout, "setContentsMargins", None)
@@ -406,7 +399,6 @@ def _create_deadline_grid_layout(qt_widgets: Any, parent: Any) -> Any:
     if set_v_spacing is not None:
         set_v_spacing(2)
     return grid_layout
-
 
 def _add_deadline_grid_pair(
     qt_widgets: Any,
@@ -449,7 +441,6 @@ def _add_deadline_grid_pair(
         width=right_width,
         on_changed=on_changed,
     )
-
 
 def _add_deadline_grid_field(
     qt_widgets: Any,
@@ -498,7 +489,6 @@ def _add_deadline_grid_field(
     else:
         add_widget(field, row, column + 1)
 
-
 def _build_deadline_label(qt_widgets: Any, text: str) -> Any:
     label = qt_widgets.QLabel(text)
     set_fixed_horizontal_size_policy(qt_widgets, label)
@@ -506,7 +496,6 @@ def _build_deadline_label(qt_widgets: Any, text: str) -> Any:
     if set_fixed_width is not None:
         set_fixed_width(_DEADLINE_LABEL_WIDTH)
     return label
-
 
 def _build_deadline_line_edit(
     qt_widgets: Any,
@@ -532,7 +521,6 @@ def _build_deadline_line_edit(
         connect(on_changed)
     return field
 
-
 def _configure_deadline_grid(qt_widgets: Any, grid_layout: Any) -> None:
     set_column_stretch = getattr(grid_layout, "setColumnStretch", None)
     if set_column_stretch is not None:
@@ -543,7 +531,6 @@ def _configure_deadline_grid(qt_widgets: Any, grid_layout: Any) -> None:
         set_column_minimum_width(0, _DEADLINE_LABEL_WIDTH)
         set_column_minimum_width(2, _DEADLINE_PAIR_GAP)
         set_column_minimum_width(3, _DEADLINE_LABEL_WIDTH)
-
 
 def _set_deadline_details_visible(details: Any, visible: bool) -> None:
     set_visible = getattr(details, "setVisible", None)

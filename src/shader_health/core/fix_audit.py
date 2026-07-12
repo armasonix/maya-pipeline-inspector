@@ -11,7 +11,6 @@ from typing import Any, Optional, Protocol
 FIX_AUDIT_SCHEMA_VERSION = "1.0"
 JsonDict = dict[str, Any]
 
-
 class ApplyFixReportLike(Protocol):
     undo_chunk_name: str
     total: int
@@ -21,7 +20,6 @@ class ApplyFixReportLike(Protocol):
 
     @property
     def records(self) -> Iterable[Any]: ...
-
 
 @dataclass(frozen=True)
 class FixAuditSession:
@@ -69,7 +67,6 @@ class FixAuditSession:
             ),
         )
 
-
 @dataclass(frozen=True)
 class FixAuditSidecar:
     scene_path: str
@@ -95,7 +92,6 @@ class FixAuditSidecar:
                 if isinstance(item, Mapping)
             ),
         )
-
 
 def build_fix_audit_session(
     *,
@@ -124,13 +120,11 @@ def build_fix_audit_session(
         records=records,
     )
 
-
 def load_fix_audit_sidecar(path: str | Path) -> FixAuditSidecar:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, Mapping):
         raise ValueError("fix audit sidecar root must be an object")
     return FixAuditSidecar.from_dict(data)
-
 
 def write_fix_audit_sidecar(path: str | Path, sidecar: FixAuditSidecar) -> Path:
     out = Path(path)
@@ -140,7 +134,6 @@ def write_fix_audit_sidecar(path: str | Path, sidecar: FixAuditSidecar) -> Path:
         encoding="utf-8",
     )
     return out
-
 
 def append_fix_audit_session(
     path: str | Path,
@@ -160,7 +153,6 @@ def append_fix_audit_session(
     updated = FixAuditSidecar(scene_path=scene_path, sessions=sessions)
     return write_fix_audit_sidecar(sidecar_path, updated)
 
-
 def _record_to_dict(record: Any) -> JsonDict:
     to_dict = getattr(record, "to_dict", None)
     if callable(to_dict):
@@ -169,14 +161,12 @@ def _record_to_dict(record: Any) -> JsonDict:
         return dict(record)
     raise TypeError("fix audit record must provide to_dict() or be a mapping")
 
-
 def _record_sort_key(record: JsonDict) -> tuple[str, str, str]:
     return (
         str(record.get("fix_id", "")),
         str(record.get("target_node", "")),
         str(record.get("target_attr", "")),
     )
-
 
 def _sorted_sessions(
     sessions: Iterable[FixAuditSession],
@@ -191,7 +181,6 @@ def _sorted_sessions(
             ),
         )
     )
-
 
 def _utc_now() -> str:
     return (

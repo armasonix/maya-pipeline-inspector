@@ -11,11 +11,14 @@ class FakeCmds:
         self.menu_exists = menu_exists
         self.shelf_exists = shelf_exists
         self.existing_buttons: set[str] = set()
+        self.button_labels: dict[str, str] = {}
         self.deleted: list[tuple[str, dict[str, Any]]] = []
         self.created_menu: Optional[tuple[str, dict[str, Any]]] = None
         self.created_items: list[dict[str, Any]] = []
         self.created_shelf: Optional[tuple[str, dict[str, Any]]] = None
         self.created_buttons: list[tuple[str, dict[str, Any]]] = []
+        self.edited_buttons: list[tuple[str, dict[str, Any]]] = []
+        self.shelf_children: list[str] = []
 
     def menu(self, name: str, **kwargs: Any) -> object:
         if kwargs.get("query") and kwargs.get("exists"):
@@ -30,6 +33,8 @@ class FakeCmds:
     def shelfLayout(self, name: str, **kwargs: Any) -> object:
         if kwargs.get("query") and kwargs.get("exists"):
             return self.shelf_exists
+        if kwargs.get("query") and kwargs.get("childArray"):
+            return list(self.shelf_children)
         self.created_shelf = (name, dict(kwargs))
         self.shelf_exists = True
         return name
@@ -37,8 +42,22 @@ class FakeCmds:
     def shelfButton(self, name: str, **kwargs: Any) -> object:
         if kwargs.get("query") and kwargs.get("exists"):
             return name in self.existing_buttons
-        self.created_buttons.append((name, dict(kwargs)))
+        if kwargs.get("query") and kwargs.get("label"):
+            return self.button_labels.get(name, "")
+        if kwargs.get("edit"):
+            fields = dict(kwargs)
+            fields.pop("edit", None)
+            if "label" in fields:
+                self.button_labels[name] = str(fields["label"])
+            self.edited_buttons.append((name, fields))
+            return name
+        fields = dict(kwargs)
+        self.created_buttons.append((name, fields))
         self.existing_buttons.add(name)
+        if "label" in fields:
+            self.button_labels[name] = str(fields["label"])
+        if name not in self.shelf_children:
+            self.shelf_children.append(name)
         return name
 
     def deleteUI(self, name: str, **kwargs: Any) -> None:
@@ -47,6 +66,9 @@ class FakeCmds:
             self.menu_exists = False
         if kwargs.get("control"):
             self.existing_buttons.discard(name)
+            self.button_labels.pop(name, None)
+            if name in self.shelf_children:
+                self.shelf_children.remove(name)
 
 
 def test_show_ui_delegates_to_panel_launcher(monkeypatch: Any):
@@ -190,17 +212,61 @@ def test_install_shelf_creates_shelf_and_button(monkeypatch: Any):
     ]
 
 
-def test_install_shelf_replaces_existing_button(monkeypatch: Any):
+def test_install_shelf_updates_existing_button(monkeypatch: Any):
     cmds = FakeCmds(menu_exists=False, shelf_exists=True)
-    cmds.existing_buttons.add(commands.SHELF_BUTTON_NAME)
+    cmds.existing_buttons.update(
+        {commands.SHELF_BUTTON_NAME, commands.FARM_CHECK_SHELF_BUTTON_NAME}
+    )
+    cmds.button_labels[commands.SHELF_BUTTON_NAME] = commands.SHELF_BUTTON_LABEL
+    cmds.button_labels[commands.FARM_CHECK_SHELF_BUTTON_NAME] = (
+        commands.FARM_CHECK_SHELF_BUTTON_LABEL
+    )
+    cmds.shelf_children = [
+        commands.SHELF_BUTTON_NAME,
+        commands.FARM_CHECK_SHELF_BUTTON_NAME,
+    ]
     monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
 
     commands.install_shelf()
 
-    assert (commands.SHELF_BUTTON_NAME, {"control": True}) in cmds.deleted
+    assert cmds.deleted == []
     assert cmds.created_shelf is None
-    assert len(cmds.created_buttons) == 2
+    assert len(cmds.created_buttons) == 0
+    assert len(cmds.edited_buttons) == 2
+
+
+def test_install_shelf_removes_legacy_duplicate_labels(monkeypatch: Any):
+    cmds = FakeCmds(menu_exists=False, shelf_exists=True)
+    cmds.existing_buttons.update(
+        {
+            commands.SHELF_BUTTON_NAME,
+            "shelfButton42",
+            commands.FARM_CHECK_SHELF_BUTTON_NAME,
+            "shelfButton99",
+        }
+    )
+    cmds.button_labels[commands.SHELF_BUTTON_NAME] = commands.SHELF_BUTTON_LABEL
+    cmds.button_labels["shelfButton42"] = commands.SHELF_BUTTON_LABEL
+    cmds.button_labels[commands.FARM_CHECK_SHELF_BUTTON_NAME] = (
+        commands.FARM_CHECK_SHELF_BUTTON_LABEL
+    )
+    cmds.button_labels["shelfButton99"] = commands.FARM_CHECK_SHELF_BUTTON_LABEL
+    cmds.shelf_children = [
+        commands.SHELF_BUTTON_NAME,
+        "shelfButton42",
+        commands.FARM_CHECK_SHELF_BUTTON_NAME,
+        "shelfButton99",
+    ]
+    monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
+
+    commands.install_shelf()
+
+    assert ("shelfButton42", {"control": True}) in cmds.deleted
+    assert ("shelfButton99", {"control": True}) in cmds.deleted
+    assert len(cmds.created_buttons) == 0
+    assert len(cmds.edited_buttons) == 2
 
 
 def test_uninstall_shelf_deletes_existing_button(monkeypatch: Any):
@@ -208,6 +274,14 @@ def test_uninstall_shelf_deletes_existing_button(monkeypatch: Any):
     cmds.existing_buttons.update(
         {commands.SHELF_BUTTON_NAME, commands.FARM_CHECK_SHELF_BUTTON_NAME}
     )
+    cmds.button_labels[commands.SHELF_BUTTON_NAME] = commands.SHELF_BUTTON_LABEL
+    cmds.button_labels[commands.FARM_CHECK_SHELF_BUTTON_NAME] = (
+        commands.FARM_CHECK_SHELF_BUTTON_LABEL
+    )
+    cmds.shelf_children = [
+        commands.SHELF_BUTTON_NAME,
+        commands.FARM_CHECK_SHELF_BUTTON_NAME,
+    ]
     monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
 
     commands.uninstall_shelf()
@@ -216,11 +290,20 @@ def test_uninstall_shelf_deletes_existing_button(monkeypatch: Any):
     assert (commands.FARM_CHECK_SHELF_BUTTON_NAME, {"control": True}) in cmds.deleted
 
 
-def test_install_ui_installs_menu_and_shelf(monkeypatch: Any):
+def test_install_ui_refreshes_menu_and_shelf(monkeypatch: Any):
     calls: list[str] = []
-    monkeypatch.setattr(commands, "install_menu", lambda: calls.append("menu"))
-    monkeypatch.setattr(commands, "install_shelf", lambda: calls.append("shelf"))
+    monkeypatch.setattr(
+        commands,
+        "install_menu",
+        lambda: calls.append("menu") or commands.MENU_NAME,
+    )
+    monkeypatch.setattr(
+        commands,
+        "install_shelf",
+        lambda: calls.append("shelf") or commands.SHELF_NAME,
+    )
 
     commands.install_ui()
+    commands.install_ui()
 
-    assert calls == ["menu", "shelf"]
+    assert calls == ["menu", "shelf", "menu", "shelf"]

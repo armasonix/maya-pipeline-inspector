@@ -105,7 +105,11 @@ def build_ftrack_connector_section(
             label="API user",
             object_name=SETTINGS_FTRACK_API_USER_INPUT_OBJECT_NAME,
             value=ftrack.api_user,
-            placeholder="pipeline.bot",
+            placeholder="armasonix",
+            tooltip=(
+                "Ftrack User name (System settings → Users), not display name or email. "
+                "Pair with the personal API key from My Account → Security."
+            ),
             on_changed=on_settings_changed,
         )
     )
@@ -154,8 +158,9 @@ def build_ftrack_connector_section(
     _set_ftrack_details_visible(details_row, config.connectors.ftrack.enabled)
 
     hint = qt_widgets.QLabel(
-        "When enabled, Shader Health can publish validation summaries as Ftrack task "
-        "notes. API credentials and project are stored in the studio config."
+        "When enabled, Shader Health publishes validation summaries as Ftrack task notes. "
+        "API user is the User name from System settings → Users (for example armasonix), "
+        "not your display name. Connection is tested when you save or edit Ftrack settings."
     )
     hint.setWordWrap(True)
     section_layout.addWidget(hint)
@@ -168,9 +173,11 @@ def read_ftrack_connector_from_view(view: Any, qt_widgets: Any) -> FtrackConnect
     return FtrackConnectorSettings(
         enabled=enabled,
         api_url=line_edit_text(view, qt_widgets, SETTINGS_FTRACK_API_URL_INPUT_OBJECT_NAME),
-        api_user=line_edit_text(view, qt_widgets, SETTINGS_FTRACK_API_USER_INPUT_OBJECT_NAME),
-        api_key=line_edit_text(view, qt_widgets, SETTINGS_FTRACK_API_KEY_INPUT_OBJECT_NAME),
-        project=line_edit_text(view, qt_widgets, SETTINGS_FTRACK_PROJECT_INPUT_OBJECT_NAME),
+        api_user=line_edit_text(
+            view, qt_widgets, SETTINGS_FTRACK_API_USER_INPUT_OBJECT_NAME
+        ).strip(),
+        api_key=line_edit_text(view, qt_widgets, SETTINGS_FTRACK_API_KEY_INPUT_OBJECT_NAME).strip(),
+        project=line_edit_text(view, qt_widgets, SETTINGS_FTRACK_PROJECT_INPUT_OBJECT_NAME).strip(),
     )
 
 
@@ -251,6 +258,7 @@ def _build_ftrack_field_row(
     value: str,
     placeholder: str,
     secret: bool = False,
+    tooltip: str = "",
     on_changed: Optional[Callable[[], None]] = None,
 ) -> Any:
     row = qt_widgets.QWidget()
@@ -274,6 +282,9 @@ def _build_ftrack_field_row(
     set_placeholder = getattr(field, "setPlaceholderText", None)
     if set_placeholder is not None and placeholder:
         set_placeholder(placeholder)
+    set_tooltip = getattr(field, "setToolTip", None)
+    if set_tooltip is not None and tooltip:
+        set_tooltip(tooltip)
     set_fixed_width = getattr(field, "setFixedWidth", None)
     if set_fixed_width is not None:
         set_fixed_width(_FTRACK_FIELD_WIDTH)

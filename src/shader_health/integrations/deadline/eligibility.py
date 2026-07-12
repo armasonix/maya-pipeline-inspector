@@ -25,14 +25,12 @@ class FarmEligibilityDecision(str, Enum):
     WARN = "warn"
     BLOCK = "block"
 
-
 @dataclass(frozen=True)
 class FarmSceneState:
     """Maya scene context evaluated alongside validation output."""
 
     scene_saved: bool = True
     renderer_plugin_loaded: bool = True
-
 
 @dataclass(frozen=True)
 class FarmValidationResult:
@@ -79,7 +77,6 @@ class FarmValidationResult:
             block_deadline=block_deadline,
         )
 
-
 @dataclass(frozen=True)
 class FarmEligibilityResult:
     """Farm submit eligibility decision with machine-readable reasons."""
@@ -89,7 +86,6 @@ class FarmEligibilityResult:
     exit_code: int
     reasons: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
-
 
 def evaluate_farm_submit_eligibility(
     result: FarmValidationResult,
@@ -151,7 +147,6 @@ def evaluate_farm_submit_eligibility(
         reasons=("validation_error",),
     )
 
-
 def _blocked(*, exit_code: int, reasons: tuple[str, ...]) -> FarmEligibilityResult:
     return FarmEligibilityResult(
         decision=FarmEligibilityDecision.BLOCK,
@@ -159,7 +154,6 @@ def _blocked(*, exit_code: int, reasons: tuple[str, ...]) -> FarmEligibilityResu
         exit_code=exit_code,
         reasons=reasons,
     )
-
 
 def _validator_exit_code_from_blocks(
     *,

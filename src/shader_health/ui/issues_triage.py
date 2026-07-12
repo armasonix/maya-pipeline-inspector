@@ -17,7 +17,6 @@ from shader_health.ui.main_window import (
 
 ISSUE_FILTER_PREFS_ATTR = "_shader_health_issue_filter_prefs"
 
-
 @dataclass(frozen=True)
 class IssueFilterPrefs:
     """Per-session issues table filter and sort preferences."""
@@ -26,7 +25,6 @@ class IssueFilterPrefs:
     owner: str = ALL_OWNERS_LABEL
     view: str = ALL_ISSUES_LABEL
     sort: str = "severity"
-
 
 def resolve_combo_preference(
     preferred: str,
@@ -42,7 +40,6 @@ def resolve_combo_preference(
         return fallback
     return options[0] if options else preferred
 
-
 def read_issue_filter_prefs(content: Any) -> IssueFilterPrefs:
     """Read stored issue filter preferences from panel content."""
 
@@ -51,12 +48,10 @@ def read_issue_filter_prefs(content: Any) -> IssueFilterPrefs:
         return stored
     return IssueFilterPrefs()
 
-
 def write_issue_filter_prefs(content: Any, prefs: IssueFilterPrefs) -> None:
     """Persist issue filter preferences on panel content."""
 
     setattr(content, ISSUE_FILTER_PREFS_ATTR, prefs)
-
 
 def read_issue_filter_prefs_from_widgets(
     content: Any,
@@ -95,7 +90,6 @@ def read_issue_filter_prefs_from_widgets(
     write_issue_filter_prefs(content, prefs)
     return prefs
 
-
 def apply_combo_preference(
     combo: Any,
     options: Sequence[str],
@@ -112,7 +106,6 @@ def apply_combo_preference(
     if set_current is not None:
         set_current(choice)
     return choice
-
 
 def _combo_text(combo: Any, default: str) -> str:
     current_text = getattr(combo, "currentText", None)

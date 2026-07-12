@@ -20,7 +20,6 @@ MANIFEST_SCHEMA_VERSION = "1.1"
 
 JsonDict = dict[str, Any]
 
-
 def build_shader_manifest(
     snapshot: GraphSnapshot,
     *,
@@ -62,7 +61,6 @@ def build_shader_manifest(
         payload["health_score"] = resolved_health_score
     return payload
 
-
 def dumps_shader_manifest(
     snapshot: GraphSnapshot,
     *,
@@ -80,7 +78,6 @@ def dumps_shader_manifest(
         )
         + "\n"
     )
-
 
 def write_shader_manifest(
     path: str | Path,
@@ -104,7 +101,6 @@ def write_shader_manifest(
         encoding="utf-8",
     )
     return output_path
-
 
 def _material_entry(
     material: MaterialSnapshot,
@@ -134,7 +130,6 @@ def _material_entry(
         entry["issues"] = dict(issues)
     return entry
 
-
 def _material_issue_summary(
     results: Optional[Iterable[RuleResult]],
 ) -> dict[str, JsonDict]:
@@ -162,7 +157,6 @@ def _material_issue_summary(
             rule_ids.sort()
     return summary
 
-
 def _texture_entries(
     texture_node_ids: Iterable[str],
     nodes_by_id: dict[str, NodeSnapshot],
@@ -178,7 +172,6 @@ def _texture_entries(
         for dependency in sorted(dependencies, key=_dependency_sort_key):
             entries.append(_texture_entry(node_id, dependency, nodes_by_id, semantic_by_node_id))
     return entries
-
 
 def _texture_entry(
     node_id: str,
@@ -228,7 +221,6 @@ def _texture_entry(
     )
     return entry
 
-
 def _dependencies_by_node_id(
     dependencies: Iterable[FileDependencySnapshot],
 ) -> dict[str, list[FileDependencySnapshot]]:
@@ -236,7 +228,6 @@ def _dependencies_by_node_id(
     for dependency in dependencies:
         grouped.setdefault(dependency.node_id, []).append(dependency)
     return grouped
-
 
 def _semantic_by_node_id(
     connections: Iterable[ConnectionSnapshot],
@@ -252,10 +243,8 @@ def _semantic_by_node_id(
             semantics.setdefault(connection.src_node, connection.semantic)
     return semantics
 
-
 def _material_sort_key(material: MaterialSnapshot) -> tuple[str, str]:
     return (material.name, material.node_id)
-
 
 def _dependency_sort_key(dependency: FileDependencySnapshot) -> tuple[str, str, str]:
     return (

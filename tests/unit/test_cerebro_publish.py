@@ -11,6 +11,7 @@ from shader_health.integrations.cerebro.publish import (
     maybe_publish_validation_summary,
     publish_validation_summary,
     resolve_task_id,
+    task_url_candidates,
 )
 from shader_health.integrations.trackers.publish import ValidationPublishPayload
 from shader_health.studio_config import (
@@ -26,8 +27,10 @@ class FakeCerebroDatabase:
     connected: bool = False
     credentials: tuple[str, str] = ("", "")
     task_urls: dict[str, int] = field(default_factory=dict)
+    project_children: dict[int, dict[str, int]] = field(default_factory=dict)
     definition_message_ids: dict[int, int] = field(default_factory=dict)
     notes: list[tuple[int, int, str]] = field(default_factory=list)
+    status_updates: list[tuple[int, str]] = field(default_factory=list)
     next_message_id: int = 100
 
     def connect(self, user: str, password: str) -> bool:
@@ -36,7 +39,16 @@ class FakeCerebroDatabase:
         return True
 
     def task_by_url(self, task_url: str) -> int | None:
-        return self.task_urls.get(task_url)
+        task_id = self.task_urls.get(task_url)
+        if task_id is None:
+            return None
+        return task_id
+
+    def resolve_task_in_project(self, project: str, task_name: str) -> int | None:
+        project_id = self.task_urls.get(f"/{project}") or self.task_urls.get(f"/{project}/")
+        if project_id is None:
+            return None
+        return self.project_children.get(project_id, {}).get(task_name)
 
     def task_definition_message_id(self, task_id: int) -> int | None:
         return self.definition_message_ids.get(task_id)
@@ -46,6 +58,10 @@ class FakeCerebroDatabase:
         message_id = self.next_message_id
         self.next_message_id += 1
         return message_id
+
+    def set_task_status(self, task_id: int, status_name: str) -> bool:
+        self.status_updates.append((task_id, status_name))
+        return True
 
 
 def _payload(**overrides: object) -> ValidationPublishPayload:
@@ -90,8 +106,48 @@ def test_resolve_cerebro_config_requires_complete_settings():
     assert resolve_cerebro_config(_studio_config(_cerebro_settings(api_password=""))) is None
 
 
-def test_build_task_url_formats_project_and_scene():
-    assert build_task_url("Demo Project", "hero.ma") == "/Demo Project/hero.ma"
+def test_build_task_url_formats_project_and_task_name():
+    assert build_task_url("Demo Project", "hero") == "/Demo Project/hero"
+
+
+def test_task_url_candidates_try_scene_stem_before_full_filename():
+    config = _cerebro_settings().to_cerebro_config()
+    assert config is not None
+    candidates = task_url_candidates(
+        config,
+        _payload(scene_name="shader_health_demo_broken.ma"),
+    )
+    assert candidates == (
+        "/Demo Project/shader_health_demo_broken",
+        "/Demo Project/shader_health_demo_broken/",
+        "/Demo Project/shader_health_demo_broken.ma",
+        "/Demo Project/shader_health_demo_broken.ma/",
+    )
+
+
+def test_resolve_task_id_falls_back_to_project_children():
+    database = FakeCerebroDatabase(
+        task_urls={"/Demo Project": 10},
+        project_children={10: {"shader_health_demo_broken": 55}},
+        definition_message_ids={55: 7},
+    )
+    client = CerebroClient(
+        CerebroConfig(
+            server_url="https://db5.cerebrohq.com/dapi5/rpc.php",
+            api_user="api@studio",
+            api_password="secret",
+            project="Demo Project",
+        ),
+        database_port=database,
+    )
+
+    task_id = resolve_task_id(
+        client,
+        client.config,
+        _payload(scene_name="shader_health_demo_broken.ma"),
+    )
+
+    assert task_id == 55
 
 
 def test_resolve_task_id_prefers_payload_metadata():
@@ -116,9 +172,29 @@ def test_resolve_task_id_prefers_payload_metadata():
     assert database.connected is False
 
 
+def test_resolve_task_id_falls_back_to_scene_stem():
+    database = FakeCerebroDatabase(
+        task_urls={"/Demo Project/hero": 42},
+    )
+    client = CerebroClient(
+        CerebroConfig(
+            server_url="cerebrohq.com",
+            api_user="pipeline.bot",
+            api_password="secret",
+            project="Demo Project",
+        ),
+        database_port=database,
+    )
+
+    task_id = resolve_task_id(client, client.config, _payload(scene_name="hero.ma"))
+
+    assert task_id == 42
+    assert database.connected is True
+
+
 def test_publish_validation_summary_creates_task_note_from_scene_lookup():
     database = FakeCerebroDatabase(
-        task_urls={"/Demo Project/hero.ma": 42},
+        task_urls={"/Demo Project/hero": 42},
         definition_message_ids={42: 7},
     )
 
@@ -135,7 +211,7 @@ def test_publish_validation_summary_creates_task_note_from_scene_lookup():
     assert result.external_url == "100"
     assert result.metadata["note_id"] == "100"
     assert len(database.notes) == 1
-    assert "Shader Health validation summary" in database.notes[0][2]
+    assert "Health Validation Result" in database.notes[0][2]
 
 
 def test_publish_validation_summary_skips_when_task_not_found():
@@ -149,11 +225,22 @@ def test_publish_validation_summary_skips_when_task_not_found():
 
     assert result.published is False
     assert result.skipped_reason == "task_not_found"
+    assert "shader_health_demo_broken" not in (result.error_message or "")
+
+
+def test_publish_validation_summary_reports_missing_py_cerebro():
+    result = publish_validation_summary(
+        _studio_config(_cerebro_settings(service_tools_path="")),
+        _payload(),
+    )
+
+    assert result.published is False
+    assert result.error_message == "service_tools_path_empty"
 
 
 def test_maybe_publish_validation_summary_accepts_validation_run_result():
     database = FakeCerebroDatabase(
-        task_urls={"/Demo Project/hero.ma": 42},
+        task_urls={"/Demo Project/hero": 42},
         definition_message_ids={42: 7},
     )
 

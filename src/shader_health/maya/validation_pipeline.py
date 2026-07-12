@@ -278,6 +278,25 @@ def run_validation(
                 normalized_overrides,
             ),
         )
+    if session_rule_overrides:
+        from shader_health.core.rule_browser import merge_session_rule_overrides
+        from shader_health.core.rule_loader import RuleOverride
+
+        normalized_overrides = {
+            str(rule_id): (
+                override
+                if isinstance(override, RuleOverride)
+                else RuleOverride.from_dict(str(rule_id), override)
+            )
+            for rule_id, override in session_rule_overrides.items()
+        }
+        profile = replace(
+            profile,
+            rule_overrides=merge_session_rule_overrides(
+                profile.rule_overrides,
+                normalized_overrides,
+            ),
+        )
     renderer_ids = (enriched.renderer,) if enriched.renderer else ()
     rules = load_rule_stack(
         rule_root=rule_root or DEFAULT_RULE_ROOT,

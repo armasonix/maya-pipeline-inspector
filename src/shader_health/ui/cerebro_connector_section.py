@@ -30,6 +30,9 @@ SETTINGS_CEREBRO_API_PASSWORD_INPUT_OBJECT_NAME = (
     "shaderHealthInspectorSettingsCerebroApiPasswordInput"
 )
 SETTINGS_CEREBRO_PROJECT_INPUT_OBJECT_NAME = "shaderHealthInspectorSettingsCerebroProjectInput"
+SETTINGS_CEREBRO_SERVICE_TOOLS_PATH_INPUT_OBJECT_NAME = (
+    "shaderHealthInspectorSettingsCerebroServiceToolsPathInput"
+)
 
 _CEREBRO_LABEL_WIDTH = 84
 _CEREBRO_FIELD_WIDTH = 292
@@ -94,10 +97,14 @@ def build_cerebro_connector_section(
     details_layout.addWidget(
         _build_cerebro_field_row(
             qt_widgets,
-            label="Server URL",
+            label="Database host",
             object_name=SETTINGS_CEREBRO_SERVER_URL_INPUT_OBJECT_NAME,
             value=cerebro.server_url,
-            placeholder="cerebrohq.com:45432",
+            placeholder="https://db5.cerebrohq.com/dapi5/rpc.php",
+            tooltip=(
+                "Server API URL from Cerebro web (for example "
+                "https://db5.cerebrohq.com/dapi5/rpc.php). Host:45432 is derived automatically."
+            ),
             on_changed=on_settings_changed,
         )
     )
@@ -107,18 +114,20 @@ def build_cerebro_connector_section(
             label="API user",
             object_name=SETTINGS_CEREBRO_API_USER_INPUT_OBJECT_NAME,
             value=cerebro.api_user,
-            placeholder="pipeline.bot",
+            placeholder="api@studio",
+            tooltip="API Users email from Cerebro web, not your personal login.",
             on_changed=on_settings_changed,
         )
     )
     details_layout.addWidget(
         _build_cerebro_field_row(
             qt_widgets,
-            label="Password",
+            label="Access token",
             object_name=SETTINGS_CEREBRO_API_PASSWORD_INPUT_OBJECT_NAME,
             value=cerebro.api_password,
-            placeholder="cerebro-password",
+            placeholder="paste access token",
             secret=True,
+            tooltip="Access token copied from the same Cerebro API Users page.",
             on_changed=on_settings_changed,
         )
     )
@@ -129,6 +138,21 @@ def build_cerebro_connector_section(
             object_name=SETTINGS_CEREBRO_PROJECT_INPUT_OBJECT_NAME,
             value=cerebro.project,
             placeholder="Demo Project",
+            tooltip="Exact Cerebro project name used for task lookup.",
+            on_changed=on_settings_changed,
+        )
+    )
+    details_layout.addWidget(
+        _build_cerebro_field_row(
+            qt_widgets,
+            label="Service tools",
+            object_name=SETTINGS_CEREBRO_SERVICE_TOOLS_PATH_INPUT_OBJECT_NAME,
+            value=cerebro.service_tools_path,
+            placeholder=r"C:\tools\service-tools",
+            tooltip=(
+                "Folder containing py_cerebro from Cerebro service-tools.zip. "
+                "One-time Maya setup: mayapy -m pip install psycopg2-binary."
+            ),
             on_changed=on_settings_changed,
         )
     )
@@ -156,8 +180,9 @@ def build_cerebro_connector_section(
     _set_cerebro_details_visible(details_row, config.connectors.cerebro.enabled)
 
     hint = qt_widgets.QLabel(
-        "When enabled, Shader Health can publish validation summaries as Cerebro "
-        "task notes. Server URL and credentials are stored in the studio config."
+        "When enabled, Shader Health publishes validation summaries as Cerebro task notes. "
+        "Database host, API user, and access token come from Cerebro web API Users. "
+        "Connection is tested when you save or edit Cerebro settings."
     )
     hint.setWordWrap(True)
     section_layout.addWidget(hint)
@@ -177,6 +202,11 @@ def read_cerebro_connector_from_view(view: Any, qt_widgets: Any) -> CerebroConne
             SETTINGS_CEREBRO_API_PASSWORD_INPUT_OBJECT_NAME,
         ),
         project=line_edit_text(view, qt_widgets, SETTINGS_CEREBRO_PROJECT_INPUT_OBJECT_NAME),
+        service_tools_path=line_edit_text(
+            view,
+            qt_widgets,
+            SETTINGS_CEREBRO_SERVICE_TOOLS_PATH_INPUT_OBJECT_NAME,
+        ),
     )
 
 
@@ -223,6 +253,12 @@ def update_cerebro_connector_view(
         SETTINGS_CEREBRO_PROJECT_INPUT_OBJECT_NAME,
         cerebro.project,
     )
+    set_line_edit_text(
+        view,
+        qt_widgets,
+        SETTINGS_CEREBRO_SERVICE_TOOLS_PATH_INPUT_OBJECT_NAME,
+        cerebro.service_tools_path,
+    )
 
 
 def get_cerebro_settings(connectors: ConnectorSettings) -> CerebroConnectorSettings:
@@ -257,6 +293,7 @@ def _build_cerebro_field_row(
     value: str,
     placeholder: str,
     secret: bool = False,
+    tooltip: str = "",
     on_changed: Optional[Callable[[], None]] = None,
 ) -> Any:
     row = qt_widgets.QWidget()
@@ -280,6 +317,9 @@ def _build_cerebro_field_row(
     set_placeholder = getattr(field, "setPlaceholderText", None)
     if set_placeholder is not None and placeholder:
         set_placeholder(placeholder)
+    set_tooltip = getattr(field, "setToolTip", None)
+    if set_tooltip is not None and tooltip:
+        set_tooltip(tooltip)
     set_fixed_width = getattr(field, "setFixedWidth", None)
     if set_fixed_width is not None:
         set_fixed_width(_CEREBRO_FIELD_WIDTH)

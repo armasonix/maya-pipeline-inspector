@@ -410,10 +410,14 @@ class FakeTabWidget(FakeWidget):
     def __init__(self) -> None:
         super().__init__()
         self.tabs: list[tuple[str, Any]] = []
+        self.current_index = 0
 
     def addTab(self, widget: Any, title: str) -> None:
         self.tabs.append((title, widget))
         self.children.append(widget)
+
+    def setCurrentIndex(self, index: int) -> None:
+        self.current_index = index
 
 
 class FakeQtWidgets:
@@ -431,6 +435,20 @@ class FakeQtWidgets:
     QSizePolicy = FakeSizePolicy
     Qt = FakeQt
     QTabWidget = FakeTabWidget
+
+
+def test_prepare_settings_interactive_state_does_not_reset_active_tab():
+    view = settings_panel.build_settings_view(FakeQtWidgets)
+    tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    tabs.setCurrentIndex(4)
+
+    settings_panel.prepare_settings_interactive_state(
+        view,
+        FakeQtWidgets,
+        UserPreferences.default(),
+    )
+
+    assert tabs.current_index == 4
 
 
 def test_basic_tab_exposes_user_preference_controls():

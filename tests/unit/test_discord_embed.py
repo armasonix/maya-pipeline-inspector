@@ -33,7 +33,7 @@ def test_validation_embed_context_from_mapping_reads_fields():
     assert context.health_score == 61
 
 
-def test_format_validation_embed_includes_profile_overlay_and_issue_fields():
+def test_format_validation_embed_uses_unified_chat_layout():
     embed = format_validation_embed(
         ValidationEmbedContext(
             scene_name="hero.ma",
@@ -51,14 +51,12 @@ def test_format_validation_embed_includes_profile_overlay_and_issue_fields():
         matched_events=(DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH,),
     )
 
-    assert embed["title"] == "Shader Health: Publish block"
-    assert "42/100" in embed["description"]
+    assert embed["title"] == "🔍 Health Validation · Publish block"
+    assert "🔴 Health score: 42/100" in embed["description"]
+    assert "📊 Actual Issue list:" in embed["description"]
+    assert "- Publish block" in embed["description"]
     assert embed["color"] == 0xE74C3C
-    field_names = [field["name"] for field in embed["fields"]]
-    assert field_names == ["Scene", "Profile", "Scope", "Issues"]
-    assert embed["fields"][0]["value"] == "hero.ma"
-    assert embed["fields"][1]["value"] == "publish_strict+character"
-    assert "2 critical" in embed["fields"][3]["value"]
+    assert "fields" not in embed
 
 
 def test_format_validation_embed_uses_mixed_color_for_both_block_events():
@@ -82,5 +80,7 @@ def test_format_validation_embed_uses_mixed_color_for_both_block_events():
         ),
     )
 
-    assert embed["title"] == "Shader Health: Publish block, Deadline block"
+    assert embed["title"] == "🔍 Health Validation · Publish block, Deadline block"
+    assert "- Publish block" in embed["description"]
+    assert "- Deadline block" in embed["description"]
     assert embed["color"] == 0xC0392B

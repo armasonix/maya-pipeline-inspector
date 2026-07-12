@@ -52,7 +52,7 @@ def format_tracker_publish_status(outcome: TrackerPublishOutcome | None) -> str:
 
     if outcome is None:
         return (
-            "Send to Tracker skipped — enable a task tracker in Settings → Connectors."
+            "Send to Tracker skipped вЂ” enable a task tracker in Settings в†’ Connectors."
         )
 
     display_name = outcome.display_name
@@ -64,6 +64,9 @@ def format_tracker_publish_status(outcome: TrackerPublishOutcome | None) -> str:
         return f"{display_name}: validation summary published."
 
     if publish_result.skipped_reason:
+        detail = (publish_result.error_message or "").strip()
+        if detail and detail != publish_result.skipped_reason:
+            return f"{display_name}: skipped ({publish_result.skipped_reason}) — {detail}"
         return f"{display_name}: skipped ({publish_result.skipped_reason})."
 
     if publish_result.error_message:

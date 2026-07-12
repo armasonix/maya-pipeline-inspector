@@ -21,7 +21,6 @@ FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME = "shaderHealthInspectorFarmRefreshCo
 FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME = "shaderHealthInspectorFarmPreflightButton"
 FARM_SUBMIT_BUTTON_OBJECT_NAME = "shaderHealthInspectorFarmSubmitButton"
 
-
 @dataclass(frozen=True)
 class FarmTabState:
     """Display data for the Farm tab."""
@@ -38,7 +37,6 @@ class FarmTabState:
     last_job_id: str = ""
     status_message: str = "Run Farm Preflight to evaluate deadline_critical readiness."
 
-
 @dataclass(frozen=True)
 class FarmActionCallbacks:
     """Callbacks for Farm tab actions."""
@@ -46,7 +44,6 @@ class FarmActionCallbacks:
     on_refresh_connection: Optional[Callable[[], None]] = None
     on_run_farm_preflight: Optional[Callable[[], None]] = None
     on_submit_to_farm: Optional[Callable[[], None]] = None
-
 
 def build_farm_tab(
     qt_widgets: Any,
@@ -144,7 +141,6 @@ def build_farm_tab(
     _update_farm_action_buttons(tab, qt_widgets, farm_state)
     return tab
 
-
 def update_farm_tab(
     tab_root: Any,
     qt_widgets: Any,
@@ -160,7 +156,6 @@ def update_farm_tab(
     _set_label(tab_root, qt_widgets, FARM_STATUS_LABEL_OBJECT_NAME, state.status_message)
     _update_connection_indicator(tab_root, qt_widgets, state)
     _update_farm_action_buttons(tab_root, qt_widgets, state)
-
 
 def _build_connection_status_group(qt_widgets: Any, state: FarmTabState) -> Any:
     """Build Status label, colored lamp, and connection status text."""
@@ -187,7 +182,6 @@ def _build_connection_status_group(qt_widgets: Any, state: FarmTabState) -> Any:
     _set_compact_horizontal(qt_widgets, status_value)
     return group
 
-
 def _update_connection_indicator(tab_root: Any, qt_widgets: Any, state: FarmTabState) -> None:
     lamp = _find_child(tab_root, qt_widgets.QLabel, FARM_CONNECTION_LAMP_OBJECT_NAME)
     if lamp is not None:
@@ -199,13 +193,11 @@ def _update_connection_indicator(tab_root: Any, qt_widgets: Any, state: FarmTabS
         _connection_status_value_text(state),
     )
 
-
 def _qt_align_left(qt_widgets: Any) -> Any:
     qt = getattr(qt_widgets, "Qt", None)
     if qt is None:
         return None
     return getattr(qt, "AlignLeft", None)
-
 
 def _set_compact_horizontal(qt_widgets: Any, widget: Any) -> None:
     size_policy = getattr(qt_widgets, "QSizePolicy", None)
@@ -216,18 +208,15 @@ def _set_compact_horizontal(qt_widgets: Any, widget: Any) -> None:
     if fixed is not None:
         set_policy(fixed, fixed)
 
-
 def _connection_status_value_text(state: FarmTabState) -> str:
     if not state.integration_enabled:
         return "Offline"
     return "Online" if state.connection_reachable else "Offline"
 
-
 def _connection_lamp_color(state: FarmTabState) -> str:
     if state.integration_enabled and state.connection_reachable:
         return "#2ecc71"
     return "#e74c3c"
-
 
 def _apply_connection_lamp_style(lamp: Any, state: FarmTabState) -> None:
     color = _connection_lamp_color(state)
@@ -248,7 +237,6 @@ def _apply_connection_lamp_style(lamp: Any, state: FarmTabState) -> None:
             f"({state.connection_status})"
         )
 
-
 def _connection_text(state: FarmTabState) -> str:
     if not state.integration_enabled:
         return (
@@ -258,27 +246,22 @@ def _connection_text(state: FarmTabState) -> str:
     status = "reachable" if state.connection_reachable else "unreachable"
     return f"Deadline Web Service: {state.api_url} ({status}; {state.connection_status})"
 
-
 def _scene_state_text(state: FarmTabState) -> str:
     saved = "yes" if state.scene_saved else "no"
     plugin = "loaded" if state.renderer_plugin_loaded else "missing"
     return f"Scene saved: {saved}   Renderer plug-in: {plugin}"
 
-
 def _eligibility_text(state: FarmTabState) -> str:
     allowed = "yes" if state.eligibility_allowed else "no"
     return f"Farm eligibility: {state.eligibility_decision} (submit allowed: {allowed})"
-
 
 def _last_report_text(state: FarmTabState) -> str:
     report = state.last_report_path or "none"
     return f"Last farm report: {report}"
 
-
 def _last_job_text(state: FarmTabState) -> str:
     job_id = state.last_job_id or "none"
     return f"Last Deadline job id: {job_id}"
-
 
 def _farm_button(
     qt_widgets: Any,
@@ -290,7 +273,6 @@ def _farm_button(
     from shader_health.ui.main_window import _compact_button
 
     return _compact_button(qt_widgets, label, object_name, tooltip, callback)
-
 
 def _update_farm_action_buttons(tab_root: Any, qt_widgets: Any, state: FarmTabState) -> None:
     actions_enabled = state.integration_enabled
@@ -306,7 +288,6 @@ def _update_farm_action_buttons(tab_root: Any, qt_widgets: Any, state: FarmTabSt
         if set_enabled is not None:
             set_enabled(actions_enabled)
 
-
 def _set_label(tab_root: Any, qt_widgets: Any, object_name: str, text: str) -> None:
     widget = _find_child(tab_root, qt_widgets.QLabel, object_name)
     if widget is None:
@@ -314,7 +295,6 @@ def _set_label(tab_root: Any, qt_widgets: Any, object_name: str, text: str) -> N
     set_text = getattr(widget, "setText", None)
     if set_text is not None:
         set_text(text)
-
 
 def _find_child(root: Any, widget_type: Any, object_name: str) -> Any:
     if root is None:
@@ -342,7 +322,6 @@ def _find_child(root: Any, widget_type: Any, object_name: str) -> Any:
             if _widget_object_name(match) == object_name:
                 return match
     return None
-
 
 def _widget_object_name(widget: Any) -> str:
     object_name_fn = getattr(widget, "objectName", None)

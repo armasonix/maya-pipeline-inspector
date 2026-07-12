@@ -160,6 +160,24 @@ def list_rule_templates() -> tuple[RuleTemplateSpec, ...]:
     return tuple(_RULE_TEMPLATES[template_id] for template_id in RULE_TEMPLATE_IDS)
 
 
+def optional_fields_for_template(template_id: str) -> frozenset[str]:
+    """Return template-specific draft fields that should stay visible in the wizard."""
+
+    normalized = template_id.strip()
+    if normalized == RULE_TEMPLATE_ATTRIBUTE_EQUALS:
+        return frozenset({"attribute", "expected"})
+    if normalized == RULE_TEMPLATE_NUMERIC_MAX:
+        return frozenset({"attribute", "max_value"})
+    if normalized == RULE_TEMPLATE_PATH_EXISTS:
+        return frozenset({"dependency_kind"})
+    return frozenset()
+
+
+OPTIONAL_RULE_DRAFT_FIELDS = frozenset(
+    {"attribute", "expected", "max_value", "dependency_kind"}
+)
+
+
 def get_rule_template(template_id: str) -> RuleTemplateSpec:
     normalized = template_id.strip()
     try:

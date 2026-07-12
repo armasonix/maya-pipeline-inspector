@@ -87,10 +87,8 @@ _TEXTURE_PATH_ATTRS = {
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _VERSION_TOKEN_RE = re.compile(r"(?i)v(?P<version>\d+)")
 
-
 class MayaUnavailableError(RuntimeError):
     """Raised when Maya commands are required but unavailable."""
-
 
 @dataclass(frozen=True)
 class ScanOptions:
@@ -100,7 +98,6 @@ class ScanOptions:
     include_file_dependencies: bool = True
     include_connections: bool = True
 
-
 def scan_scene(
     options: Optional[ScanOptions] = None,
     cmds_module: Optional[Any] = None,
@@ -109,7 +106,6 @@ def scan_scene(
 
     cmds = _get_cmds(cmds_module)
     return _scan_snapshot(cmds, scan_scope="scene", options=options or ScanOptions())
-
 
 def scan_selection(
     options: Optional[ScanOptions] = None,
@@ -126,12 +122,10 @@ def scan_selection(
         selected_nodes=selection,
     )
 
-
 def selection_node_names(cmds_module: Optional[Any] = None) -> list[str]:
     """Return the current Maya selection as long node names."""
 
     return _selection_names(_get_cmds(cmds_module))
-
 
 def _get_cmds(cmds_module: Optional[Any]) -> Any:
     if cmds_module is not None:
@@ -145,7 +139,6 @@ def _get_cmds(cmds_module: Optional[Any]) -> Any:
             "cmds_module for tests."
         ) from exc
     return cmds
-
 
 def _scan_snapshot(
     cmds: Any,
@@ -169,7 +162,6 @@ def _scan_snapshot(
         references=graph.references,
     )
 
-
 @dataclass
 class _GraphBuildResult:
     nodes: dict[str, NodeSnapshot]
@@ -178,7 +170,6 @@ class _GraphBuildResult:
     shading_engines: list[ShadingEngineSnapshot]
     file_dependencies: list[FileDependencySnapshot]
     references: list[ReferenceSnapshot]
-
 
 def _collect_shader_graph(
     cmds: Any,
@@ -273,7 +264,6 @@ def _collect_shader_graph(
         references=references,
     )
 
-
 def _shading_engine_names(cmds: Any, selected_nodes: Optional[list[str]]) -> list[str]:
     if selected_nodes is None:
         scene_engines = _call_cmds(cmds, "ls", [], type="shadingEngine", long=True) or []
@@ -283,7 +273,6 @@ def _shading_engine_names(cmds: Any, selected_nodes: Optional[list[str]]) -> lis
     for node_name in selected_nodes:
         selected_engines.extend(_shading_engines_for_node(cmds, node_name))
     return _dedupe_strings(selected_engines)
-
 
 def _shading_engines_for_node(cmds: Any, node_name: str) -> list[str]:
     engines: list[str] = []
@@ -342,7 +331,6 @@ def _shading_engines_for_node(cmds: Any, node_name: str) -> list[str]:
 
     return _dedupe_strings(engines)
 
-
 def _is_shader_node_type(type_name: str) -> bool:
     if type_name in {
         "lambert",
@@ -354,7 +342,6 @@ def _is_shader_node_type(type_name: str) -> bool:
         return True
     lowered = type_name.lower()
     return type_name.startswith("VRay") or "material" in lowered or type_name.endswith("Mtl")
-
 
 def _walk_upstream_graph(cmds: Any, root_node: str) -> tuple[list[str], list[ConnectionSnapshot]]:
     visited: set[str] = set()
@@ -372,7 +359,6 @@ def _walk_upstream_graph(cmds: Any, root_node: str) -> tuple[list[str], list[Con
 
     visit(root_node)
     return ordered_nodes, _dedupe_connections(connections)
-
 
 def _input_connections(cmds: Any, node_name: str) -> list[ConnectionSnapshot]:
     raw_connections = _call_cmds(
@@ -408,7 +394,6 @@ def _input_connections(cmds: Any, node_name: str) -> list[ConnectionSnapshot]:
         )
     return connections
 
-
 def _material_snapshot(
     cmds: Any,
     *,
@@ -441,7 +426,6 @@ def _material_snapshot(
         graph_fingerprint="",
     )
 
-
 def _add_node_snapshot(cmds: Any, nodes: dict[str, NodeSnapshot], node_name: str) -> None:
     node_id = _node_id(node_name)
     if node_id in nodes:
@@ -462,7 +446,6 @@ def _add_node_snapshot(cmds: Any, nodes: dict[str, NodeSnapshot], node_name: str
         classification=_classify_node(type_name),
     )
 
-
 def _collect_attrs(cmds: Any, node_name: str, type_name: str) -> dict[str, Any]:
     attrs: dict[str, Any] = {}
     for attr_name in _attrs_for_type(type_name):
@@ -471,10 +454,8 @@ def _collect_attrs(cmds: Any, node_name: str, type_name: str) -> dict[str, Any]:
             attrs[attr_name] = value
     return attrs
 
-
 def _attrs_for_type(type_name: str) -> tuple[str, ...]:
     return _ATTRS_BY_TYPE.get(type_name, ())
-
 
 def _safe_get_attr(cmds: Any, node_name: str, attr_name: str) -> Any:
     plug = f"{node_name}.{attr_name}"
@@ -487,16 +468,13 @@ def _safe_get_attr(cmds: Any, node_name: str, attr_name: str) -> Any:
         log.debug("Skipping unreadable Maya attribute %s: %s", plug, exc)
         return None
 
-
 def _is_referenced(cmds: Any, node_name: str) -> bool:
     value = _call_cmds(cmds, "referenceQuery", False, node_name, isNodeReferenced=True)
     return bool(value)
 
-
 def _reference_path(cmds: Any, node_name: str) -> Optional[str]:
     value = _call_cmds(cmds, "referenceQuery", None, node_name, filename=True)
     return str(value) if value else None
-
 
 def _is_locked(cmds: Any, node_name: str) -> bool:
     value = _call_cmds(cmds, "lockNode", False, node_name, query=True, lock=True)
@@ -504,14 +482,11 @@ def _is_locked(cmds: Any, node_name: str) -> bool:
         return bool(value[0]) if value else False
     return bool(value)
 
-
 def _namespace(node_name: str) -> Optional[str]:
     short_path = node_name.rsplit("|", 1)[-1]
     if ":" not in short_path:
         return None
     return short_path.rsplit(":", 1)[0]
-
-
 
 def _collect_reference_snapshots(nodes: dict[str, NodeSnapshot]) -> list[ReferenceSnapshot]:
     grouped: dict[tuple[str, str], list[NodeSnapshot]] = {}
@@ -577,19 +552,15 @@ def _collect_file_dependencies(nodes: dict[str, NodeSnapshot]) -> list[FileDepen
 
     return dependencies
 
-
 def _texture_path_attr(type_name: str) -> Optional[str]:
     return _TEXTURE_PATH_ATTRS.get(type_name)
-
 
 def _resolve_path(raw_path: str) -> str:
     expanded = os.path.expanduser(os.path.expandvars(raw_path))
     return expanded.replace("\\", "/")
 
-
 def _is_udim_path(path: str) -> bool:
     return "<UDIM>" in path or "<udim>" in path
-
 
 def _udim_glob_pattern(path: str) -> str:
     return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace(
@@ -597,10 +568,8 @@ def _udim_glob_pattern(path: str) -> str:
         "[0-9][0-9][0-9][0-9]",
     )
 
-
 def _udim_files(path: str) -> list[Path]:
     return sorted(Path(item) for item in glob.glob(_udim_glob_pattern(path)))
-
 
 def _existing_udim_tiles(path: str) -> list[int]:
     tiles: set[int] = set()
@@ -610,13 +579,11 @@ def _existing_udim_tiles(path: str) -> list[int]:
             tiles.add(int(matches[-1]))
     return sorted(tiles)
 
-
 def _missing_udim_tiles(existing_tiles: list[int]) -> list[int]:
     if len(existing_tiles) < 2:
         return []
     existing = set(existing_tiles)
     return [tile for tile in range(min(existing), max(existing) + 1) if tile not in existing]
-
 
 def _first_existing_file(path: str, is_udim: bool) -> Optional[Path]:
     if is_udim:
@@ -625,7 +592,6 @@ def _first_existing_file(path: str, is_udim: bool) -> Optional[Path]:
 
     file_path = Path(path)
     return file_path if file_path.is_file() else None
-
 
 def _file_metadata(path: Optional[Path]) -> tuple[Optional[str], Optional[int]]:
     if path is None:
@@ -640,17 +606,14 @@ def _file_metadata(path: Optional[Path]) -> tuple[Optional[str], Optional[int]]:
     mtime_utc = mtime.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return mtime_utc, stat.st_size
 
-
 def _path_extension(path: str) -> Optional[str]:
     normalized = path.replace("<UDIM>", "1001").replace("<udim>", "1001")
     suffix = Path(normalized).suffix
     return suffix or None
 
-
 def _texture_version(path: str) -> Optional[str]:
     match = _VERSION_TOKEN_RE.search(Path(path).name)
     return match.group("version") if match else None
-
 
 def _latest_texture_version(path: str) -> Optional[str]:
     current_version = _texture_version(path)
@@ -695,43 +658,35 @@ def _latest_texture_version(path: str) -> Optional[str]:
     latest = max(int(item) for item in versions)
     return str(latest).zfill(width)
 
-
 def _connected_node(cmds: Any, plug: str) -> Optional[str]:
     connected = _call_cmds(cmds, "listConnections", [], plug, source=True, destination=False) or []
     if not connected:
         return None
     return _plug_node(str(connected[0]))
 
-
 def _set_members(cmds: Any, shading_engine: str) -> list[str]:
     members = _call_cmds(cmds, "sets", [], shading_engine, query=True) or []
     return [str(item) for item in members]
-
 
 def _scene_path(cmds: Any) -> str:
     scene_path = _call_cmds(cmds, "file", "", query=True, sceneName=True)
     return str(scene_path or "")
 
-
 def _maya_version(cmds: Any) -> str:
     version = _call_cmds(cmds, "about", "", version=True)
     return str(version or "")
-
 
 def _current_renderer(cmds: Any) -> Optional[str]:
     renderer = _call_cmds(cmds, "getAttr", None, "defaultRenderGlobals.currentRenderer")
     return str(renderer) if renderer else None
 
-
 def _selection_names(cmds: Any) -> list[str]:
     selection = _call_cmds(cmds, "ls", [], selection=True, long=True) or []
     return [str(item) for item in selection]
 
-
 def _node_type(cmds: Any, node: str) -> str:
     node_type = _call_cmds(cmds, "nodeType", "", node)
     return str(node_type or "")
-
 
 def _classify_node(type_name: str) -> list[str]:
     lowered = type_name.lower()
@@ -747,7 +702,6 @@ def _classify_node(type_name: str) -> list[str]:
         return ["material"]
     return ["utility"]
 
-
 def _renderer_family(type_name: str) -> Optional[str]:
     if type_name.startswith("VRay"):
         return "vray"
@@ -757,24 +711,19 @@ def _renderer_family(type_name: str) -> Optional[str]:
         return "common"
     return None
 
-
 def _node_id(node_name: str) -> str:
     return f"node:{node_name}"
-
 
 def _node_name_from_id(node_id: str) -> str:
     return node_id[5:] if node_id.startswith("node:") else node_id
 
-
 def _plug_node(plug: str) -> str:
     return plug.split(".", 1)[0]
-
 
 def _plug_attr(plug: str) -> str:
     if "." not in plug:
         return ""
     return plug.split(".", 1)[1]
-
 
 def _short_name(full_name: str) -> str:
     if "|" in full_name:
@@ -782,7 +731,6 @@ def _short_name(full_name: str) -> str:
     if ":" in full_name:
         return full_name.rsplit(":", 1)[-1]
     return full_name
-
 
 def _dedupe_strings(values: list[str]) -> list[str]:
     result: list[str] = []
@@ -793,7 +741,6 @@ def _dedupe_strings(values: list[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
-
 
 def _dedupe_connections(connections: list[ConnectionSnapshot]) -> list[ConnectionSnapshot]:
     result: list[ConnectionSnapshot] = []
@@ -806,10 +753,8 @@ def _dedupe_connections(connections: list[ConnectionSnapshot]) -> list[Connectio
         result.append(connection)
     return result
 
-
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
 
 def _call_cmds(cmds: Any, name: str, default: Any, *args: Any, **kwargs: Any) -> Any:
     command = getattr(cmds, name, None)

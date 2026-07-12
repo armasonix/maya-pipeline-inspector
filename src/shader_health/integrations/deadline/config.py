@@ -24,7 +24,6 @@ _ENV_POOL = "SHADER_HEALTH_DEADLINE_POOL"
 _ENV_GROUP = "SHADER_HEALTH_DEADLINE_GROUP"
 _ENV_USER_NAME = "SHADER_HEALTH_DEADLINE_USER_NAME"
 
-
 @dataclass(frozen=True)
 class DeadlineConfig:
     """Connection and validation defaults for Deadline 10 Web Service."""
@@ -97,18 +96,15 @@ class DeadlineConfig:
             user_name=_optional_str(payload.get("user_name")),
         )
 
-
 def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
     return text or None
 
-
 def _optional_path(value: Any) -> Path | None:
     text = _optional_str(value)
     return Path(text) if text else None
-
 
 def _optional_float(value: Any, default: float) -> float:
     if value is None:

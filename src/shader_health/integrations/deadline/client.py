@@ -13,7 +13,6 @@ from shader_health.integrations.deadline.config import DeadlineConfig
 
 HttpTransport = Callable[["HttpRequest", float], "DeadlineResponse"]
 
-
 @dataclass(frozen=True)
 class HttpRequest:
     """Low-level HTTP request passed to a transport implementation."""
@@ -23,7 +22,6 @@ class HttpRequest:
     body: bytes | None
     headers: Mapping[str, str]
 
-
 @dataclass(frozen=True)
 class DeadlineResponse:
     """Normalized Deadline Web Service response."""
@@ -32,10 +30,8 @@ class DeadlineResponse:
     body: str
     json_data: dict[str, Any] | list[Any] | None = None
 
-
 class DeadlineClientError(RuntimeError):
     """Raised when the Deadline Web Service returns an unexpected response."""
-
 
 class DeadlineClient:
     """REST wrapper for Deadline 10 on-prem Web Service endpoints."""
@@ -137,7 +133,6 @@ class DeadlineClient:
             f"Deadline {action} failed with HTTP {response.status_code}: {response.body.strip()}"
         )
 
-
 def default_http_transport(request: HttpRequest, timeout: float) -> DeadlineResponse:
     """Send an HTTP request using the Python standard library."""
 
@@ -163,7 +158,6 @@ def default_http_transport(request: HttpRequest, timeout: float) -> DeadlineResp
             json_data=_parse_json_body(body),
         )
 
-
 def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     text = body.strip()
     if not text or text[0] not in "{[":
@@ -175,7 +169,6 @@ def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     if isinstance(parsed, (dict, list)):
         return parsed
     return None
-
 
 def _extract_job_id(response: DeadlineResponse) -> str:
     if isinstance(response.json_data, dict):

@@ -8,20 +8,17 @@ from shader_health.ui.qt import load_qt_gui
 
 DEFAULT_DOCUMENTATION_URL = "https://github.com/armasonix/maya-shader-health-inspector/wiki"
 
-
 def normalize_documentation_url(url: str) -> str:
     """Return a non-empty documentation URL, falling back to the packaged default."""
 
     text = str(url or "").strip()
     return text or DEFAULT_DOCUMENTATION_URL
 
-
 def is_valid_http_url(url: str) -> bool:
     """Return whether ``url`` is an absolute HTTP or HTTPS URL."""
 
     parsed = urlparse(url)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
-
 
 def open_documentation_url(url: str, *, qt_gui: Any | None = None) -> bool:
     """Open ``url`` in the system browser via ``QDesktopServices``."""

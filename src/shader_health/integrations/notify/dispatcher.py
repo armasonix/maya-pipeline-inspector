@@ -123,3 +123,5 @@ def report_validation_notification_outcomes(
             writer(f"{display_name} notification sent.")
         elif outcome.error_message:
             writer(f"{display_name} notification failed: {outcome.error_message}")
+        elif outcome.skipped_reason:
+            writer(f"{display_name} notification skipped: {outcome.skipped_reason}")

@@ -33,7 +33,6 @@ from shader_health.ui.shotgrid_connector_section import (
 
 TrackerSettingsValue = Any
 
-
 @dataclass(frozen=True)
 class TrackerConnectorDefinition:
     """Metadata for one task tracker connector."""
@@ -49,10 +48,8 @@ class TrackerConnectorDefinition:
     update_view: Callable[[Any, Any, TrackerSettingsValue], None] | None = None
     secret_field_names: frozenset[str] = frozenset()
 
-
 def _get_ftrack_settings(connectors: ConnectorSettings) -> FtrackConnectorSettings:
     return connectors.ftrack
-
 
 def _apply_ftrack_settings(
     connectors: ConnectorSettings,
@@ -60,10 +57,8 @@ def _apply_ftrack_settings(
 ) -> ConnectorSettings:
     return replace(connectors, ftrack=settings)
 
-
 def _get_shotgrid_settings(connectors: ConnectorSettings) -> ShotGridConnectorSettings:
     return connectors.shotgrid
-
 
 def _apply_shotgrid_settings(
     connectors: ConnectorSettings,
@@ -71,17 +66,14 @@ def _apply_shotgrid_settings(
 ) -> ConnectorSettings:
     return replace(connectors, shotgrid=settings)
 
-
 def _get_cerebro_settings(connectors: ConnectorSettings) -> CerebroConnectorSettings:
     return connectors.cerebro
-
 
 def _apply_cerebro_settings(
     connectors: ConnectorSettings,
     settings: TrackerSettingsValue,
 ) -> ConnectorSettings:
     return replace(connectors, cerebro=settings)
-
 
 def _build_ftrack_section(
     qt_widgets: Any,
@@ -95,7 +87,6 @@ def _build_ftrack_section(
         on_settings_changed=getattr(callbacks, "on_ftrack_settings_changed", None),
     )
 
-
 def _build_shotgrid_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -108,7 +99,6 @@ def _build_shotgrid_section(
         on_settings_changed=getattr(callbacks, "on_shotgrid_settings_changed", None),
     )
 
-
 def _build_cerebro_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -120,7 +110,6 @@ def _build_cerebro_section(
         on_enabled_changed=getattr(callbacks, "on_cerebro_enabled_changed", None),
         on_settings_changed=getattr(callbacks, "on_cerebro_settings_changed", None),
     )
-
 
 TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
     TrackerConnectorDefinition(
@@ -163,19 +152,16 @@ TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
 
 TRACKER_CONNECTOR_IDS: tuple[str, ...] = tuple(tracker.id for tracker in TRACKERS)
 
-
 def iter_trackers() -> tuple[TrackerConnectorDefinition, ...]:
     """Return registered tracker connector definitions in display order."""
 
     return TRACKERS
-
 
 def get_tracker(tracker_id: str) -> TrackerConnectorDefinition | None:
     for tracker in TRACKERS:
         if tracker.id == tracker_id:
             return tracker
     return None
-
 
 def resolve_tracker(config: StudioConfig, tracker_id: str) -> Any | None:
     """Resolve runtime tracker settings for a connector id."""
@@ -184,7 +170,6 @@ def resolve_tracker(config: StudioConfig, tracker_id: str) -> Any | None:
     if tracker is None:
         return None
     return tracker.resolve_fn(config)
-
 
 def tracker_is_enabled(config: StudioConfig, tracker_id: str) -> bool:
     """Return True when the given tracker connector is enabled in studio config."""
@@ -195,7 +180,6 @@ def tracker_is_enabled(config: StudioConfig, tracker_id: str) -> bool:
     settings = tracker.get_settings(config.connectors)
     return bool(getattr(settings, "enabled", False))
 
-
 def first_enabled_tracker(config: StudioConfig) -> TrackerConnectorDefinition | None:
     """Return the first enabled tracker connector in registry order."""
 
@@ -203,7 +187,6 @@ def first_enabled_tracker(config: StudioConfig) -> TrackerConnectorDefinition | 
         if tracker_is_enabled(config, tracker.id):
             return tracker
     return None
-
 
 def read_trackers_from_settings_view(
     view: Any,
@@ -220,7 +203,6 @@ def read_trackers_from_settings_view(
         settings = tracker.read_from_view(view, qt_widgets)
         connectors = tracker.apply_settings(connectors, settings)
     return connectors
-
 
 def update_tracker_views(
     view: Any,

@@ -15,7 +15,6 @@ from shader_health.studio_config import StudioConfig, resolve_shotgrid_config
 
 ShotGridClientFactory = Callable[[ShotGridConfig], ShotGridClient]
 
-
 def _entity_id_from_payload(
     payload: ValidationPublishPayload,
     entity_type: str,
@@ -31,7 +30,6 @@ def _entity_id_from_payload(
         if raw_value.isdigit():
             return int(raw_value)
     return None
-
 
 def resolve_entity(
     client: ShotGridClient,
@@ -59,7 +57,6 @@ def resolve_entity(
     if isinstance(raw_entity_id, str) and raw_entity_id.isdigit():
         return entity_type, int(raw_entity_id)
     return None
-
 
 def publish_validation_summary(
     studio_config: StudioConfig | None,
@@ -100,7 +97,6 @@ def publish_validation_summary(
         external_url=note_id,
         metadata=metadata,
     )
-
 
 def maybe_publish_validation_summary(
     studio_config: StudioConfig | None,

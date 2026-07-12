@@ -24,7 +24,6 @@ INVALID_RELINK_PATH_REASON = "invalid_relink_path"
 INVALID_NORMALIZE_PATH_REASON = "invalid_normalize_path"
 METADATA_PLUG_NAMES = frozenset({"version"})
 
-
 @dataclass(frozen=True)
 class AppliedFixRecord:
     fix_id: str
@@ -53,7 +52,6 @@ class AppliedFixRecord:
             "message": self.message,
             "block_reasons": list(self.block_reasons),
         }
-
 
 @dataclass(frozen=True)
 class ApplyFixReport:
@@ -87,7 +85,6 @@ class ApplyFixReport:
         }
         return payload
 
-
 def apply_fix_actions(
     actions: Iterable[FixAction],
     *,
@@ -119,7 +116,6 @@ def apply_fix_actions(
         maya_cmds.undoInfo(closeChunk=True)
     return ApplyFixReport(records=tuple(records), undo_chunk_name=undo_chunk_name)
 
-
 def _apply_one(
     action: FixAction,
     cmds: Any,
@@ -144,12 +140,10 @@ def _apply_one(
         return _apply_disable_feature(action, cmds)
     return _blocked(action, [UNSUPPORTED_FIX_REASON])
 
-
 def _apply_disable_feature(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if action.after_value is None:
         return _blocked(action, [MISSING_ATTR_REASON])
     return _apply_set_attr(action, cmds)
-
 
 def _apply_set_attr(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if not action.target_attr:
@@ -164,7 +158,6 @@ def _apply_set_attr(action: FixAction, cmds: Any) -> AppliedFixRecord:
     after_value = cmds.getAttr(plug)
     return _applied(action, action.target_attr, before_value, after_value)
 
-
 def _apply_relink_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
     target_attr = _path_target_attr(action)
     if not target_attr:
@@ -173,7 +166,6 @@ def _apply_relink_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
         return _blocked(action, [INVALID_RELINK_PATH_REASON])
 
     return _apply_path_value(action, cmds, target_attr, str(action.after_value).strip())
-
 
 def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
     target_attr = _path_target_attr(action)
@@ -199,7 +191,6 @@ def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
 
     return _apply_path_value(action, cmds, target_attr, str(normalized_path).strip(), before_value)
 
-
 def _apply_path_value(
     action: FixAction,
     cmds: Any,
@@ -216,7 +207,6 @@ def _apply_path_value(
     after_value = cmds.getAttr(plug)
     return _applied(action, target_attr, current_value, after_value)
 
-
 def _path_target_attr(action: FixAction) -> Optional[str]:
     if action.target_attr and action.target_attr not in METADATA_PLUG_NAMES:
         return action.target_attr
@@ -225,10 +215,8 @@ def _path_target_attr(action: FixAction) -> Optional[str]:
         return str(param_attr)
     return DEFAULT_TEXTURE_PATH_ATTR
 
-
 def _is_path_string_value(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
-
 
 def _plug_exists(cmds: Any, plug: str) -> bool:
     try:
@@ -236,7 +224,6 @@ def _plug_exists(cmds: Any, plug: str) -> bool:
     except (KeyError, RuntimeError, TypeError, ValueError):
         return False
     return True
-
 
 def _applied(
     action: FixAction,
@@ -257,7 +244,6 @@ def _applied(
         "Fix applied.",
         [],
     )
-
 
 def _reasons(
     action: FixAction,
@@ -280,7 +266,6 @@ def _reasons(
         _append_unique(reasons, LOCKED_BLOCK_REASON)
     return reasons
 
-
 def _studio_environment_from_params(
     params: Mapping[str, Any],
 ) -> Optional[StudioEnvironmentSettings]:
@@ -289,11 +274,9 @@ def _studio_environment_from_params(
         return StudioEnvironmentSettings.from_mapping(raw)
     return None
 
-
 def _append_unique(items: list[str], item: str) -> None:
     if item not in items:
         items.append(item)
-
 
 def _blocked(action: FixAction, reasons: list[str]) -> AppliedFixRecord:
     return AppliedFixRecord(
@@ -310,13 +293,11 @@ def _blocked(action: FixAction, reasons: list[str]) -> AppliedFixRecord:
         reasons,
     )
 
-
 def _set_attr(cmds: Any, plug: str, value: Any) -> None:
     if isinstance(value, str):
         cmds.setAttr(plug, value, type="string")
         return
     cmds.setAttr(plug, value)
-
 
 def _maya_cmds() -> Any:
     try:

@@ -12,6 +12,7 @@ from shader_health.ui.settings_widgets import (
     qt_align_right_vcenter,
     set_fixed_horizontal_size_policy,
     set_line_edit_text,
+    widget_has_focus,
     wire_line_edit_finished,
     wire_plain_text_changed,
 )
@@ -165,6 +166,8 @@ def build_studio_environment_section(
         text=format_variable_aliases(environment.variable_aliases),
         placeholder="STUDIO_TEXTURE_ROOT=\\\\farm\\textures",
         tooltip="One NAME=value alias per line. Overrides built-in ${STUDIO_*_ROOT} tokens.",
+        width=_ROOT_FIELD_WIDTH,
+        height=72,
     )
     wire_plain_text_changed(aliases_input, on_settings_changed)
     section_layout.addWidget(aliases_input)
@@ -237,7 +240,8 @@ def update_studio_environment_view(
         _plain_text_widget_type(qt_widgets),
         SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME,
     )
-    _set_plain_text(aliases_input, format_variable_aliases(environment.variable_aliases))
+    if aliases_input is not None and not widget_has_focus(aliases_input):
+        _set_plain_text(aliases_input, format_variable_aliases(environment.variable_aliases))
 
 
 def parse_variable_aliases(text: str) -> dict[str, str]:
@@ -365,6 +369,8 @@ def _build_plain_text_input(
     text: str,
     placeholder: str,
     tooltip: str,
+    width: int = _ROOT_FIELD_WIDTH,
+    height: int = 72,
 ) -> Any:
     plain_text_class = _plain_text_widget_type(qt_widgets)
     field = plain_text_class()
@@ -376,6 +382,13 @@ def _build_plain_text_input(
     if set_placeholder is not None:
         set_placeholder(placeholder)
     field.setToolTip(tooltip)
+    set_fixed_width = getattr(field, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(width)
+    set_fixed_height = getattr(field, "setFixedHeight", None)
+    if set_fixed_height is not None:
+        set_fixed_height(height)
+    set_fixed_horizontal_size_policy(qt_widgets, field)
     return field
 
 

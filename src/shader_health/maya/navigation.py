@@ -21,7 +21,6 @@ class NavigationActionResult:
     succeeded: bool
     message: str
 
-
 def select_node(node_name: str, *, cmds: Optional[Any] = None) -> NavigationActionResult:
     """Select a Maya node by name."""
 
@@ -31,7 +30,6 @@ def select_node(node_name: str, *, cmds: Optional[Any] = None) -> NavigationActi
         return _result("select_node", target, False, "Node does not exist.")
     maya_cmds.select(target, replace=True)
     return _result("select_node", target, True, "Node selected.")
-
 
 def open_in_hypershade(
     node_name: str,
@@ -84,7 +82,6 @@ def open_in_hypershade(
         f"Hypershade focused on {target} (input and output connections).",
     )
 
-
 def open_attribute_editor(
     node_name: str,
     *,
@@ -101,7 +98,6 @@ def open_attribute_editor(
     maya_mel = mel or _maya_mel()
     maya_mel.eval("openAEWindow")
     return _result("open_attribute_editor", target, True, "Attribute Editor opened.")
-
 
 def copy_path(
     path: str,
@@ -122,7 +118,6 @@ def copy_path(
         return _result("copy_path", target, False, "No active Qt application found.")
     app.clipboard().setText(target)
     return _result("copy_path", target, True, "Path copied to clipboard.")
-
 
 def reveal_file(
     path: str,
@@ -150,7 +145,6 @@ def reveal_file(
     launcher(command)
     return _result("reveal_file", target, True, "Reveal command launched.")
 
-
 def _existing_reveal_target(target: Path) -> Optional[Path]:
     if target.exists():
         return target.resolve()
@@ -158,7 +152,6 @@ def _existing_reveal_target(target: Path) -> Optional[Path]:
     if parent.exists():
         return parent.resolve()
     return None
-
 
 def _reveal_command(path: Path, system_name: str) -> Optional[list[str]]:
     target_text = str(path)
@@ -173,18 +166,14 @@ def _reveal_command(path: Path, system_name: str) -> Optional[list[str]]:
         return ["xdg-open", str(reveal_target)]
     return None
 
-
 def _launch_process(command: Sequence[str]) -> None:
     subprocess.Popen(list(command))  # noqa: S603
-
 
 def _maya_cmds() -> Any:
     return _maya_module("maya.cmds")
 
-
 def _maya_mel() -> Any:
     return _maya_module("maya.mel")
-
 
 def _maya_module(module_name: str) -> Any:
     try:
@@ -192,13 +181,11 @@ def _maya_module(module_name: str) -> Any:
     except ImportError as exc:
         raise RuntimeError("Maya navigation actions can only run inside Autodesk Maya.") from exc
 
-
 def _require_text(value: str, *, field_name: str) -> str:
     stripped = value.strip()
     if not stripped:
         raise ValueError(f"{field_name} must not be empty.")
     return stripped
-
 
 def _hypershade_panel_name(maya_cmds: Any) -> str:
     """Return the active Hypershade model panel name, if Hypershade is open."""
@@ -227,7 +214,6 @@ def _hypershade_panel_name(maya_cmds: Any) -> str:
             if editor_name == "hyperShadePanel":
                 return str(panel)
     return ""
-
 
 def _result(
     action: str,

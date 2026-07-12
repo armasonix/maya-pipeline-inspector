@@ -99,6 +99,21 @@ def should_send_discord_notification(
     )
 
 
+def format_discord_http_error(response: Any) -> str:
+    """Return a user-visible Discord webhook HTTP error string."""
+
+    status_code = int(getattr(response, "status_code", 0) or 0)
+    json_data = getattr(response, "json_data", None)
+    if isinstance(json_data, dict):
+        message = str(json_data.get("message", "") or "").strip()
+        if message:
+            return f"HTTP {status_code}: {message}"
+    body = str(getattr(response, "body", "") or "").strip()
+    if body and len(body) <= 160:
+        return f"HTTP {status_code}: {body}"
+    return f"HTTP {status_code}"
+
+
 def send_discord_validation_notification(
     studio_config: StudioConfig | None,
     context: ValidationEmbedContext,
@@ -137,7 +152,7 @@ def send_discord_validation_notification(
     if response.status_code not in (200, 204):
         return DiscordNotificationResult(
             sent=False,
-            error_message=f"HTTP {response.status_code}",
+            error_message=format_discord_http_error(response),
         )
 
     return DiscordNotificationResult(sent=True)

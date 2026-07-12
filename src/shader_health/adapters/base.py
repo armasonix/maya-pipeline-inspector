@@ -174,10 +174,8 @@ _ARNOLD_COMPLEXITY_WEIGHTS = {
     "aiUtility": 0.75,
 }
 
-
 class RendererAdapterError(ValueError):
     """Raised when renderer adapter registration or lookup fails."""
-
 
 @runtime_checkable
 class RendererAdapter(Protocol):
@@ -212,7 +210,6 @@ class RendererAdapter(Protocol):
     def default_rule_packs(self) -> list[str]:
         """Return default rule pack identifiers for this adapter."""
 
-
 @dataclass(frozen=True)
 class BaseRendererAdapter:
     """Small base implementation for simple renderer adapters and tests."""
@@ -241,7 +238,6 @@ class BaseRendererAdapter:
 
     def default_rule_packs(self) -> list[str]:
         return []
-
 
 @dataclass(frozen=True)
 class CommonMayaAdapter(BaseRendererAdapter):
@@ -283,7 +279,6 @@ class CommonMayaAdapter(BaseRendererAdapter):
     def default_rule_packs(self) -> list[str]:
         return ["common"]
 
-
 @dataclass(frozen=True)
 class VrayAdapter(BaseRendererAdapter):
     """Adapter for V-Ray for Maya material and texture graph concepts."""
@@ -319,7 +314,6 @@ class VrayAdapter(BaseRendererAdapter):
 
     def default_rule_packs(self) -> list[str]:
         return ["common", "vray"]
-
 
 @dataclass(frozen=True)
 class ArnoldAdapter(BaseRendererAdapter):
@@ -358,7 +352,6 @@ class ArnoldAdapter(BaseRendererAdapter):
 
     def default_rule_packs(self) -> list[str]:
         return ["common", "arnold"]
-
 
 class RendererAdapterRegistry:
     """Deterministic in-memory registry for renderer adapters."""
@@ -401,7 +394,6 @@ class RendererAdapterRegistry:
                 continue
             tags.extend(adapter.classify_node(node))
         return _dedupe(tags)
-
 
 def _dedupe(values: Iterable[str]) -> list[str]:
     result: list[str] = []

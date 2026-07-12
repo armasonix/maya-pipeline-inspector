@@ -50,7 +50,6 @@ _TELEGRAM_NOTIFY_CHECKBOX_OBJECT_NAMES = {
     ),
 }
 
-
 def build_telegram_connector_section(
     qt_widgets: Any,
     config: StudioConfig,
@@ -185,7 +184,6 @@ def build_telegram_connector_section(
     section_layout.addWidget(hint)
     return section
 
-
 def read_telegram_connector_from_view(view: Any, qt_widgets: Any) -> TelegramConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_TELEGRAM_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
@@ -200,7 +198,6 @@ def read_telegram_connector_from_view(view: Any, qt_widgets: Any) -> TelegramCon
         chat_id=line_edit_text(view, qt_widgets, SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME),
         notify_on=notify_on,
     )
-
 
 def update_telegram_connector_view(
     view: Any,
@@ -241,17 +238,14 @@ def update_telegram_connector_view(
             event_id in telegram.notify_on,
         )
 
-
 def get_telegram_settings(connectors: ConnectorSettings) -> TelegramConnectorSettings:
     return connectors.telegram
-
 
 def apply_telegram_settings(
     connectors: ConnectorSettings,
     settings: TelegramConnectorSettings,
 ) -> ConnectorSettings:
     return replace(connectors, telegram=settings)
-
 
 def _on_telegram_enabled_changed(
     qt_widgets: Any,
@@ -264,7 +258,6 @@ def _on_telegram_enabled_changed(
         _set_telegram_details_visible(details, enabled)
     if on_enabled_changed is not None:
         on_enabled_changed(enabled)
-
 
 def _build_telegram_field_row(
     qt_widgets: Any,
@@ -307,7 +300,6 @@ def _build_telegram_field_row(
     row_layout.addWidget(field)
     row_layout.addStretch(1)
     return row
-
 
 def _set_telegram_details_visible(details: Any, visible: bool) -> None:
     set_visible = getattr(details, "setVisible", None)

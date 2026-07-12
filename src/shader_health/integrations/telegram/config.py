@@ -7,7 +7,6 @@ from typing import Any
 DEFAULT_API_BASE_URL = "https://api.telegram.org"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 
-
 @dataclass(frozen=True)
 class TelegramConfig:
     """Connection defaults for the Telegram Bot API."""

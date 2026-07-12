@@ -55,6 +55,7 @@ def build_basic_settings_section(
     user_config: UserPreferences,
     *,
     on_preferences_changed: Optional[Callable[[], None]] = None,
+    on_theme_changed: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build the Basic settings tab content."""
 
@@ -125,7 +126,11 @@ def build_basic_settings_section(
         selected_value=user_config.theme,
         tooltip="Panel color theme. Changes apply immediately for live preview.",
     )
-    wire_combo_changed(theme_combo, on_preferences_changed)
+    def _on_theme_combo_changed() -> None:
+        if on_theme_changed is not None:
+            on_theme_changed()
+
+    wire_combo_changed(theme_combo, _on_theme_combo_changed)
     form.addRow("UI theme", theme_combo)
 
     docs_url_input = qt_widgets.QLineEdit(user_config.docs_url)
@@ -172,9 +177,9 @@ def read_basic_user_preferences_from_view(
 
     default_profile_id = _combo_data(profile_combo)
     default_asset_class_id = _combo_data(asset_class_combo)
-    default_scan_scope = _combo_data(scan_scope_combo) or "scene"
-    ui_density = _combo_data(density_combo) or "comfortable"
-    theme = _combo_data(theme_combo) or "classic"
+    default_scan_scope = _combo_data(scan_scope_combo, options=_SCAN_SCOPE_OPTIONS) or "scene"
+    ui_density = _combo_data(density_combo, options=_UI_DENSITY_OPTIONS) or "comfortable"
+    theme = _combo_data(theme_combo, options=_THEME_OPTIONS) or "classic"
 
     if default_scan_scope not in SUPPORTED_SCAN_SCOPES:
         default_scan_scope = "scene"
@@ -232,6 +237,30 @@ def update_basic_settings_view(
         set_text = getattr(docs_url_input, "setText", None)
         if set_text is not None:
             set_text(user_config.docs_url)
+
+
+def prepare_basic_settings_interactions(
+    view: Any,
+    qt_widgets: Any,
+    user_config: UserPreferences,
+    *,
+    on_preferences_changed: Optional[Callable[[], None]] = None,
+    on_theme_changed: Optional[Callable[[], None]] = None,
+) -> None:
+    """Refresh Basic tab controls and ensure live theme preview wiring."""
+
+    update_basic_settings_view(view, qt_widgets, user_config)
+    theme_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME)
+    if theme_combo is None:
+        return
+
+    def _on_theme_combo_changed() -> None:
+        if on_theme_changed is not None:
+            on_theme_changed()
+        if on_preferences_changed is not None:
+            on_preferences_changed()
+
+    wire_combo_changed(theme_combo, _on_theme_combo_changed)
 
 
 def _workflow_profile_options() -> tuple[ProfileOption, ...]:
@@ -349,27 +378,49 @@ def _set_value_combo_selection(
         return
     if _set_combo_data(combo, selected_value):
         return
-    for label, value in options:
-        if value == selected_value:
-            set_text = getattr(combo, "setCurrentText", None)
-            if set_text is not None:
-                set_text(label)
-            return
+    for index, (_label, value) in enumerate(options):
+        if value != selected_value:
+            continue
+        set_current_index = getattr(combo, "setCurrentIndex", None)
+        block_signals = getattr(combo, "blockSignals", None)
+        if set_current_index is None:
+            break
+        blocked = False
+        if block_signals is not None:
+            blocked = bool(block_signals(True))
+        try:
+            set_current_index(index)
+        finally:
+            if block_signals is not None and blocked:
+                block_signals(False)
+        return
 
 
 def _set_combo_data(combo: Any, data: str) -> bool:
     find_data = getattr(combo, "findData", None)
     set_current_index = getattr(combo, "setCurrentIndex", None)
+    block_signals = getattr(combo, "blockSignals", None)
     if find_data is None or set_current_index is None:
         return False
     index = find_data(data)
-    if index < 0:
+    if index is None or index < 0:
         return False
-    set_current_index(index)
+    blocked = False
+    if block_signals is not None:
+        blocked = bool(block_signals(True))
+    try:
+        set_current_index(index)
+    finally:
+        if block_signals is not None and blocked:
+            block_signals(False)
     return True
 
 
-def _combo_data(combo: Any | None) -> str:
+def _combo_data(
+    combo: Any | None,
+    *,
+    options: Sequence[tuple[str, str]] | None = None,
+) -> str:
     if combo is None:
         return ""
     current_data = getattr(combo, "currentData", None)
@@ -378,7 +429,15 @@ def _combo_data(combo: Any | None) -> str:
         if data is not None:
             return str(data)
     current_text = getattr(combo, "currentText", lambda: "")()
-    return str(current_text or "")
+    text = str(current_text or "").strip()
+    if options:
+        for label, value in options:
+            if text.casefold() == label.casefold():
+                return value
+        for _label, value in options:
+            if text.casefold() == value.casefold():
+                return value
+    return text
 
 
 def _line_edit_text(field: Any | None) -> str:

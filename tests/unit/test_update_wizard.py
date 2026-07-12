@@ -146,14 +146,26 @@ class FakeDialog(FakeWidget):
         super().__init__()
         self.exec_called = False
         self.show_called = False
+        self.window_flags: object | None = None
 
     def exec_(self) -> int:
+        self.show()
         self.exec_called = True
+        FakeQTimer.run_pending()
         return 0
 
     def show(self) -> None:
         self.show_called = True
         self.visible = True
+
+    def setWindowFlags(self, flags: object) -> None:
+        self.window_flags = flags
+
+    def raise_(self) -> None:
+        return
+
+    def activateWindow(self) -> None:
+        return
 
 
 class FakeApplication:
@@ -165,7 +177,25 @@ class FakeApplication:
 
 
 class FakeQt:
-    ApplicationModal = "application-modal"
+    ApplicationModal = 32
+    Dialog = 2
+    WindowTitleHint = 4
+    WindowCloseButtonHint = 8
+
+
+class FakeQTimer:
+    _pending: list[object] = []
+
+    @classmethod
+    def singleShot(cls, _delay_ms: int, callback: object) -> None:
+        cls._pending.append(callback)
+
+    @classmethod
+    def run_pending(cls) -> None:
+        pending = cls._pending[:]
+        cls._pending.clear()
+        for callback in pending:
+            callback()
 
 
 class FakeQtWidgets:
@@ -178,6 +208,7 @@ class FakeQtWidgets:
     QProgressBar = FakeProgressBar
     Qt = FakeQt
     QApplication = FakeApplication
+    QTimer = FakeQTimer
 
 
 def _write_install_tree(root: Path, *, version: str) -> None:
@@ -365,7 +396,9 @@ def test_show_update_wizard_runs_modal_flow_with_parent_and_process_events():
     )
 
     assert session.dialog.exec_called is True
-    assert session.dialog.show_called is True
     assert session.dialog.parent is parent
+    assert session.dialog.window_flags == (
+        FakeQt.Dialog | FakeQt.WindowTitleHint | FakeQt.WindowCloseButtonHint
+    )
     assert session.result.up_to_date is True
     assert app.process_events_calls >= 1

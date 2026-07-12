@@ -40,7 +40,6 @@ _ARNOLD_KEY_ATTR_KEYS = (
     "specularRotation",
 )
 
-
 def enrich_arnold_metadata(snapshot: GraphSnapshot) -> GraphSnapshot:
     """Attach Arnold scene and material metadata without failing on missing nodes."""
 
@@ -55,7 +54,6 @@ def enrich_arnold_metadata(snapshot: GraphSnapshot) -> GraphSnapshot:
         materials=list(materials),
         arnold_scene_metadata=_build_arnold_scene_metadata(snapshot, materials),
     )
-
 
 def _build_arnold_scene_metadata(
     snapshot: GraphSnapshot,
@@ -84,7 +82,6 @@ def _build_arnold_scene_metadata(
         has_stand_ins=bool(stand_in_node_ids),
     )
 
-
 def _enrich_arnold_material(
     material: MaterialSnapshot,
     nodes_by_id: dict[str, NodeSnapshot],
@@ -108,7 +105,6 @@ def _enrich_arnold_material(
         ),
     )
 
-
 def _material_has_displacement(
     material: MaterialSnapshot,
     engines_by_id: dict[str, ShadingEngineSnapshot],
@@ -120,7 +116,6 @@ def _material_has_displacement(
         if engine is not None and engine.displacement_shader:
             return True
     return False
-
 
 def _collect_key_attrs(node: Optional[NodeSnapshot]) -> dict[str, Any]:
     if node is None:
@@ -150,7 +145,6 @@ def _collect_key_attrs(node: Optional[NodeSnapshot]) -> dict[str, Any]:
             key_attrs[key] = attrs[key]
     return key_attrs
 
-
 def _coerce_int(value: Any) -> Optional[int]:
     if value is None:
         return None
@@ -161,7 +155,6 @@ def _coerce_int(value: Any) -> Optional[int]:
     if isinstance(value, float):
         return int(value)
     return None
-
 
 def _coerce_float(value: Any) -> Optional[float]:
     if value is None:

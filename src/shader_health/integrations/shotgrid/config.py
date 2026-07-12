@@ -8,7 +8,6 @@ DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_ENTITY_TYPE = "Shot"
 SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset({"Shot", "Asset"})
 
-
 @dataclass(frozen=True)
 class ShotGridConfig:
     """Connection defaults for the ShotGrid REST API."""

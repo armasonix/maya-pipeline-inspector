@@ -10,7 +10,6 @@ from shader_health.core.models import ConnectionSnapshot, MaterialSnapshot, Node
 
 JsonValue = Any
 
-
 def material_graph_fingerprint(
     material: MaterialSnapshot,
     *,
@@ -38,7 +37,6 @@ def material_graph_fingerprint(
         "texture_paths": [_normalize_path(path) for path in sorted(texture_paths)],
     }
     return _fingerprint_digest(payload)
-
 
 def material_graph_content_fingerprint(
     material: MaterialSnapshot,
@@ -70,13 +68,11 @@ def material_graph_content_fingerprint(
     }
     return _fingerprint_digest(payload)
 
-
 def _fingerprint_digest(payload: Mapping[str, JsonValue]) -> str:
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     return f"sha256:{digest}"
-
 
 def _graph_node_ids(
     material: MaterialSnapshot,
@@ -96,7 +92,6 @@ def _graph_node_ids(
                     changed = True
     return graph_ids
 
-
 def _node_fingerprint_entry(node: NodeSnapshot) -> dict[str, JsonValue]:
     attrs = {
         key: _json_safe(value)
@@ -108,7 +103,6 @@ def _node_fingerprint_entry(node: NodeSnapshot) -> dict[str, JsonValue]:
         "type_name": node.type_name,
         "attrs": attrs,
     }
-
 
 def _node_content_fingerprint_entry(node: NodeSnapshot, canonical_id: str) -> dict[str, JsonValue]:
     attrs = {
@@ -122,7 +116,6 @@ def _node_content_fingerprint_entry(node: NodeSnapshot, canonical_id: str) -> di
         "attrs": attrs,
     }
 
-
 def _connection_content_fingerprint_entry(
     connection: ConnectionSnapshot,
     canonical_ids: Mapping[str, str],
@@ -132,11 +125,9 @@ def _connection_content_fingerprint_entry(
         "target": f"{canonical_ids[connection.dst_node]}.{connection.dst_attr}",
     }
 
-
 def _canonical_node_ids(nodes: Sequence[NodeSnapshot]) -> dict[str, str]:
     ordered = sorted(nodes, key=_node_content_sort_key)
     return {node.id: f"n{index}" for index, node in enumerate(ordered)}
-
 
 def _node_content_sort_key(node: NodeSnapshot) -> tuple[str, str]:
     attrs = {
@@ -146,13 +137,11 @@ def _node_content_sort_key(node: NodeSnapshot) -> tuple[str, str]:
     }
     return (node.type_name, json.dumps(attrs, sort_keys=True, separators=(",", ":")))
 
-
 def _connection_fingerprint_entry(connection: ConnectionSnapshot) -> dict[str, str]:
     return {
         "source": f"{connection.src_node}.{connection.src_attr}",
         "target": f"{connection.dst_node}.{connection.dst_attr}",
     }
-
 
 def _connection_sort_key(connection: ConnectionSnapshot) -> tuple[str, str, str, str]:
     return (
@@ -162,16 +151,13 @@ def _connection_sort_key(connection: ConnectionSnapshot) -> tuple[str, str, str,
         connection.dst_attr,
     )
 
-
 def _normalize_path(path: str) -> str:
     return path.replace("\\", "/").strip()
-
 
 def _json_safe(value: JsonValue) -> JsonValue:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return str(value)
-
 
 _FINGERPRINT_ATTRS = frozenset(
     {

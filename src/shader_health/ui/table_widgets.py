@@ -21,7 +21,6 @@ def connect_qt_signal(signal: Any, slot: Callable[..., Any]) -> bool:
         return False
     return True
 
-
 def configure_read_only_table(table: Any, qt_widgets: Any) -> None:
     """Disable in-cell text editing for validation result tables."""
 
@@ -32,7 +31,6 @@ def configure_read_only_table(table: Any, qt_widgets: Any) -> None:
     no_edit_triggers = getattr(abstract_view, "NoEditTriggers", None)
     if no_edit_triggers is not None:
         set_triggers(no_edit_triggers)
-
 
 def make_read_only_item(qt_widgets: Any, text: str) -> Any:
     """Return a table cell that cannot be edited by the user."""
@@ -50,7 +48,6 @@ def make_read_only_item(qt_widgets: Any, text: str) -> Any:
     if editable is not None:
         set_flags(flags_fn() & ~editable)
     return item
-
 
 def make_checkbox_item(qt_widgets: Any, *, checked: bool = False) -> Any:
     """Return a checkable Selected cell for the fix queue table."""
@@ -72,9 +69,7 @@ def make_checkbox_item(qt_widgets: Any, *, checked: bool = False) -> Any:
         item.setCheckState(checked_state if checked else unchecked_state)
     return item
 
-
 FIX_QUEUE_SELECT_BUTTON_OBJECT_NAME = "shaderHealthFixQueueSelectButton"
-
 
 def make_fix_queue_select_cell(
     qt_widgets: Any,
@@ -121,7 +116,6 @@ def make_fix_queue_select_cell(
     cell._shader_health_select_button = checkbox
     return cell
 
-
 def is_fix_queue_select_checked(table: Any, row_index: int) -> bool:
     """Return whether a fix-queue Select button row is active."""
 
@@ -133,7 +127,6 @@ def is_fix_queue_select_checked(table: Any, row_index: int) -> bool:
         return False
     is_checked = getattr(button, "isChecked", None)
     return bool(is_checked()) if is_checked is not None else False
-
 
 def set_fix_queue_select_checked(table: Any, row_index: int, checked: bool) -> bool:
     """Update a fix-queue Select control and return the new checked state."""
@@ -150,7 +143,6 @@ def set_fix_queue_select_checked(table: Any, row_index: int, checked: bool) -> b
     _update_fix_queue_select_control(control, checked)
     return checked
 
-
 def _find_fix_queue_select_button(cell_widget: Any) -> Any:
     stored = getattr(cell_widget, "_shader_health_select_button", None)
     if stored is not None:
@@ -165,20 +157,16 @@ def _find_fix_queue_select_button(cell_widget: Any) -> Any:
             return child
     return None
 
-
 def _fix_queue_select_label(checked: bool) -> str:
     return "Selected" if checked else "Select"
-
 
 def _update_fix_queue_select_control(control: Any, checked: bool) -> None:
     set_text = getattr(control, "setText", None)
     if set_text is not None:
         set_text(_fix_queue_select_label(checked))
 
-
 def _update_fix_queue_select_button_style(button: Any, checked: bool) -> None:
     _update_fix_queue_select_control(button, checked)
-
 
 def is_checkbox_checked(item: Any) -> bool:
     """Return True when a fix-queue checkbox cell is checked."""

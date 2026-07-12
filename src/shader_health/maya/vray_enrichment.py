@@ -37,7 +37,6 @@ _VRAY_LIMIT_ATTR_KEYS = (
 )
 _SUBDIVISION_ATTR_KEYS = ("igi", "generateGi", "subdivs", "fde", "gfr", "ufs")
 
-
 def enrich_vray_metadata(snapshot: GraphSnapshot) -> GraphSnapshot:
     """Attach V-Ray scene and material metadata without failing on missing nodes."""
 
@@ -52,7 +51,6 @@ def enrich_vray_metadata(snapshot: GraphSnapshot) -> GraphSnapshot:
         materials=list(materials),
         vray_scene_metadata=_build_vray_scene_metadata(snapshot, materials),
     )
-
 
 def _build_vray_scene_metadata(
     snapshot: GraphSnapshot,
@@ -72,7 +70,6 @@ def _build_vray_scene_metadata(
         vray_material_count=vray_material_count,
         has_vray_materials=vray_material_count > 0,
     )
-
 
 def _enrich_vray_material(
     material: MaterialSnapshot,
@@ -98,7 +95,6 @@ def _enrich_vray_material(
         ),
     )
 
-
 def _material_has_displacement(
     material: MaterialSnapshot,
     engines_by_id: dict[str, ShadingEngineSnapshot],
@@ -110,7 +106,6 @@ def _material_has_displacement(
         if engine is not None and engine.displacement_shader:
             return True
     return False
-
 
 def _subdivision_enabled(node: Optional[NodeSnapshot]) -> bool:
     if node is None:
@@ -124,7 +119,6 @@ def _subdivision_enabled(node: Optional[NodeSnapshot]) -> bool:
         if _truthy(value):
             return True
     return False
-
 
 def _collect_limit_attrs(node: Optional[NodeSnapshot]) -> dict[str, Any]:
     if node is None:
@@ -156,7 +150,6 @@ def _collect_limit_attrs(node: Optional[NodeSnapshot]) -> dict[str, Any]:
             limit_attrs[key] = attrs[key]
     return limit_attrs
 
-
 def _coerce_int(value: Any) -> Optional[int]:
     if value is None:
         return None
@@ -167,7 +160,6 @@ def _coerce_int(value: Any) -> Optional[int]:
     if isinstance(value, float):
         return int(value)
     return None
-
 
 def _truthy(value: Any) -> bool:
     if isinstance(value, bool):

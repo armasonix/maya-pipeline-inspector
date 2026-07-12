@@ -27,7 +27,6 @@ SCREENSHOT_FIELD_NAME = "screenshot"
 SCREENSHOT_FILENAME = "screenshot.jpg"
 PAYLOAD_FIELD_NAME = "payload"
 
-
 @dataclass(frozen=True)
 class HttpRequest:
     """Low-level HTTP request passed to a transport implementation."""
@@ -37,7 +36,6 @@ class HttpRequest:
     body: bytes | None
     headers: Mapping[str, str]
 
-
 @dataclass(frozen=True)
 class RelayResponse:
     """Normalized bug report relay response."""
@@ -45,7 +43,6 @@ class RelayResponse:
     status_code: int
     body: str
     json_data: dict[str, Any] | list[Any] | None = None
-
 
 @dataclass(frozen=True)
 class BugReportRelayResult:
@@ -57,10 +54,8 @@ class BugReportRelayResult:
     error_message: str = ""
     status_code: int = 0
 
-
 class BugReportRelayClientError(RuntimeError):
     """Raised when the bug report relay returns an unexpected response."""
-
 
 class BugReportRelayClient:
     """Multipart client for studio bug report relay endpoints."""
@@ -149,7 +144,6 @@ class BugReportRelayClient:
             status_code=response.status_code,
         )
 
-
 def maybe_submit_bug_report(
     studio_config: StudioConfig | None,
     payload: BugReportPayload,
@@ -194,7 +188,6 @@ def maybe_submit_bug_report(
         )
     return result
 
-
 def build_multipart_body(
     *,
     fields: Mapping[str, str],
@@ -225,7 +218,6 @@ def build_multipart_body(
     content_type = f"multipart/form-data; boundary={chosen_boundary}"
     return body, content_type
 
-
 def parse_issue_url(response: RelayResponse) -> str:
     """Extract a created GitHub issue URL from a relay response."""
 
@@ -239,7 +231,6 @@ def parse_issue_url(response: RelayResponse) -> str:
         if value:
             return value
     return ""
-
 
 def default_http_transport(request: HttpRequest, timeout: float) -> RelayResponse:
     """Send an HTTP request using the Python standard library."""
@@ -266,7 +257,6 @@ def default_http_transport(request: HttpRequest, timeout: float) -> RelayRespons
             json_data=_parse_json_body(body),
         )
 
-
 def _validated_screenshot(
     screenshot_jpeg: bytes | None,
     *,
@@ -280,12 +270,10 @@ def _validated_screenshot(
         return None
     return screenshot_jpeg
 
-
 def is_jpeg_bytes(data: bytes) -> bool:
     """Return True when bytes look like a JPEG image."""
 
     return len(data) >= 3 and data[:3] == JPEG_MAGIC_PREFIX
-
 
 def _relay_error_message(response: RelayResponse) -> str:
     if isinstance(response.json_data, dict):
@@ -298,10 +286,8 @@ def _relay_error_message(response: RelayResponse) -> str:
         return body
     return f"relay_http_{response.status_code}"
 
-
 def _generate_boundary() -> str:
     return f"shader-health-{secrets.token_hex(16)}"
-
 
 def _encode_field_part(boundary: str, name: str, value: str) -> bytes:
     return (
@@ -310,7 +296,6 @@ def _encode_field_part(boundary: str, name: str, value: str) -> bytes:
         f"\r\n"
         f"{value}\r\n"
     ).encode()
-
 
 def _encode_file_part(
     boundary: str,
@@ -327,7 +312,6 @@ def _encode_file_part(
         f"\r\n"
     ).encode("ascii")
     return header + data + b"\r\n"
-
 
 def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     text = body.strip()

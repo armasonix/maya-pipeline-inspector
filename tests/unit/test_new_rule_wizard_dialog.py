@@ -16,13 +16,36 @@ from tests.unit.test_telegram_connector_section import _find
 
 from shader_health.core.rule_browser import load_packaged_rules_catalog
 from shader_health.core.rule_schema import RuleResult
-from shader_health.core.rule_wizard import build_draft_prefill_from_issue
+from shader_health.core.rule_wizard import (
+    RULE_TEMPLATE_NUMERIC_MAX,
+    RULE_TEMPLATE_PATH_EXISTS,
+    build_draft_prefill_from_issue,
+    optional_fields_for_template,
+)
 from shader_health.ui.new_rule_wizard_dialog import (
     NEW_RULE_WIZARD_DIALOG_OBJECT_NAME,
     NEW_RULE_WIZARD_EXPORT_STUDIO_BUTTON_OBJECT_NAME,
     NEW_RULE_WIZARD_STATUS_LABEL_OBJECT_NAME,
     NewRuleWizardDialog,
 )
+
+
+class VisibleFakeLabel(FakeLabel):
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self.visible = True
+
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
+
+
+class VisibleFakeLineEdit(FakeLineEdit):
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self.visible = True
+
+    def setVisible(self, visible: bool) -> None:
+        self.visible = visible
 
 
 class FakeComboBox(FakeWidget):
@@ -61,12 +84,12 @@ class FakeDialog(FakeWidget):
 class NewRuleWizardFakeQtWidgets:
     QDialog = FakeDialog
     QWidget = FakeWidget
-    QLabel = FakeLabel
+    QLabel = VisibleFakeLabel
     QVBoxLayout = FakeVBoxLayout
     QHBoxLayout = FakeHBoxLayout
     QFormLayout = FakeFormLayout
     QComboBox = FakeComboBox
-    QLineEdit = FakeLineEdit
+    QLineEdit = VisibleFakeLineEdit
     QPushButton = FakePushButton
 
 
@@ -76,6 +99,33 @@ def test_new_rule_wizard_dialog_builds_template_fields():
     assert controller.dialog.object_name == NEW_RULE_WIZARD_DIALOG_OBJECT_NAME
     assert controller.template_combo.items
     assert controller.field_inputs["rule_id"].value
+    assert controller.template_combo.currentIndexChanged.handlers
+    hash(controller.template_combo.currentIndexChanged.handlers[0])
+
+
+def test_new_rule_wizard_hides_irrelevant_template_fields():
+    controller = NewRuleWizardDialog.build(NewRuleWizardFakeQtWidgets)
+    controller.template_combo.setCurrentIndex(2)
+    controller.load_template_defaults(2)
+
+    assert optional_fields_for_template(RULE_TEMPLATE_PATH_EXISTS) == frozenset(
+        {"dependency_kind"}
+    )
+    assert controller.field_inputs["dependency_kind"].visible is True
+    assert controller.field_inputs["attribute"].visible is False
+    assert controller.field_inputs["expected"].visible is False
+    assert controller.field_inputs["max_value"].visible is False
+
+    controller.template_combo.setCurrentIndex(1)
+    controller.load_template_defaults(1)
+
+    assert optional_fields_for_template(RULE_TEMPLATE_NUMERIC_MAX) == frozenset(
+        {"attribute", "max_value"}
+    )
+    assert controller.field_inputs["attribute"].visible is True
+    assert controller.field_inputs["max_value"].visible is True
+    assert controller.field_inputs["expected"].visible is False
+    assert controller.field_inputs["dependency_kind"].visible is False
 
 
 def test_new_rule_wizard_dialog_validate_reports_valid_draft():

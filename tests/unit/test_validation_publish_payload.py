@@ -134,11 +134,11 @@ def test_format_validation_publish_summary_includes_core_fields_and_report_path(
 
     message = format_validation_publish_summary(payload)
 
-    assert "Shader Health validation summary (Publish block)" in message
+    assert "Health Validation Result" in message
     assert "Scene: hero.ma" in message
     assert "Profile: publish_strict+character" in message
     assert "Scope: Scene" in message
-    assert "Health: 42/100" in message
-    assert "Issues: 2 critical, 1 error, 3 warning, 0 info" in message
-    assert "Validated at: 2026-07-10T12:00:00Z" in message
+    assert "Health score: 42/100" in message
+    assert "2 critical ⛔" in message
+    assert "Validated: 2026-07-10T12:00:00Z" in message
     assert r"Report: \\farm\render\hero_shader_health_report.json" in message

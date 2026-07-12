@@ -6,7 +6,6 @@ from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
 
-
 @dataclass(frozen=True)
 class SlackConfig:
     """Connection defaults for Slack incoming webhooks with channel routing."""

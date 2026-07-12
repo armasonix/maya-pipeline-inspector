@@ -38,7 +38,6 @@ TEXTURE_FIELDS = (
     "max_dimension",
 )
 
-
 def build_manifest_diff(
     old_manifest: Mapping[str, Any],
     new_manifest: Mapping[str, Any],
@@ -84,7 +83,6 @@ def build_manifest_diff(
         },
     }
 
-
 def dumps_manifest_diff(
     old_manifest: Mapping[str, Any],
     new_manifest: Mapping[str, Any],
@@ -95,7 +93,6 @@ def dumps_manifest_diff(
 
     payload = build_manifest_diff(old_manifest, new_manifest)
     return json.dumps(payload, indent=indent, sort_keys=True) + "\n"
-
 
 def write_manifest_diff(
     path: str | Path,
@@ -113,7 +110,6 @@ def write_manifest_diff(
         encoding="utf-8",
     )
     return output_path
-
 
 def _manifest_items(manifest: Mapping[str, Any]) -> dict[str, JsonDict]:
     items: dict[str, JsonDict] = {}
@@ -141,10 +137,8 @@ def _manifest_items(manifest: Mapping[str, Any]) -> dict[str, JsonDict]:
             }
     return items
 
-
 def _selected_fields(source: Mapping[str, Any], fields: tuple[str, ...]) -> JsonDict:
     return {field: _json_safe(source.get(field)) for field in fields}
-
 
 def _item_changes(old_item: JsonDict, new_item: JsonDict) -> list[JsonDict]:
     old_fields = _fields(old_item)
@@ -157,7 +151,6 @@ def _item_changes(old_item: JsonDict, new_item: JsonDict) -> list[JsonDict]:
             changes.append({"field": field, "old": old_value, "new": new_value})
     return changes
 
-
 def _changed_entry(key: str, old_item: JsonDict, new_item: JsonDict) -> JsonDict:
     entry = {
         "kind": new_item["kind"],
@@ -168,7 +161,6 @@ def _changed_entry(key: str, old_item: JsonDict, new_item: JsonDict) -> JsonDict
     if "material_id" in new_item:
         entry["material_id"] = new_item["material_id"]
     return entry
-
 
 def _new_or_resolved_entry(item: JsonDict) -> JsonDict:
     entry = {
@@ -181,17 +173,14 @@ def _new_or_resolved_entry(item: JsonDict) -> JsonDict:
         entry["material_id"] = item["material_id"]
     return entry
 
-
 def _fields(item: JsonDict) -> JsonDict:
     value = item.get("fields")
     if isinstance(value, Mapping):
         return dict(value)
     return {}
 
-
 def _material_id(material: Mapping[str, Any]) -> str:
     return str(material.get("node_id") or material.get("name") or "")
-
 
 def _texture_id(material_id: str, texture: Mapping[str, Any]) -> str:
     node_id = str(texture.get("node_id") or texture.get("node_name") or "")
@@ -200,12 +189,10 @@ def _texture_id(material_id: str, texture: Mapping[str, Any]) -> str:
     attr = str(texture.get("attr") or "")
     return f"texture:{material_id}:{node_id}:{attr}"
 
-
 def _list_of_mappings(value: JsonValue) -> list[Mapping[str, Any]]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, Mapping)]
-
 
 def _json_safe(value: JsonValue) -> JsonValue:
     if isinstance(value, Mapping):
@@ -217,7 +204,6 @@ def _json_safe(value: JsonValue) -> JsonValue:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return str(value)
-
 
 def _fingerprint_change_count(changed_entries: list[JsonDict]) -> int:
     count = 0

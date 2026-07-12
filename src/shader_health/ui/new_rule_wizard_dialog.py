@@ -8,6 +8,7 @@ from typing import Any
 
 from shader_health.core.rule_schema import SEVERITIES
 from shader_health.core.rule_wizard import (
+    OPTIONAL_RULE_DRAFT_FIELDS,
     IncidentRuleExportContext,
     IssueRuleDraftPrefill,
     NewRuleDraftInput,
@@ -17,6 +18,7 @@ from shader_health.core.rule_wizard import (
     default_draft_input_for_template,
     export_incident_rule_draft_to_studio_extra_rules,
     list_rule_templates,
+    optional_fields_for_template,
     validate_new_rule_draft,
     write_rule_draft_file,
 )
@@ -55,13 +57,14 @@ _COMMON_FIELD_SPECS: tuple[tuple[str, str], ...] = (
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class NewRuleWizardDialog:
     """Controller for the new rule wizard dialog."""
 
     dialog: Any
     template_combo: Any
     field_inputs: dict[str, Any]
+    field_labels: dict[str, Any]
     status_label: Any
     validate_button: Any
     save_button: Any
@@ -114,6 +117,7 @@ class NewRuleWizardDialog:
         form.addRow("Template", template_combo)
 
         field_inputs: dict[str, Any] = {}
+        field_labels: dict[str, Any] = {}
         for field_name, label in _COMMON_FIELD_SPECS:
             if field_name == "severity":
                 widget = qt_widgets.QComboBox()
@@ -135,7 +139,9 @@ class NewRuleWizardDialog:
             widget = qt_widgets.QLineEdit()
             widget.setObjectName(_field_object_name(field_name))
             field_inputs[field_name] = widget
-            form.addRow(label, widget)
+            label_widget = qt_widgets.QLabel(label)
+            field_labels[field_name] = label_widget
+            form.addRow(label_widget, widget)
 
         layout.addLayout(form)
 
@@ -166,6 +172,7 @@ class NewRuleWizardDialog:
             dialog=dialog,
             template_combo=template_combo,
             field_inputs=field_inputs,
+            field_labels=field_labels,
             status_label=status_label,
             validate_button=validate_button,
             save_button=save_button,
@@ -193,7 +200,9 @@ class NewRuleWizardDialog:
             set_export_enabled(bool(studio_extra_rules_folder.strip()))
         current_index_changed = getattr(template_combo, "currentIndexChanged", None)
         if current_index_changed is not None:
-            current_index_changed.connect(controller.load_template_defaults)
+            current_index_changed.connect(
+                lambda index: controller.load_template_defaults(index)
+            )
         if prefill is not None:
             controller.apply_prefill(prefill)
         else:
@@ -231,6 +240,7 @@ class NewRuleWizardDialog:
             self._set_field_text("max_value", "")
         self._set_field_text("dependency_kind", draft.dependency_kind)
         self.last_validation = None
+        self._update_template_field_visibility()
         self.set_status_message("Prefilled from selected issue context.")
 
     def selected_template(self) -> RuleTemplateSpec:
@@ -257,7 +267,23 @@ class NewRuleWizardDialog:
             self._set_field_text("max_value", "")
         self._set_field_text("dependency_kind", defaults.dependency_kind)
         self.last_validation = None
+        self._update_template_field_visibility()
         self.set_status_message(f"Loaded template: {template.label}")
+
+    def _update_template_field_visibility(self) -> None:
+        visible_fields = optional_fields_for_template(self.selected_template().template_id)
+        for field_name in OPTIONAL_RULE_DRAFT_FIELDS:
+            visible = field_name in visible_fields
+            label = self.field_labels.get(field_name)
+            widget = self.field_inputs.get(field_name)
+            if label is not None:
+                set_visible = getattr(label, "setVisible", None)
+                if set_visible is not None:
+                    set_visible(visible)
+            if widget is not None:
+                set_visible = getattr(widget, "setVisible", None)
+                if set_visible is not None:
+                    set_visible(visible)
 
     def read_draft_input(self) -> NewRuleDraftInput:
         max_value = _parse_optional_number(self._field_text("max_value"))
@@ -350,7 +376,22 @@ class NewRuleWizardDialog:
         if set_text is not None:
             set_text(message)
 
-    def show(self, *, parent: Any | None = None, modal: bool = True) -> None:
+    def show(
+        self,
+        *,
+        parent: Any | None = None,
+        modal: bool = True,
+        qt_widgets: Any | None = None,
+    ) -> None:
+        if modal and qt_widgets is not None:
+            from shader_health.ui.settings_widgets import show_modal_dialog
+
+            show_modal_dialog(
+                self.dialog,
+                qt_widgets,
+                singleton_key=NEW_RULE_WIZARD_DIALOG_OBJECT_NAME,
+            )
+            return
         if parent is not None:
             set_parent = getattr(self.dialog, "setParent", None)
             if set_parent is not None:
@@ -415,7 +456,7 @@ def show_new_rule_wizard_dialog(
         studio_extra_rules_folder=studio_extra_rules_folder,
         export_context=export_context,
     )
-    dialog.show(parent=parent, modal=True)
+    dialog.show(parent=parent, modal=True, qt_widgets=qt_widgets)
 
 
 def _field_object_name(field_name: str) -> str:

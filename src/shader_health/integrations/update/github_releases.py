@@ -116,13 +116,44 @@ class GitHubReleasesClient:
             "Accept": "application/vnd.github+json",
             "User-Agent": self._config.user_agent,
         }
+        token = str(self._config.github_token or "").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         request = HttpRequest(method=method.upper(), url=url, body=None, headers=headers)
         return self._transport(request, self._config.timeout_seconds)
+
+    def _private_repo_error_message(self) -> str:
+        return (
+            "GitHub repository is private or not accessible without a token. "
+            "Add updates.github_token to shader_health_studio.json "
+            f"(repo: {self._config.owner}/{self._config.repo})."
+        )
+
+    def _fetch_latest_release_from_list(self) -> GitHubRelease | None:
+        response = self.request("GET", self._config.releases_url)
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            return None
+        if not isinstance(response.json_data, list):
+            return None
+        for item in response.json_data:
+            if not isinstance(item, Mapping):
+                continue
+            if bool(item.get("draft")):
+                continue
+            return parse_release_payload(item)
+        return None
 
     def fetch_latest_release(self) -> GitHubRelease:
         """Fetch metadata and assets for the latest GitHub release."""
 
         response = self.request("GET", self._config.latest_release_url)
+        if response.status_code == 404:
+            fallback = self._fetch_latest_release_from_list()
+            if fallback is not None:
+                return fallback
+            raise GitHubReleasesClientError(self._private_repo_error_message())
         if response.status_code != 200:
             raise GitHubReleasesClientError(
                 f"GitHub Releases API returned HTTP {response.status_code} for latest release."
@@ -135,7 +166,31 @@ class GitHubReleasesClient:
         """Compare the installed version against the latest GitHub release tag."""
 
         response = self.request("GET", self._config.latest_release_url)
-        if response.status_code != 200:
+        release_payload: Mapping[str, Any] | None = None
+        if response.status_code == 200 and isinstance(response.json_data, dict):
+            release_payload = response.json_data
+        elif response.status_code == 404:
+            fallback_release = self._fetch_latest_release_from_list()
+            if fallback_release is None:
+                return UpdateCheckResult(
+                    installed_version=installed_version,
+                    latest_version="",
+                    tag_name="",
+                    update_available=False,
+                    error_message=self._private_repo_error_message(),
+                    status_code=response.status_code,
+                )
+            release = fallback_release
+            update_available = is_newer_version(release.version, installed_version)
+            return UpdateCheckResult(
+                installed_version=installed_version,
+                latest_version=release.version,
+                tag_name=release.tag_name,
+                update_available=update_available,
+                release=release,
+                status_code=response.status_code,
+            )
+        elif response.status_code != 200:
             return UpdateCheckResult(
                 installed_version=installed_version,
                 latest_version="",
@@ -147,7 +202,7 @@ class GitHubReleasesClient:
                 ),
                 status_code=response.status_code,
             )
-        if not isinstance(response.json_data, dict):
+        else:
             return UpdateCheckResult(
                 installed_version=installed_version,
                 latest_version="",
@@ -157,7 +212,7 @@ class GitHubReleasesClient:
                 status_code=response.status_code,
             )
 
-        release = parse_release_payload(response.json_data)
+        release = parse_release_payload(release_payload)
         update_available = is_newer_version(release.version, installed_version)
         return UpdateCheckResult(
             installed_version=installed_version,

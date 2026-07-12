@@ -27,6 +27,7 @@ from shader_health.ui.advanced_settings_section import (
 )
 from shader_health.ui.basic_settings_section import (
     build_basic_settings_section,
+    prepare_basic_settings_interactions,
     read_basic_user_preferences_from_view,
     update_basic_settings_view,
 )
@@ -90,6 +91,18 @@ class SettingsActionCallbacks:
     on_require_tx_changed: Optional[Callable[[bool], None]] = None
     on_deadline_enabled_changed: Optional[Callable[[bool], None]] = None
     on_deadline_settings_changed: Optional[Callable[[], None]] = None
+    on_telegram_enabled_changed: Optional[Callable[[bool], None]] = None
+    on_telegram_settings_changed: Optional[Callable[[], None]] = None
+    on_discord_enabled_changed: Optional[Callable[[bool], None]] = None
+    on_discord_settings_changed: Optional[Callable[[], None]] = None
+    on_slack_enabled_changed: Optional[Callable[[bool], None]] = None
+    on_slack_settings_changed: Optional[Callable[[], None]] = None
+    on_ftrack_enabled_changed: Optional[Callable[[bool], None]] = None
+    on_ftrack_settings_changed: Optional[Callable[[], None]] = None
+    on_shotgrid_enabled_changed: Optional[Callable[[bool], None]] = None
+    on_shotgrid_settings_changed: Optional[Callable[[], None]] = None
+    on_cerebro_enabled_changed: Optional[Callable[[bool], None]] = None
+    on_cerebro_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
     on_bug_report_settings_changed: Optional[Callable[[], None]] = None
@@ -99,6 +112,7 @@ class SettingsActionCallbacks:
     on_save_user_preferences: Optional[Callable[[], None]] = None
     on_load_user_preferences: Optional[Callable[[], None]] = None
     on_user_preferences_changed: Optional[Callable[[], None]] = None
+    on_theme_changed: Optional[Callable[[], None]] = None
     on_open_rule_editor: Optional[Callable[[], None]] = None
     on_open_new_rule_wizard: Optional[Callable[[], None]] = None
     on_open_rule_browser: Optional[Callable[[], None]] = None
@@ -195,6 +209,25 @@ def build_settings_view(
     layout.addLayout(user_actions_row)
 
     return view
+
+
+def prepare_settings_interactive_state(
+    view: Any,
+    qt_widgets: Any,
+    user_config: UserPreferences,
+    *,
+    on_preferences_changed: Optional[Callable[[], None]] = None,
+    on_theme_changed: Optional[Callable[[], None]] = None,
+) -> None:
+    """Wire Basic settings interactions when the settings screen is opened."""
+
+    prepare_basic_settings_interactions(
+        view,
+        qt_widgets,
+        user_config,
+        on_preferences_changed=on_preferences_changed,
+        on_theme_changed=on_theme_changed,
+    )
 
 
 def build_require_tx_toggle(
@@ -349,6 +382,7 @@ def _build_basic_tab(
             qt_widgets,
             user_config,
             on_preferences_changed=callbacks.on_user_preferences_changed,
+            on_theme_changed=callbacks.on_theme_changed,
         )
     )
     layout.addStretch(1)
@@ -469,9 +503,14 @@ def _build_studio_tab(
 
 
 def _studio_config_path_text(config: StudioConfig) -> str:
+    studio_name = str(config.studio_name or "").strip()
+    name_prefix = f'Studio "{studio_name}" — ' if studio_name else ""
     if config.config_path is None:
-        return "Studio config: in-session defaults (no file loaded)."
-    return f"Studio config: {config.config_path}"
+        return (
+            f"{name_prefix}shader_health_studio.json not saved yet "
+            "(in-session defaults)."
+        )
+    return f"{name_prefix}shader_health_studio.json: {config.config_path}"
 
 
 def _user_config_path_text(config: UserPreferences) -> str:

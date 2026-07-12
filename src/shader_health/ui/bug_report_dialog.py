@@ -36,7 +36,6 @@ BUG_REPORT_DIALOG_INTRO = (
 )
 BUG_REPORT_ISSUE_URL_CAPTION = "GitHub issue for maintainers to track the fix:"
 
-
 @dataclass(frozen=True)
 class BugReportFormValues:
     """Artist-entered bug report form fields."""
@@ -44,7 +43,6 @@ class BugReportFormValues:
     title: str
     description: str
     steps_to_reproduce: str = ""
-
 
 @dataclass
 class BugReportDialog:
@@ -227,7 +225,6 @@ class BugReportDialog:
         _set_label_text(self.issue_url_label, "")
         _set_widget_visible(self.issue_url_caption, False)
 
-
 def show_bug_report_dialog(
     qt_widgets: Any,
     *,
@@ -250,7 +247,6 @@ def show_bug_report_dialog(
             show()
     return dialog
 
-
 def _build_line_edit(
     qt_widgets: Any,
     *,
@@ -263,7 +259,6 @@ def _build_line_edit(
     if set_placeholder is not None:
         set_placeholder(placeholder)
     return line_edit
-
 
 def _build_text_edit(
     qt_widgets: Any,
@@ -278,13 +273,11 @@ def _build_text_edit(
         set_placeholder(placeholder)
     return text_edit
 
-
 def _read_line_edit_text(widget: Any) -> str:
     read_text = getattr(widget, "text", None)
     if callable(read_text):
         return str(read_text() or "").strip()
     return ""
-
 
 def _read_text_edit_text(widget: Any) -> str:
     to_plain_text = getattr(widget, "toPlainText", None)
@@ -292,30 +285,25 @@ def _read_text_edit_text(widget: Any) -> str:
         return str(to_plain_text() or "").strip()
     return ""
 
-
 def _set_label_text(widget: Any, text: str) -> None:
     set_text = getattr(widget, "setText", None)
     if set_text is not None:
         set_text(text)
-
 
 def _set_button_enabled(widget: Any, enabled: bool) -> None:
     set_enabled = getattr(widget, "setEnabled", None)
     if set_enabled is not None:
         set_enabled(enabled)
 
-
 def _set_button_text(widget: Any, text: str) -> None:
     set_text = getattr(widget, "setText", None)
     if set_text is not None:
         set_text(text)
 
-
 def _set_widget_visible(widget: Any, visible: bool) -> None:
     set_visible = getattr(widget, "setVisible", None)
     if set_visible is not None:
         set_visible(visible)
-
 
 def _close_dialog(dialog: Any) -> None:
     reject = getattr(dialog, "reject", None)

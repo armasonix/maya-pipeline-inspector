@@ -12,7 +12,6 @@ SETTINGS_STUDIO_TAB_OBJECT_NAME = "shaderHealthInspectorSettingsStudioTab"
 SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME = "shaderHealthInspectorSettingsStudioEnvironmentTab"
 SETTINGS_BUG_REPORT_TAB_OBJECT_NAME = "shaderHealthInspectorSettingsBugReportTab"
 
-
 @dataclass(frozen=True)
 class SettingsTabSpec:
     """Metadata for one settings category tab."""
@@ -21,7 +20,6 @@ class SettingsTabSpec:
     title: str
     object_name: str
     placeholder_text: str
-
 
 SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
     SettingsTabSpec(
@@ -62,19 +60,16 @@ SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
     ),
 )
 
-
 def settings_tab_titles() -> tuple[str, ...]:
     """Return settings tab titles in display order."""
 
     return tuple(spec.title for spec in SETTINGS_TAB_SPECS)
-
 
 def get_settings_tab_spec(tab_id: str) -> SettingsTabSpec | None:
     for spec in SETTINGS_TAB_SPECS:
         if spec.tab_id == tab_id:
             return spec
     return None
-
 
 def build_placeholder_tab(
     qt_widgets: Any,

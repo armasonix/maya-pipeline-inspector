@@ -8,6 +8,10 @@ from urllib.parse import urlparse
 DEFAULT_TIMEOUT_SECONDS = 15.0
 
 
+DEFAULT_NOTE_AUTHOR_USERNAME = "maya.pipeline.inspector"
+DEFAULT_TASK_STATUS_NAME = "Pending Review"
+
+
 @dataclass(frozen=True)
 class FtrackConfig:
     """Connection defaults for the Ftrack HTTP API."""
@@ -16,6 +20,8 @@ class FtrackConfig:
     api_user: str
     api_key: str
     project: str
+    note_author_username: str = DEFAULT_NOTE_AUTHOR_USERNAME
+    task_status_name: str = DEFAULT_TASK_STATUS_NAME
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
 
     def with_overrides(self, **kwargs: Any) -> FtrackConfig:

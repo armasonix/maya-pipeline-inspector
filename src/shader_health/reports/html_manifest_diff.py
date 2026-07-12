@@ -17,7 +17,6 @@ ISSUE_GROUP_LABELS = {
 JsonDict = dict[str, Any]
 JsonValue = Any
 
-
 def build_html_manifest_diff(diff_payload: Mapping[str, Any]) -> str:
     """Build a deterministic self-contained HTML manifest diff report."""
 
@@ -43,7 +42,6 @@ def build_html_manifest_diff(diff_payload: Mapping[str, Any]) -> str:
     ]
     return "\n".join(html) + "\n"
 
-
 def write_html_manifest_diff(
     path: str | Path,
     diff_payload: Mapping[str, Any],
@@ -54,7 +52,6 @@ def write_html_manifest_diff(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(build_html_manifest_diff(diff_payload), encoding="utf-8")
     return output_path
-
 
 def _render_header(payload: JsonDict) -> str:
     summary = _mapping(payload.get("summary"))
@@ -99,7 +96,6 @@ def _render_header(payload: JsonDict) -> str:
         ]
     )
 
-
 def _render_summary(payload: JsonDict) -> str:
     summary = _mapping(payload.get("summary"))
 
@@ -115,7 +111,6 @@ def _render_summary(payload: JsonDict) -> str:
             "</section>",
         ]
     )
-
 
 def _render_issue_groups(payload: JsonDict) -> str:
     issues = _mapping(payload.get("issues"))
@@ -133,7 +128,6 @@ def _render_issue_groups(payload: JsonDict) -> str:
         sections.append(_render_issue_group(group_id, entries))
     sections.append("</section>")
     return "\n".join(sections)
-
 
 def _render_issue_group(group_id: str, entries: list[JsonDict]) -> str:
     label = ISSUE_GROUP_LABELS[group_id]
@@ -158,7 +152,6 @@ def _render_issue_group(group_id: str, entries: list[JsonDict]) -> str:
     lines.extend(["</div>", "</details>"])
     return "\n".join(lines)
 
-
 def _render_entry_table(entries: list[JsonDict]) -> list[str]:
     lines = [
         '<div class="table-wrap">',
@@ -179,7 +172,6 @@ def _render_entry_table(entries: list[JsonDict]) -> list[str]:
     lines.extend(["</tbody>", "</table>", "</div>"])
     return lines
 
-
 def _render_entry_row(entry: JsonDict) -> str:
     fields = entry.get("fields")
     return "".join(
@@ -193,7 +185,6 @@ def _render_entry_row(entry: JsonDict) -> str:
             "</tr>",
         ]
     )
-
 
 def _render_changed_table(entries: list[JsonDict]) -> list[str]:
     lines = [
@@ -216,7 +207,6 @@ def _render_changed_table(entries: list[JsonDict]) -> list[str]:
         lines.extend(_render_changed_rows(entry))
     lines.extend(["</tbody>", "</table>", "</div>"])
     return lines
-
 
 def _render_changed_rows(entry: JsonDict) -> list[str]:
     changes = entry.get("changes")
@@ -266,7 +256,6 @@ def _render_changed_rows(entry: JsonDict) -> list[str]:
         )
     return rows
 
-
 def _render_footer() -> str:
     return "\n".join(
         [
@@ -276,16 +265,13 @@ def _render_footer() -> str:
         ]
     )
 
-
 def _meta_item(label: str, value: JsonValue) -> str:
     return f"<div><dt>{_text(label)}</dt><dd>{_text(value)}</dd></div>"
-
 
 def _kind_cell(kind: JsonValue) -> str:
     return (
         f'<td><span class="kind-pill kind-{_attr(kind)}">{_text(kind)}</span></td>'
     )
-
 
 def _metric_card(label: str, value: JsonValue) -> str:
     return "".join(
@@ -297,18 +283,15 @@ def _metric_card(label: str, value: JsonValue) -> str:
         ]
     )
 
-
 def _issue_entries(value: JsonValue) -> list[JsonDict]:
     if not isinstance(value, list):
         return []
     return [dict(item) for item in value if isinstance(item, Mapping)]
 
-
 def _mapping(value: JsonValue) -> JsonDict:
     if isinstance(value, Mapping):
         return dict(value)
     return {}
-
 
 def _diff_stylesheet() -> str:
     return "\n".join(

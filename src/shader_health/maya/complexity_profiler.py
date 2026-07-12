@@ -20,7 +20,6 @@ _FARM_COST_HINT_BANDS = (
     ("high", 28.0),
 )
 
-
 def profile_material_complexity(
     material: MaterialSnapshot,
     *,
@@ -69,7 +68,6 @@ def profile_material_complexity(
         complexity_metadata=complexity_metadata,
     )
 
-
 def _incoming_by_destination(
     connections: Iterable[ConnectionSnapshot],
 ) -> dict[str, list[str]]:
@@ -78,14 +76,12 @@ def _incoming_by_destination(
         incoming.setdefault(connection.dst_node, []).append(connection.src_node)
     return incoming
 
-
 def _material_roots(material: MaterialSnapshot) -> list[str]:
     roots = [material.node_id]
     for node_id in material.displacement_nodes:
         if node_id not in roots:
             roots.append(node_id)
     return roots
-
 
 def _collect_material_graph_node_ids(
     material: MaterialSnapshot,
@@ -101,7 +97,6 @@ def _collect_material_graph_node_ids(
             graph_node_ids.add(src_node)
             stack.append(src_node)
     return graph_node_ids
-
 
 def _depths_from_roots(
     *,
@@ -123,11 +118,9 @@ def _depths_from_roots(
                 queue.append(src_node)
     return depths
 
-
 def _depth_histogram(depths: Mapping[str, int]) -> dict[str, int]:
     counts = Counter(str(depth) for depth in depths.values())
     return {key: counts[key] for key in sorted(counts, key=int)}
-
 
 def _merged_complexity_weights(
     renderer_family: Optional[str],
@@ -138,7 +131,6 @@ def _merged_complexity_weights(
         with suppress(RendererAdapterError):
             weights.update(adapter_registry.get(renderer_family).complexity_weights())
     return weights
-
 
 def _farm_cost_hint(score: float) -> str:
     for hint, upper_bound in _FARM_COST_HINT_BANDS:

@@ -313,7 +313,7 @@ def uninstall_menu() -> None:
 
 
 def install_shelf(parent: Optional[str] = None) -> str:
-    """Install a Maya shelf tab and button that opens the dockable panel."""
+    """Install or refresh the Shader Health shelf tab and buttons."""
 
     cmds = _maya_cmds()
     shelf_parent = parent or _maya_shelf_top_level()
@@ -321,40 +321,38 @@ def install_shelf(parent: Optional[str] = None) -> str:
     if not cmds.shelfLayout(SHELF_NAME, query=True, exists=True):
         cmds.shelfLayout(SHELF_NAME, parent=shelf_parent)
 
-    if cmds.shelfButton(SHELF_BUTTON_NAME, query=True, exists=True):
-        cmds.deleteUI(SHELF_BUTTON_NAME, control=True)
-    if cmds.shelfButton(FARM_CHECK_SHELF_BUTTON_NAME, query=True, exists=True):
-        cmds.deleteUI(FARM_CHECK_SHELF_BUTTON_NAME, control=True)
-
-    cmds.shelfButton(
-        SHELF_BUTTON_NAME,
+    _ensure_shelf_button(
+        cmds,
+        name=SHELF_BUTTON_NAME,
         parent=SHELF_NAME,
         label=SHELF_BUTTON_LABEL,
         annotation=SHELF_BUTTON_ANNOTATION,
-        image1="commandButton.png",
-        sourceType="python",
         command=OPEN_UI_PYTHON_COMMAND,
     )
-    cmds.shelfButton(
-        FARM_CHECK_SHELF_BUTTON_NAME,
+    _ensure_shelf_button(
+        cmds,
+        name=FARM_CHECK_SHELF_BUTTON_NAME,
         parent=SHELF_NAME,
         label=FARM_CHECK_SHELF_BUTTON_LABEL,
         annotation=FARM_CHECK_SHELF_BUTTON_ANNOTATION,
-        image1="commandButton.png",
-        sourceType="python",
         command=FARM_CHECK_UI_PYTHON_COMMAND,
     )
     return SHELF_NAME
 
 
 def uninstall_shelf() -> None:
-    """Remove the Shader Health shelf buttons if they exist."""
+    """Remove Shader Health shelf buttons, including legacy unnamed duplicates."""
 
     cmds = _maya_cmds()
-    if cmds.shelfButton(SHELF_BUTTON_NAME, query=True, exists=True):
-        cmds.deleteUI(SHELF_BUTTON_NAME, control=True)
-    if cmds.shelfButton(FARM_CHECK_SHELF_BUTTON_NAME, query=True, exists=True):
-        cmds.deleteUI(FARM_CHECK_SHELF_BUTTON_NAME, control=True)
+    if not cmds.shelfLayout(SHELF_NAME, query=True, exists=True):
+        return
+    for label in (SHELF_BUTTON_LABEL, FARM_CHECK_SHELF_BUTTON_LABEL):
+        for child in _shelf_layout_children(cmds, SHELF_NAME):
+            if not cmds.shelfButton(child, query=True, exists=True):
+                continue
+            if _shelf_button_label(cmds, child) != label:
+                continue
+            cmds.deleteUI(child, control=True)
 
 
 def uninstall_ui() -> None:
@@ -369,13 +367,11 @@ _UI_INSTALLED = False
 
 
 def install_ui() -> None:
-    """Install all Maya UI entrypoints for the current session."""
+    """Install or refresh Maya UI entrypoints for the current session."""
 
-    global _UI_INSTALLED
-    if _UI_INSTALLED:
-        return
     install_menu()
     install_shelf()
+    global _UI_INSTALLED
     _UI_INSTALLED = True
 
 
@@ -662,6 +658,64 @@ def _maya_node_name(node_id: Optional[str]) -> str:
     if text.startswith("node:"):
         return text.split(":", 1)[1]
     return text
+
+
+def _shelf_layout_children(cmds: Any, shelf_name: str) -> tuple[str, ...]:
+    if not cmds.shelfLayout(shelf_name, query=True, exists=True):
+        return ()
+    children = cmds.shelfLayout(shelf_name, query=True, childArray=True)
+    if not children:
+        return ()
+    if isinstance(children, str):
+        return (children,)
+    return tuple(str(child) for child in children)
+
+
+def _shelf_button_label(cmds: Any, button_name: str) -> str:
+    try:
+        return str(cmds.shelfButton(button_name, query=True, label=True) or "")
+    except Exception:
+        return ""
+
+
+def _remove_extra_shelf_buttons(
+    cmds: Any,
+    *,
+    shelf_name: str,
+    label: str,
+    keep_name: str,
+) -> None:
+    for child in _shelf_layout_children(cmds, shelf_name):
+        if child == keep_name:
+            continue
+        if not cmds.shelfButton(child, query=True, exists=True):
+            continue
+        if _shelf_button_label(cmds, child) != label:
+            continue
+        cmds.deleteUI(child, control=True)
+
+
+def _ensure_shelf_button(
+    cmds: Any,
+    *,
+    name: str,
+    parent: str,
+    label: str,
+    annotation: str,
+    command: str,
+) -> None:
+    _remove_extra_shelf_buttons(cmds, shelf_name=parent, label=label, keep_name=name)
+    button_fields = {
+        "label": label,
+        "annotation": annotation,
+        "image1": "commandButton.png",
+        "sourceType": "python",
+        "command": command,
+    }
+    if cmds.shelfButton(name, query=True, exists=True):
+        cmds.shelfButton(name, edit=True, **button_fields)
+        return
+    cmds.shelfButton(name, parent=parent, **button_fields)
 
 
 def _maya_shelf_top_level() -> str:

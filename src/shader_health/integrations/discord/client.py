@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from shader_health.integrations.discord.config import DiscordConfig
+from shader_health.integrations.discord.config import USER_AGENT, DiscordConfig
 
 HttpTransport = Callable[["HttpRequest", float], "DiscordResponse"]
 
@@ -60,7 +60,10 @@ class DiscordClient:
         """Send a POST request to the configured webhook URL."""
 
         body = None
-        headers = {"Accept": "application/json"}
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": USER_AGENT,
+        }
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")
             headers = {**headers, "Content-Type": "application/json"}
