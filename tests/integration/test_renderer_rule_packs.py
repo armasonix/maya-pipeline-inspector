@@ -14,7 +14,7 @@ from tests.integration.fixtures import (
     broken_scene_snapshot,
 )
 
-from shader_health.maya.validation_pipeline import run_validation
+from pipeline_inspector.maya.validation_pipeline import run_validation
 
 
 def test_vray_renderer_pack_flags_missing_plugin_node(tmp_path: Path):

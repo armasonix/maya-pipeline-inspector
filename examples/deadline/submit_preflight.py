@@ -1,4 +1,4 @@
-"""Deadline submit preflight example for Shader Health Inspector."""
+"""Deadline submit preflight example for Pipeline Inspector."""
 from __future__ import annotations
 
 import argparse
@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     PREFLIGHT_ERROR,
     SUBMISSION_ALLOWED,
     SUBMISSION_BLOCKED,
@@ -38,7 +38,7 @@ __all__ = [
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run Shader Health before Deadline submission.")
+    parser = argparse.ArgumentParser(description="Run Pipeline Inspector before Deadline submission.")
     parser.add_argument("scene_path", type=Path)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--profile", type=Path, required=True)

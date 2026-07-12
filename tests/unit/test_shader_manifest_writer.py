@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
 )
-from shader_health.reports.manifest import (
+from pipeline_inspector.reports.manifest import (
     MANIFEST_SCHEMA_VERSION,
     build_shader_manifest,
     dumps_shader_manifest,

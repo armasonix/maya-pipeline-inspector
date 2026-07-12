@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from shader_health.studio_config import StudioConfig, StudioEnvironmentSettings
-from shader_health.ui.studio_environment_section import (
+from pipeline_inspector.studio_config import StudioConfig, StudioEnvironmentSettings
+from pipeline_inspector.ui.studio_environment_section import (
     SETTINGS_ASSET_ROOT_INPUT_OBJECT_NAME,
     SETTINGS_CACHE_ROOT_INPUT_OBJECT_NAME,
     SETTINGS_RENDER_ROOT_INPUT_OBJECT_NAME,

@@ -3,8 +3,8 @@ from __future__ import annotations
 from tests.unit.test_maya_summary_header import FakeLabel, FakeSignal
 from tests.unit.test_telegram_connector_section import FakeQtWidgets, FakeWidget, _find
 
-from shader_health.integrations.bug_report.relay_client import BugReportRelayResult
-from shader_health.ui.bug_report_dialog import (
+from pipeline_inspector.integrations.bug_report.relay_client import BugReportRelayResult
+from pipeline_inspector.ui.bug_report_dialog import (
     BUG_REPORT_DESCRIPTION_INPUT_OBJECT_NAME,
     BUG_REPORT_FORM_WIDGET_OBJECT_NAME,
     BUG_REPORT_ISSUE_URL_LABEL_OBJECT_NAME,
@@ -60,7 +60,7 @@ class BugReportFakeQtWidgets(FakeQtWidgets):
 def test_bug_report_dialog_builds_form_fields():
     controller = BugReportDialog.build(BugReportFakeQtWidgets)
 
-    assert controller.dialog.object_name == "shaderHealthInspectorBugReportDialog"
+    assert controller.dialog.object_name == "pipelineInspectorBugReportDialog"
     _find(controller.dialog, BUG_REPORT_TITLE_INPUT_OBJECT_NAME)
     _find(controller.dialog, BUG_REPORT_DESCRIPTION_INPUT_OBJECT_NAME)
     _find(controller.dialog, BUG_REPORT_STEPS_INPUT_OBJECT_NAME)

@@ -2,8 +2,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from shader_health.core import GraphSnapshot
-from shader_health.maya import ScanOptions, scan_scene, scan_selection
+from pipeline_inspector.core import GraphSnapshot
+from pipeline_inspector.maya import ScanOptions, scan_scene, scan_selection
 
 
 class FakeCmds:
@@ -174,7 +174,7 @@ def test_scan_scene_collects_upstream_nodes_and_connections():
 
 
 def test_scan_scene_collects_node_attrs_reference_lock_and_namespace(caplog):
-    caplog.set_level(logging.DEBUG, logger="shader_health.maya.scanner")
+    caplog.set_level(logging.DEBUG, logger="pipeline_inspector.maya.scanner")
 
     snapshot = scan_scene(cmds_module=FakeCmds())
     nodes = {node.id: node for node in snapshot.nodes}

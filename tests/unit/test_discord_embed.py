@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from shader_health.integrations.discord.embed import (
+from pipeline_inspector.integrations.discord.embed import (
     ValidationEmbedContext,
     format_validation_embed,
     validation_embed_context_from_mapping,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE,
     DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH,
 )

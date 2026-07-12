@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from shader_health import cli
+from pipeline_inspector import cli
 
 
 def main(argv: list[str] | None = None) -> int:

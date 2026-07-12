@@ -3,17 +3,21 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.shotgrid import ShotGridClient, ShotGridConfig, ShotGridResponse
-from shader_health.integrations.shotgrid.client import HttpRequest
-from shader_health.integrations.shotgrid.publish import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.shotgrid import (
+    ShotGridClient,
+    ShotGridConfig,
+    ShotGridResponse,
+)
+from pipeline_inspector.integrations.shotgrid.client import HttpRequest
+from pipeline_inspector.integrations.shotgrid.publish import (
     maybe_publish_validation_summary,
     publish_validation_summary,
     resolve_entity,
 )
-from shader_health.integrations.trackers.publish import ValidationPublishPayload
-from shader_health.studio_config import (
+from pipeline_inspector.integrations.trackers.publish import ValidationPublishPayload
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     ShotGridConnectorSettings,
     StudioConfig,
@@ -45,7 +49,7 @@ def _shotgrid_settings(**overrides: object) -> ShotGridConnectorSettings:
     defaults = {
         "enabled": True,
         "site_url": "https://studio.shotgrid.autodesk.com",
-        "script_name": "shader_health",
+        "script_name": "pipeline_inspector",
         "api_key": "secret",
         "project": "Demo Project",
         "entity_type": "Shot",
@@ -81,7 +85,7 @@ def test_resolve_entity_prefers_payload_metadata():
     client = ShotGridClient(
         ShotGridConfig(
             site_url="https://studio.shotgrid.autodesk.com",
-            script_name="shader_health",
+            script_name="pipeline_inspector",
             api_key="secret",
             project="Demo Project",
         ),

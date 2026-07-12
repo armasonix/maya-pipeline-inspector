@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
@@ -12,17 +12,19 @@ from shader_health.core import (
     ValidationEngine,
     load_rule_file,
 )
-from shader_health.maya.snapshot_enrichment import (
+from pipeline_inspector.maya.snapshot_enrichment import (
     build_material_index,
     enrich_rule_results,
     prepare_snapshot_for_validation,
 )
-from shader_health.studio_config import StudioEnvironmentSettings
+from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
 ROOT = Path(__file__).resolve().parents[2]
-COLOR_SPACE_RULE = ROOT / "src" / "shader_health" / "rules" / "common" / "color_space.json"
-UDIM_RULE = ROOT / "src" / "shader_health" / "rules" / "common" / "udim_integrity.json"
-DISPLACEMENT_RULE = ROOT / "src" / "shader_health" / "rules" / "common" / "displacement_common.json"
+COLOR_SPACE_RULE = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "color_space.json"
+UDIM_RULE = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "udim_integrity.json"
+DISPLACEMENT_RULE = (
+    ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "displacement_common.json"
+)
 
 
 def _broken_scene_like_snapshot(tmp_path: Path) -> GraphSnapshot:

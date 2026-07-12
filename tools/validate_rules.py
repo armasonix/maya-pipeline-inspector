@@ -11,8 +11,8 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from shader_health.core.rule_loader import DEFAULT_RULE_ROOT  # noqa: E402
-from shader_health.core.rule_pack_validation import (  # noqa: E402
+from pipeline_inspector.core.rule_loader import DEFAULT_RULE_ROOT  # noqa: E402
+from pipeline_inspector.core.rule_pack_validation import (  # noqa: E402
     RuleValidationFailure,
     collect_rule_ids,
     find_json_files,
@@ -22,7 +22,7 @@ from shader_health.core.rule_pack_validation import (  # noqa: E402
     validate_rule_file,
     validate_rule_object,
 )
-from shader_health.rules_cli import validate_rule_paths  # noqa: E402
+from pipeline_inspector.rules_cli import validate_rule_paths  # noqa: E402
 
 __all__ = [
     "DEFAULT_RULE_ROOT",
@@ -40,14 +40,14 @@ __all__ = [
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate Maya Shader Health Inspector JSON rule packs."
+        description="Validate Maya Pipeline Inspector JSON rule packs."
     )
     parser.add_argument(
         "paths",
         nargs="*",
         type=Path,
         default=[DEFAULT_RULE_ROOT],
-        help="Rule file or directory paths. Defaults to src/shader_health/rules.",
+        help="Rule file or directory paths. Defaults to src/pipeline_inspector/rules.",
     )
     parser.add_argument(
         "--quiet",

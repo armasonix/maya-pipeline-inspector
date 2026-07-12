@@ -11,13 +11,13 @@ Manual steps for **#112** / **#138** — prepare `v0.4.0` on branch `dev`, then 
 ### Git Bash
 
 ```bash
-export REPO="/d/Workspace/portfolio/maya-shader-health-inspector"
+export REPO="/d/Workspace/portfolio/maya-pipeline-inspector"
 cd "$REPO"
 
 python -m pip install -e ".[dev]"
 python -m pytest tests -q
 python -m ruff check src tests tools
-python -m shader_health validate tests/fixtures/snapshots/vray_policy_scene.json \
+python -m pipeline_inspector validate tests/fixtures/snapshots/vray_policy_scene.json \
   --input-kind snapshot --profile-id ci_headless \
   --report _cli_test_out/pre_release_smoke.json
 echo "validate exit=$?"
@@ -26,13 +26,13 @@ echo "validate exit=$?"
 ### PowerShell
 
 ```powershell
-$REPO = "D:\Workspace\portfolio\maya-shader-health-inspector"
+$REPO = "D:\Workspace\portfolio\maya-pipeline-inspector"
 Set-Location $REPO
 
 python -m pip install -e ".[dev]"
 python -m pytest tests -q
 python -m ruff check src tests tools
-python -m shader_health validate (Join-Path $REPO "tests\fixtures\snapshots\vray_policy_scene.json") `
+python -m pipeline_inspector validate (Join-Path $REPO "tests\fixtures\snapshots\vray_policy_scene.json") `
   --input-kind snapshot --profile-id ci_headless `
   --report (Join-Path $REPO "_cli_test_out\pre_release_smoke.json")
 $LASTEXITCODE
@@ -113,7 +113,7 @@ gh pr create --base main --head dev \
   --body "$(cat <<'EOF'
 ## Summary
 - GUI-first Farm tab + Deadline 10 on-prem integration
-- Studio settings (`shader_health_studio.json`) + Thinkbox Deadline connector
+- Studio settings (`pipeline_inspector_studio.json`) + Thinkbox Deadline connector
 - Render-risk depth (displacement, .tx/optimized textures, duplicate materials)
 - Native .mll Phase 1 scaffolding + Maya integration CI smoke
 - Release hygiene: remove local demo junk, bump 0.4.0 docs
@@ -150,7 +150,7 @@ cd "$REPO"
 git checkout main
 git pull origin main
 
-git tag -a v0.4.0 -m "Maya Shader Health Inspector v0.4.0"
+git tag -a v0.4.0 -m "Maya Pipeline Inspector v0.4.0"
 git push origin v0.4.0
 ```
 
@@ -161,7 +161,7 @@ Set-Location $REPO
 git checkout main
 git pull origin main
 
-git tag -a v0.4.0 -m "Maya Shader Health Inspector v0.4.0"
+git tag -a v0.4.0 -m "Maya Pipeline Inspector v0.4.0"
 git push origin v0.4.0
 ```
 
@@ -169,7 +169,7 @@ Verify:
 
 ```bash
 git show v0.4.0 --no-patch
-python -c "import shader_health; print(shader_health.__version__)"
+python -c "import pipeline_inspector; print(pipeline_inspector.__version__)"
 ```
 
 ---
@@ -202,7 +202,7 @@ gh release create v0.4.0 \
 Copy into GitHub Release description:
 
 ```markdown
-## Maya Shader Health Inspector v0.4.0
+## Maya Pipeline Inspector v0.4.0
 
 **Theme:** GUI-first Deadline farm integration, render-risk depth, studio settings.
 
@@ -210,8 +210,8 @@ Copy into GitHub Release description:
 
 - **Farm tab** — Deadline Web Service status, preflight, CommandScript submit
 - **Settings → Connectors** — Thinkbox Deadline **Remote Farm** toggle + compact Deadline fields
-- **Studio config** — `shader_health_studio.json` (Require `.tx`, Deadline connector)
-- **Deadline package** — `shader_health.integrations.deadline` + [integration guide](docs/integrations/deadline_submit_preflight.md)
+- **Studio config** — `pipeline_inspector_studio.json` (Require `.tx`, Deadline connector)
+- **Deadline package** — `pipeline_inspector.integrations.deadline` + [integration guide](docs/integrations/deadline_submit_preflight.md)
 - **Render risk** — displacement depth, optimized texture / `.tx` rules, duplicate material/texture detection
 - **Native plugin Phase 1** — CMake scaffolding + ADR 0006 (`.mll` optional; Python fallback remains)
 - **UX Wave 1** — Issue Details polish, double-click issue → select node
@@ -219,8 +219,8 @@ Copy into GitHub Release description:
 ### Install
 
 ```bash
-git clone https://github.com/armasonix/maya-shader-health-inspector.git
-cd maya-shader-health-inspector
+git clone https://github.com/armasonix/maya-pipeline-inspector.git
+cd maya-pipeline-inspector
 git checkout v0.4.0
 python -m pip install -e ".[dev]"
 ```
@@ -230,19 +230,19 @@ Maya module path: see [docs/MAYA_INSTALL.md](docs/MAYA_INSTALL.md).
 ### Headless smoke
 
 ```bash
-python -m shader_health validate tests/fixtures/snapshots/vray_policy_scene.json \
+python -m pipeline_inspector validate tests/fixtures/snapshots/vray_policy_scene.json \
   --input-kind snapshot --profile-id publish_strict --report report.json
 ```
 
 ### Known limitations
 
-- Headless CLI does not yet load `shader_health_studio.json` (Maya UI only).
+- Headless CLI does not yet load `pipeline_inspector_studio.json` (Maya UI only).
 - `.mll` binaries are not in the repo — build locally or use release attachments.
 - Maya integration CI requires self-hosted runner with `mayapy`.
 
 ### Full changelog
 
-[CHANGELOG.md — v0.4.0](https://github.com/armasonix/maya-shader-health-inspector/blob/v0.4.0/CHANGELOG.md#040---2026-07-08)
+[CHANGELOG.md — v0.4.0](https://github.com/armasonix/maya-pipeline-inspector/blob/v0.4.0/CHANGELOG.md#040---2026-07-08)
 ```
 
 ---
@@ -265,7 +265,7 @@ Update any open issues/milestones for v0.4 cycle → closed.
 If you built Windows `.mll` per `native/README.md`:
 
 ```bash
-gh release upload v0.4.0 native/build/Release/shader_health_inspector_2025.mll#shader_health_inspector-maya2025-win64.mll
+gh release upload v0.4.0 native/build/Release/pipeline_inspector_2025.mll#pipeline_inspector-maya2025-win64.mll
 ```
 
 (Adjust path/year to your build output.)
@@ -276,7 +276,7 @@ gh release upload v0.4.0 native/build/Release/shader_health_inspector_2025.mll#s
 
 | File | Field |
 |------|--------|
-| `src/shader_health/version.py` | `__version__` |
+| `src/pipeline_inspector/version.py` | `__version__` |
 | `pyproject.toml` | `version` |
 | `tests/unit/test_import.py` | assert |
 | `CHANGELOG.md` | `[0.4.0]` section |

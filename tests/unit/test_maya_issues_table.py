@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from shader_health.ui import main_window
+from pipeline_inspector.ui import main_window
 
 
 class FakeWidget:

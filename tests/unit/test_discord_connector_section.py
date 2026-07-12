@@ -6,13 +6,13 @@ from tests.unit.test_telegram_connector_section import (
     _find,
 )
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DiscordConnectorSettings,
     StudioConfig,
 )
-from shader_health.ui.discord_connector_section import (
+from pipeline_inspector.ui.discord_connector_section import (
     SETTINGS_DISCORD_DETAILS_OBJECT_NAME,
     SETTINGS_DISCORD_ENABLED_TOGGLE_OBJECT_NAME,
     SETTINGS_DISCORD_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME,

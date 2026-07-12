@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from shader_health.integrations.deadline.eligibility import (
+from pipeline_inspector.integrations.deadline.eligibility import (
     FarmEligibilityDecision,
     FarmSceneState,
     FarmValidationResult,
     evaluate_farm_submit_eligibility,
 )
-from shader_health.integrations.deadline.preflight import (
+from pipeline_inspector.integrations.deadline.preflight import (
     PREFLIGHT_ERROR,
     SUBMISSION_ALLOWED,
     SUBMISSION_BLOCKED,

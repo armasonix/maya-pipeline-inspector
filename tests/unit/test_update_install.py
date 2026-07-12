@@ -5,18 +5,18 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.integrations.update.install import install_staged_update
-from shader_health.studio_config import STUDIO_CONFIG_FILENAME
-from shader_health.user_config import USER_CONFIG_DIRNAME, USER_CONFIG_FILENAME
+from pipeline_inspector.integrations.update.install import install_staged_update
+from pipeline_inspector.studio_config import STUDIO_CONFIG_FILENAME
+from pipeline_inspector.user_config import USER_CONFIG_DIRNAME, USER_CONFIG_FILENAME
 
 
 def _write_install_tree(root: Path, *, version: str) -> None:
     maya_module = root / "maya_module"
-    package = root / "src" / "shader_health"
+    package = root / "src" / "pipeline_inspector"
     maya_module.mkdir(parents=True)
     package.mkdir(parents=True)
-    (maya_module / "shader_health_inspector.mod").write_text(
-        f"+ shader_health_inspector {version} .\n",
+    (maya_module / "pipeline_inspector.mod").write_text(
+        f"+ pipeline_inspector {version} .\n",
         encoding="utf-8",
     )
     (package / "__init__.py").write_text("", encoding="utf-8")
@@ -52,9 +52,9 @@ def test_install_staged_update_replaces_payload_and_preserves_config_files(
     install_root = tmp_path / "install"
     _write_install_tree(install_root, version="0.4.0")
 
-    payload_root = tmp_path / "package" / "maya-shader-health-inspector"
+    payload_root = tmp_path / "package" / "maya-pipeline-inspector"
     _write_install_tree(payload_root, version="0.5.0")
-    zip_path = tmp_path / "package" / "maya-shader-health-inspector-0.5.0.zip"
+    zip_path = tmp_path / "package" / "maya-pipeline-inspector-0.5.0.zip"
     _write_zip_from_payload(zip_path, payload_root)
 
     result = install_staged_update(
@@ -65,7 +65,7 @@ def test_install_staged_update_replaces_payload_and_preserves_config_files(
     )
 
     assert result.success is True
-    assert (install_root / "src" / "shader_health" / "version_marker.txt").read_text(
+    assert (install_root / "src" / "pipeline_inspector" / "version_marker.txt").read_text(
         encoding="utf-8"
     ) == "0.5.0"
     assert (home / USER_CONFIG_DIRNAME / STUDIO_CONFIG_FILENAME).read_text(
@@ -83,16 +83,16 @@ def test_install_staged_update_rolls_back_when_apply_fails(
     install_root = tmp_path / "install"
     _write_install_tree(install_root, version="0.4.0")
 
-    payload_root = tmp_path / "package" / "maya-shader-health-inspector"
+    payload_root = tmp_path / "package" / "maya-pipeline-inspector"
     _write_install_tree(payload_root, version="0.5.0")
-    zip_path = tmp_path / "package" / "maya-shader-health-inspector-0.5.0.zip"
+    zip_path = tmp_path / "package" / "maya-pipeline-inspector-0.5.0.zip"
     _write_zip_from_payload(zip_path, payload_root)
 
     def _raise_copy_error(*_args: object, **_kwargs: object) -> None:
         raise OSError("copy failed")
 
     monkeypatch.setattr(
-        "shader_health.integrations.update.install.apply_install_payload",
+        "pipeline_inspector.integrations.update.install.apply_install_payload",
         _raise_copy_error,
     )
 
@@ -106,7 +106,7 @@ def test_install_staged_update_rolls_back_when_apply_fails(
     assert result.success is False
     assert result.rolled_back is True
     assert (
-        install_root / "src" / "shader_health" / "version_marker.txt"
+        install_root / "src" / "pipeline_inspector" / "version_marker.txt"
     ).read_text(encoding="utf-8") == "0.4.0"
 
 
@@ -126,5 +126,5 @@ def test_install_staged_update_returns_failure_for_invalid_package(tmp_path: Pat
     assert result.success is False
     assert result.rolled_back is False
     assert (
-        install_root / "src" / "shader_health" / "version_marker.txt"
+        install_root / "src" / "pipeline_inspector" / "version_marker.txt"
     ).read_text(encoding="utf-8") == "0.4.0"

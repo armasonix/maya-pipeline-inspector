@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     SNAPSHOT_SCHEMA_VERSION,
     ConnectionSnapshot,
     FileDependencySnapshot,

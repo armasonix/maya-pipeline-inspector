@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from shader_health.core.rule_browser import load_packaged_rules_catalog
-from shader_health.core.rule_schema import RuleResult
-from shader_health.core.rule_wizard import (
+from pipeline_inspector.core.rule_browser import load_packaged_rules_catalog
+from pipeline_inspector.core.rule_schema import RuleResult
+from pipeline_inspector.core.rule_wizard import (
     RULE_TEMPLATE_ATTRIBUTE_EQUALS,
     RULE_TEMPLATE_NUMERIC_MAX,
     RULE_TEMPLATE_PATH_EXISTS,

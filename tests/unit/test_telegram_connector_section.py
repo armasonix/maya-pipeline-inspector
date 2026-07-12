@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     StudioConfig,
     TelegramConnectorSettings,
 )
-from shader_health.ui.telegram_connector_section import (
+from pipeline_inspector.ui.telegram_connector_section import (
     SETTINGS_TELEGRAM_BOT_TOKEN_INPUT_OBJECT_NAME,
     SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME,
     SETTINGS_TELEGRAM_DETAILS_OBJECT_NAME,

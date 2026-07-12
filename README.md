@@ -1,4 +1,4 @@
-# Maya Shader Health Inspector
+# Maya Pipeline Inspector
 
 Production material QA framework for Maya pipelines.
 
@@ -15,11 +15,11 @@ The tool answers one practical production question:
 
 ## Visual demo
 
-Captured from [`examples/broken_scene/shader_health_demo_broken.ma`](examples/broken_scene/shader_health_demo_broken.ma). Full capture notes: [`docs/assets/README.md`](docs/assets/README.md).
+Captured from [`examples/broken_scene/pipeline_inspector_demo_broken.ma`](examples/broken_scene/pipeline_inspector_demo_broken.ma). Full capture notes: [`docs/assets/README.md`](docs/assets/README.md).
 
 ### Dockable panel
 
-![Shader Health Inspector UI — validate scene, issue table, details, health summary, and safe auto-fix queue](docs/assets/ui-panel.png)
+![Pipeline Inspector UI — validate scene, issue table, details, health summary, and safe auto-fix queue](docs/assets/ui-panel.png)
 
 The dockable Maya panel after **Validate Scene**: health score, severity filters, issue details, and the Safe Auto-Fix Queue on the broken demo scene.
 
@@ -31,9 +31,9 @@ Self-contained HTML export from the same demo validation. Severity groups collap
 
 Sample artifacts:
 
-- [Open HTML report](examples/broken_scene/shader_health_demo_broken_shader_health_report.html)
-- [JSON report](examples/broken_scene/shader_health_demo_broken_shader_health_report.json)
-- [Shader manifest](examples/broken_scene/shader_health_demo_broken_shader_health_manifest.json)
+- [Open HTML report](examples/broken_scene/pipeline_inspector_demo_broken_pipeline_inspector_report.html)
+- [JSON report](examples/broken_scene/pipeline_inspector_demo_broken_pipeline_inspector_report.json)
+- [Shader manifest](examples/broken_scene/pipeline_inspector_demo_broken_pipeline_inspector_manifest.json)
 
 ### Safe auto-fix (before / after)
 
@@ -100,7 +100,7 @@ The v0.1 demo is a deliberately broken Maya scene with readable geometry and mat
 
 ```text
 examples/broken_scene/
-├── shader_health_demo_broken.ma
+├── pipeline_inspector_demo_broken.ma
 ├── textures/
 └── README.md
 ```
@@ -124,7 +124,7 @@ Build and validation steps: [`examples/broken_scene/README.md`](examples/broken_
 - **Task trackers** — Ftrack, ShotGrid, Cerebro; **Send to Tracker** from Reports tab.
 - **Bug Report** — studio HTTPS relay client and payload schema.
 - **Check for Updates** — GitHub Releases wizard with safe install and rollback.
-- **Rule authoring** — rule browser, new rule wizard, incident-to-rule draft export; `shader_health rules validate`.
+- **Rule authoring** — rule browser, new rule wizard, incident-to-rule draft export; `pipeline_inspector rules validate`.
 - Headless **`--studio-config`** for farm/CI studio policy.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.5.0 release notes.
@@ -133,7 +133,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.5.0 release notes.
 
 - Everything in v0.3, plus:
 - **Deadline 10 on-prem** integration package + **Farm** tab (connection status, preflight, CommandScript submit).
-- **Settings** screen with studio config (`shader_health_studio.json`): **Require .tx** and **Thinkbox Deadline** connector (**Remote Farm** toggle).
+- **Settings** screen with studio config (`pipeline_inspector_studio.json`): **Require .tx** and **Thinkbox Deadline** connector (**Remote Farm** toggle).
 - Expanded render-risk rules: displacement depth, optimized texture / `.tx` policy, duplicate materials/textures.
 - Native `.mll` plugin Phase 1 (CMake + ADR 0006); Python plug-in fallback unchanged.
 - Maya integration CI smoke on self-hosted runners (`workflow_dispatch`).
@@ -144,8 +144,8 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.4.0 release notes.
 ## Current capabilities (v0.3)
 
 - Everything in v0.2, plus:
-- Manifest schema **1.1** with material graph fingerprints and regression gates (`shader_health gate`, `validate --baseline-manifest`).
-- Headless `shader_health manifest` and `shader_health apply-fixes` (ADR 0004 policy).
+- Manifest schema **1.1** with material graph fingerprints and regression gates (`pipeline_inspector gate`, `validate --baseline-manifest`).
+- Headless `pipeline_inspector manifest` and `pipeline_inspector apply-fixes` (ADR 0004 policy).
 - Texture resolution budgets by asset class (Hero / Prop / Background) in UI and CLI (`--asset-class-id`).
 - Python MPx plugin dual install; **Compare to Approved Manifest**, **Publish Preflight**, and **Manifest Gate** UI shortcuts.
 - Optional Maya CI manifest export + gate smoke (`workflow_dispatch`).
@@ -183,11 +183,11 @@ For studio rollout from the repository module layout or an editable `pip` instal
 Quick start with `MAYA_MODULE_PATH`:
 
 ```powershell
-$env:MAYA_MODULE_PATH = "D:\tools\maya-shader-health-inspector\maya_module"
+$env:MAYA_MODULE_PATH = "D:\tools\maya-pipeline-inspector\maya_module"
 maya
 ```
 
-Maya runs `maya_module/scripts/userSetup.py` at startup and installs the **Shader Health** menu plus **ShaderHealth** shelf button automatically.
+Maya runs `maya_module/scripts/userSetup.py` at startup and installs the **Pipeline Inspector** menu plus **PipelineInspector** shelf button automatically.
 
 ## Development
 
@@ -227,7 +227,7 @@ python tools/validate_rules.py
 ### Source layout
 
 ```text
-src/shader_health/
+src/pipeline_inspector/
 ├── core/          # models, rules, validator, scoring, fix plan, reports
 ├── maya/          # scanner, commands, UI launcher, fix applier
 ├── ui/            # dockable panel widgets

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from shader_health.core.fix_plan import FixAction
-from shader_health.maya.fix_applier import apply_fix_actions
+from pipeline_inspector.core.fix_plan import FixAction
+from pipeline_inspector.maya.fix_applier import apply_fix_actions
 
 
 class FakeCmds:
@@ -34,7 +34,7 @@ def test_apply_fix_actions_uses_undo_chunk_and_records_before_after_values():
     report = apply_fix_actions([action], cmds=cmds)
 
     assert cmds.undo_calls == [
-        {"openChunk": True, "chunkName": "Shader Health Apply Fixes"},
+        {"openChunk": True, "chunkName": "Pipeline Inspector Apply Fixes"},
         {"closeChunk": True},
     ]
     assert cmds.set_calls == [("file1.colorSpace", "Raw", {"type": "string"})]
@@ -103,7 +103,7 @@ def test_apply_fix_actions_returns_empty_report_without_undo_chunk_for_empty_inp
         "applied_count": 0,
         "blocked_count": 0,
         "failed_count": 0,
-        "undo_chunk_name": "Shader Health Apply Fixes",
+        "undo_chunk_name": "Pipeline Inspector Apply Fixes",
         "records": [],
     }
     assert cmds.undo_calls == []
@@ -123,7 +123,7 @@ def test_apply_relink_path_updates_file_texture_path_inside_undo_chunk():
     report = apply_fix_actions([action], cmds=cmds)
 
     assert cmds.undo_calls == [
-        {"openChunk": True, "chunkName": "Shader Health Apply Fixes"},
+        {"openChunk": True, "chunkName": "Pipeline Inspector Apply Fixes"},
         {"closeChunk": True},
     ]
     assert cmds.set_calls == [

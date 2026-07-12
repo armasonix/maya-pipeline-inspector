@@ -6,13 +6,13 @@ from tests.unit.test_telegram_connector_section import (
     _find,
 )
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     ShotGridConnectorSettings,
     StudioConfig,
 )
-from shader_health.ui.shotgrid_connector_section import (
+from pipeline_inspector.ui.shotgrid_connector_section import (
     SETTINGS_SHOTGRID_API_KEY_INPUT_OBJECT_NAME,
     SETTINGS_SHOTGRID_DETAILS_OBJECT_NAME,
     SETTINGS_SHOTGRID_ENABLED_TOGGLE_OBJECT_NAME,
@@ -52,7 +52,7 @@ def test_build_shotgrid_connector_section_masks_api_key_and_shows_fields():
                 shotgrid=ShotGridConnectorSettings(
                     enabled=True,
                     site_url="https://studio.shotgrid.autodesk.com",
-                    script_name="shader_health",
+                    script_name="pipeline_inspector",
                     api_key="secret",
                     project="Demo Project",
                     entity_type="Shot",
@@ -90,7 +90,7 @@ def test_read_shotgrid_connector_from_view_round_trips_settings():
     project = _find(section, SETTINGS_SHOTGRID_PROJECT_INPUT_OBJECT_NAME)
     entity_type = _find(section, SETTINGS_SHOTGRID_ENTITY_TYPE_INPUT_OBJECT_NAME)
     site_url.setText("https://studio.shotgrid.autodesk.com")
-    script_name.setText("shader_health")
+    script_name.setText("pipeline_inspector")
     api_key.setText("secret")
     project.setText("Demo Project")
     entity_type.setText("Asset")
@@ -99,7 +99,7 @@ def test_read_shotgrid_connector_from_view_round_trips_settings():
 
     assert settings.enabled is True
     assert settings.site_url == "https://studio.shotgrid.autodesk.com"
-    assert settings.script_name == "shader_health"
+    assert settings.script_name == "pipeline_inspector"
     assert settings.api_key == "secret"
     assert settings.project == "Demo Project"
     assert settings.entity_type == "Asset"
@@ -121,7 +121,7 @@ def test_update_shotgrid_connector_view_refreshes_controls():
         ShotGridConnectorSettings(
             enabled=True,
             site_url="https://studio.shotgrid.autodesk.com",
-            script_name="shader_health",
+            script_name="pipeline_inspector",
             api_key="rotated",
             project="Hero Project",
             entity_type="Asset",

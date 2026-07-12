@@ -1,4 +1,4 @@
 def test_package_imports():
-    import shader_health
+    import pipeline_inspector
 
-    assert shader_health.__version__ == "0.5.0"
+    assert pipeline_inspector.__version__ == "0.5.0"

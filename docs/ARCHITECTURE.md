@@ -1,6 +1,6 @@
 # Architecture
 
-Maya Shader Health Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
+Maya Pipeline Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
 
 Status: **v0.5.0 shipped** (2026-07-12). GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); settings and connectors hub ([ADR 0007](adr/0007-settings-and-connectors-architecture.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Maya dockable panel is the primary surface; CLI, reports, Deadline, notifications, and tracker hooks are integration surfaces on the same validation pipeline.
 
@@ -55,7 +55,7 @@ Maya scene
 
 ## UX Layer (panel)
 
-The dockable panel (`shader_health.ui.main_window`, launched via `shader_health.maya.ui_launcher`) is the primary artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and `shader_health.integrations.deadline` — no duplicated rule evaluation in widgets.
+The dockable panel (`pipeline_inspector.ui.main_window`, launched via `pipeline_inspector.maya.ui_launcher`) is the primary artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and `pipeline_inspector.integrations.deadline` — no duplicated rule evaluation in widgets.
 
 ```mermaid
 flowchart TD
@@ -94,21 +94,21 @@ flowchart TD
 
 ## Maya Plugin Delivery (ADR 0006)
 
-Maya integration uses a **thin native bootstrap** plus **Python implementation**. The compiled plug-in (`.mll` / `.so` / `.bundle`) exists only to register with Maya and call existing Python bootstrap code; validation, UI, and rules stay in `src/shader_health/`.
+Maya integration uses a **thin native bootstrap** plus **Python implementation**. The compiled plug-in (`.mll` / `.so` / `.bundle`) exists only to register with Maya and call existing Python bootstrap code; validation, UI, and rules stay in `src/pipeline_inspector/`.
 
 ```text
 maya_module/
   scripts/userSetup.py          # deferred startup; year-aware load order
-  scripts/shader_health_inspector_bootstrap.py
+  scripts/pipeline_inspector_bootstrap.py
   plug-ins/
-    {2024,2025,2026}/shader_health_inspector.mll   # preferred when built (#096–#097)
-    shader_health_inspector.py                     # OpenMayaMPx fallback (v0.3+)
+    {2024,2025,2026}/pipeline_inspector.mll   # preferred when built (#096–#097)
+    pipeline_inspector.py                     # OpenMayaMPx fallback (v0.3+)
         |
         v
-  shader_health.maya.commands / ui_launcher / validation_pipeline
+  pipeline_inspector.maya.commands / ui_launcher / validation_pipeline
         |
         v
-  src/shader_health/ (core + maya + ui)
+  src/pipeline_inspector/ (core + maya + ui)
 ```
 
 Load priority: **native `.mll` for current Maya year → `.py` plugin → direct `install_ui()`**. Open-source checkouts without compiled binaries continue to work via the `.py` path.
@@ -154,7 +154,7 @@ Benefits:
 Target structure:
 
 ```text
-src/shader_health/
+src/pipeline_inspector/
 ├── core/
 │   ├── models.py
 │   ├── rule_schema.py
@@ -323,10 +323,10 @@ Safe-fix rules:
 
 ## Headless Parity
 
-UI and CLI both call `shader_health.maya.validation_pipeline.run_validation`, which runs snapshot enrichment, profile resolution, waiver loading, result enrichment, and fix planning in one shared path. ADR 0005 defines the panel as the primary product surface; headless and farm paths are integration surfaces on this same pipeline — not alternate implementations.
+UI and CLI both call `pipeline_inspector.maya.validation_pipeline.run_validation`, which runs snapshot enrichment, profile resolution, waiver loading, result enrichment, and fix planning in one shared path. ADR 0005 defines the panel as the primary product surface; headless and farm paths are integration surfaces on this same pipeline — not alternate implementations.
 
 ```bash
-python -m shader_health validate scene.ma --profile-id publish_strict --report report.json
+python -m pipeline_inspector validate scene.ma --profile-id publish_strict --report report.json
 ```
 
 ## Testing Strategy

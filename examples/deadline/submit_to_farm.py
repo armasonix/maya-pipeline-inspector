@@ -1,23 +1,23 @@
-"""Submit a Shader Health validation utility job to Deadline."""
+"""Submit a Pipeline Inspector validation utility job to Deadline."""
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
     DeadlineConfig,
     DeadlineSubmitError,
     FarmSceneState,
     FarmValidationResult,
-    submit_shader_health_validation_job,
+    submit_pipeline_inspector_validation_job,
 )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Submit a Shader Health validation utility job to Deadline.",
+        description="Submit a Pipeline Inspector validation utility job to Deadline.",
     )
     parser.add_argument("scene_path", type=Path)
     parser.add_argument("--report", type=Path, required=True)
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--config",
         type=Path,
-        help="Optional Deadline JSON config. Defaults to SHADER_HEALTH_DEADLINE_* env vars.",
+        help="Optional Deadline JSON config. Defaults to PIPELINE_INSPECTOR_DEADLINE_* env vars.",
     )
     parser.add_argument(
         "--run-local-preflight",
@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
-        result = submit_shader_health_validation_job(
+        result = submit_pipeline_inspector_validation_job(
             client=client,
             scene_path=args.scene_path,
             report_path=args.report,

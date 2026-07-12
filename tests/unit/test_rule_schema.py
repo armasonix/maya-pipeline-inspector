@@ -1,6 +1,6 @@
 import pytest
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,

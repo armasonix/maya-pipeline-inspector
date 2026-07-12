@@ -1,12 +1,12 @@
 # Architecture Decision Records
 
-This folder contains Architecture Decision Records (ADRs) for Maya Shader Health Inspector.
+This folder contains Architecture Decision Records (ADRs) for Maya Pipeline Inspector.
 
 ADRs document important technical decisions that shape the project architecture. They explain what was decided, why it was decided, what alternatives were considered, and what consequences the decision has.
 
 ## Why ADRs Exist
 
-Maya Shader Health Inspector is intended to become a production-ready, open-source Maya material QA framework. The project has several architectural constraints:
+Maya Pipeline Inspector is intended to become a production-ready, open-source Maya material QA framework. The project has several architectural constraints:
 
 - the core validation engine must remain testable without Maya;
 - renderer-specific behavior must stay outside the core;

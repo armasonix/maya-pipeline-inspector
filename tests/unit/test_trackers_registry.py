@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     CerebroConnectorSettings,
     ConnectorSettings,
     FtrackConnectorSettings,
@@ -10,7 +10,7 @@ from shader_health.studio_config import (
     resolve_ftrack_config,
     resolve_shotgrid_config,
 )
-from shader_health.trackers_registry import (
+from pipeline_inspector.trackers_registry import (
     TRACKER_CONNECTOR_IDS,
     first_enabled_tracker,
     get_tracker,
@@ -54,7 +54,7 @@ def test_resolve_tracker_returns_settings_only_when_enabled():
             shotgrid=ShotGridConnectorSettings(
                 enabled=True,
                 site_url="https://studio.shotgrid.autodesk.com",
-                script_name="shader_health",
+                script_name="pipeline_inspector",
                 api_key="secret",
                 project="Demo Project",
             ),

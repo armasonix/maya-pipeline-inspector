@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core.fix_plan import FixAction, FixPlan, build_fix_plan
-from shader_health.core.models import GraphSnapshot, NodeSnapshot
-from shader_health.core.rule_schema import (
+from pipeline_inspector.core.fix_plan import FixAction, FixPlan, build_fix_plan
+from pipeline_inspector.core.models import GraphSnapshot, NodeSnapshot
+from pipeline_inspector.core.rule_schema import (
     RuleCheck,
     RuleDefinition,
     RuleFix,
@@ -13,7 +13,7 @@ from shader_health.core.rule_schema import (
     RulePolicy,
     RuleResult,
 )
-from shader_health.reports import (
+from pipeline_inspector.reports import (
     FIX_PLAN_SCHEMA_VERSION,
     build_fix_plan_export,
     dumps_fix_plan_export,
@@ -104,7 +104,7 @@ def test_fix_plan_export_output_is_deterministic():
 def test_write_fix_plan_export_round_trips_through_json(tmp_path: Path):
     snapshot = _snapshot(NodeSnapshot(id="node:file1", name="file1", type_name="file"))
     plan = build_fix_plan([_failed_result()], [_rule_with_fix()], snapshot)
-    output_path = tmp_path / "hero_shader_health_fix_plan.json"
+    output_path = tmp_path / "hero_pipeline_inspector_fix_plan.json"
 
     written_path = write_fix_plan_export(
         output_path,

@@ -1,0 +1,766 @@
+"""Maya scene scanner entrypoints.
+
+This module is intentionally safe to import outside Maya. Real Maya modules are
+loaded lazily only when scan functions run without an injected ``cmds_module``.
+"""
+from __future__ import annotations
+
+import glob
+import logging
+import os
+import re
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Optional
+
+from pipeline_inspector.core import (
+    ConnectionSnapshot,
+    FileDependencySnapshot,
+    GraphSnapshot,
+    MaterialSnapshot,
+    NodeSnapshot,
+    ReferenceSnapshot,
+    ShadingEngineSnapshot,
+)
+
+log = logging.getLogger(__name__)
+
+_ATTRS_BY_TYPE = {
+    "file": ("fileTextureName", "colorSpace", "uvTilingMode"),
+    "VRayBitmap": ("file", "colorSpace"),
+    "aiImage": ("filename", "colorSpace"),
+    "VRayMtl": (
+        "diffuseColor",
+        "reflectionGlossiness",
+        "reflectionColor",
+        "rlmd",
+        "rrmd",
+        "igi",
+        "fde",
+        "gfr",
+        "ufs",
+        "brdf",
+        "omode",
+        "gtrec",
+        "cth",
+        "and",
+        "afs",
+        "uf",
+    ),
+    "aiStandardSurface": (
+        "baseColor",
+        "specularRoughness",
+        "metalness",
+        "transmission",
+        "transmissionDepth",
+        "opacity",
+        "emission",
+        "subsurface",
+        "specular",
+    ),
+    "standardSurface": ("baseColor", "specularRoughness", "metalness"),
+    "lambert": ("color", "transparency"),
+    "displacementShader": (
+        "scale",
+        "displacement",
+        "displacementAmount",
+        "minValue",
+        "maxValue",
+    ),
+    "VRayDisplacement": (
+        "scale",
+        "displacement",
+        "displacementAmount",
+        "minValue",
+        "maxValue",
+        "shift",
+    ),
+}
+
+_TEXTURE_PATH_ATTRS = {
+    "file": "fileTextureName",
+    "VRayBitmap": "file",
+    "aiImage": "filename",
+}
+
+_UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
+_VERSION_TOKEN_RE = re.compile(r"(?i)v(?P<version>\d+)")
+
+class MayaUnavailableError(RuntimeError):
+    """Raised when Maya commands are required but unavailable."""
+
+@dataclass(frozen=True)
+class ScanOptions:
+    """Options shared by scanner entrypoints."""
+
+    include_references: bool = True
+    include_file_dependencies: bool = True
+    include_connections: bool = True
+
+def scan_scene(
+    options: Optional[ScanOptions] = None,
+    cmds_module: Optional[Any] = None,
+) -> GraphSnapshot:
+    """Scan the current Maya scene and return a GraphSnapshot."""
+
+    cmds = _get_cmds(cmds_module)
+    return _scan_snapshot(cmds, scan_scope="scene", options=options or ScanOptions())
+
+def scan_selection(
+    options: Optional[ScanOptions] = None,
+    cmds_module: Optional[Any] = None,
+) -> GraphSnapshot:
+    """Scan current Maya selection and return a selection-scoped snapshot."""
+
+    cmds = _get_cmds(cmds_module)
+    selection = _selection_names(cmds)
+    return _scan_snapshot(
+        cmds,
+        scan_scope="selection",
+        options=options or ScanOptions(),
+        selected_nodes=selection,
+    )
+
+def selection_node_names(cmds_module: Optional[Any] = None) -> list[str]:
+    """Return the current Maya selection as long node names."""
+
+    return _selection_names(_get_cmds(cmds_module))
+
+def _get_cmds(cmds_module: Optional[Any]) -> Any:
+    if cmds_module is not None:
+        return cmds_module
+
+    try:
+        import maya.cmds as cmds  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise MayaUnavailableError(
+            "maya.cmds is unavailable. Run this scanner inside Maya or pass "
+            "cmds_module for tests."
+        ) from exc
+    return cmds
+
+def _scan_snapshot(
+    cmds: Any,
+    *,
+    scan_scope: str,
+    options: ScanOptions,
+    selected_nodes: Optional[list[str]] = None,
+) -> GraphSnapshot:
+    graph = _collect_shader_graph(cmds, options=options, selected_nodes=selected_nodes)
+    return GraphSnapshot(
+        scene_path=_scene_path(cmds),
+        maya_version=_maya_version(cmds),
+        renderer=_current_renderer(cmds),
+        scan_scope=scan_scope,
+        scanned_at_utc=_utc_now(),
+        nodes=list(graph.nodes.values()),
+        connections=graph.connections,
+        materials=graph.materials,
+        shading_engines=graph.shading_engines,
+        file_dependencies=graph.file_dependencies,
+        references=graph.references,
+    )
+
+@dataclass
+class _GraphBuildResult:
+    nodes: dict[str, NodeSnapshot]
+    connections: list[ConnectionSnapshot]
+    materials: list[MaterialSnapshot]
+    shading_engines: list[ShadingEngineSnapshot]
+    file_dependencies: list[FileDependencySnapshot]
+    references: list[ReferenceSnapshot]
+
+def _collect_shader_graph(
+    cmds: Any,
+    *,
+    options: ScanOptions,
+    selected_nodes: Optional[list[str]] = None,
+) -> _GraphBuildResult:
+    nodes: dict[str, NodeSnapshot] = {}
+    connections: list[ConnectionSnapshot] = []
+    materials: list[MaterialSnapshot] = []
+    shading_engines: list[ShadingEngineSnapshot] = []
+
+    for selected in selected_nodes or []:
+        _add_node_snapshot(cmds, nodes, selected)
+
+    for engine_name in _shading_engine_names(cmds, selected_nodes):
+        engine_id = _node_id(engine_name)
+        _add_node_snapshot(cmds, nodes, engine_name)
+
+        surface_shader = _connected_node(cmds, f"{engine_name}.surfaceShader")
+        displacement_shader = _connected_node(cmds, f"{engine_name}.displacementShader")
+        volume_shader = _connected_node(cmds, f"{engine_name}.volumeShader")
+        members = _set_members(cmds, engine_name)
+
+        shading_engines.append(
+            ShadingEngineSnapshot(
+                node_id=engine_id,
+                name=_short_name(engine_name),
+                surface_shader=_node_id(surface_shader) if surface_shader else None,
+                displacement_shader=_node_id(displacement_shader) if displacement_shader else None,
+                volume_shader=_node_id(volume_shader) if volume_shader else None,
+                members=members,
+            )
+        )
+
+        for shader_attr, shader_name in (
+            ("surfaceShader", surface_shader),
+            ("displacementShader", displacement_shader),
+            ("volumeShader", volume_shader),
+        ):
+            if shader_name is None:
+                continue
+            connections.append(
+                ConnectionSnapshot(
+                    src_node=_node_id(shader_name),
+                    src_attr="outColor",
+                    dst_node=engine_id,
+                    dst_attr=shader_attr,
+                )
+            )
+
+        if surface_shader:
+            graph_nodes, graph_connections = _walk_upstream_graph(cmds, surface_shader)
+            for node_name in graph_nodes:
+                _add_node_snapshot(cmds, nodes, node_name)
+            if options.include_connections:
+                connections.extend(graph_connections)
+            materials.append(
+                _material_snapshot(
+                    cmds,
+                    material_name=surface_shader,
+                    shading_engine_id=engine_id,
+                    members=members,
+                    graph_nodes=graph_nodes,
+                    displacement_shader=displacement_shader,
+                )
+            )
+
+        if displacement_shader:
+            displacement_nodes, displacement_connections = _walk_upstream_graph(
+                cmds,
+                displacement_shader,
+            )
+            for node_name in displacement_nodes:
+                _add_node_snapshot(cmds, nodes, node_name)
+            if options.include_connections:
+                connections.extend(displacement_connections)
+
+    file_dependencies = (
+        _collect_file_dependencies(nodes)
+        if options.include_file_dependencies
+        else []
+    )
+    references = _collect_reference_snapshots(nodes)
+
+    return _GraphBuildResult(
+        nodes=nodes,
+        connections=_dedupe_connections(connections),
+        materials=materials,
+        shading_engines=shading_engines,
+        file_dependencies=file_dependencies,
+        references=references,
+    )
+
+def _shading_engine_names(cmds: Any, selected_nodes: Optional[list[str]]) -> list[str]:
+    if selected_nodes is None:
+        scene_engines = _call_cmds(cmds, "ls", [], type="shadingEngine", long=True) or []
+        return [str(item) for item in scene_engines]
+
+    selected_engines: list[str] = []
+    for node_name in selected_nodes:
+        selected_engines.extend(_shading_engines_for_node(cmds, node_name))
+    return _dedupe_strings(selected_engines)
+
+def _shading_engines_for_node(cmds: Any, node_name: str) -> list[str]:
+    engines: list[str] = []
+    node_type = _node_type(cmds, node_name)
+
+    if node_type == "shadingEngine":
+        engines.append(node_name)
+
+    connected = _call_cmds(cmds, "listConnections", [], node_name, type="shadingEngine") or []
+    engines.extend(str(item) for item in connected)
+
+    if node_type == "transform":
+        shapes = _call_cmds(
+            cmds,
+            "listRelatives",
+            [],
+            node_name,
+            shapes=True,
+            fullPath=True,
+            noIntermediate=True,
+        ) or []
+        for shape in shapes:
+            shape_engines = _call_cmds(
+                cmds,
+                "listConnections",
+                [],
+                str(shape),
+                type="shadingEngine",
+            ) or []
+            engines.extend(str(item) for item in shape_engines)
+
+    if _is_shader_node_type(node_type):
+        shader_engines = _call_cmds(
+            cmds,
+            "listConnections",
+            [],
+            node_name,
+            type="shadingEngine",
+            destination=True,
+        ) or []
+        engines.extend(str(item) for item in shader_engines)
+
+    if node_type in {"file", "VRayBitmap", "aiImage"}:
+        downstream = _call_cmds(
+            cmds,
+            "listConnections",
+            [],
+            node_name,
+            destination=True,
+            connections=False,
+        ) or []
+        for downstream_node in downstream:
+            downstream_type = _node_type(cmds, str(downstream_node))
+            if _is_shader_node_type(downstream_type):
+                engines.extend(_shading_engines_for_node(cmds, str(downstream_node)))
+
+    return _dedupe_strings(engines)
+
+def _is_shader_node_type(type_name: str) -> bool:
+    if type_name in {
+        "lambert",
+        "blinn",
+        "phong",
+        "aiStandardSurface",
+        "standardSurface",
+    }:
+        return True
+    lowered = type_name.lower()
+    return type_name.startswith("VRay") or "material" in lowered or type_name.endswith("Mtl")
+
+def _walk_upstream_graph(cmds: Any, root_node: str) -> tuple[list[str], list[ConnectionSnapshot]]:
+    visited: set[str] = set()
+    ordered_nodes: list[str] = []
+    connections: list[ConnectionSnapshot] = []
+
+    def visit(node_name: str) -> None:
+        if node_name in visited:
+            return
+        visited.add(node_name)
+        ordered_nodes.append(node_name)
+        for connection in _input_connections(cmds, node_name):
+            connections.append(connection)
+            visit(_node_name_from_id(connection.src_node))
+
+    visit(root_node)
+    return ordered_nodes, _dedupe_connections(connections)
+
+def _input_connections(cmds: Any, node_name: str) -> list[ConnectionSnapshot]:
+    raw_connections = _call_cmds(
+        cmds,
+        "listConnections",
+        [],
+        node_name,
+        source=True,
+        destination=False,
+        plugs=True,
+        connections=True,
+    ) or []
+    if len(raw_connections) % 2 != 0:
+        return []
+
+    connections: list[ConnectionSnapshot] = []
+    for index in range(0, len(raw_connections), 2):
+        first = str(raw_connections[index])
+        second = str(raw_connections[index + 1])
+        if _plug_node(first) == node_name:
+            dst_plug = first
+            src_plug = second
+        else:
+            src_plug = first
+            dst_plug = second
+        connections.append(
+            ConnectionSnapshot(
+                src_node=_node_id(_plug_node(src_plug)),
+                src_attr=_plug_attr(src_plug),
+                dst_node=_node_id(_plug_node(dst_plug)),
+                dst_attr=_plug_attr(dst_plug),
+            )
+        )
+    return connections
+
+def _material_snapshot(
+    cmds: Any,
+    *,
+    material_name: str,
+    shading_engine_id: str,
+    members: list[str],
+    graph_nodes: list[str],
+    displacement_shader: Optional[str],
+) -> MaterialSnapshot:
+    texture_nodes = [
+        _node_id(node_name)
+        for node_name in graph_nodes
+        if "texture" in _classify_node(_node_type(cmds, node_name))
+    ]
+    displacement_nodes = []
+    if displacement_shader:
+        displacement_nodes.append(_node_id(displacement_shader))
+
+    return MaterialSnapshot(
+        node_id=_node_id(material_name),
+        name=_short_name(material_name),
+        type_name=_node_type(cmds, material_name),
+        renderer_family=_renderer_family(_node_type(cmds, material_name)),
+        shading_engines=[shading_engine_id],
+        assigned_shapes=members,
+        texture_nodes=texture_nodes,
+        displacement_nodes=displacement_nodes,
+        graph_node_count=len(graph_nodes),
+        graph_depth=max(len(graph_nodes) - 1, 0),
+        graph_fingerprint="",
+    )
+
+def _add_node_snapshot(cmds: Any, nodes: dict[str, NodeSnapshot], node_name: str) -> None:
+    node_id = _node_id(node_name)
+    if node_id in nodes:
+        return
+    type_name = _node_type(cmds, node_name)
+    referenced = _is_referenced(cmds, node_name)
+    nodes[node_id] = NodeSnapshot(
+        id=node_id,
+        name=_short_name(node_name),
+        full_name=node_name,
+        type_name=type_name,
+        renderer_family=_renderer_family(type_name),
+        namespace=_namespace(node_name),
+        referenced=referenced,
+        reference_path=_reference_path(cmds, node_name) if referenced else None,
+        locked=_is_locked(cmds, node_name),
+        attrs=_collect_attrs(cmds, node_name, type_name),
+        classification=_classify_node(type_name),
+    )
+
+def _collect_attrs(cmds: Any, node_name: str, type_name: str) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    for attr_name in _attrs_for_type(type_name):
+        value = _safe_get_attr(cmds, node_name, attr_name)
+        if value is not None:
+            attrs[attr_name] = value
+    return attrs
+
+def _attrs_for_type(type_name: str) -> tuple[str, ...]:
+    return _ATTRS_BY_TYPE.get(type_name, ())
+
+def _safe_get_attr(cmds: Any, node_name: str, attr_name: str) -> Any:
+    plug = f"{node_name}.{attr_name}"
+    command = getattr(cmds, "getAttr", None)
+    if command is None:
+        return None
+    try:
+        return command(plug)
+    except Exception as exc:
+        log.debug("Skipping unreadable Maya attribute %s: %s", plug, exc)
+        return None
+
+def _is_referenced(cmds: Any, node_name: str) -> bool:
+    value = _call_cmds(cmds, "referenceQuery", False, node_name, isNodeReferenced=True)
+    return bool(value)
+
+def _reference_path(cmds: Any, node_name: str) -> Optional[str]:
+    value = _call_cmds(cmds, "referenceQuery", None, node_name, filename=True)
+    return str(value) if value else None
+
+def _is_locked(cmds: Any, node_name: str) -> bool:
+    value = _call_cmds(cmds, "lockNode", False, node_name, query=True, lock=True)
+    if isinstance(value, list):
+        return bool(value[0]) if value else False
+    return bool(value)
+
+def _namespace(node_name: str) -> Optional[str]:
+    short_path = node_name.rsplit("|", 1)[-1]
+    if ":" not in short_path:
+        return None
+    return short_path.rsplit(":", 1)[0]
+
+def _collect_reference_snapshots(nodes: dict[str, NodeSnapshot]) -> list[ReferenceSnapshot]:
+    grouped: dict[tuple[str, str], list[NodeSnapshot]] = {}
+
+    for node in nodes.values():
+        if not node.referenced or not node.reference_path:
+            continue
+
+        key = (node.namespace or "", node.reference_path)
+        grouped.setdefault(key, []).append(node)
+
+    references: list[ReferenceSnapshot] = []
+    for namespace, path in sorted(grouped):
+        referenced_nodes = grouped[(namespace, path)]
+        references.append(
+            ReferenceSnapshot(
+                namespace=namespace,
+                path=path,
+                loaded=True,
+                locked=any(node.locked for node in referenced_nodes),
+                node_ids=sorted(node.id for node in referenced_nodes),
+            )
+        )
+
+    return references
+
+def _collect_file_dependencies(nodes: dict[str, NodeSnapshot]) -> list[FileDependencySnapshot]:
+    dependencies: list[FileDependencySnapshot] = []
+    for node in nodes.values():
+        path_attr = _texture_path_attr(node.type_name)
+        if path_attr is None:
+            continue
+
+        raw_path = node.attrs.get(path_attr)
+        if raw_path is None or str(raw_path).strip() == "":
+            continue
+
+        raw_path_text = str(raw_path)
+        resolved_path = _resolve_path(raw_path_text)
+        is_udim = _is_udim_path(raw_path_text)
+        udim_tiles = _existing_udim_tiles(resolved_path) if is_udim else []
+        existing_file = _first_existing_file(resolved_path, is_udim)
+        mtime_utc, size_bytes = _file_metadata(existing_file)
+
+        dependencies.append(
+            FileDependencySnapshot(
+                node_id=node.id,
+                attr=path_attr,
+                raw_path=raw_path_text,
+                resolved_path=resolved_path,
+                exists=bool(udim_tiles) if is_udim else Path(resolved_path).is_file(),
+                is_sequence=False,
+                is_udim=is_udim,
+                udim_tiles=udim_tiles,
+                missing_udim_tiles=_missing_udim_tiles(udim_tiles),
+                extension=_path_extension(resolved_path),
+                version=_texture_version(raw_path_text),
+                latest_version=_latest_texture_version(resolved_path),
+                mtime_utc=mtime_utc,
+                size_bytes=size_bytes,
+            )
+        )
+
+    return dependencies
+
+def _texture_path_attr(type_name: str) -> Optional[str]:
+    return _TEXTURE_PATH_ATTRS.get(type_name)
+
+def _resolve_path(raw_path: str) -> str:
+    expanded = os.path.expanduser(os.path.expandvars(raw_path))
+    return expanded.replace("\\", "/")
+
+def _is_udim_path(path: str) -> bool:
+    return "<UDIM>" in path or "<udim>" in path
+
+def _udim_glob_pattern(path: str) -> str:
+    return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace(
+        "<udim>",
+        "[0-9][0-9][0-9][0-9]",
+    )
+
+def _udim_files(path: str) -> list[Path]:
+    return sorted(Path(item) for item in glob.glob(_udim_glob_pattern(path)))
+
+def _existing_udim_tiles(path: str) -> list[int]:
+    tiles: set[int] = set()
+    for file_path in _udim_files(path):
+        matches = _UDIM_TILE_RE.findall(file_path.name)
+        if matches:
+            tiles.add(int(matches[-1]))
+    return sorted(tiles)
+
+def _missing_udim_tiles(existing_tiles: list[int]) -> list[int]:
+    if len(existing_tiles) < 2:
+        return []
+    existing = set(existing_tiles)
+    return [tile for tile in range(min(existing), max(existing) + 1) if tile not in existing]
+
+def _first_existing_file(path: str, is_udim: bool) -> Optional[Path]:
+    if is_udim:
+        files = _udim_files(path)
+        return files[0] if files else None
+
+    file_path = Path(path)
+    return file_path if file_path.is_file() else None
+
+def _file_metadata(path: Optional[Path]) -> tuple[Optional[str], Optional[int]]:
+    if path is None:
+        return None, None
+
+    try:
+        stat = path.stat()
+    except OSError:
+        return None, None
+
+    mtime = datetime.fromtimestamp(stat.st_mtime, timezone.utc)
+    mtime_utc = mtime.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return mtime_utc, stat.st_size
+
+def _path_extension(path: str) -> Optional[str]:
+    normalized = path.replace("<UDIM>", "1001").replace("<udim>", "1001")
+    suffix = Path(normalized).suffix
+    return suffix or None
+
+def _texture_version(path: str) -> Optional[str]:
+    match = _VERSION_TOKEN_RE.search(Path(path).name)
+    return match.group("version") if match else None
+
+def _latest_texture_version(path: str) -> Optional[str]:
+    current_version = _texture_version(path)
+    if current_version is None:
+        return None
+
+    path_obj = Path(path)
+    parent = path_obj.parent
+    if not parent.is_dir():
+        return current_version
+
+    name = path_obj.name
+    match = _VERSION_TOKEN_RE.search(name)
+    if match is None:
+        return current_version
+
+    prefix = name[: match.start("version")]
+    suffix = name[match.end("version") :]
+    suffix_pattern = re.escape(suffix)
+    suffix_pattern = suffix_pattern.replace(re.escape("<UDIM>"), r"\d{4}")
+    suffix_pattern = suffix_pattern.replace(re.escape("<udim>"), r"\d{4}")
+
+    version_pattern = re.compile(
+        "^" + re.escape(prefix) + r"(?P<version>\d+)" + suffix_pattern + "$",
+        re.IGNORECASE,
+    )
+
+    versions = [current_version]
+    try:
+        children = list(parent.iterdir())
+    except OSError:
+        return current_version
+
+    for child in children:
+        if not child.is_file():
+            continue
+        child_match = version_pattern.match(child.name)
+        if child_match:
+            versions.append(child_match.group("version"))
+
+    width = max(len(item) for item in versions)
+    latest = max(int(item) for item in versions)
+    return str(latest).zfill(width)
+
+def _connected_node(cmds: Any, plug: str) -> Optional[str]:
+    connected = _call_cmds(cmds, "listConnections", [], plug, source=True, destination=False) or []
+    if not connected:
+        return None
+    return _plug_node(str(connected[0]))
+
+def _set_members(cmds: Any, shading_engine: str) -> list[str]:
+    members = _call_cmds(cmds, "sets", [], shading_engine, query=True) or []
+    return [str(item) for item in members]
+
+def _scene_path(cmds: Any) -> str:
+    scene_path = _call_cmds(cmds, "file", "", query=True, sceneName=True)
+    return str(scene_path or "")
+
+def _maya_version(cmds: Any) -> str:
+    version = _call_cmds(cmds, "about", "", version=True)
+    return str(version or "")
+
+def _current_renderer(cmds: Any) -> Optional[str]:
+    renderer = _call_cmds(cmds, "getAttr", None, "defaultRenderGlobals.currentRenderer")
+    return str(renderer) if renderer else None
+
+def _selection_names(cmds: Any) -> list[str]:
+    selection = _call_cmds(cmds, "ls", [], selection=True, long=True) or []
+    return [str(item) for item in selection]
+
+def _node_type(cmds: Any, node: str) -> str:
+    node_type = _call_cmds(cmds, "nodeType", "", node)
+    return str(node_type or "")
+
+def _classify_node(type_name: str) -> list[str]:
+    lowered = type_name.lower()
+    if type_name == "shadingEngine":
+        return ["shading_engine"]
+    if type_name in {"file", "VRayBitmap", "aiImage"}:
+        return ["texture", "file"]
+    if "displacement" in lowered:
+        return ["displacement"]
+    if type_name.startswith("VRay") or type_name in {"aiStandardSurface", "lambert"}:
+        return ["material"]
+    if type_name == "standardSurface":
+        return ["material"]
+    return ["utility"]
+
+def _renderer_family(type_name: str) -> Optional[str]:
+    if type_name.startswith("VRay"):
+        return "vray"
+    if type_name.startswith("ai"):
+        return "arnold"
+    if type_name in {"file", "shadingEngine", "lambert", "standardSurface"}:
+        return "common"
+    return None
+
+def _node_id(node_name: str) -> str:
+    return f"node:{node_name}"
+
+def _node_name_from_id(node_id: str) -> str:
+    return node_id[5:] if node_id.startswith("node:") else node_id
+
+def _plug_node(plug: str) -> str:
+    return plug.split(".", 1)[0]
+
+def _plug_attr(plug: str) -> str:
+    if "." not in plug:
+        return ""
+    return plug.split(".", 1)[1]
+
+def _short_name(full_name: str) -> str:
+    if "|" in full_name:
+        full_name = full_name.rsplit("|", 1)[-1]
+    if ":" in full_name:
+        return full_name.rsplit(":", 1)[-1]
+    return full_name
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+def _dedupe_connections(connections: list[ConnectionSnapshot]) -> list[ConnectionSnapshot]:
+    result: list[ConnectionSnapshot] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for connection in connections:
+        key = (connection.src_node, connection.src_attr, connection.dst_node, connection.dst_attr)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(connection)
+    return result
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+def _call_cmds(cmds: Any, name: str, default: Any, *args: Any, **kwargs: Any) -> Any:
+    command = getattr(cmds, name, None)
+    if command is None:
+        return default
+    try:
+        return command(*args, **kwargs)
+    except Exception:
+        return default

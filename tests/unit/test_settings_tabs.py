@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.settings_tabs import (
+from pipeline_inspector.ui.settings_tabs import (
     SETTINGS_TAB_SPECS,
     get_settings_tab_spec,
     settings_tab_titles,
@@ -18,9 +18,9 @@ def test_settings_tab_specs_include_v05_tabs():
     )
 
 
-def test_settings_tab_object_names_follow_shader_health_pattern():
+def test_settings_tab_object_names_follow_pipeline_inspector_pattern():
     for spec in SETTINGS_TAB_SPECS:
-        assert spec.object_name.startswith("shaderHealthInspectorSettings")
+        assert spec.object_name.startswith("pipelineInspectorSettings")
         assert spec.object_name.endswith("Tab")
 
 

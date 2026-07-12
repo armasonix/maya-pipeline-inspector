@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot, ValidationEngine, build_fix_plan, load_rule_stack
+from pipeline_inspector.core import GraphSnapshot, ValidationEngine, build_fix_plan, load_rule_stack
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_ROOT = ROOT / "src" / "shader_health" / "rules"
+RULE_ROOT = ROOT / "src" / "pipeline_inspector" / "rules"
 FIXTURES_ROOT = ROOT / "tests" / "fixtures" / "snapshots"
 
 
@@ -26,7 +26,7 @@ def test_packaged_rules_emit_medium_and_high_fix_actions():
 
 
 def test_swap_texture_version_in_path_replaces_version_token():
-    from shader_health.core.fix_plan import swap_texture_version_in_path
+    from pipeline_inspector.core.fix_plan import swap_texture_version_in_path
 
     updated = swap_texture_version_in_path(
         "D:/show/tex/albedo_v001.<UDIM>.exr",

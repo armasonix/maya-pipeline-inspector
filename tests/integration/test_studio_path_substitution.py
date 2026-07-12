@@ -8,10 +8,12 @@ from typing import Any
 
 import pytest
 
-from shader_health import cli
-from shader_health.core import FileDependencySnapshot, GraphSnapshot, NodeSnapshot
-from shader_health.maya.validation_pipeline import ValidationRunResult, run_validation
-from shader_health.studio_config import (
+from pipeline_inspector import cli
+from pipeline_inspector.core import FileDependencySnapshot, GraphSnapshot, NodeSnapshot
+from pipeline_inspector.maya.validation_pipeline import ValidationRunResult, run_validation
+from pipeline_inspector.studio_config import (
+    LEGACY_STUDIO_CONFIG_ENV_VAR,
+    STUDIO_CONFIG_ENV_VAR,
     PipelineSettings,
     StudioConfig,
     StudioEnvironmentSettings,
@@ -180,7 +182,7 @@ def test_studio_path_substitution_cli_respects_studio_config_flag(
     snapshot_path = tmp_path / "snapshot.json"
     snapshot_path.write_text(snapshot.to_json(), encoding="utf-8")
     report_path = tmp_path / "report.json"
-    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    studio_path = tmp_path / "studio" / "pipeline_inspector_studio.json"
     save_studio_config(
         studio_path,
         StudioConfig(
@@ -267,6 +269,7 @@ def test_studio_path_substitution_custom_alias_resolves_nested_texture_root(
 
 
 def _isolate_studio_config_discovery(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.delenv("SHADER_HEALTH_STUDIO_CONFIG", raising=False)
+    monkeypatch.delenv(STUDIO_CONFIG_ENV_VAR, raising=False)
+    monkeypatch.delenv(LEGACY_STUDIO_CONFIG_ENV_VAR, raising=False)
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setenv("HOME", str(tmp_path))

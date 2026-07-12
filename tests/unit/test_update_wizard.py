@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.integrations.update.download import select_update_asset
-from shader_health.integrations.update.github_releases import (
+from pipeline_inspector.integrations.update.download import select_update_asset
+from pipeline_inspector.integrations.update.github_releases import (
     GitHubReleasesResponse,
     HttpRequest,
     ReleaseAsset,
 )
-from shader_health.studio_config import StudioConfig, StudioUpdatesSettings
-from shader_health.ui.update_progress_dialog import UpdateProgressDialog
-from shader_health.ui.update_wizard import (
+from pipeline_inspector.studio_config import StudioConfig, StudioUpdatesSettings
+from pipeline_inspector.ui.update_progress_dialog import UpdateProgressDialog
+from pipeline_inspector.ui.update_wizard import (
     UPDATE_WIZARD_STAGE_RESTART,
     UPDATE_WIZARD_STATUS_RESTART,
     UPDATE_WIZARD_STATUS_UP_TO_DATE,
@@ -213,11 +213,11 @@ class FakeQtWidgets:
 
 def _write_install_tree(root: Path, *, version: str) -> None:
     maya_module = root / "maya_module"
-    package = root / "src" / "shader_health"
+    package = root / "src" / "pipeline_inspector"
     maya_module.mkdir(parents=True)
     package.mkdir(parents=True)
-    (maya_module / "shader_health_inspector.mod").write_text(
-        f"+ shader_health_inspector {version} .\n",
+    (maya_module / "pipeline_inspector.mod").write_text(
+        f"+ pipeline_inspector {version} .\n",
         encoding="utf-8",
     )
     (package / "__init__.py").write_text("", encoding="utf-8")
@@ -242,7 +242,7 @@ def _release_payload(*, tag_name: str = "v0.5.0", version: str | None = None) ->
         "assets": [
             {
                 "id": 1,
-                "name": f"maya-shader-health-inspector-{tag_name.lstrip('v')}.zip",
+                "name": f"maya-pipeline-inspector-{tag_name.lstrip('v')}.zip",
                 "browser_download_url": f"https://example.test/{tag_name}.zip",
                 "size": 128,
                 "content_type": "application/zip",
@@ -264,8 +264,8 @@ def _github_transport(payload: dict[str, object]):
 
 def test_select_update_asset_prefers_maya_module_zip():
     assets = (
-        ReleaseAsset("shader_health_inspector.mll", "https://x/mll", 1, "bin", 1),
-        ReleaseAsset("maya-shader-health-inspector-0.5.0.zip", "https://x/zip", 2, "zip", 2),
+        ReleaseAsset("pipeline_inspector.mll", "https://x/mll", 1, "bin", 1),
+        ReleaseAsset("maya-pipeline-inspector-0.5.0.zip", "https://x/zip", 2, "zip", 2),
     )
 
     selected = select_update_asset(assets)
@@ -298,16 +298,16 @@ def test_run_update_wizard_flow_advances_through_download_install_and_restart(
 ):
     install_root = tmp_path / "install"
     _write_install_tree(install_root, version="0.4.0")
-    payload_root = tmp_path / "package" / "maya-shader-health-inspector"
+    payload_root = tmp_path / "package" / "maya-pipeline-inspector"
     _write_install_tree(payload_root, version="0.5.0")
-    zip_path = tmp_path / "package" / "maya-shader-health-inspector-0.5.0.zip"
+    zip_path = tmp_path / "package" / "maya-pipeline-inspector-0.5.0.zip"
     _write_zip_from_payload(zip_path, payload_root)
 
     controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
 
     def install_handler(staging_path: Path, release) -> object:
-        from shader_health.integrations.update.install import install_staged_update
-        from shader_health.ui.update_wizard import UpdateInstallOutcome
+        from pipeline_inspector.integrations.update.install import install_staged_update
+        from pipeline_inspector.ui.update_wizard import UpdateInstallOutcome
 
         result = install_staged_update(
             staging_path,
@@ -329,7 +329,7 @@ def test_run_update_wizard_flow_advances_through_download_install_and_restart(
     assert result.completed is True
     assert result.update_available is True
     assert (
-        install_root / "src" / "shader_health" / "version_marker.txt"
+        install_root / "src" / "pipeline_inspector" / "version_marker.txt"
     ).read_text(encoding="utf-8") == "0.5.0"
     assert controller.status_label.text == UPDATE_WIZARD_STATUS_RESTART
     assert controller.step_labels[UPDATE_WIZARD_STAGE_RESTART].text.startswith("[current] 5.")
@@ -338,14 +338,14 @@ def test_run_update_wizard_flow_advances_through_download_install_and_restart(
 def test_run_update_wizard_flow_stops_on_install_failure(tmp_path: Path):
     install_root = tmp_path / "install"
     _write_install_tree(install_root, version="0.4.0")
-    payload_root = tmp_path / "package" / "maya-shader-health-inspector"
+    payload_root = tmp_path / "package" / "maya-pipeline-inspector"
     _write_install_tree(payload_root, version="0.5.0")
-    zip_path = tmp_path / "package" / "maya-shader-health-inspector-0.5.0.zip"
+    zip_path = tmp_path / "package" / "maya-pipeline-inspector-0.5.0.zip"
     _write_zip_from_payload(zip_path, payload_root)
     controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
 
     def install_handler(_staging_path: Path, _release) -> object:
-        from shader_health.ui.update_wizard import UpdateInstallOutcome
+        from pipeline_inspector.ui.update_wizard import UpdateInstallOutcome
 
         return UpdateInstallOutcome(success=False, message="Install failed in test.")
 

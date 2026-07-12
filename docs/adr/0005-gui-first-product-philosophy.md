@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-v0.3 delivered a functional Maya dockable panel, headless CLI, manifest gates, apply-fixes automation, and a Deadline preflight example. Pipeline TDs can integrate Shader Health Inspector without opening Maya, and the shared `validation_pipeline` keeps UI and headless results aligned.
+v0.3 delivered a functional Maya dockable panel, headless CLI, manifest gates, apply-fixes automation, and a Deadline preflight example. Pipeline TDs can integrate Pipeline Inspector without opening Maya, and the shared `validation_pipeline` keeps UI and headless results aligned.
 
 In practice, the primary daily users are artists and Shader TDs working inside Maya. They validate scenes during lookdev, triage issues before publish, and need fast, low-friction access to blocking state (`block_publish`, `block_deadline`) without reading JSON reports or running terminal commands. v0.4 expands farm submission (Deadline 10 on-prem), native plugin bootstrap, and UX improvements — all of which must land in the panel first or alongside headless delivery.
 
@@ -18,13 +18,13 @@ Without an explicit product philosophy, new features risk shipping as CLI-only u
 
 ## Decision
 
-Maya Shader Health Inspector adopts a **GUI-first product philosophy** for v0.4 and subsequent releases:
+Maya Pipeline Inspector adopts a **GUI-first product philosophy** for v0.4 and subsequent releases:
 
 1. **GUI first** — Every new pipeline-facing feature must ship with a Maya panel affordance before (or in the same milestone as) CLI-only delivery. Headless and farm wrappers remain required, but they are secondary surfaces that call the same modules the panel uses.
 2. **Speed** — Default artist flows should reach an actionable result in **three clicks or fewer** from an open panel: for example, open panel → Validate Scene → select or fix an issue. Farm preflight and submit paths follow the same constraint once the Farm tab ships (M26).
 3. **Clarity** — Publish and Deadline blocking state must be visible in the panel summary without opening exported JSON. Health score, severity counts, and `block_publish` / `block_deadline` chips belong in persistent UI chrome, not only in report files.
 4. **Delight** — Routine safe actions should not spam confirmation modals. Use consistent spacing, tooltips, non-blocking progress feedback, and deferred UI updates (existing Maya-safe patterns) so validation feels responsive during long scans.
-5. **Parity** — The Maya panel and headless entrypoints must call `shader_health.maya.validation_pipeline` (and future `integrations/deadline` helpers) — never duplicate validation or preflight decision logic in UI-only code paths.
+5. **Parity** — The Maya panel and headless entrypoints must call `pipeline_inspector.maya.validation_pipeline` (and future `integrations/deadline` helpers) — never duplicate validation or preflight decision logic in UI-only code paths.
 
 ### Architectural layering
 
@@ -124,10 +124,10 @@ docs/adr/0005-gui-first-product-philosophy.md   # this ADR
 docs/ARCHITECTURE.md                            # product surface diagram, status
 docs/USER_GUIDE.md                              # artist-facing principles
 docs/MAYA_UX_AUDIT_v0.4.md                      # friction inventory (#092)
-src/shader_health/maya/ui_launcher.py           # panel callbacks (no duplicated validation)
-src/shader_health/ui/main_window.py             # tabs, summary chrome, Farm tab (#101)
-src/shader_health/maya/validation_pipeline.py   # single enrichment + validation path
-src/shader_health/integrations/deadline/        # shared farm preflight/submit (#098–#100)
+src/pipeline_inspector/maya/ui_launcher.py           # panel callbacks (no duplicated validation)
+src/pipeline_inspector/ui/main_window.py             # tabs, summary chrome, Farm tab (#101)
+src/pipeline_inspector/maya/validation_pipeline.py   # single enrichment + validation path
+src/pipeline_inspector/integrations/deadline/        # shared farm preflight/submit (#098–#100)
 ```
 
 When adding a feature, use this checklist:

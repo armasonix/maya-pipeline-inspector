@@ -1,4 +1,4 @@
-"""Farm worker script for MayaBatch Shader Health validation jobs."""
+"""Farm worker script for MayaBatch Pipeline Inspector validation jobs."""
 from __future__ import annotations
 
 import os
@@ -19,7 +19,7 @@ def _deadline_plugin_info(name: str, default: str = "") -> str:
 def main() -> int:
     scene_path = Path(_deadline_plugin_info("SceneFile"))
     report_path = Path(
-        _deadline_plugin_info("ReportPath", str(scene_path.with_suffix(".shader_health.json")))
+        _deadline_plugin_info("ReportPath", str(scene_path.with_suffix(".pipeline_inspector.json")))
     )
     profile_path = Path(_deadline_plugin_info("ProfilePath"))
     mayapy = _deadline_plugin_info("Mayapy", "mayapy")
@@ -27,7 +27,7 @@ def main() -> int:
     command = [
         mayapy,
         "-m",
-        "shader_health",
+        "pipeline_inspector",
         "validate",
         str(scene_path),
         "--input-kind",

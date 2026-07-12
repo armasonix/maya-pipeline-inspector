@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.fix_queue import (
+from pipeline_inspector.ui.fix_queue import (
     FIX_QUEUE_ACTIONS_ROW_OBJECT_NAME,
     FIX_QUEUE_BLOCKED_COLUMN_INDEX,
     FIX_QUEUE_SELECT_COLUMN_INDEX,
@@ -13,7 +13,7 @@ from shader_health.ui.fix_queue import (
     selected_fix_rows,
     selected_from_table_item,
 )
-from shader_health.ui.table_widgets import FIX_QUEUE_SELECT_BUTTON_OBJECT_NAME
+from pipeline_inspector.ui.table_widgets import FIX_QUEUE_SELECT_BUTTON_OBJECT_NAME
 
 
 class FakeItem:
@@ -40,7 +40,7 @@ class FakeCheckBox:
 
 class FakeCell:
     def __init__(self, *, control: FakeCheckBox) -> None:
-        self._shader_health_select_button = control
+        self._pipeline_inspector_select_button = control
 
 
 class FakeTable:
@@ -403,7 +403,7 @@ def test_build_fix_queue_keeps_actions_under_table_without_table_stretch():
 
 def test_configure_fix_queue_table_stretches_content_columns():
     table = FakeTableWidget()
-    from shader_health.ui.fix_queue import _configure_fix_queue_table
+    from pipeline_inspector.ui.fix_queue import _configure_fix_queue_table
 
     _configure_fix_queue_table(table, FakeQtWidgets)
 

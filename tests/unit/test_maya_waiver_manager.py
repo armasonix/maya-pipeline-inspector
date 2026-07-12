@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from shader_health.core.waivers import create_waiver_from_result
-from shader_health.maya import commands
-from shader_health.ui import waiver_manager
+from pipeline_inspector.core.waivers import create_waiver_from_result
+from pipeline_inspector.maya import commands
+from pipeline_inspector.ui import waiver_manager
 
 
 class FakeSignal:
@@ -122,7 +122,7 @@ class FakeQtWidgets:
 
 
 def _failed_result():
-    from shader_health.core import RuleResult
+    from pipeline_inspector.core import RuleResult
 
     return RuleResult(
         rule_id="common.texture.colorspace.data_raw",
@@ -214,7 +214,7 @@ def test_waiver_manager_callbacks_fire_refresh_revoke_and_make_waive(
 def test_revoke_waiver_action_updates_sidecar(tmp_path: Path, monkeypatch: Any):
     scene_path = tmp_path / "hero.ma"
     scene_path.write_text("//Maya ASCII", encoding="utf-8")
-    sidecar_path = tmp_path / "hero.shader_health_waivers.json"
+    sidecar_path = tmp_path / "hero.pipeline_inspector_waivers.json"
     waiver = create_waiver_from_result(
         _failed_result(),
         reason="Approved.",
@@ -222,7 +222,7 @@ def test_revoke_waiver_action_updates_sidecar(tmp_path: Path, monkeypatch: Any):
         created_at_utc="2026-07-02T08:00:00Z",
         expires_at_utc="2026-08-02T08:00:00Z",
     )
-    from shader_health.core.waivers import (
+    from pipeline_inspector.core.waivers import (
         WaiverSidecar,
         load_waiver_sidecar_optional,
         write_waiver_sidecar,

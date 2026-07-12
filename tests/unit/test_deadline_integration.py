@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
     DeadlineClientError,
     DeadlineConfig,
     HttpRequest,
     run_deadline_preflight,
 )
-from shader_health.integrations.deadline.client import DeadlineResponse
-from shader_health.integrations.deadline.preflight import (
+from pipeline_inspector.integrations.deadline.client import DeadlineResponse
+from pipeline_inspector.integrations.deadline.preflight import (
     PREFLIGHT_ERROR,
     SUBMISSION_ALLOWED,
     SUBMISSION_BLOCKED,
@@ -38,10 +38,10 @@ def test_deadline_config_from_env(tmp_path: Path):
     profile_path.write_text("{}", encoding="utf-8")
     config = DeadlineConfig.from_env(
         {
-            "SHADER_HEALTH_DEADLINE_API_URL": "http://farm.local:8082",
-            "SHADER_HEALTH_DEADLINE_TIMEOUT": "12.5",
-            "SHADER_HEALTH_DEADLINE_PROFILE_PATH": str(profile_path),
-            "SHADER_HEALTH_DEADLINE_QUEUE": "shader_q",
+            "PIPELINE_INSPECTOR_DEADLINE_API_URL": "http://farm.local:8082",
+            "PIPELINE_INSPECTOR_DEADLINE_TIMEOUT": "12.5",
+            "PIPELINE_INSPECTOR_DEADLINE_PROFILE_PATH": str(profile_path),
+            "PIPELINE_INSPECTOR_DEADLINE_QUEUE": "shader_q",
         }
     )
     assert config.api_url == "http://farm.local:8082"
@@ -79,7 +79,7 @@ def test_build_validator_command_runs_validator_in_critical_mode(tmp_path: Path)
     assert command == (
         "mayapy",
         "-m",
-        "shader_health",
+        "pipeline_inspector",
         "validate",
         str(tmp_path / "scene.ma"),
         "--input-kind",
@@ -185,7 +185,7 @@ def test_deadline_client_submit_job_returns_plain_text_id():
 
     client = DeadlineClient(DeadlineConfig(api_url="http://farm:8082"), transport=transport)
     job_id = client.submit_job(
-        job_info={"Name": "Shader Health", "Plugin": "CommandScript", "Frames": "0"},
+        job_info={"Name": "Pipeline Inspector", "Plugin": "CommandScript", "Frames": "0"},
         plugin_info={"StartupDirectory": "/"},
     )
     assert job_id == "job-9001"

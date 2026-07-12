@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     FileDependencySnapshot,
     GraphSnapshot,
     NodeSnapshot,
@@ -13,10 +13,10 @@ from shader_health.core import (
 
 ROOT = Path(__file__).resolve().parents[2]
 DISPLACEMENT_RULE_PATH = (
-    ROOT / "src" / "shader_health" / "rules" / "common" / "displacement_common.json"
+    ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "displacement_common.json"
 )
 COLOR_SPACE_RULE_PATH = (
-    ROOT / "src" / "shader_health" / "rules" / "common" / "color_space.json"
+    ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "color_space.json"
 )
 
 
@@ -213,7 +213,7 @@ def test_displacement_amount_rule_skips_missing_numeric_metadata():
 
 
 def test_displacement_risk_score_rule_fails_above_threshold():
-    from shader_health.core import DisplacementRiskMetadata, MaterialSnapshot
+    from pipeline_inspector.core import DisplacementRiskMetadata, MaterialSnapshot
 
     rule = load_rule(DISPLACEMENT_RULE_PATH, "common.displacement.risk_score.max")
     snapshot = GraphSnapshot(
@@ -242,7 +242,7 @@ def test_displacement_risk_score_rule_fails_above_threshold():
 
 
 def test_displacement_subdivision_rule_fails_when_subdivision_enabled():
-    from shader_health.core import DisplacementRiskMetadata, MaterialSnapshot
+    from pipeline_inspector.core import DisplacementRiskMetadata, MaterialSnapshot
 
     rule = load_rule(DISPLACEMENT_RULE_PATH, "common.displacement.subdivision.enabled")
     snapshot = GraphSnapshot(

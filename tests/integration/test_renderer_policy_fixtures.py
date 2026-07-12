@@ -11,8 +11,8 @@ from typing import Any, Optional
 
 import pytest
 
-from shader_health.core import GraphSnapshot, RuleResult
-from shader_health.maya.validation_pipeline import ValidationRunResult, run_validation
+from pipeline_inspector.core import GraphSnapshot, RuleResult
+from pipeline_inspector.maya.validation_pipeline import ValidationRunResult, run_validation
 
 FIXTURES_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "snapshots"
 

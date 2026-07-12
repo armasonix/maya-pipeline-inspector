@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from shader_health.core.rule_browser import (
+from pipeline_inspector.core.rule_browser import (
     build_session_override_from_edits,
     editable_fields_for_rule,
     effective_rule,
     load_packaged_rules_catalog,
     merge_session_rule_overrides,
 )
-from shader_health.core.rule_loader import RuleOverride
+from pipeline_inspector.core.rule_loader import RuleOverride
 
 
 def _catalog_entry(rule_id: str):
@@ -78,8 +78,8 @@ def test_validate_effective_rule_uses_validate_rules_schema():
         for item in load_packaged_rules_catalog()
         if item.rule.id == "common.shader_complexity.graph_nodes.max"
     )
-    from shader_health.core.rule_browser import validate_effective_rule
-    from shader_health.core.rule_loader import RuleOverride
+    from pipeline_inspector.core.rule_browser import validate_effective_rule
+    from pipeline_inspector.core.rule_loader import RuleOverride
 
     rule = validate_effective_rule(
         entry,

@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from shader_health.integrations.bug_report.config import BugReportRelayConfig
-from shader_health.integrations.bug_report.throttle import (
+from pipeline_inspector.integrations.bug_report.config import BugReportRelayConfig
+from pipeline_inspector.integrations.bug_report.throttle import (
     RATE_LIMITED_SKIPPED_REASON,
     evaluate_bug_report_throttle,
     format_rate_limit_message,

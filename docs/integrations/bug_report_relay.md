@@ -1,12 +1,12 @@
 # Bug report relay server specification
 
-Shader Health Inspector ships a **client-only** bug report path for **plugin defects** — crashes, wrong validation results, panel freezes, and other issues in the tool itself. Artists and TDs use it to notify **plugin maintainers** (open-source developers and contributors) so the problem can be triaged, patched, and released.
+Pipeline Inspector ships a **client-only** bug report path for **plugin defects** — crashes, wrong validation results, panel freezes, and other issues in the tool itself. Artists and TDs use it to notify **plugin maintainers** (open-source developers and contributors) so the problem can be triaged, patched, and released.
 
-This is **not** a general pipeline bug tracker for scene shading or asset issues. It is specifically: *something is wrong with Shader Health Inspector → report to the people who ship the plugin*.
+This is **not** a general pipeline bug tracker for scene shading or asset issues. It is specifically: *something is wrong with Pipeline Inspector → report to the people who ship the plugin*.
 
 Each studio deploys an **HTTPS relay** that accepts submissions from Maya, creates a GitHub Issue in the plugin repository, optionally emails maintainers, and returns the issue URL to the panel.
 
-The open-source plugin never stores a GitHub PAT on artist workstations. Relay credentials (`relay_url`, `api_key`) live in `shader_health_studio.json` and are managed by pipeline TDs.
+The open-source plugin never stores a GitHub PAT on artist workstations. Relay credentials (`relay_url`, `api_key`) live in `pipeline_inspector_studio.json` and are managed by pipeline TDs.
 
 See [ADR 0007](../adr/0007-settings-and-connectors-architecture.md) for the security checklist and Settings architecture.
 
@@ -99,7 +99,7 @@ Example:
 
 ```json
 {
-  "issue_url": "https://github.com/org/maya-shader-health-inspector/issues/184"
+  "issue_url": "https://github.com/org/maya-pipeline-inspector/issues/184"
 }
 ```
 
@@ -107,7 +107,7 @@ Optional relay observability fields (ignored by the Maya client):
 
 ```json
 {
-  "issue_url": "https://github.com/org/maya-shader-health-inspector/issues/184",
+  "issue_url": "https://github.com/org/maya-pipeline-inspector/issues/184",
   "email_notified": true
 }
 ```
@@ -131,9 +131,9 @@ After the GitHub issue is created, the relay may send a **best-effort email** to
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `SHADER_HEALTH_MAINTAINER_EMAIL` | When email notify is enabled | Primary maintainer recipient |
-| `SHADER_HEALTH_EMAIL_FROM` | When email notify is enabled | SMTP `From` address |
-| `SHADER_HEALTH_EMAIL_NOTIFY_ENABLED` | No | Default `true` when maintainer email is set |
+| `PIPELINE_INSPECTOR_MAINTAINER_EMAIL` | When email notify is enabled | Primary maintainer recipient |
+| `PIPELINE_INSPECTOR_EMAIL_FROM` | When email notify is enabled | SMTP `From` address |
+| `PIPELINE_INSPECTOR_EMAIL_NOTIFY_ENABLED` | No | Default `true` when maintainer email is set |
 | `SMTP_HOST` | When email notify is enabled | Outbound SMTP host |
 | `SMTP_PORT` | No | SMTP port (default `587`) |
 | `SMTP_USER` / `SMTP_PASSWORD` | Depends on provider | SMTP authentication when required |
@@ -146,13 +146,13 @@ Studios may substitute an internal mail API (SendGrid, SES, Microsoft Graph) beh
 **Subject**
 
 ```text
-[Shader Health] User bug report: {title}
+[Pipeline Inspector] User bug report: {title}
 ```
 
 **Body (plain text)**
 
 ```text
-A new Shader Health bug report was filed from Maya.
+A new Pipeline Inspector bug report was filed from Maya.
 
 Reporter: {os_user}@{machine_id}
 Plugin: {plugin_version}
@@ -199,7 +199,7 @@ The Maya client maps **429** to `skipped_reason="rate_limited"`. Other failures 
   "description": "Panel freezes when switching to publish_strict.",
   "plugin_version": "0.5.0",
   "scene_basename": "hero.ma",
-  "app_name": "Maya Shader Health Inspector",
+  "app_name": "Maya Pipeline Inspector",
   "maya_version": "2024.2",
   "os_user": "artist",
   "machine_id": "workstation-01",
@@ -215,7 +215,7 @@ The Maya client maps **429** to `skipped_reason="rate_limited"`. Other failures 
 | `schema_version` | Yes | Must be `1.0` for v0.5 clients |
 | `title` | Yes | Short issue title from the artist |
 | `description` | Yes | Free-text bug description |
-| `plugin_version` | Yes | Shader Health release string |
+| `plugin_version` | Yes | Pipeline Inspector release string |
 | `scene_basename` | Yes | Filename only — **no full scene path** |
 | `app_name` | No | Application display name |
 | `maya_version` | No | Maya build string when available |
@@ -275,10 +275,10 @@ Reference contract for studio relay implementers. Path is illustrative — the p
 ```yaml
 openapi: 3.0.3
 info:
-  title: Shader Health Bug Report Relay
+  title: Pipeline Inspector Bug Report Relay
   version: 1.0.0
   description: >
-    Studio-hosted HTTPS relay between Maya Shader Health Inspector and GitHub Issues.
+    Studio-hosted HTTPS relay between Maya Pipeline Inspector and GitHub Issues.
     The open-source plugin implements the client; each studio hosts this API.
 servers:
   - url: https://pipeline.studio.internal/shader-health
@@ -322,7 +322,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/BugReportRelaySuccess"
               example:
-                issue_url: https://github.com/org/maya-shader-health-inspector/issues/184
+                issue_url: https://github.com/org/maya-pipeline-inspector/issues/184
         "200":
           description: GitHub Issue created (alternate success code)
           content:
@@ -459,11 +459,11 @@ components:
 ## Package layout (plugin client)
 
 ```text
-src/shader_health/integrations/bug_report/
+src/pipeline_inspector/integrations/bug_report/
   config.py        # BugReportRelayConfig
   payload.py       # BugReportPayload schema 1.0
   relay_client.py  # multipart POST, issue_url parsing
-  throttle.py      # per-machine/user daily limit (~/.shader_health/bug_report_throttle.json)
+  throttle.py      # per-machine/user daily limit (~/.pipeline_inspector/bug_report_throttle.json)
 ```
 
 Entry point for UI and automation: `maybe_submit_bug_report(studio_config, payload, screenshot_jpeg=...)`.

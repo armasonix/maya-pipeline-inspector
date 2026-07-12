@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from shader_health.integrations.slack.blocks import (
+from pipeline_inspector.integrations.slack.blocks import (
     ValidationBlocksContext,
     build_optional_report_link,
     format_validation_blocks,
     route_matched_events,
     webhook_url_for_event,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     SLACK_NOTIFY_EVENT_BLOCK_DEADLINE,
     SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,
     SlackConnectorSettings,
@@ -69,14 +69,14 @@ def test_build_optional_report_link_uses_render_root_and_scene_stem():
     )
 
     assert link is not None
-    assert link.replace("\\", "/").endswith("/hero_shader_health_report.json")
+    assert link.replace("\\", "/").endswith("/hero_pipeline_inspector_report.json")
 
 
 def test_format_validation_blocks_uses_unified_chat_layout():
     payload = format_validation_blocks(
         _context(asset_class_id="character"),
         matched_events=(SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,),
-        report_link=r"\\farm\render\hero_shader_health_report.json",
+        report_link=r"\\farm\render\hero_pipeline_inspector_report.json",
     )
 
     summary_text = payload["blocks"][0]["text"]["text"]
@@ -84,7 +84,7 @@ def test_format_validation_blocks_uses_unified_chat_layout():
     assert "📊 Actual Issue list:" in summary_text
     assert "publish_strict+character" in summary_text
     assert "- Publish block" in summary_text
-    assert "hero_shader_health_report.json" in payload["blocks"][1]["text"]["text"]
+    assert "hero_pipeline_inspector_report.json" in payload["blocks"][1]["text"]["text"]
 
 
 def test_format_validation_blocks_includes_thread_ts_when_provided():

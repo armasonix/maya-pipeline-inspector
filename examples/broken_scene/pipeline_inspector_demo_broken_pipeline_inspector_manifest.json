@@ -1,0 +1,422 @@
+{
+  "health_score": 0,
+  "manifest_schema_version": "1.1",
+  "materials": [
+    {
+      "assigned_shapes": [
+        "pHelixShape1"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:08d192e52e599c2c66e89c8c7e24be33abe6c36eee1e51988fc426f8ec1bc5be",
+      "graph_node_count": 6,
+      "issues": {
+        "critical": 2,
+        "error": 3,
+        "failed": 6,
+        "rule_ids": [
+          "common.texture.colorspace.color_managed",
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root",
+          "common.texture.version.latest"
+        ],
+        "warning": 1
+      },
+      "name": "VRayMtl1",
+      "node_id": "node:VRayMtl1",
+      "renderer_family": "vray",
+      "shading_engines": [
+        "node:VRayMtl1SG1"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": "002",
+          "max_dimension": 512,
+          "missing_udim_tiles": [],
+          "node_id": "node:demo_albedo_v001_2",
+          "node_name": "demo_albedo_v001_2",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_albedo_v001.1001.exr",
+          "semantic": "base_color",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": "001"
+        },
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": "001",
+          "max_dimension": 512,
+          "missing_udim_tiles": [],
+          "node_id": "node:demo_roughness_v001_3",
+          "node_name": "demo_roughness_v001_3",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "semantic": "roughness",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": "001"
+        }
+      ],
+      "type_name": "VRayMtl"
+    },
+    {
+      "assigned_shapes": [
+        "mesh_displacement_risk_GEOShape"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:68d89180845ad4ef510c366373c14615e8492f747023d9babbe7fa54f5df0fba",
+      "graph_node_count": 7,
+      "issues": {
+        "critical": 2,
+        "error": 2,
+        "failed": 8,
+        "rule_ids": [
+          "common.displacement.subdivision.enabled",
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root",
+          "vray.material.displacement_force.warning",
+          "vray.material.displacement_linked.info",
+          "vray.material.displacement_review.warning"
+        ],
+        "warning": 3
+      },
+      "name": "demo_displacement_risk_MTL",
+      "node_id": "node:demo_displacement_risk_MTL",
+      "renderer_family": "vray",
+      "shading_engines": [
+        "node:VRayMtl3SG"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": "001",
+          "max_dimension": 512,
+          "missing_udim_tiles": [],
+          "node_id": "node:demo_normal_v001_1",
+          "node_name": "demo_normal_v001_1",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_normal_v001.1001.exr",
+          "semantic": "bump",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": "001"
+        }
+      ],
+      "type_name": "VRayMtl"
+    },
+    {
+      "assigned_shapes": [
+        "mesh_local_path_GEOShape"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:2698c2338c2e632711717e2445f1738bc19f2ff24b822baa3535f0866ae39bf3",
+      "graph_node_count": 4,
+      "issues": {
+        "critical": 2,
+        "error": 2,
+        "failed": 4,
+        "rule_ids": [
+          "common.texture.colorspace.color_managed",
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root",
+          "common.texture.path.user_location"
+        ],
+        "warning": 0
+      },
+      "name": "demo_local_path_MTL",
+      "node_id": "node:demo_local_path_MTL",
+      "renderer_family": "arnold",
+      "shading_engines": [
+        "node:aiStandardSurface2SG"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": null,
+          "max_dimension": 512,
+          "missing_udim_tiles": [],
+          "node_id": "node:local_only_texture_1",
+          "node_name": "local_only_texture_1",
+          "raw_path": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "resolved_path": "C:/Users/ledorub3d/Documents/local_only_texture.exr",
+          "semantic": "base_color",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": null
+        }
+      ],
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "assigned_shapes": [
+        "mesh_missing_texture_GEOShape"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:9ecedf91b9bf0622672cb8266429d305db2f5e1f06937c18a2e748a40e5044b3",
+      "graph_node_count": 4,
+      "issues": {
+        "critical": 2,
+        "error": 2,
+        "failed": 4,
+        "rule_ids": [
+          "common.texture.colorspace.color_managed",
+          "common.texture.missing",
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root"
+        ],
+        "warning": 0
+      },
+      "name": "demo_missing_texture_MTL",
+      "node_id": "node:demo_missing_texture_MTL",
+      "renderer_family": "vray",
+      "shading_engines": [
+        "node:VRayMtl1SG"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": false,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": null,
+          "max_dimension": null,
+          "missing_udim_tiles": [],
+          "node_id": "node:demo_albedo_v001_1",
+          "node_name": "demo_albedo_v001_1",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/examples/broken_scene/textures/DOES_NOT_EXIST_missing_albedo.exr",
+          "semantic": "base_color",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": null
+        }
+      ],
+      "type_name": "VRayMtl"
+    },
+    {
+      "assigned_shapes": [
+        "mesh_missing_udim_GEOShape"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:acd0464424f2137f54570ab99e2a97d3c5975178fea16f8785103c3606daf129",
+      "graph_node_count": 4,
+      "issues": {
+        "critical": 2,
+        "error": 1,
+        "failed": 3,
+        "rule_ids": [
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root",
+          "common.texture.udim.missing_tiles"
+        ],
+        "warning": 0
+      },
+      "name": "demo_missing_udim_MTL",
+      "node_id": "node:demo_missing_udim_MTL",
+      "renderer_family": "arnold",
+      "shading_engines": [
+        "node:aiStandardSurface1SG"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": true,
+          "latest_version": "001",
+          "max_dimension": 512,
+          "missing_udim_tiles": [
+            1002
+          ],
+          "node_id": "node:demo_roughness_v001_2",
+          "node_name": "demo_roughness_v001_2",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_roughness_v001.<UDIM>.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_roughness_v001.<UDIM>.exr",
+          "semantic": "roughness",
+          "type_name": "file",
+          "udim_tiles": [
+            1001,
+            1003
+          ],
+          "version": "001"
+        }
+      ],
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "assigned_shapes": [],
+      "graph_depth": 0,
+      "graph_fingerprint": "sha256:4f3ae5d0d47be78f726303018e1f8c180830adb3d10e6d54a9964b2539cc2560",
+      "graph_node_count": 1,
+      "issues": {
+        "critical": 0,
+        "error": 0,
+        "failed": 1,
+        "rule_ids": [
+          "common.shader_network.material.unassigned"
+        ],
+        "warning": 1
+      },
+      "name": "demo_orphan_unused_MTL",
+      "node_id": "node:demo_orphan_unused_MTL",
+      "renderer_family": "arnold",
+      "shading_engines": [
+        "node:aiStandardSurface3SG"
+      ],
+      "textures": [],
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "assigned_shapes": [
+        "pPlatonicShape1"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:b7b72bfafc01ca0a88959752b806cebe7103c77cfb35ce2ab46e7ef9be10854d",
+      "graph_node_count": 4,
+      "issues": {
+        "critical": 1,
+        "error": 2,
+        "failed": 3,
+        "rule_ids": [
+          "common.texture.colorspace.color_managed",
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root"
+        ],
+        "warning": 0
+      },
+      "name": "demo_overResolution_texture_MTL",
+      "node_id": "node:demo_overResolution_texture_MTL",
+      "renderer_family": "vray",
+      "shading_engines": [
+        "node:VRayMtl4SG"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": "002",
+          "max_dimension": 8192,
+          "missing_udim_tiles": [],
+          "node_id": "node:demo_albedo_v002_2",
+          "node_name": "demo_albedo_v002_2",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr",
+          "semantic": "base_color",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": "002"
+        }
+      ],
+      "type_name": "VRayMtl"
+    },
+    {
+      "assigned_shapes": [
+        "mesh_wrong_colorspace_GEOShape"
+      ],
+      "graph_depth": 2,
+      "graph_fingerprint": "sha256:29392fed6b9ffc420d1247871d9407a6f6e2558bda5a1f34abc694afdeae6d4f",
+      "graph_node_count": 4,
+      "issues": {
+        "critical": 1,
+        "error": 1,
+        "failed": 2,
+        "rule_ids": [
+          "common.texture.path.local_drive",
+          "common.texture.path.project_root"
+        ],
+        "warning": 0
+      },
+      "name": "demo_wrong_colorspace_MTL",
+      "node_id": "node:demo_wrong_colorspace_MTL",
+      "renderer_family": "vray",
+      "shading_engines": [
+        "node:VRayMtl2SG"
+      ],
+      "textures": [
+        {
+          "attr": "fileTextureName",
+          "exists": true,
+          "extension": ".exr",
+          "is_udim": false,
+          "latest_version": "001",
+          "max_dimension": 512,
+          "missing_udim_tiles": [],
+          "node_id": "node:demo_roughness_v001_1",
+          "node_name": "demo_roughness_v001_1",
+          "raw_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "resolved_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_roughness_v001.1001.exr",
+          "semantic": "roughness",
+          "type_name": "file",
+          "udim_tiles": [],
+          "version": "001"
+        }
+      ],
+      "type_name": "VRayMtl"
+    },
+    {
+      "assigned_shapes": [],
+      "graph_depth": 0,
+      "graph_fingerprint": "sha256:6e61207c33e4a092f9e98bf02c28d0957c41a6df5efcbc1b69159660ddd405ef",
+      "graph_node_count": 1,
+      "issues": {
+        "critical": 0,
+        "error": 0,
+        "failed": 2,
+        "rule_ids": [
+          "common.shader_network.material.unassigned"
+        ],
+        "warning": 2
+      },
+      "name": "standardSurface1",
+      "node_id": "node:standardSurface1",
+      "renderer_family": "common",
+      "shading_engines": [
+        "node:initialParticleSE"
+      ],
+      "textures": [],
+      "type_name": "standardSurface"
+    },
+    {
+      "assigned_shapes": [],
+      "graph_depth": 0,
+      "graph_fingerprint": "sha256:6e61207c33e4a092f9e98bf02c28d0957c41a6df5efcbc1b69159660ddd405ef",
+      "graph_node_count": 1,
+      "issues": {
+        "critical": 0,
+        "error": 0,
+        "failed": 2,
+        "rule_ids": [
+          "common.shader_network.material.unassigned"
+        ],
+        "warning": 2
+      },
+      "name": "standardSurface1",
+      "node_id": "node:standardSurface1",
+      "renderer_family": "common",
+      "shading_engines": [
+        "node:initialShadingGroup"
+      ],
+      "textures": [],
+      "type_name": "standardSurface"
+    }
+  ],
+  "renderer": "vray",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-12T13:06:53Z",
+  "scene_path": "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/pipeline_inspector_demo_broken.ma",
+  "snapshot_schema_version": "1.0"
+}

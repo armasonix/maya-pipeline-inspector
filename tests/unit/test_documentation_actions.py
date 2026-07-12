@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.documentation_actions import (
+from pipeline_inspector.ui.documentation_actions import (
     DEFAULT_DOCUMENTATION_URL,
     is_valid_http_url,
     normalize_documentation_url,
@@ -37,7 +37,7 @@ def test_normalize_documentation_url_uses_default_for_blank_values():
 
 
 def test_is_valid_http_url_accepts_http_and_https_only():
-    assert is_valid_http_url("https://github.com/armasonix/maya-shader-health-inspector/wiki")
+    assert is_valid_http_url("https://github.com/armasonix/maya-pipeline-inspector/wiki")
     assert is_valid_http_url("http://localhost/docs")
     assert not is_valid_http_url("ftp://example.test/docs")
     assert not is_valid_http_url("not-a-url")

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from shader_health.ui.issues_triage import (
+from pipeline_inspector.ui.issues_triage import (
     IssueFilterPrefs,
     apply_combo_preference,
     read_issue_filter_prefs,
     resolve_combo_preference,
     write_issue_filter_prefs,
 )
-from shader_health.ui.main_window import ALL_SEVERITIES_LABEL
+from pipeline_inspector.ui.main_window import ALL_SEVERITIES_LABEL
 
 
 class FakeCombo:

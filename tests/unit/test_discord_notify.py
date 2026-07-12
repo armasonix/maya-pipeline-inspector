@@ -3,19 +3,19 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.discord import DiscordClient, DiscordConfig, DiscordResponse
-from shader_health.integrations.discord.client import HttpRequest
-from shader_health.integrations.discord.embed import ValidationEmbedContext
-from shader_health.integrations.discord.notify import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.discord import DiscordClient, DiscordConfig, DiscordResponse
+from pipeline_inspector.integrations.discord.client import HttpRequest
+from pipeline_inspector.integrations.discord.embed import ValidationEmbedContext
+from pipeline_inspector.integrations.discord.notify import (
     matched_notify_events,
     maybe_send_discord_validation_notification,
     send_discord_validation_notification,
     should_send_discord_notification,
     validation_notification_context_from_run,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DiscordConnectorSettings,
     StudioConfig,

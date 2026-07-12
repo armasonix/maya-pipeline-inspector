@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.trackers.publish import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.trackers.publish import (
     ValidationPublishPayload,
     format_validation_publish_summary,
     scene_basename,
@@ -47,7 +47,7 @@ def test_scene_basename_normalizes_windows_and_posix_paths():
 def test_validation_publish_payload_from_run_reads_snapshot_and_health():
     payload = validation_publish_payload_from_run(
         _run_result(),
-        report_path=r"\\farm\render\hero_shader_health_report.json",
+        report_path=r"\\farm\render\hero_pipeline_inspector_report.json",
         metadata={"thread_ts": "123.456"},
     )
 
@@ -59,7 +59,7 @@ def test_validation_publish_payload_from_run_reads_snapshot_and_health():
     assert payload.block_publish is True
     assert payload.block_deadline is False
     assert payload.validated_at_utc == "2026-07-10T12:00:00Z"
-    assert payload.report_path.endswith("hero_shader_health_report.json")
+    assert payload.report_path.endswith("hero_pipeline_inspector_report.json")
     assert payload.metadata["thread_ts"] == "123.456"
 
 
@@ -129,7 +129,7 @@ def test_validation_publish_payload_profile_and_block_labels():
 def test_format_validation_publish_summary_includes_core_fields_and_report_path():
     payload = validation_publish_payload_from_run(
         _run_result(),
-        report_path=r"\\farm\render\hero_shader_health_report.json",
+        report_path=r"\\farm\render\hero_pipeline_inspector_report.json",
     )
 
     message = format_validation_publish_summary(payload)
@@ -141,4 +141,4 @@ def test_format_validation_publish_summary_includes_core_fields_and_report_path(
     assert "Health score: 42/100" in message
     assert "2 critical ⛔" in message
     assert "Validated: 2026-07-10T12:00:00Z" in message
-    assert r"Report: \\farm\render\hero_shader_health_report.json" in message
+    assert r"Report: \\farm\render\hero_pipeline_inspector_report.json" in message

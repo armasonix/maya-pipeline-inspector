@@ -1,13 +1,13 @@
 """Compare two shader manifest JSON files and write deterministic JSON diff.
 
-Deprecated wrapper: prefer `python -m shader_health diff OLD.json NEW.json`.
+Deprecated wrapper: prefer `python -m pipeline_inspector diff OLD.json NEW.json`.
 """
 from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Optional
 
-from shader_health.reports.manifest_diff_cli import run_manifest_diff
+from pipeline_inspector.reports.manifest_diff_cli import run_manifest_diff
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

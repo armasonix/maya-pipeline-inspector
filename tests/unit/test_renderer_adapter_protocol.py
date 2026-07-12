@@ -1,6 +1,6 @@
 import pytest
 
-from shader_health.adapters import (
+from pipeline_inspector.adapters import (
     ArnoldAdapter,
     BaseRendererAdapter,
     CommonMayaAdapter,
@@ -10,7 +10,7 @@ from shader_health.adapters import (
     VrayAdapter,
     classify_semantic_data_kind,
 )
-from shader_health.core import ConnectionSnapshot, GraphSnapshot, NodeSnapshot
+from pipeline_inspector.core import ConnectionSnapshot, GraphSnapshot, NodeSnapshot
 
 
 class FakeAdapter(BaseRendererAdapter):

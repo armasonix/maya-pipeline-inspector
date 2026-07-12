@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot, RuleResult
-from shader_health.reports.html_report import build_html_report, write_html_report
+from pipeline_inspector.core import GraphSnapshot, RuleResult
+from pipeline_inspector.reports.html_report import build_html_report, write_html_report
 
 
 def make_snapshot() -> GraphSnapshot:
@@ -137,5 +137,5 @@ def test_html_report_writer_writes_utf8_file(tmp_path: Path):
     assert written_path == output_path
     assert output_path.exists()
     html = output_path.read_text(encoding="utf-8")
-    assert "Maya Shader Health Report" in html
+    assert "Maya Pipeline Inspector Report" in html
     assert "common.texture.colorspace.data_raw" in html

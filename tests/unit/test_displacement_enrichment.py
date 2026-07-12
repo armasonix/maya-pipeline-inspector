@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot
-from shader_health.maya.displacement_enrichment import enrich_displacement_metadata
-from shader_health.maya.snapshot_enrichment import prepare_snapshot_for_validation
+from pipeline_inspector.core import GraphSnapshot
+from pipeline_inspector.maya.displacement_enrichment import enrich_displacement_metadata
+from pipeline_inspector.maya.snapshot_enrichment import prepare_snapshot_for_validation
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "snapshots"

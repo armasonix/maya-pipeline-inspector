@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     FileDependencySnapshot,
     GraphSnapshot,
     RuleDefinition,
@@ -13,7 +13,7 @@ from shader_health.core import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "texture_freshness.json"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "texture_freshness.json"
 FIXTURES_ROOT = ROOT / "tests" / "fixtures" / "snapshots"
 
 TEXTURE_FRESHNESS_FIXTURE_CASES = (

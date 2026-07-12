@@ -8,10 +8,10 @@ from typing import Any, Optional
 import pytest
 from tests.unit.test_manifest_diff_command import old_manifest
 
-from shader_health.core import GraphSnapshot, MaterialSnapshot, RuleResult
-from shader_health.maya import commands, export_actions
-from shader_health.reports.manifest import build_shader_manifest
-from shader_health.ui import main_window
+from pipeline_inspector.core import GraphSnapshot, MaterialSnapshot, RuleResult
+from pipeline_inspector.maya import commands, export_actions
+from pipeline_inspector.reports.manifest import build_shader_manifest
+from pipeline_inspector.ui import main_window
 
 
 def make_snapshot(scene_path: str) -> GraphSnapshot:
@@ -49,7 +49,7 @@ def test_export_html_report_writes_report_file(tmp_path: Path):
 
     assert result.succeeded is True
     assert Path(result.path) == output_path
-    assert "Maya Shader Health Report" in output_path.read_text(encoding="utf-8")
+    assert "Maya Pipeline Inspector Report" in output_path.read_text(encoding="utf-8")
 
 
 def test_export_shader_manifest_writes_manifest_file(tmp_path: Path):
@@ -126,7 +126,7 @@ def test_build_shader_manifest_uses_explicit_health_score_override():
 
 
 def test_export_fix_plan_writes_fix_plan_file(tmp_path: Path):
-    from shader_health.core.fix_plan import FixPlan
+    from pipeline_inspector.core.fix_plan import FixPlan
 
     output_path = tmp_path / "fix_plan.json"
     fix_plan = FixPlan()
@@ -148,7 +148,7 @@ def test_export_fix_plan_writes_fix_plan_file(tmp_path: Path):
 
 
 def test_export_fix_plan_uses_scene_based_default_path(tmp_path: Path):
-    from shader_health.core.fix_plan import FixPlan
+    from pipeline_inspector.core.fix_plan import FixPlan
 
     scene_path = tmp_path / "asset_shading.ma"
 
@@ -158,7 +158,7 @@ def test_export_fix_plan_uses_scene_based_default_path(tmp_path: Path):
         profile_id="artist_relaxed",
     )
 
-    assert Path(result.path) == tmp_path / "asset_shading_shader_health_fix_plan.json"
+    assert Path(result.path) == tmp_path / "asset_shading_pipeline_inspector_fix_plan.json"
 
 
 def test_export_json_report_uses_scene_based_default_path(tmp_path: Path):
@@ -166,7 +166,7 @@ def test_export_json_report_uses_scene_based_default_path(tmp_path: Path):
 
     result = export_actions.export_json_report(snapshot=make_snapshot(str(scene_path)))
 
-    assert Path(result.path) == tmp_path / "asset_shading_shader_health_report.json"
+    assert Path(result.path) == tmp_path / "asset_shading_pipeline_inspector_report.json"
 
 
 def test_export_manifest_diff_writes_json_and_html_outputs(tmp_path: Path):
@@ -188,7 +188,7 @@ def test_export_manifest_diff_writes_json_and_html_outputs(tmp_path: Path):
     assert Path(result.path) == json_path
     assert json.loads(json_path.read_text(encoding="utf-8"))["summary"]["changed"] >= 0
     html = html_path.read_text(encoding="utf-8")
-    assert "Maya Shader Health Manifest Diff" in html
+    assert "Maya Pipeline Inspector Manifest Diff" in html
 
 
 def test_export_manifest_diff_uses_scene_based_default_paths(tmp_path: Path):
@@ -202,8 +202,8 @@ def test_export_manifest_diff_uses_scene_based_default_paths(tmp_path: Path):
     )
 
     assert result.succeeded is True
-    assert Path(result.path) == tmp_path / "asset_shading_shader_health_manifest_diff.json"
-    assert (tmp_path / "asset_shading_shader_health_manifest_diff.html").is_file()
+    assert Path(result.path) == tmp_path / "asset_shading_pipeline_inspector_manifest_diff.json"
+    assert (tmp_path / "asset_shading_pipeline_inspector_manifest_diff.html").is_file()
 
 
 def test_export_manifest_diff_reports_invalid_baseline(tmp_path: Path):
@@ -416,7 +416,7 @@ class FakeQtWidgets:
 
 def test_approved_manifest_sidecar_path_uses_scene_sidecar(tmp_path: Path):
     scene_path = tmp_path / "hero_shading.ma"
-    sidecar = tmp_path / "hero_shading_shader_health_manifest.json"
+    sidecar = tmp_path / "hero_shading_pipeline_inspector_manifest.json"
     sidecar.write_text("{}", encoding="utf-8")
     snapshot = SimpleNamespace(scene_path=str(scene_path))
 
@@ -436,7 +436,7 @@ def test_export_manifest_diff_prefers_approved_sidecar_without_dialog(
     tmp_path: Path,
 ):
     scene_path = tmp_path / "hero_shading.ma"
-    sidecar = tmp_path / "hero_shading_shader_health_manifest.json"
+    sidecar = tmp_path / "hero_shading_pipeline_inspector_manifest.json"
     sidecar.write_text(json.dumps(old_manifest()), encoding="utf-8")
     snapshot = make_snapshot(str(scene_path))
     snapshot = GraphSnapshot(
@@ -465,8 +465,8 @@ def test_export_manifest_diff_prefers_approved_sidecar_without_dialog(
     )
 
     assert result.succeeded is True
-    assert Path(result.path).name == "hero_shading_shader_health_manifest_diff.json"
-    assert (tmp_path / "hero_shading_shader_health_manifest_diff.html").is_file()
+    assert Path(result.path).name == "hero_shading_pipeline_inspector_manifest_diff.json"
+    assert (tmp_path / "hero_shading_pipeline_inspector_manifest_diff.html").is_file()
 
 
 def test_export_buttons_connect_to_callbacks():
@@ -516,7 +516,7 @@ def test_reports_export_grid_omits_manifest_gate_button():
 
 
 def test_fix_queue_export_fix_plan_button_connects_to_callback():
-    from shader_health.ui.fix_queue import (
+    from pipeline_inspector.ui.fix_queue import (
         FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
         FixQueueActionCallbacks,
         build_fix_queue,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from shader_health import __version__
-from shader_health.ui.update_progress_dialog import (
+from pipeline_inspector import __version__
+from pipeline_inspector.ui.update_progress_dialog import (
     UPDATE_PROGRESS_CLOSE_BUTTON_OBJECT_NAME,
     UPDATE_PROGRESS_SHELL_STATUS,
     UPDATE_PROGRESS_SPINNER_OBJECT_NAME,

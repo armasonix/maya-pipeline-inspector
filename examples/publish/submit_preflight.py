@@ -1,4 +1,4 @@
-"""Publish preflight example for Shader Health Inspector."""
+"""Publish preflight example for Pipeline Inspector."""
 from __future__ import annotations
 
 import argparse
@@ -50,7 +50,7 @@ def build_validator_command(
     return (
         mayapy,
         "-m",
-        "shader_health",
+        "pipeline_inspector",
         "validate",
         str(scene_path),
         "--input-kind",
@@ -76,7 +76,7 @@ def build_manifest_gate_command(
     command = [
         mayapy,
         "-m",
-        "shader_health",
+        "pipeline_inspector",
         "gate",
         str(scene_path),
         str(baseline_manifest_path),
@@ -100,7 +100,7 @@ def run_publish_preflight(
     gate_report_path: Path | None = None,
     runner: Runner = subprocess.run,
 ) -> PublishPreflightResult:
-    """Run Shader Health validation and map result to a publish decision."""
+    """Run Pipeline Inspector validation and map result to a publish decision."""
 
     command = build_validator_command(
         mayapy=mayapy,
@@ -155,7 +155,7 @@ def run_publish_preflight(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run Shader Health before asset publish.")
+    parser = argparse.ArgumentParser(description="Run Pipeline Inspector before asset publish.")
     parser.add_argument("scene_path", type=Path)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument(
@@ -233,12 +233,12 @@ def _result(
 def _blocked_message(result: PublishPreflightResult) -> str:
     if result.manifest_gate_exit_code:
         return (
-            "Publish blocked by Shader Health manifest gate. "
+            "Publish blocked by Pipeline Inspector manifest gate. "
             f"manifest_gate_exit_code={result.manifest_gate_exit_code}; "
             f"report={result.report_path}"
         )
     return (
-        "Publish blocked by Shader Health preflight. "
+        "Publish blocked by Pipeline Inspector preflight. "
         f"validator_exit_code={result.validator_exit_code}; "
         f"report={result.report_path}"
     )

@@ -1,6 +1,6 @@
 {
   "required_sections": [
-    "Maya Shader Health Manifest Diff",
+    "Maya Pipeline Inspector Manifest Diff",
     "Summary",
     "Issue Groups",
     "New (1)",

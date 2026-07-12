@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     GraphSnapshot,
     NodeSnapshot,
     RuleDefinition,
@@ -9,7 +9,7 @@ from shader_health.core import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "color_space.json"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "color_space.json"
 
 
 def load_color_space_rule(rule_id: str) -> RuleDefinition:

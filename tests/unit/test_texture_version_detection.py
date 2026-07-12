@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.maya.scanner import _latest_texture_version, _texture_version
+from pipeline_inspector.maya.scanner import _latest_texture_version, _texture_version
 
 
 def _write_udim_tiles(folder: Path, stem: str, tiles: list[int]) -> None:

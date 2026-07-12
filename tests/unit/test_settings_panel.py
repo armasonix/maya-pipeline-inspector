@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     BugReportSettings,
     CerebroConnectorSettings,
     ConnectorSettings,
@@ -18,7 +18,7 @@ from shader_health.studio_config import (
     TelegramConnectorSettings,
     WaiverDefaultsSettings,
 )
-from shader_health.ui import (
+from pipeline_inspector.ui import (
     bug_report_section,
     cerebro_connector_section,
     deadline_connector_section,
@@ -30,13 +30,13 @@ from shader_health.ui import (
     slack_connector_section,
     telegram_connector_section,
 )
-from shader_health.ui.advanced_settings_section import (
+from pipeline_inspector.ui.advanced_settings_section import (
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
     SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
     SETTINGS_MAYAPY_PATH_INPUT_OBJECT_NAME,
 )
-from shader_health.ui.basic_settings_section import (
+from pipeline_inspector.ui.basic_settings_section import (
     SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
@@ -44,13 +44,13 @@ from shader_health.ui.basic_settings_section import (
     SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
 )
-from shader_health.ui.settings_dirty_state import (
+from pipeline_inspector.ui.settings_dirty_state import (
     SETTINGS_DIRTY_BANNER_OBJECT_NAME,
     SettingsDirtyState,
     studio_config_from_settings_view,
 )
-from shader_health.ui.settings_tabs import SETTINGS_TAB_SPECS
-from shader_health.ui.studio_environment_section import (
+from pipeline_inspector.ui.settings_tabs import SETTINGS_TAB_SPECS
+from pipeline_inspector.ui.studio_environment_section import (
     SETTINGS_ASSET_ROOT_INPUT_OBJECT_NAME,
     SETTINGS_CACHE_ROOT_INPUT_OBJECT_NAME,
     SETTINGS_RENDER_ROOT_INPUT_OBJECT_NAME,
@@ -59,12 +59,12 @@ from shader_health.ui.studio_environment_section import (
     SETTINGS_TEXTURE_ROOT_INPUT_OBJECT_NAME,
     SETTINGS_VARIABLE_ALIASES_INPUT_OBJECT_NAME,
 )
-from shader_health.ui.studio_policy_section import (
+from pipeline_inspector.ui.studio_policy_section import (
     SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
     SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME,
     SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME,
 )
-from shader_health.user_config import UserPreferences
+from pipeline_inspector.user_config import UserPreferences
 
 _DEADLINE_ENABLED = deadline_connector_section.SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME
 _DEADLINE_DETAILS = deadline_connector_section.SETTINGS_DEADLINE_DETAILS_OBJECT_NAME
@@ -898,18 +898,18 @@ def test_settings_view_exposes_split_save_and_load_actions():
 
 
 def test_settings_view_shows_studio_and_user_config_paths():
-    from shader_health.user_config import UserPreferences
+    from pipeline_inspector.user_config import UserPreferences
 
     view = settings_panel.build_settings_view(
         FakeQtWidgets,
-        config=StudioConfig(config_path=Path("C:/studio/shader_health_studio.json")),
-        user_config=UserPreferences(config_path=Path("C:/Users/me/.shader_health/user.json")),
+        config=StudioConfig(config_path=Path("C:/studio/pipeline_inspector_studio.json")),
+        user_config=UserPreferences(config_path=Path("C:/Users/me/.pipeline_inspector/user.json")),
     )
 
     studio_label = _find(view, settings_panel.SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME)
     user_label = _find(view, settings_panel.SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME)
 
-    assert "shader_health_studio.json" in studio_label.text
+    assert "pipeline_inspector_studio.json" in studio_label.text
     assert "user.json" in user_label.text
 
 
@@ -957,7 +957,7 @@ def test_studio_tab_clarifies_pipeline_policy_scope():
     policy_section = studio_tab.layout.widgets[0]
     intro = policy_section.layout.widgets[0]
 
-    assert "shader_health_studio.json" in intro.text
+    assert "pipeline_inspector_studio.json" in intro.text
     assert "Studio Environment" in intro.text
 
 
@@ -1438,7 +1438,7 @@ def test_update_settings_view_hides_dirty_banner_after_save_message():
         config=StudioConfig(),
         user_config=UserPreferences(),
         dirty_state=SettingsDirtyState(),
-        status_message="User preferences saved to C:/Users/me/.shader_health/user.json.",
+        status_message="User preferences saved to C:/Users/me/.pipeline_inspector/user.json.",
     )
 
     dirty_banner = _find(view, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
@@ -1466,15 +1466,15 @@ def test_build_main_widget_applies_user_defaults_to_validate_tab():
 
     assert profile_dropdown.currentData() == "deadline_critical"
     assert asset_class_dropdown.currentData() == "asset_class_hero"
-    assert widget._shader_health_scan_scope == "selection"
-    assert widget._shader_health_theme == "dark"
+    assert widget._pipeline_inspector_scan_scope == "selection"
+    assert widget._pipeline_inspector_theme == "dark"
 
 
 def test_apply_user_preferences_to_panel_sets_validate_dropdowns_and_scan_scope():
     from tests.unit.test_maya_summary_header import FakeQtWidgets as MainWindowFakeQtWidgets
 
-    from shader_health.ui import main_window
-    from shader_health.ui.user_preferences_ui import apply_user_preferences_to_panel
+    from pipeline_inspector.ui import main_window
+    from pipeline_inspector.ui.user_preferences_ui import apply_user_preferences_to_panel
 
     widget = main_window.build_main_widget(
         MainWindowFakeQtWidgets,
@@ -1497,8 +1497,8 @@ def test_apply_user_preferences_to_panel_sets_validate_dropdowns_and_scan_scope(
 
     assert profile_dropdown.currentData() == "deadline_critical"
     assert asset_class_dropdown.currentData() == "asset_class_hero"
-    assert widget._shader_health_scan_scope == "selection"
-    assert widget._shader_health_ui_density == "compact"
+    assert widget._pipeline_inspector_scan_scope == "selection"
+    assert widget._pipeline_inspector_ui_density == "compact"
 
 
 def _set_combo_data(view: Any, object_name: str, data: str) -> None:

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.core import GraphSnapshot, RuleResult
-from shader_health.core.waivers import (
+from pipeline_inspector.core import GraphSnapshot, RuleResult
+from pipeline_inspector.core.waivers import (
     WaiverSidecar,
     apply_waivers,
     create_waiver_from_result,
@@ -13,7 +13,7 @@ from shader_health.core.waivers import (
     revoke_waiver,
     write_waiver_sidecar,
 )
-from shader_health.reports import build_json_report
+from pipeline_inspector.reports import build_json_report
 
 
 def test_create_waiver_from_issue_result():
@@ -35,7 +35,7 @@ def test_create_waiver_from_issue_result():
 
 def test_load_and_write_waiver_sidecar(tmp_path: Path):
     sidecar = WaiverSidecar((_waiver(),))
-    path = tmp_path / "scene.shader_health_waivers.json"
+    path = tmp_path / "scene.pipeline_inspector_waivers.json"
 
     write_waiver_sidecar(path, sidecar)
     loaded = load_waiver_sidecar(path)
@@ -90,7 +90,7 @@ def test_json_report_includes_waived_issue():
 
 def test_revoke_waiver_removes_record_and_round_trips(tmp_path: Path):
     sidecar = WaiverSidecar((_waiver(),))
-    path = tmp_path / "scene.shader_health_waivers.json"
+    path = tmp_path / "scene.pipeline_inspector_waivers.json"
     write_waiver_sidecar(path, sidecar)
 
     updated = revoke_waiver(sidecar, sidecar.waivers[0].id)
@@ -112,7 +112,7 @@ def test_waiver_status_label_marks_expired_records():
     active = _waiver(expires_at_utc="2026-08-02T08:00:00Z")
     expired = _waiver(expires_at_utc="2026-07-01T08:00:00Z")
 
-    from shader_health.core.waivers import waiver_status_label
+    from pipeline_inspector.core.waivers import waiver_status_label
 
     assert waiver_status_label(active, now_utc="2026-07-03T08:00:00Z") == "active"
     assert waiver_status_label(expired, now_utc="2026-07-03T08:00:00Z") == "expired"

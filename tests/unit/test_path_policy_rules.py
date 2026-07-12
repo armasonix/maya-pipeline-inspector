@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     FileDependencySnapshot,
     GraphSnapshot,
     RuleDefinition,
@@ -9,7 +9,7 @@ from shader_health.core import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "texture_paths.json"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "texture_paths.json"
 
 
 def load_texture_rule(rule_id: str) -> RuleDefinition:

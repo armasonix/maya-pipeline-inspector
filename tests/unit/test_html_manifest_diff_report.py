@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 from tests.unit.test_manifest_diff_command import new_manifest, old_manifest
 
-from shader_health.reports.html_manifest_diff import (
+from pipeline_inspector.reports.html_manifest_diff import (
     build_html_manifest_diff,
     write_html_manifest_diff,
 )
-from shader_health.reports.manifest_diff import build_manifest_diff
+from pipeline_inspector.reports.manifest_diff import build_manifest_diff
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "reports" / "manifest_diff_sample.json"
@@ -38,7 +38,7 @@ def test_html_manifest_diff_is_self_contained(sample_diff: dict[str, object]):
 def test_html_manifest_diff_renders_summary_and_issue_groups(sample_diff: dict[str, object]):
     html = build_html_manifest_diff(sample_diff)
 
-    assert "Maya Shader Health Manifest Diff" in html
+    assert "Maya Pipeline Inspector Manifest Diff" in html
     assert "Before/after comparison of shader manifest materials and textures." in html
     assert "Summary" in html
     assert "Issue Groups" in html

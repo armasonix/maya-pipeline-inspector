@@ -4,9 +4,9 @@ Use this checklist before tagging **v0.2.0**. Public CI does not launch Maya; th
 
 ## Session 1 — Demo scene regression
 
-Scene: [`shader_health_demo_broken.ma`](../examples/broken_scene/shader_health_demo_broken.ma)
+Scene: [`pipeline_inspector_demo_broken.ma`](../examples/broken_scene/pipeline_inspector_demo_broken.ma)
 
-1. Open the panel via **Shader Health** menu or shelf.
+1. Open the panel via **Pipeline Inspector** menu or shelf.
 2. Profile `publish_strict` → **Validate Scene**.
 3. Confirm six issue categories still appear (missing texture, colorSpace, UDIM, local path, displacement, orphan).
 4. Issue filters are on **one horizontal row** above the issues table.
@@ -38,10 +38,10 @@ Requires V-Ray or Arnold loaded in Maya.
 ## Session 4 — Headless parity
 
 ```powershell
-mayapy -m shader_health validate examples/broken_scene/shader_health_demo_broken.ma `
+mayapy -m pipeline_inspector validate examples/broken_scene/pipeline_inspector_demo_broken.ma `
   --input-kind scene --profile-id publish_strict --report report.json
-mayapy examples/publish/submit_preflight.py examples/broken_scene/shader_health_demo_broken.ma `
-  --repo-root D:\Workspace\portfolio\maya-shader-health-inspector `
+mayapy examples/publish/submit_preflight.py examples/broken_scene/pipeline_inspector_demo_broken.ma `
+  --repo-root D:\Workspace\portfolio\maya-pipeline-inspector `
   --mayapy "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
 ```
 

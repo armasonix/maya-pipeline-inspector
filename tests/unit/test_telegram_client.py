@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from shader_health.integrations.telegram import TelegramClient, TelegramConfig, TelegramResponse
-from shader_health.integrations.telegram.client import HttpRequest
+from pipeline_inspector.integrations.telegram import (
+    TelegramClient,
+    TelegramConfig,
+    TelegramResponse,
+)
+from pipeline_inspector.integrations.telegram.client import HttpRequest
 
 
 def test_telegram_client_ping_returns_true_for_ok_get_me():
@@ -12,8 +16,8 @@ def test_telegram_client_ping_returns_true_for_ok_get_me():
         _ = timeout
         return TelegramResponse(
             status_code=200,
-            body='{"ok": true, "result": {"username": "shader_health_bot"}}',
-            json_data={"ok": True, "result": {"username": "shader_health_bot"}},
+            body='{"ok": true, "result": {"username": "pipeline_inspector_bot"}}',
+            json_data={"ok": True, "result": {"username": "pipeline_inspector_bot"}},
         )
 
     client = TelegramClient(

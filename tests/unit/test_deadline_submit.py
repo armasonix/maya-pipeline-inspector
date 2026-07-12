@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
     DeadlineConfig,
     DeadlineSubmitError,
@@ -15,11 +15,11 @@ from shader_health.integrations.deadline import (
     FarmValidationResult,
     build_command_script_job,
     build_maya_batch_script_job,
-    submit_shader_health_validation_job,
+    submit_pipeline_inspector_validation_job,
     write_command_script_file,
 )
-from shader_health.integrations.deadline.client import DeadlineResponse, HttpRequest
-from shader_health.integrations.deadline.preflight import VALIDATOR_OK
+from pipeline_inspector.integrations.deadline.client import DeadlineResponse, HttpRequest
+from pipeline_inspector.integrations.deadline.preflight import VALIDATOR_OK
 
 
 def test_write_command_script_file_uses_windows_quoting_on_win32(
@@ -35,10 +35,10 @@ def test_write_command_script_file_uses_windows_quoting_on_win32(
 def test_build_command_script_job_payload(tmp_path: Path):
     config = DeadlineConfig(
         mayapy="mayapy",
-        queue="shader_health",
+        queue="pipeline_inspector",
         user_name="pipeline",
     )
-    command_script = tmp_path / "shader_health_command.txt"
+    command_script = tmp_path / "pipeline_inspector_command.txt"
     job_info, plugin_info, aux_files = build_command_script_job(
         config=config,
         scene_path=tmp_path / "scene.ma",
@@ -48,7 +48,7 @@ def test_build_command_script_job_payload(tmp_path: Path):
     )
     assert job_info["Plugin"] == "CommandScript"
     assert job_info["Frames"] == "0"
-    assert job_info["Pool"] == "shader_health"
+    assert job_info["Pool"] == "pipeline_inspector"
     assert job_info["UserName"] == "pipeline"
     assert plugin_info["StartupDirectory"] == str(tmp_path)
     assert aux_files == (str(command_script),)
@@ -59,19 +59,19 @@ def test_build_maya_batch_script_job_payload(tmp_path: Path):
     job_info, plugin_info, aux_files = build_maya_batch_script_job(
         config=config,
         scene_path=tmp_path / "scene.ma",
-        script_path=tmp_path / "shader_health_deadline_validate.py",
+        script_path=tmp_path / "pipeline_inspector_deadline_validate.py",
         maya_version="2024",
     )
     assert job_info["Plugin"] == "MayaBatch"
     assert job_info["Group"] == "lookdev"
     assert plugin_info["SceneFile"] == str(tmp_path / "scene.ma")
-    assert plugin_info["ScriptFile"] == str(tmp_path / "shader_health_deadline_validate.py")
+    assert plugin_info["ScriptFile"] == str(tmp_path / "pipeline_inspector_deadline_validate.py")
     assert plugin_info["ScriptJob"] is True
     assert plugin_info["Version"] == "2024"
     assert aux_files == ()
 
 
-def test_submit_shader_health_validation_job_submits_command_script(tmp_path: Path):
+def test_submit_pipeline_inspector_validation_job_submits_command_script(tmp_path: Path):
     requests: list[HttpRequest] = []
 
     def transport(request: HttpRequest, timeout: float) -> DeadlineResponse:
@@ -79,8 +79,8 @@ def test_submit_shader_health_validation_job_submits_command_script(tmp_path: Pa
         return DeadlineResponse(status_code=200, body="job-551")
 
     client = DeadlineClient(DeadlineConfig(mayapy="mayapy"), transport=transport)
-    command_script = tmp_path / "shader_health_command.txt"
-    result = submit_shader_health_validation_job(
+    command_script = tmp_path / "pipeline_inspector_command.txt"
+    result = submit_pipeline_inspector_validation_job(
         client=client,
         scene_path=tmp_path / "scene.ma",
         report_path=tmp_path / "report.json",
@@ -92,14 +92,14 @@ def test_submit_shader_health_validation_job_submits_command_script(tmp_path: Pa
     assert result.report_path == tmp_path / "report.json"
     assert command_script.is_file()
     assert result.command_script_line is not None
-    assert "shader_health" in result.command_script_line
+    assert "pipeline_inspector" in result.command_script_line
 
     payload = json.loads(requests[0].body.decode("utf-8"))
     assert payload["JobInfo"]["Plugin"] == "CommandScript"
     assert payload["AuxFiles"] == [str(command_script)]
 
 
-def test_submit_shader_health_validation_job_can_run_local_preflight(tmp_path: Path):
+def test_submit_pipeline_inspector_validation_job_can_run_local_preflight(tmp_path: Path):
     calls: list[tuple[str, ...]] = []
 
     def runner(command: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -110,7 +110,7 @@ def test_submit_shader_health_validation_job_can_run_local_preflight(tmp_path: P
         return DeadlineResponse(status_code=200, body="job-552")
 
     client = DeadlineClient(DeadlineConfig(), transport=transport)
-    result = submit_shader_health_validation_job(
+    result = submit_pipeline_inspector_validation_job(
         client=client,
         scene_path=tmp_path / "scene.ma",
         report_path=tmp_path / "report.json",
@@ -123,11 +123,11 @@ def test_submit_shader_health_validation_job_can_run_local_preflight(tmp_path: P
     assert calls
 
 
-def test_submit_shader_health_validation_job_blocks_on_eligibility(tmp_path: Path):
+def test_submit_pipeline_inspector_validation_job_blocks_on_eligibility(tmp_path: Path):
     client = DeadlineClient(DeadlineConfig())
 
     with pytest.raises(DeadlineSubmitError, match="eligibility gate"):
-        submit_shader_health_validation_job(
+        submit_pipeline_inspector_validation_job(
             client=client,
             scene_path=tmp_path / "scene.ma",
             report_path=tmp_path / "report.json",
@@ -137,13 +137,13 @@ def test_submit_shader_health_validation_job_blocks_on_eligibility(tmp_path: Pat
         )
 
 
-def test_submit_shader_health_validation_job_requires_script_path_for_maya_batch(
+def test_submit_pipeline_inspector_validation_job_requires_script_path_for_maya_batch(
     tmp_path: Path,
 ):
     client = DeadlineClient(DeadlineConfig())
 
     with pytest.raises(DeadlineSubmitError, match="script_path is required"):
-        submit_shader_health_validation_job(
+        submit_pipeline_inspector_validation_job(
             client=client,
             scene_path=tmp_path / "scene.ma",
             report_path=tmp_path / "report.json",

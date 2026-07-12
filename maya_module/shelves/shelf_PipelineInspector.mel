@@ -1,0 +1,32 @@
+global proc shelf_PipelineInspector()
+{
+    string $shelfName = "PipelineInspector";
+    string $openButton = "pipelineInspectorShelfButton";
+    string $farmButton = "pipelineInspectorFarmCheckShelfButton";
+
+    if (!`shelfLayout -q -exists $shelfName`) {
+        return;
+    }
+
+    if (!`shelfButton -q -exists $openButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $openButton
+            -label "Pipeline Inspector"
+            -annotation "Open Maya Pipeline Inspector"
+            -image1 "commandButton.png"
+            -sourceType "mel"
+            -command "python(\"import pipeline_inspector_bootstrap; pipeline_inspector_bootstrap.show()\")";
+    }
+
+    if (!`shelfButton -q -exists $farmButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $farmButton
+            -label "Pipeline Inspector Farm Check"
+            -annotation "Open the Farm tab and run deadline_critical preflight"
+            -image1 "commandButton.png"
+            -sourceType "mel"
+            -command "python(\"from pipeline_inspector.maya.commands import show_farm_check_ui; show_farm_check_ui()\")";
+    }
+}

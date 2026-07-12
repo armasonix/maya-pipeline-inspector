@@ -3,5 +3,5 @@
   "profile_id": "deadline_critical",
   "mayapy": "mayapy",
   "timeout_seconds": 30,
-  "queue": "shader_health"
+  "queue": "pipeline_inspector"
 }

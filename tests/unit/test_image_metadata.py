@@ -3,9 +3,9 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from shader_health.core.image_metadata import max_image_dimension, read_image_dimensions
-from shader_health.core.models import FileDependencySnapshot, GraphSnapshot, NodeSnapshot
-from shader_health.maya.snapshot_enrichment import enrich_snapshot
+from pipeline_inspector.core.image_metadata import max_image_dimension, read_image_dimensions
+from pipeline_inspector.core.models import FileDependencySnapshot, GraphSnapshot, NodeSnapshot
+from pipeline_inspector.maya.snapshot_enrichment import enrich_snapshot
 
 
 def _write_png(path: Path, width: int, height: int) -> None:

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot, NodeSnapshot
-from shader_health.maya.validation_pipeline import (
+from pipeline_inspector.core import GraphSnapshot, NodeSnapshot
+from pipeline_inspector.maya.validation_pipeline import (
     list_packaged_profile_ids,
     packaged_profile_path,
     run_validation,
     run_validation_for_user,
 )
-from shader_health.user_config import UserPreferences
+from pipeline_inspector.user_config import UserPreferences
 
 
 def test_list_packaged_profile_ids_includes_mvp_profiles():
@@ -109,7 +109,7 @@ def test_run_validation_for_user_applies_user_defaults(tmp_path: Path):
 
 
 def test_run_validation_applies_session_rule_overrides(tmp_path: Path):
-    from shader_health.core.rule_loader import RuleOverride
+    from pipeline_inspector.core.rule_loader import RuleOverride
 
     snapshot = GraphSnapshot(
         scene_path=str(tmp_path / "demo.ma"),

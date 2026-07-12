@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from shader_health import cli
-from shader_health.core.fix_audit import load_fix_audit_sidecar
-from shader_health.core.fix_plan import FixAction, FixPlan, fix_plan_from_export
-from shader_health.maya.fix_applier import AppliedFixRecord, ApplyFixReport
+from pipeline_inspector import cli
+from pipeline_inspector.core.fix_audit import load_fix_audit_sidecar
+from pipeline_inspector.core.fix_plan import FixAction, FixPlan, fix_plan_from_export
+from pipeline_inspector.maya.fix_applier import AppliedFixRecord, ApplyFixReport
 
 
 def test_fix_plan_from_export_loads_actions():
@@ -365,7 +365,7 @@ def test_apply_fixes_cli_appends_fix_audit_sidecar_on_real_apply(tmp_path: Path,
 
     exit_code = cli.main(["apply-fixes", str(scene_path)])
 
-    audit_path = scene_path.with_name("hero.shader_health_fix_audit.json")
+    audit_path = scene_path.with_name("hero.pipeline_inspector_fix_audit.json")
     loaded = load_fix_audit_sidecar(audit_path)
     assert exit_code == cli.EXIT_OK
     assert len(loaded.sessions) == 1
@@ -393,7 +393,7 @@ def test_apply_fixes_cli_dry_run_skips_fix_audit_sidecar(tmp_path: Path, monkeyp
 
     exit_code = cli.main(["apply-fixes", str(scene_path), "--dry-run"])
 
-    audit_path = scene_path.with_name("hero.shader_health_fix_audit.json")
+    audit_path = scene_path.with_name("hero.pipeline_inspector_fix_audit.json")
     assert exit_code == cli.EXIT_OK
     assert not audit_path.exists()
 

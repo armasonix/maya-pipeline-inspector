@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from shader_health.core.fix_plan import (
+from pipeline_inspector.core.fix_plan import (
     FixAction,
     build_fix_plan,
     fix_plan_from_export,
@@ -11,8 +11,8 @@ from shader_health.core.fix_plan import (
     replace_path_prefix,
     resolve_normalize_path_value,
 )
-from shader_health.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
-from shader_health.core.rule_schema import (
+from pipeline_inspector.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
+from pipeline_inspector.core.rule_schema import (
     RuleCheck,
     RuleDefinition,
     RuleFix,
@@ -20,7 +20,7 @@ from shader_health.core.rule_schema import (
     RulePolicy,
     RuleResult,
 )
-from shader_health.studio_config import StudioEnvironmentSettings
+from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
 
 def test_fix_planner_builds_action_for_failed_result_with_rule_fix():
@@ -212,7 +212,7 @@ def test_resolve_normalize_path_value_uses_replace_from_and_replace_to():
 
 def test_resolve_normalize_path_value_uses_scene_project_root_fallback(tmp_path: Path):
     repo_root = tmp_path / "repo"
-    (repo_root / "src" / "shader_health").mkdir(parents=True)
+    (repo_root / "src" / "pipeline_inspector").mkdir(parents=True)
     scene_path = repo_root / "examples" / "broken_scene" / "demo.ma"
     scene_path.parent.mkdir(parents=True)
     texture_path = repo_root / "examples" / "broken_scene" / "textures" / "demo.exr"
@@ -229,7 +229,7 @@ def test_resolve_normalize_path_value_maps_user_home_path_to_asset_root_textures
     assert resolve_normalize_path_value(
         "C:/Users/ledorub3d/Documents/local_only_texture.exr",
         {"replace_to": "${ASSET_ROOT}"},
-        scene_path="D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/demo.ma",
+        scene_path="D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/demo.ma",
     ) == "${ASSET_ROOT}/textures/local_only_texture.exr"
 
 
@@ -249,7 +249,7 @@ def test_resolve_normalize_path_value_uses_studio_asset_root_for_local_paths():
     assert resolve_normalize_path_value(
         "C:/Users/ledorub3d/Documents/local_only_texture.exr",
         {"replace_to": "${ASSET_ROOT}"},
-        scene_path="D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/demo.ma",
+        scene_path="D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/demo.ma",
         studio_environment=environment,
     ) == "${STUDIO_ASSET_ROOT}/textures/local_only_texture.exr"
 
@@ -263,7 +263,7 @@ def test_build_fix_plan_embeds_studio_environment_in_normalize_path_params():
             params={"attribute": "fileTextureName", "replace_to": "${ASSET_ROOT}"},
         ),
     )
-    from shader_health.core.models import FileDependencySnapshot
+    from pipeline_inspector.core.models import FileDependencySnapshot
 
     snapshot = GraphSnapshot(
         scene_path="D:/show/scenes/demo.ma",
@@ -292,9 +292,9 @@ def test_build_fix_plan_embeds_studio_environment_in_normalize_path_params():
     assert plan.actions[0].params["studio_environment"]["texture_root"] == "\\\\farm\\textures"
 
 
-def test_project_root_from_scene_detects_shader_health_repo(tmp_path: Path):
+def test_project_root_from_scene_detects_pipeline_inspector_repo(tmp_path: Path):
     repo_root = tmp_path / "repo"
-    (repo_root / "src" / "shader_health").mkdir(parents=True)
+    (repo_root / "src" / "pipeline_inspector").mkdir(parents=True)
     scene_path = repo_root / "examples" / "broken_scene" / "demo.ma"
 
     root = project_root_from_scene(str(scene_path).replace("\\", "/"))
@@ -332,7 +332,7 @@ def test_fix_planner_builds_relink_path_action_from_texture_version_failure():
         auto_fix_available=True,
         fix_id="relink_path",
     )
-    from shader_health.core.models import FileDependencySnapshot
+    from pipeline_inspector.core.models import FileDependencySnapshot
 
     snapshot = GraphSnapshot(
         file_dependencies=[

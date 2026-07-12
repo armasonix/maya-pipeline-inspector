@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from shader_health.core.manifest_gate import ManifestGatePolicy
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
+from pipeline_inspector.studio_config import (
     PipelineSettings,
     StudioConfig,
     WaiverDefaultsSettings,
 )
-from shader_health.ui.studio_policy_section import (
+from pipeline_inspector.ui.studio_policy_section import (
     SETTINGS_ALLOW_CRITICAL_WAIVERS_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
     SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,

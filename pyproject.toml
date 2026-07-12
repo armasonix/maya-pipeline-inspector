@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "maya-shader-health-inspector"
+name = "maya-pipeline-inspector"
 version = "0.5.0"
 description = "Production-oriented material QA framework for Autodesk Maya pipelines."
 readme = "README.md"
@@ -46,16 +46,16 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/armasonix/maya-shader-health-inspector"
-Repository = "https://github.com/armasonix/maya-shader-health-inspector"
-Issues = "https://github.com/armasonix/maya-shader-health-inspector/issues"
+Homepage = "https://github.com/armasonix/maya-pipeline-inspector"
+Repository = "https://github.com/armasonix/maya-pipeline-inspector"
+Issues = "https://github.com/armasonix/maya-pipeline-inspector/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["shader_health*"]
+include = ["pipeline_inspector*"]
 
 [tool.setuptools.package-data]
-shader_health = ["rules/**/*.json", "ui/themes/*.qss"]
+pipeline_inspector = ["rules/**/*.json", "ui/themes/*.qss", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -73,7 +73,7 @@ ignore = ["UP045"]
 
 [tool.mypy]
 python_version = "3.9"
-packages = ["shader_health"]
+packages = ["pipeline_inspector"]
 strict = false
 warn_unused_configs = true
 warn_redundant_casts = true

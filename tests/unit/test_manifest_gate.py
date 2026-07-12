@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.core.manifest_gate import ManifestGatePolicy, evaluate_manifest_gate
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy, evaluate_manifest_gate
 
 
 def test_manifest_gate_blocks_new_textures():

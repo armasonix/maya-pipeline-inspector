@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
@@ -23,7 +23,7 @@ def broken_scene_snapshot(tmp_path: Path) -> GraphSnapshot:
     udim_path = str(tile_1001).replace("\\", "/")
 
     return GraphSnapshot(
-        scene_path=str(tmp_path / "shader_health_demo_broken.ma"),
+        scene_path=str(tmp_path / "pipeline_inspector_demo_broken.ma"),
         maya_version="2024",
         renderer="vray",
         scan_scope="scene",

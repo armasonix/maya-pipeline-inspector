@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from shader_health.maya import commands, navigation
+from pipeline_inspector.maya import commands, navigation
 
 
 class FakeClipboard:

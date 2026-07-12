@@ -5,9 +5,20 @@ import json
 import sys
 from pathlib import Path
 
-from shader_health import cli
-from shader_health.core import FileDependencySnapshot, GraphSnapshot, MaterialSnapshot, NodeSnapshot
-from shader_health.studio_config import PipelineSettings, StudioConfig, save_studio_config
+from pipeline_inspector import cli
+from pipeline_inspector.core import (
+    FileDependencySnapshot,
+    GraphSnapshot,
+    MaterialSnapshot,
+    NodeSnapshot,
+)
+from pipeline_inspector.studio_config import (
+    LEGACY_STUDIO_CONFIG_ENV_VAR,
+    STUDIO_CONFIG_ENV_VAR,
+    PipelineSettings,
+    StudioConfig,
+    save_studio_config,
+)
 
 
 def test_validate_snapshot_writes_report_and_returns_publish_block(tmp_path: Path):
@@ -137,7 +148,7 @@ def test_validate_respects_studio_config_flag_disabling_tx_rules(tmp_path: Path,
     _isolate_studio_config_discovery(monkeypatch, tmp_path)
     snapshot_path = _write_optimized_texture_snapshot(tmp_path)
     report_path = tmp_path / "report.json"
-    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    studio_path = tmp_path / "studio" / "pipeline_inspector_studio.json"
 
     blocked_code = cli.main(
         [
@@ -183,12 +194,12 @@ def test_validate_respects_studio_config_env_var(tmp_path: Path, monkeypatch):
     _isolate_studio_config_discovery(monkeypatch, tmp_path)
     snapshot_path = _write_optimized_texture_snapshot(tmp_path)
     report_path = tmp_path / "report.json"
-    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    studio_path = tmp_path / "studio" / "pipeline_inspector_studio.json"
     save_studio_config(
         studio_path,
         StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
     )
-    monkeypatch.setenv("SHADER_HEALTH_STUDIO_CONFIG", str(studio_path))
+    monkeypatch.setenv("PIPELINE_INSPECTOR_STUDIO_CONFIG", str(studio_path))
 
     cli.main(
         [
@@ -230,7 +241,7 @@ def test_validate_missing_studio_config_path_returns_config_error(tmp_path: Path
 def test_manifest_accepts_studio_config_flag(tmp_path: Path, monkeypatch):
     _isolate_studio_config_discovery(monkeypatch, tmp_path)
     snapshot_path = _write_optimized_texture_snapshot(tmp_path)
-    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    studio_path = tmp_path / "studio" / "pipeline_inspector_studio.json"
     save_studio_config(
         studio_path,
         StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
@@ -258,7 +269,7 @@ def test_gate_accepts_studio_config_flag(tmp_path: Path, monkeypatch):
     _isolate_studio_config_discovery(monkeypatch, tmp_path)
     snapshot_path = _write_optimized_texture_snapshot(tmp_path)
     manifest_path = tmp_path / "manifest.json"
-    studio_path = tmp_path / "studio" / "shader_health_studio.json"
+    studio_path = tmp_path / "studio" / "pipeline_inspector_studio.json"
     save_studio_config(
         studio_path,
         StudioConfig(pipeline=PipelineSettings(require_tx_derivatives=False)),
@@ -582,7 +593,7 @@ def test_snapshot_from_scene_calls_maya_standalone_before_cmds_file(monkeypatch,
         def file(path: str, *, open: bool = True, force: bool = True) -> None:
             file_calls.append(path)
 
-    scanner = importlib.import_module("shader_health.maya.scanner")
+    scanner = importlib.import_module("pipeline_inspector.maya.scanner")
     monkeypatch.setitem(sys.modules, "maya.standalone", FakeStandalone())
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds())
     monkeypatch.setattr(cli, "_MAYA_STANDALONE_INITIALIZED", False)
@@ -633,7 +644,8 @@ def _write_optimized_texture_snapshot(tmp_path: Path) -> Path:
 
 
 def _isolate_studio_config_discovery(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.delenv("SHADER_HEALTH_STUDIO_CONFIG", raising=False)
+    monkeypatch.delenv(STUDIO_CONFIG_ENV_VAR, raising=False)
+    monkeypatch.delenv(LEGACY_STUDIO_CONFIG_ENV_VAR, raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 

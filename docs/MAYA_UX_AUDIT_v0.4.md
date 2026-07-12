@@ -2,9 +2,9 @@
 
 **Status:** Baseline audit (pre–Wave 1)  
 **Date:** 2026-07-07  
-**Plan issue:** #092 (GitHub [#120](https://github.com/armasonix/maya-shader-health-inspector/issues/120))  
+**Plan issue:** #092 (GitHub [#120](https://github.com/armasonix/maya-pipeline-inspector/issues/120))  
 **Philosophy:** [ADR 0005 — GUI-first product philosophy](adr/0005-gui-first-product-philosophy.md)  
-**Code reviewed:** `src/shader_health/ui/main_window.py`, `src/shader_health/maya/ui_launcher.py`, `src/shader_health/ui/fix_queue.py`, `src/shader_health/ui/waiver_manager.py`, `maya_module/shelves/shelf_ShaderHealth.mel`
+**Code reviewed:** `src/pipeline_inspector/ui/main_window.py`, `src/pipeline_inspector/maya/ui_launcher.py`, `src/pipeline_inspector/ui/fix_queue.py`, `src/pipeline_inspector/ui/waiver_manager.py`, `maya_module/shelves/shelf_PipelineInspector.mel`
 
 ---
 
@@ -12,7 +12,7 @@
 
 The v0.3 dockable panel is **functionally complete** for validate → triage → fix → export, with shared `validation_pipeline` parity to CLI. For daily artist use, the **Validate tab is vertically overloaded**: summary, four action buttons, four filters, the issues table, a six-field details block, and a status line compete for the same scroll area. Pipeline actions (manifest gate, publish preflight) sit beside primary validate buttons without grouping, and farm/Deadline workflow is **absent from the panel** (CLI/example only).
 
-This audit records **22 findings**. **Seven are P0** and map to M28 issues [#108](https://github.com/armasonix/maya-shader-health-inspector/issues/136) and [#109](https://github.com/armasonix/maya-shader-health-inspector/issues/137). **Farm tab work** (M26, #101) addresses a separate P0 gap.
+This audit records **22 findings**. **Seven are P0** and map to M28 issues [#108](https://github.com/armasonix/maya-pipeline-inspector/issues/136) and [#109](https://github.com/armasonix/maya-pipeline-inspector/issues/137). **Farm tab work** (M26, #101) addresses a separate P0 gap.
 
 **Wave 1 goal:** reduce validate → triage → select node from **5+ clicks / 2 tab switches** toward **≤3 clicks** on the Validate tab, with visible blocking state and non-blocking scan feedback.
 
@@ -39,8 +39,8 @@ Manual timing (before/after Wave 1) will be recorded in [MAYA_V04_MANUAL_CHECKLI
 | **Validate** | Panel header, summary labels, workflow/asset class combos, 4 validate buttons, 4 filter combos, issues table, issue details + 4 nav buttons, status label | `ui_launcher._validate_from_ui`, `_populate_validation_result` |
 | **Waivers** | Panel header, waiver table, Refresh / Make Waive / Revoke | `commands.list_waivers_action` |
 | **Fixes** | Panel header, fix queue table, Apply Selected / Apply Safe / Export Fix Plan | `fix_plan` from last validation |
-| **Reports** | Panel header, 7 export/gate buttons (3×3 grid) | Requires `_shader_health_snapshot` from prior validate |
-| **Farm** | Connection status, scene readiness, eligibility, last report/job id; **Refresh Connection**, **Run Farm Preflight**, **Submit to Farm** | `shader_health.maya.farm_actions` → `integrations.deadline` |
+| **Reports** | Panel header, 7 export/gate buttons (3×3 grid) | Requires `_pipeline_inspector_snapshot` from prior validate |
+| **Farm** | Connection status, scene readiness, eligibility, last report/job id; **Refresh Connection**, **Run Farm Preflight**, **Submit to Farm** | `pipeline_inspector.maya.farm_actions` → `integrations.deadline` |
 
 **Shipped in v0.4 (#101):** Farm tab with Deadline connection status, in-panel preflight eligibility, and CommandScript submit with last job id.
 
@@ -52,7 +52,7 @@ Manual timing (before/after Wave 1) will be recorded in [MAYA_V04_MANUAL_CHECKLI
 
 | Step | Action | Clicks | Notes |
 |------|--------|--------|-------|
-| 1 | Shelf **Shader Health** or menu | 1 | Shelf only opens panel; no validate shortcut |
+| 1 | Shelf **Pipeline Inspector** or menu | 1 | Shelf only opens panel; no validate shortcut |
 | 2 | **Validate Scene** | 1 | Blocks UI thread; no progress bar (F-07) |
 | 3 | Scroll to see issues table if summary + filters fill viewport | 0–1 | Vertical stack pushes table down (F-06) |
 | 4 | Click issue row | 1 | Selection updates details below table |
@@ -103,7 +103,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 
 | Step | Action | Clicks | Notes |
 |------|--------|--------|-------|
-| 1 | Open panel → **Farm** tab | 2 | Connection status pings `SHADER_HEALTH_DEADLINE_API_URL` (default `http://localhost:8081`) |
+| 1 | Open panel → **Farm** tab | 2 | Connection status pings `PIPELINE_INSPECTOR_DEADLINE_API_URL` (default `http://localhost:8081`) |
 | 2 | **Validate Scene** on Validate tab (if not already run) | 1 | Farm preflight reads last validation summary |
 | 3 | **Run Farm Preflight** | 1 | Evaluates `deadline_critical` eligibility + scene saved / renderer plug-in |
 | 4 | **Submit to Farm** (when allowed) | 1 | Submits CommandScript utility job; shows last job id |
@@ -137,7 +137,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | F-19 | **No scene name in chrome** — `DEVELOPMENT_PLAN.md` mockup shows scene + renderer; panel omits scene file name | Validate | 3 | 2 | **P2** | #108 optional |
 | F-20 | **No severity color in table** — text-only severities; harder scan at a glance | Validate | 2 | 2 | **P2** | theme pass deferred |
 | F-21 | **Asset class hint always expanded** — three-line hint under combos consumes vertical space | Validate | 2 | 1 | **P2** | collapsible hint |
-| F-22 | ~~**Shelf single action**~~ — **Resolved (#102):** **Shader Health Farm Check** menu + shelf; guide in [deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) | Shelf | 3 | 2 | **P1** | M26 #102 ✅ |
+| F-22 | ~~**Shelf single action**~~ — **Resolved (#102):** **Pipeline Inspector Farm Check** menu + shelf; guide in [deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) | Shelf | 3 | 2 | **P1** | M26 #102 ✅ |
 
 ---
 
@@ -147,11 +147,11 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 
 | ID | Summary | Owner issue |
 |----|---------|-------------|
-| F-01 | Unified Validate tab action bar (primary vs pipeline groups) | [#108](https://github.com/armasonix/maya-shader-health-inspector/issues/136) |
+| F-01 | Unified Validate tab action bar (primary vs pipeline groups) | [#108](https://github.com/armasonix/maya-pipeline-inspector/issues/136) |
 | F-02 | Sticky summary header (health, blocks, profile chips) | #108 |
 | F-03 | Last-validated timestamp in summary | #108 |
-| F-04 | Farm tab + Deadline status — **shipped (#101)** | [#101](https://github.com/armasonix/maya-shader-health-inspector/issues/129) M26 ✅ |
-| F-05 | Double-click issue row → select node | [#109](https://github.com/armasonix/maya-shader-health-inspector/issues/137) |
+| F-04 | Farm tab + Deadline status — **shipped (#101)** | [#101](https://github.com/armasonix/maya-pipeline-inspector/issues/129) M26 ✅ |
+| F-05 | Double-click issue row → select node | [#109](https://github.com/armasonix/maya-pipeline-inspector/issues/137) |
 | F-06 | Reduce vertical overload (compact summary / splitter so table + details visible) | #108 |
 | F-07 | Non-blocking progress indicator during validate | #109 |
 
@@ -219,7 +219,7 @@ Implements P0 panel items from this audit. Farm work stays in M26.
 | Audit ID | Deliverable |
 |----------|-------------|
 | F-04 | Farm tab: connection status, Run Farm Preflight, Submit to Farm |
-| F-22 | Shelf **Shader Health Farm Check** |
+| F-22 | Shelf **Pipeline Inspector Farm Check** |
 
 ---
 
@@ -238,7 +238,7 @@ Implements P0 panel items from this audit. Farm work stays in M26.
 ## Recommended layout (Wave 1 target)
 
 ```text
-+-- Maya Shader Health Inspector  v0.4.x -----------------------------------+
++-- Maya Pipeline Inspector  v0.4.x -----------------------------------+
 | [Sticky summary]  Health 78  C:2 E:5  Publish: YES  Deadline: NO        |
 | Scene: char.ma   Profile: Publish Strict   Asset: Hero   Last: 14:32    |
 | [Validate Scene] [Validate Selection]  |  [Publish Preflight] [Gate]   |
@@ -262,4 +262,4 @@ Implements P0 panel items from this audit. Farm work stays in M26.
 - [ARCHITECTURE.md — UX Layer](ARCHITECTURE.md)
 - [USER_GUIDE.md — GUI-first workflow](USER_GUIDE.md)
 - [DEVELOPMENT_PLAN.md §19 — UI/UX Design](DEVELOPMENT_PLAN.md)
-- v0.4 plan issues [#108](https://github.com/armasonix/maya-shader-health-inspector/issues/136) / [#109](https://github.com/armasonix/maya-shader-health-inspector/issues/137) / [#101](https://github.com/armasonix/maya-shader-health-inspector/issues/129)
+- v0.4 plan issues [#108](https://github.com/armasonix/maya-pipeline-inspector/issues/136) / [#109](https://github.com/armasonix/maya-pipeline-inspector/issues/137) / [#101](https://github.com/armasonix/maya-pipeline-inspector/issues/129)

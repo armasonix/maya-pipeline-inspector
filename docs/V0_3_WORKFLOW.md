@@ -48,7 +48,7 @@ Details: [V0_3_DEVELOPMENT_PLAN.md](V0_3_DEVELOPMENT_PLAN.md).
 ## Per-issue loop (repeat for #071 … #090)
 
 ```bash
-cd /d/Workspace/portfolio/maya-shader-health-inspector
+cd /d/Workspace/portfolio/maya-pipeline-inspector
 git checkout dev
 git pull origin dev
 

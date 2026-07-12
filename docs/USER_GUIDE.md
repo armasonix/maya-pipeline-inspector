@@ -1,6 +1,6 @@
 # User Guide
 
-Maya Shader Health Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
+Maya Pipeline Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
 
 Status: **v0.5.0 shipped** (2026-07-12). See [CHANGELOG.md](../CHANGELOG.md). v0.5 cycle: [V0_5_DEVELOPMENT_PLAN.md](V0_5_DEVELOPMENT_PLAN.md).
 
@@ -12,15 +12,15 @@ Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVE
 
 ## GUI-first workflow
 
-Shader Health Inspector is built for daily use **inside the Maya dockable panel**. Pipeline TDs can automate the same checks headlessly, but artists and Shader TDs should not need a terminal or JSON export for routine validate → triage → fix → revalidate work.
+Pipeline Inspector is built for daily use **inside the Maya dockable panel**. Pipeline TDs can automate the same checks headlessly, but artists and Shader TDs should not need a terminal or JSON export for routine validate → triage → fix → revalidate work.
 
 Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
 
-1. **Panel first** — Open **Window → Shader Health Inspector** (or the shelf button). For farm preflight, use **Shader Health → Shader Health Farm Check** or the **Shader Health Farm Check** shelf button.
+1. **Panel first** — Open **Window → Pipeline Inspector** (or the shelf button). For farm preflight, use **Pipeline Inspector → Pipeline Inspector Farm Check** or the **Pipeline Inspector Farm Check** shelf button.
 2. **Fast paths** — Target three clicks or fewer from an open panel to an actionable result (for example: open panel → **Validate Scene** → double-click an issue to select the node).
 3. **Clear blocking state** — After validation, the summary shows health score, severity counts, and whether the scene **blocks publish** or **blocks Deadline** without opening a report file.
 4. **Low-friction fixes** — Safe auto-fixes use the Fixes tab queue; high-risk or referenced edits still require explicit confirmation per studio policy.
-5. **Same results everywhere** — The panel, `shader_health validate`, and Deadline preflight share one validation pipeline, so GUI and headless reports stay aligned.
+5. **Same results everywhere** — The panel, `pipeline_inspector validate`, and Deadline preflight share one validation pipeline, so GUI and headless reports stay aligned.
 6. **Check for Updates** — Use the panel header button to compare against GitHub Releases. Module-path installs can download and install in-app; pip installs should use `mayapy -m pip install -U` (see [auto_update.md](integrations/auto_update.md)).
 
 UX friction and Wave 1 backlog: [MAYA_UX_AUDIT_v0.4.md](MAYA_UX_AUDIT_v0.4.md).
@@ -46,7 +46,7 @@ v0.3 adds manifest schema 1.1, manifest regression gates, headless apply-fixes, 
 
 Rule `common.texture.version.latest` compares the `v###` token in a texture filename against the highest numeric sibling found in the same folder on disk (for example `albedo_v001.<UDIM>.exr` vs `albedo_v003.<UDIM>.exr` in the same directory).
 
-**v0.2 limitation:** version detection is filesystem-based only. Shader Health Inspector does not query a publish database, asset management system, or shot-level version registry. If the latest approved texture lives on another path, branch, or storage tier, the rule may report a false pass or false fail.
+**v0.2 limitation:** version detection is filesystem-based only. Pipeline Inspector does not query a publish database, asset management system, or shot-level version registry. If the latest approved texture lives on another path, branch, or storage tier, the rule may report a false pass or false fail.
 
 The check is skipped when the filename has no `v###` version token or when the scanner cannot resolve version metadata from the path.
 
@@ -65,7 +65,7 @@ During Maya scan, snapshot enrichment probes PNG/JPEG/WebP headers to populate `
 Headless example:
 
 ```bash
-python -m shader_health validate scene.ma --profile-id asset_class_hero --report report.json
+python -m pipeline_inspector validate scene.ma --profile-id asset_class_hero --report report.json
 ```
 
 Shader manifests (schema 1.1) include `max_dimension` per texture entry for diff review.
@@ -116,7 +116,7 @@ Main needs:
 
 ```text
 1. Open Maya scene.
-2. Open Maya Shader Health Inspector panel.
+2. Open Maya Pipeline Inspector panel.
 3. Select profile: `artist_relaxed`, `publish_strict`, `deadline_critical`, `supervisor_full`, or `ci_headless`.
 4. Click Validate Scene or Validate Selection.
 5. Review health score and blocking status.
@@ -135,7 +135,7 @@ The dockable panel uses five tabs. Each tab shows the panel title and version at
 
 ```text
 +--------------------------------------------------------------------------------+
-| Maya Shader Health Inspector  v0.3.0                                           |
+| Maya Pipeline Inspector  v0.3.0                                           |
 | [Validate] [Waivers] [Fixes] [Reports] [Farm]                                  |
 +--------------------------------------------------------------------------------+
 | Validate tab (default)                                                         |
@@ -222,7 +222,7 @@ Important block flags:
 
 Profiles control strictness and runtime behavior.
 
-Packaged MVP profiles (under `src/shader_health/rules/profiles/`):
+Packaged MVP profiles (under `src/pipeline_inspector/rules/profiles/`):
 
 | Profile | Purpose |
 |---|---|
@@ -239,7 +239,7 @@ The Maya UI and headless CLI both call the same validation pipeline (`run_valida
 
 ## Renderer Rule Packs
 
-Packaged renderer-specific rules live under `src/shader_health/rules/vray/` and `src/shader_health/rules/arnold/`.
+Packaged renderer-specific rules live under `src/pipeline_inspector/rules/vray/` and `src/pipeline_inspector/rules/arnold/`.
 
 Current v0.1 renderer checks are info-level audits such as:
 
@@ -281,7 +281,7 @@ Use the **checkboxes** in the Selected column to choose fixes. **Apply Safe Fixe
 
 ### Local development paths (no studio `$ASSET_ROOT` yet)
 
-When textures use absolute paths such as `D:/Workspace/.../examples/broken_scene/textures/...`, the `normalize_path` fix rewrites them relative to the detected project root (folder containing `src/shader_health/`) as `${ASSET_ROOT}/examples/broken_scene/...`.
+When textures use absolute paths such as `D:/Workspace/.../examples/broken_scene/textures/...`, the `normalize_path` fix rewrites them relative to the detected project root (folder containing `src/pipeline_inspector/`) as `${ASSET_ROOT}/examples/broken_scene/...`.
 
 Paths outside the project (for example `C:/Users/.../Documents/local_only_texture.exr`) normalize to `${ASSET_ROOT}/textures/<filename>`. Copy or relink the file into your project textures folder after apply if needed.
 
@@ -337,7 +337,7 @@ If an issue is inside a referenced asset, the tool should:
 
 Waivers are controlled exceptions for known issues.
 
-The dockable panel includes a **Waiver Manager** section that lists waivers from the scene sidecar (`*.shader_health_waivers.json`), shows rule id, target, approver, expiry, and whether each entry is active or expired. Expired waivers are labeled as ignored on validate. Use **Revoke Selected** to remove a waiver and revalidate.
+The dockable panel includes a **Waiver Manager** section that lists waivers from the scene sidecar (`*.pipeline_inspector_waivers.json`), shows rule id, target, approver, expiry, and whether each entry is active or expired. Expired waivers are labeled as ignored on validate. Use **Revoke Selected** to remove a waiver and revalidate.
 
 Expected behavior (implemented via waiver sidecar beside the scene file):
 
@@ -369,15 +369,15 @@ JSON reports are intended for pipeline systems. HTML reports are self-contained,
 
 ### Compare to Approved Manifest (v0.3)
 
-Export a shader manifest beside the scene (`{scene}_shader_health_manifest.json`), then open the **Reports** tab or use **Compare to Approved Manifest** to diff against that sidecar without a file picker. If the sidecar is missing, the action falls back to the baseline manifest file picker (same as **Export Manifest Diff**). Use **Make Waive** on the **Waivers** tab for the selected issue from the Validate tab.
+Export a shader manifest beside the scene (`{scene}_pipeline_inspector_manifest.json`), then open the **Reports** tab or use **Compare to Approved Manifest** to diff against that sidecar without a file picker. If the sidecar is missing, the action falls back to the baseline manifest file picker (same as **Export Manifest Diff**). Use **Make Waive** on the **Waivers** tab for the selected issue from the Validate tab.
 
 ## Headless Usage
 
 ```bash
-python -m shader_health validate scene.ma --profile-id publish_strict --report report.json
-python -m shader_health manifest scene.ma --out shader_manifest.json
-python -m shader_health validate snapshot.json --input-kind snapshot --profile-id ci_headless --report report.json
-python -m shader_health validate scene.ma --waiver-sidecar scene.shader_health_waivers.json --report report.json
+python -m pipeline_inspector validate scene.ma --profile-id publish_strict --report report.json
+python -m pipeline_inspector manifest scene.ma --out shader_manifest.json
+python -m pipeline_inspector validate snapshot.json --input-kind snapshot --profile-id ci_headless --report report.json
+python -m pipeline_inspector validate scene.ma --waiver-sidecar scene.pipeline_inspector_waivers.json --report report.json
 ```
 
 The headless CLI uses the same validation pipeline as the Maya UI (`prepare_snapshot_for_validation`, profile loading, waivers, enrichment, fix planning).
@@ -408,10 +408,10 @@ Artist workflow for Deadline 10 on-prem validation from Maya (v0.4):
 
 | Step | Where | Action |
 | --- | --- | --- |
-| 1 | Menu or shelf | **Shader Health Farm Check** — opens **Farm** tab and runs `deadline_critical` preflight in one click |
-| 2 | Farm tab | Confirm **Status: Online** (green lamp). If **Offline**, ask TD to verify Web Service URL / `SHADER_HEALTH_DEADLINE_API_URL` |
+| 1 | Menu or shelf | **Pipeline Inspector Farm Check** — opens **Farm** tab and runs `deadline_critical` preflight in one click |
+| 2 | Farm tab | Confirm **Status: Online** (green lamp). If **Offline**, ask TD to verify Web Service URL / `PIPELINE_INSPECTOR_DEADLINE_API_URL` |
 | 3 | Farm tab | Review eligibility after preflight — blocked scenes show reasons (unsaved file, missing renderer plug-in, `block_deadline` issues) |
-| 4 | Validate / Fixes tabs | Fix farm-blocking issues, then re-run **Shader Health Farm Check** or **Run Farm Preflight** |
+| 4 | Validate / Fixes tabs | Fix farm-blocking issues, then re-run **Pipeline Inspector Farm Check** or **Run Farm Preflight** |
 | 5 | Farm tab | When eligibility is **allow**, click **Submit to Farm** to queue a CommandScript utility job |
 | 6 | Farm tab | Note **Last farm report** and **Last Deadline job id** for supervisor / wrangler follow-up |
 

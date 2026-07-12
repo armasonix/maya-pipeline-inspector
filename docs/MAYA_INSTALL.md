@@ -1,6 +1,6 @@
 # Maya install guide
 
-This guide documents how to load **Maya Shader Health Inspector** inside Autodesk Maya using the packaged `maya_module/` layout, and how to use an editable `pip` install as an alternative.
+This guide documents how to load **Maya Pipeline Inspector** inside Autodesk Maya using the packaged `maya_module/` layout, and how to use an editable `pip` install as an alternative.
 
 The module path is intended for studio deployment from a cloned or packaged repo. The `pip` path is convenient for TD workstations and for environments where `MAYA_MODULE_PATH` is not used.
 
@@ -10,16 +10,16 @@ Regardless of install method, the UI entrypoints are the same:
 
 | Entrypoint | Name | Behavior |
 | --- | --- | --- |
-| Main menu | `Shader Health` | Items: **Open Shader Health Inspector**, **Shader Health Farm Check**, **Close Shader Health Inspector** |
-| Shelf tab | `ShaderHealth` | Buttons: **Shader Health** (open panel), **Shader Health Farm Check** (Farm tab + preflight) |
-| Python API | `shader_health.maya.commands` | `install_ui()`, `show_ui()`, `show_farm_check_ui()`, `close_ui()`, validation and export commands |
+| Main menu | `Pipeline Inspector` | Items: **Open Pipeline Inspector**, **Pipeline Inspector Farm Check**, **Close Pipeline Inspector** |
+| Shelf tab | `PipelineInspector` | Buttons: **Pipeline Inspector** (open panel), **Pipeline Inspector Farm Check** (Farm tab + preflight) |
+| Python API | `pipeline_inspector.maya.commands` | `install_ui()`, `show_ui()`, `show_farm_check_ui()`, `close_ui()`, validation and export commands |
 
 On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers UI installation and runs **dual-install detection** ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)):
 
 1. Year-specific native `.mll` at `plug-ins/{mayaYear}/` (absolute path load)
-2. Top-level native `.mll` at `plug-ins/shader_health_inspector.mll` (Plug-in Manager copy)
-3. Python plug-in `plug-ins/shader_health_inspector.py`
-4. Direct `shader_health_inspector_bootstrap.install_ui()` when plug-in load fails
+2. Top-level native `.mll` at `plug-ins/pipeline_inspector.mll` (Plug-in Manager copy)
+3. Python plug-in `plug-ins/pipeline_inspector.py`
+4. Direct `pipeline_inspector_bootstrap.install_ui()` when plug-in load fails
 
 ## Supported Maya versions (best-effort)
 
@@ -27,7 +27,7 @@ Maintainer-tested versions in this repository:
 
 | Maya version | Status | Notes |
 | --- | --- | --- |
-| 2024 | Tested | Demo scene [`examples/broken_scene/shader_health_demo_broken.ma`](../examples/broken_scene/shader_health_demo_broken.ma) is saved in Maya 2024 |
+| 2024 | Tested | Demo scene [`examples/broken_scene/pipeline_inspector_demo_broken.ma`](../examples/broken_scene/pipeline_inspector_demo_broken.ma) is saved in Maya 2024 |
 | 2025 | Tested | Scanner and command unit tests target Maya 2025 APIs |
 | 2026 | Best effort | Not regularly CI-tested; report issues if panel or `mayapy` integration differs |
 | 2023 and earlier | Not tested | May work with PySide2-based Maya builds, but is outside the current support matrix |
@@ -41,8 +41,8 @@ Renderer plugins (V-Ray, Arnold) are optional for opening the panel, but rendere
 ### 1. Clone or sync the repository
 
 ```bash
-git clone https://github.com/armasonix/maya-shader-health-inspector.git
-cd maya-shader-health-inspector
+git clone https://github.com/armasonix/maya-pipeline-inspector.git
+cd maya-pipeline-inspector
 ```
 
 ### 2. Point Maya at the module folder
@@ -52,87 +52,87 @@ Add the `maya_module` directory to `MAYA_MODULE_PATH` before launching Maya.
 Windows (PowerShell, current session):
 
 ```powershell
-$env:MAYA_MODULE_PATH = "D:\tools\maya-shader-health-inspector\maya_module"
+$env:MAYA_MODULE_PATH = "D:\tools\maya-pipeline-inspector\maya_module"
 & "C:\Program Files\Autodesk\Maya2025\bin\maya.exe"
 ```
 
 Linux/macOS (bash, current session):
 
 ```bash
-export MAYA_MODULE_PATH="/tools/maya-shader-health-inspector/maya_module"
+export MAYA_MODULE_PATH="/tools/maya-pipeline-inspector/maya_module"
 maya
 ```
 
-For a persistent studio setup, set `MAYA_MODULE_PATH` in the facility launcher, shell profile, or render wrangler environment the same way you manage other Maya modules. Roll out `shader_health_studio.json` the same way via `SHADER_HEALTH_STUDIO_CONFIG` (see [Studio config rollout](#studio-config-rollout-shader_health_studiojson) below).
+For a persistent studio setup, set `MAYA_MODULE_PATH` in the facility launcher, shell profile, or render wrangler environment the same way you manage other Maya modules. Roll out `pipeline_inspector_studio.json` the same way via `PIPELINE_INSPECTOR_STUDIO_CONFIG` (see [Studio config rollout](#studio-config-rollout-pipeline_inspector_studiojson) below).
 
 ### 3. What the module file does
 
-[`maya_module/shader_health_inspector.mod`](../maya_module/shader_health_inspector.mod):
+[`maya_module/pipeline_inspector.mod`](../maya_module/pipeline_inspector.mod):
 
 ```text
-+ shader_health_inspector 0.4 .
++ pipeline_inspector 0.4 .
 PYTHONPATH +:= ../src
 scripts: scripts
 shelves: shelves
 plug-ins: plug-ins
 ```
 
-- `plug-ins: plug-ins` exposes both the Python fallback (`shader_health_inspector.py`) and any built native binaries (`shader_health_inspector.mll`, plus year folders `2024/`, `2025/`, `2026/`).
+- `plug-ins: plug-ins` exposes both the Python fallback (`pipeline_inspector.py`) and any built native binaries (`pipeline_inspector.mll`, plus year folders `2024/`, `2025/`, `2026/`).
 
-- `PYTHONPATH +:= ../src` adds the repository `src/` folder so `import shader_health` resolves without a separate `pip` install.
+- `PYTHONPATH +:= ../src` adds the repository `src/` folder so `import pipeline_inspector` resolves without a separate `pip` install.
 - `scripts: scripts` puts `maya_module/scripts/` on Maya's script path so `userSetup.py` runs at startup.
 - `shelves: shelves` publishes the optional MEL shelf helper in `maya_module/shelves/`.
 
 ### 4. Dual install detection and startup behavior
 
-[`shader_health_inspector_bootstrap.py`](../maya_module/scripts/shader_health_inspector_bootstrap.py) resolves the active Maya year from `cmds.about(version=True)` and picks the first available delivery path:
+[`pipeline_inspector_bootstrap.py`](../maya_module/scripts/pipeline_inspector_bootstrap.py) resolves the active Maya year from `cmds.about(version=True)` and picks the first available delivery path:
 
 | Priority | `detect_install_mode` | File | Notes |
 | --- | --- | --- | --- |
-| 1 | `native_year` | `plug-ins/{year}/shader_health_inspector.mll` | Preferred when built for the running Maya year; loaded by **absolute path** (Maya does not search plug-in subfolders by relative name). |
-| 2 | `native_manager` | `plug-ins/shader_health_inspector.mll` | Top-level copy created by `tools/build_native_plugin.ps1` so Plug-in Manager can browse the native binary. |
-| 3 | `python` | `plug-ins/shader_health_inspector.py` | Default for source checkouts without a local native build. |
+| 1 | `native_year` | `plug-ins/{year}/pipeline_inspector.mll` | Preferred when built for the running Maya year; loaded by **absolute path** (Maya does not search plug-in subfolders by relative name). |
+| 2 | `native_manager` | `plug-ins/pipeline_inspector.mll` | Top-level copy created by `tools/build_native_plugin.ps1` so Plug-in Manager can browse the native binary. |
+| 3 | `python` | `plug-ins/pipeline_inspector.py` | Default for source checkouts without a local native build. |
 | 4 | `module_only` | _(no plug-in file)_ | `userSetup.py` calls `install_ui()` directly. |
 
 At Maya launch:
 
 1. Maya executes `maya_module/scripts/userSetup.py`.
-2. `userSetup.py` defers `_install_shader_health_ui()`.
-3. If `shader_health_inspector` is already loaded, startup exits early.
+2. `userSetup.py` defers `_install_pipeline_inspector_ui()`.
+3. If `pipeline_inspector` is already loaded, startup exits early.
 4. Otherwise `userSetup.py` tries each path from `plugin_load_candidates()` in order.
-5. When a plug-in loads, `initializePlugin` defers `shader_health_inspector_bootstrap.install_ui()`.
+5. When a plug-in loads, `initializePlugin` defers `pipeline_inspector_bootstrap.install_ui()`.
 6. If every plug-in load fails, `userSetup.py` falls back to `install_ui()` directly.
-7. After UI initialization, `install_ui()` creates the **Shader Health** menu and **ShaderHealth** shelf buttons.
-8. If installation fails, Maya prints a warning: `Shader Health Inspector UI install failed: ...`.
+7. After UI initialization, `install_ui()` creates the **Pipeline Inspector** menu and **PipelineInspector** shelf buttons.
+8. If installation fails, Maya prints a warning: `Pipeline Inspector UI install failed: ...`.
 
 Troubleshooting in Script Editor:
 
 ```python
-import shader_health_inspector_bootstrap as bootstrap
+import pipeline_inspector_bootstrap as bootstrap
 from maya import cmds
 
 print(bootstrap.describe_dual_install(
     bootstrap.resolve_maya_year(lambda: cmds.about(version=True))
 ))
-print(cmds.pluginInfo("shader_health_inspector", q=True, path=True))
+print(cmds.pluginInfo("pipeline_inspector", q=True, path=True))
 ```
 
 Expected native load: `plugin_path` ends with `.mll` under `plug-ins/2024/` (or the top-level manager copy).
 
-The bootstrap module also ensures the repository `src/` directory is on `sys.path` before importing `shader_health`, even if the `.mod` path is customized.
+The bootstrap module also ensures the repository `src/` directory is on `sys.path` before importing `pipeline_inspector`, even if the `.mod` path is customized.
 
 ## Plug-in Manager: dual install (native `.mll` + Python fallback)
 
 | Delivery | File | When used |
 | --- | --- | --- |
-| Native year build | `plug-ins/{year}/shader_health_inspector.mll` | Built for the running Maya year; highest priority at startup |
-| Native manager copy | `plug-ins/shader_health_inspector.mll` | Same binary copied to plug-ins root for Plug-in Manager browsing |
-| Python fallback | `plug-ins/shader_health_inspector.py` | Source checkout or machines without a devkit build |
-| Module-only fallback | `shader_health_inspector_bootstrap.install_ui()` | All plug-in loads failed |
+| Native year build | `plug-ins/{year}/pipeline_inspector.mll` | Built for the running Maya year; highest priority at startup |
+| Native manager copy | `plug-ins/pipeline_inspector.mll` | Same binary copied to plug-ins root for Plug-in Manager browsing |
+| Python fallback | `plug-ins/pipeline_inspector.py` | Source checkout or machines without a devkit build |
+| Module-only fallback | `pipeline_inspector_bootstrap.install_ui()` | All plug-in loads failed |
 
-Do **not** load both `.mll` and `.py` at the same time — they register the same plug-in name (`shader_health_inspector`). `userSetup.py` loads the first successful candidate only.
+Do **not** load both `.mll` and `.py` at the same time — they register the same plug-in name (`pipeline_inspector`). `userSetup.py` loads the first successful candidate only.
 
-The native `.mll` is a **thin C++ bootstrap** only — it calls the same `shader_health_inspector_bootstrap` Python module as the `.py` plug-in. Validation and UI logic are unchanged. Build requirements and per-year matrix: [ADR 0006](adr/0006-native-mll-plugin-strategy.md).
+The native `.mll` is a **thin C++ bootstrap** only — it calls the same `pipeline_inspector_bootstrap` Python module as the `.py` plug-in. Validation and UI logic are unchanged. Build requirements and per-year matrix: [ADR 0006](adr/0006-native-mll-plugin-strategy.md).
 
 ### Build the native plug-in (optional)
 
@@ -142,7 +142,7 @@ CMake scaffold lives in [`native/`](../native/README.md). From the repo root (Wi
 .\tools\build_native_plugin.ps1 -MayaVersion 2025
 ```
 
-This installs `shader_health_inspector.mll` to `maya_module/plug-ins/{year}/` and copies it to `maya_module/plug-ins/shader_health_inspector.mll` for Plug-in Manager.
+This installs `pipeline_inspector.mll` to `maya_module/plug-ins/{year}/` and copies it to `maya_module/plug-ins/pipeline_inspector.mll` for Plug-in Manager.
 
 ## Plug-in Manager workflow
 
@@ -153,15 +153,15 @@ This installs `shader_health_inspector.mll` to `maya_module/plug-ins/{year}/` an
 
 1. Ensure `MAYA_MODULE_PATH` points at `maya_module/` (see Option A above).
 2. Open **Settings → Plug-in Manager**.
-3. Enable **Loaded** for `shader_health_inspector` (native `.mll` under `plug-ins/{year}/` when built, or `shader_health_inspector.py` fallback).
-4. Confirm the **Shader Health** menu and **ShaderHealth** shelf appear.
+3. Enable **Loaded** for `pipeline_inspector` (native `.mll` under `plug-ins/{year}/` when built, or `pipeline_inspector.py` fallback).
+4. Confirm the **Pipeline Inspector** menu and **PipelineInspector** shelf appear.
 5. Unload the plugin to remove menu, shelf, and panel without restarting Maya.
 
 ### `autoLoad` studio policy
 
-- **Manual load (default):** leave `autoLoad` off so TDs control when Shader Health UI appears.
+- **Manual load (default):** leave `autoLoad` off so TDs control when Pipeline Inspector UI appears.
 - **Auto load:** enable `autoLoad` in Plug-in Manager or rely on `userSetup.py`, which calls `cmds.loadPlugin(..., quiet=True)` when your facility wants the panel available in every interactive session.
-- **Farm / `mayapy`:** headless validation does **not** require plugin load; use `mayapy -m shader_health ...` instead.
+- **Farm / `mayapy`:** headless validation does **not** require plugin load; use `mayapy -m pipeline_inspector ...` instead.
 
 ### 5. Verify in Maya
 
@@ -170,17 +170,17 @@ After Maya finishes loading:
 ```python
 from maya import cmds
 
-print(cmds.menu("shaderHealthInspectorMenu", q=True, exists=True))      # expect True
-print(cmds.shelfButton("shaderHealthInspectorShelfButton", q=True, exists=True))  # expect True
-print(cmds.shelfButton("shaderHealthInspectorFarmCheckShelfButton", q=True, exists=True))  # expect True
+print(cmds.menu("pipelineInspectorMenu", q=True, exists=True))      # expect True
+print(cmds.shelfButton("pipelineInspectorShelfButton", q=True, exists=True))  # expect True
+print(cmds.shelfButton("pipelineInspectorFarmCheckShelfButton", q=True, exists=True))  # expect True
 
-from shader_health.maya.commands import show_ui
+from pipeline_inspector.maya.commands import show_ui
 show_ui()
 ```
 
 Then open the demo scene and run **Validate Scene**:
 
-`examples/broken_scene/shader_health_demo_broken.ma`
+`examples/broken_scene/pipeline_inspector_demo_broken.ma`
 
 ## Option B — Editable `pip` install (TD / workstation alternative)
 
@@ -192,7 +192,7 @@ Windows example with Maya 2025:
 
 ```powershell
 & "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe" -m pip install --upgrade pip
-& "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe" -m pip install -e "D:\tools\maya-shader-health-inspector"
+& "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe" -m pip install -e "D:\tools\maya-pipeline-inspector"
 ```
 
 Use the `mayapy` executable that matches the Maya version artists launch.
@@ -202,7 +202,7 @@ Use the `mayapy` executable that matches the Maya version artists launch.
 In Maya's Script Editor:
 
 ```python
-from shader_health.maya.commands import install_ui, show_ui
+from pipeline_inspector.maya.commands import install_ui, show_ui
 
 install_ui()
 show_ui()
@@ -213,14 +213,14 @@ To load the UI automatically, wrap the same calls in a studio `userSetup.py` or 
 ### 3. Headless validation with `mayapy`
 
 ```bash
-mayapy -m shader_health validate scene.ma --profile-id publish_strict --report report.json
+mayapy -m pipeline_inspector validate scene.ma --profile-id publish_strict --report report.json
 ```
 
 Scene validation requires `mayapy`; regular system Python can validate snapshot JSON inputs only.
 
-## Studio config rollout (`shader_health_studio.json`)
+## Studio config rollout (`pipeline_inspector_studio.json`)
 
-Pipeline TDs deploy one JSON file for studio-wide policy: pipeline toggles, network path roots, connector credentials, bug-report relay URL, and waiver/manifest defaults. Per-machine artist preferences stay in `~/.shader_health/user.json` (see [ADR 0007](adr/0007-settings-and-connectors-architecture.md)).
+Pipeline TDs deploy one JSON file for studio-wide policy: pipeline toggles, network path roots, connector credentials, bug-report relay URL, and waiver/manifest defaults. Per-machine artist preferences stay in `~/.pipeline_inspector/user.json` (see [ADR 0007](adr/0007-settings-and-connectors-architecture.md)).
 
 ### Discovery order
 
@@ -228,44 +228,44 @@ The Maya panel and headless CLI (`validate`, `manifest`, `gate`) resolve the sam
 
 | Priority | Source |
 | --- | --- |
-| 1 | `SHADER_HEALTH_STUDIO_CONFIG` environment variable (absolute path to a JSON file) |
-| 2 | `~/.shader_health/shader_health_studio.json` |
-| 3 | `~/shader_health_studio.json` |
+| 1 | `PIPELINE_INSPECTOR_STUDIO_CONFIG` environment variable (absolute path to a JSON file) |
+| 2 | `~/.pipeline_inspector/pipeline_inspector_studio.json` |
+| 3 | `~/pipeline_inspector_studio.json` |
 
-Headless CLI also accepts `--studio-config /path/to/shader_health_studio.json`, which overrides env and default discovery.
+Headless CLI also accepts `--studio-config /path/to/pipeline_inspector_studio.json`, which overrides env and default discovery.
 
 ### Recommended facility rollout
 
-1. Place `shader_health_studio.json` on a network share (for example `\\pipeline\config\shader_health\shader_health_studio.json`).
-2. Set `SHADER_HEALTH_STUDIO_CONFIG` in the facility Maya launcher, farm wrangler environment, and Deadline worker setup so interactive and headless sessions load the same file.
+1. Place `pipeline_inspector_studio.json` on a network share (for example `\\pipeline\config\pipeline_inspector\pipeline_inspector_studio.json`).
+2. Set `PIPELINE_INSPECTOR_STUDIO_CONFIG` in the facility Maya launcher, farm wrangler environment, and Deadline worker setup so interactive and headless sessions load the same file.
 3. Keep files with connector tokens and relay API keys out of git — see [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md).
 
 Windows launcher (PowerShell):
 
 ```powershell
-$env:SHADER_HEALTH_STUDIO_CONFIG = "\\pipeline\config\shader_health\shader_health_studio.json"
+$env:PIPELINE_INSPECTOR_STUDIO_CONFIG = "\\pipeline\config\pipeline_inspector\pipeline_inspector_studio.json"
 & "C:\Program Files\Autodesk\Maya2025\bin\maya.exe"
 ```
 
 Linux/macOS:
 
 ```bash
-export SHADER_HEALTH_STUDIO_CONFIG="/pipeline/config/shader_health/shader_health_studio.json"
+export PIPELINE_INSPECTOR_STUDIO_CONFIG="/pipeline/config/pipeline_inspector/pipeline_inspector_studio.json"
 maya
 ```
 
 Headless validation with the same studio policy:
 
 ```bash
-export SHADER_HEALTH_STUDIO_CONFIG="/pipeline/config/shader_health/shader_health_studio.json"
-mayapy -m shader_health validate scene.ma --profile-id publish_strict --report report.json
+export PIPELINE_INSPECTOR_STUDIO_CONFIG="/pipeline/config/pipeline_inspector/pipeline_inspector_studio.json"
+mayapy -m pipeline_inspector validate scene.ma --profile-id publish_strict --report report.json
 ```
 
 Or pass the path explicitly:
 
 ```bash
-mayapy -m shader_health validate scene.ma \
-  --studio-config /pipeline/config/shader_health/shader_health_studio.json \
+mayapy -m pipeline_inspector validate scene.ma \
+  --studio-config /pipeline/config/pipeline_inspector/pipeline_inspector_studio.json \
   --profile-id publish_strict \
   --report report.json
 ```
@@ -280,16 +280,16 @@ Full rollout templates, secret handling, and how studio policy relates to custom
 
 ## Optional MEL shelf helper
 
-[`maya_module/shelves/shelf_ShaderHealth.mel`](../maya_module/shelves/shelf_ShaderHealth.mel) defines two shelf buttons:
+[`maya_module/shelves/shelf_PipelineInspector.mel`](../maya_module/shelves/shelf_PipelineInspector.mel) defines two shelf buttons:
 
-- **Shader Health** — opens the dockable panel
-- **Shader Health Farm Check** — opens the **Farm** tab and runs `deadline_critical` preflight
+- **Pipeline Inspector** — opens the dockable panel
+- **Pipeline Inspector Farm Check** — opens the **Farm** tab and runs `deadline_critical` preflight
 
 The open-panel button calls:
 
 ```python
-import shader_health_inspector_bootstrap
-shader_health_inspector_bootstrap.show()
+import pipeline_inspector_bootstrap
+pipeline_inspector_bootstrap.show()
 ```
 
 Studios that already manage shelves through MEL can use this file directly. The default startup path still uses the Python `install_shelf()` helper from `userSetup.py`.
@@ -300,9 +300,9 @@ If you cannot use `MAYA_MODULE_PATH` or `pip`, add the repository `src/` directo
 
 ```python
 import sys
-sys.path.insert(0, r"D:\tools\maya-shader-health-inspector\src")
+sys.path.insert(0, r"D:\tools\maya-pipeline-inspector\src")
 
-from shader_health.maya.commands import install_ui, show_ui
+from pipeline_inspector.maya.commands import install_ui, show_ui
 install_ui()
 show_ui()
 ```
@@ -321,11 +321,11 @@ Full flow, studio policy fields, staging paths, and the **Maya restart checklist
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| `No module named 'shader_health'` | Package not on Maya `PYTHONPATH` | Use `MAYA_MODULE_PATH`, editable `pip` install, or bootstrap/`src` path |
-| `Shader Health Inspector UI install failed` on startup | Import error before UI wiring | Open Script Editor traceback; confirm `src/` exists relative to `maya_module/` |
+| `No module named 'pipeline_inspector'` | Package not on Maya `PYTHONPATH` | Use `MAYA_MODULE_PATH`, editable `pip` install, or bootstrap/`src` path |
+| `Pipeline Inspector UI install failed` on startup | Import error before UI wiring | Open Script Editor traceback; confirm `src/` exists relative to `maya_module/` |
 | Menu exists but panel does not open | Qt import issue in the active Maya build | Confirm Maya version is in the support matrix; test `show_ui()` in Script Editor |
 | Validation returns empty renderer rules | Renderer plugin not loaded | Load V-Ray or Arnold before validating renderer-specific scenes |
-| `scene validation requires Autodesk Maya / mayapy` in CLI | Running scene validation outside Maya | Use `mayapy -m shader_health ...` |
+| `scene validation requires Autodesk Maya / mayapy` in CLI | Running scene validation outside Maya | Use `mayapy -m pipeline_inspector ...` |
 
 ## Uninstall / disable
 
@@ -337,23 +337,23 @@ For the module path:
 For a `pip` install:
 
 ```bash
-mayapy -m pip uninstall maya-shader-health-inspector
+mayapy -m pip uninstall maya-pipeline-inspector
 ```
 
 To remove only the current session menu/shelf/panel:
 
 ```python
-from shader_health.maya.commands import uninstall_ui
+from pipeline_inspector.maya.commands import uninstall_ui
 
 uninstall_ui()
 ```
 
-When using Plug-in Manager, unloading `shader_health_inspector` runs the same cleanup via `uninitializePlugin`.
+When using Plug-in Manager, unloading `pipeline_inspector` runs the same cleanup via `uninitializePlugin`.
 
 ## Related docs
 
 - [`USER_GUIDE.md`](USER_GUIDE.md) — artist and TD workflow inside the panel
-- [`STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md) — rolling `shader_health_studio.json` and custom rule packs
+- [`STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md) — rolling `pipeline_inspector_studio.json` and custom rule packs
 - [`adr/0007-settings-and-connectors-architecture.md`](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
 - [`integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) — publish gate example
 - [`integrations/deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
@@ -377,15 +377,15 @@ mayapy -m pytest tests/integration -v
 When validating v0.3 manifest automation locally, also run:
 
 ```bash
-DEMO_SCENE="examples/broken_scene/shader_health_demo_broken.ma"
-OUT_MANIFEST="/tmp/shader_health_manifest_smoke.json"
-GATE_REPORT="/tmp/shader_health_gate_smoke.json"
+DEMO_SCENE="examples/broken_scene/pipeline_inspector_demo_broken.ma"
+OUT_MANIFEST="/tmp/pipeline_inspector_manifest_smoke.json"
+GATE_REPORT="/tmp/pipeline_inspector_gate_smoke.json"
 
-mayapy -m shader_health manifest "$DEMO_SCENE" \
+mayapy -m pipeline_inspector manifest "$DEMO_SCENE" \
   --out "$OUT_MANIFEST" \
   --profile-id publish_strict
 
-mayapy -m shader_health gate "$DEMO_SCENE" "$OUT_MANIFEST" \
+mayapy -m pipeline_inspector gate "$DEMO_SCENE" "$OUT_MANIFEST" \
   --profile-id publish_strict \
   --out "$GATE_REPORT"
 ```
@@ -398,7 +398,7 @@ Real Maya integration runs on a **self-hosted runner** labeled `self-hosted` and
 |---------|----------------|
 | `workflow_dispatch` | Manual run from **Actions → Maya integration** |
 | `schedule` | Weekly (Monday 06:00 UTC) on the default branch |
-| `pull_request` | Same-repo PRs only, when paths under `src/shader_health/maya/`, `maya_module/`, `tests/integration/`, or related examples change |
+| `pull_request` | Same-repo PRs only, when paths under `src/pipeline_inspector/maya/`, `maya_module/`, `tests/integration/`, or related examples change |
 
 **Fork pull requests are skipped** — untrusted code must not execute on a studio self-hosted runner.
 
@@ -421,13 +421,13 @@ Real Maya integration runs on a **self-hosted runner** labeled `self-hosted` and
 
 #### Smoke steps (v0.4)
 
-Demo scene: [`examples/broken_scene/shader_health_demo_broken_headless.ma`](../examples/broken_scene/shader_health_demo_broken_headless.ma)
+Demo scene: [`examples/broken_scene/pipeline_inspector_demo_broken_headless.ma`](../examples/broken_scene/pipeline_inspector_demo_broken_headless.ma)
 
 After `pytest tests/integration`:
 
-1. `shader_health validate` (publish_strict) — report written; exit codes 0–2 accepted
-2. `shader_health manifest` — schema **1.1**
-3. `shader_health gate` — baseline = freshly exported manifest (no regression expected)
+1. `pipeline_inspector validate` (publish_strict) — report written; exit codes 0–2 accepted
+2. `pipeline_inspector manifest` — schema **1.1**
+3. `pipeline_inspector gate` — baseline = freshly exported manifest (no regression expected)
 4. `examples/deadline/submit_preflight.py` — `deadline_critical` profile dry-run; exit codes 0–2 accepted
 
 Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Maya-free.
@@ -436,13 +436,13 @@ Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Ma
 
 ```powershell
 $env:MAYA_PY = "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
-$SCENE = "examples\broken_scene\shader_health_demo_broken_headless.ma"
+$SCENE = "examples\broken_scene\pipeline_inspector_demo_broken_headless.ma"
 & $env:MAYA_PY -m pip install -e ".[dev]"
 & $env:MAYA_PY -m pytest tests/integration -v
-& $env:MAYA_PY -m shader_health validate $SCENE --input-kind scene --profile-id publish_strict --report "$env:TEMP\validate_smoke.json"
+& $env:MAYA_PY -m pipeline_inspector validate $SCENE --input-kind scene --profile-id publish_strict --report "$env:TEMP\validate_smoke.json"
 & $env:MAYA_PY examples\deadline\submit_preflight.py $SCENE `
   --report "$env:TEMP\deadline_preflight_smoke.json" `
-  --profile "src\shader_health\rules\profiles\deadline_critical.json" `
+  --profile "src\pipeline_inspector\rules\profiles\deadline_critical.json" `
   --repo-root (Get-Location) `
   --mayapy $env:MAYA_PY
 ```

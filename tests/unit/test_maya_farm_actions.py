@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
     DeadlineConfig,
     FarmSceneState,
     FarmValidationResult,
 )
-from shader_health.integrations.deadline.client import DeadlineResponse, HttpRequest
-from shader_health.maya import farm_actions
-from shader_health.ui.farm_tab import FarmTabState
+from pipeline_inspector.integrations.deadline.client import DeadlineResponse, HttpRequest
+from pipeline_inspector.maya import farm_actions
+from pipeline_inspector.ui.farm_tab import FarmTabState
 
 
 class FakeSummary:
@@ -123,8 +123,8 @@ def test_submit_farm_validation_action_blocks_unreachable_service(tmp_path: Path
 
 def test_default_farm_paths_use_scene_stem(tmp_path: Path):
     scene = tmp_path / "hero.ma"
-    assert farm_actions.default_farm_report_path(scene).name == "hero_shader_health_farm.json"
+    assert farm_actions.default_farm_report_path(scene).name == "hero_pipeline_inspector_farm.json"
     assert (
         farm_actions.default_command_script_path(scene).name
-        == "hero_shader_health_deadline_command.txt"
+        == "hero_pipeline_inspector_deadline_command.txt"
     )

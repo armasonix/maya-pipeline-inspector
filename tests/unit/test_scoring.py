@@ -1,4 +1,4 @@
-from shader_health.core import RuleResult, compute_health_score
+from pipeline_inspector.core import RuleResult, compute_health_score
 
 
 def make_result(

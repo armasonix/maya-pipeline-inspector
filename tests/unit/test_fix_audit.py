@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot
-from shader_health.core.fix_audit import (
+from pipeline_inspector.core import GraphSnapshot
+from pipeline_inspector.core.fix_audit import (
     FIX_AUDIT_SCHEMA_VERSION,
     FixAuditSession,
     FixAuditSidecar,
@@ -12,18 +12,18 @@ from shader_health.core.fix_audit import (
     load_fix_audit_sidecar,
     write_fix_audit_sidecar,
 )
-from shader_health.maya.fix_applier import AppliedFixRecord, ApplyFixReport
-from shader_health.maya.validation_pipeline import (
+from pipeline_inspector.maya.fix_applier import AppliedFixRecord, ApplyFixReport
+from pipeline_inspector.maya.validation_pipeline import (
     fix_audit_sidecar_path_for_scene,
     persist_fix_apply_audit,
 )
-from shader_health.reports import build_json_report
+from pipeline_inspector.reports import build_json_report
 
 
 def test_fix_audit_sidecar_path_for_scene():
     path = fix_audit_sidecar_path_for_scene("D:/show/asset/shading/hero.ma")
 
-    assert path == Path("D:/show/asset/shading/hero.shader_health_fix_audit.json")
+    assert path == Path("D:/show/asset/shading/hero.pipeline_inspector_fix_audit.json")
 
 
 def test_build_fix_audit_session_sorts_records_by_fix_id():
@@ -52,7 +52,7 @@ def test_build_fix_audit_session_sorts_records_by_fix_id():
                 message="Fix applied.",
             ),
         ),
-        undo_chunk_name="Shader Health Apply Fixes",
+        undo_chunk_name="Pipeline Inspector Apply Fixes",
     )
 
     session = build_fix_audit_session(
@@ -64,7 +64,7 @@ def test_build_fix_audit_session_sorts_records_by_fix_id():
 
     assert session.scene_path == "D:/show/asset/shading/hero.ma"
     assert session.profile_id == "artist_relaxed"
-    assert session.undo_chunk_name == "Shader Health Apply Fixes"
+    assert session.undo_chunk_name == "Pipeline Inspector Apply Fixes"
     assert session.total == 2
     assert session.applied_count == 2
     assert [record["fix_id"] for record in session.records] == ["a.fix", "z.fix"]
@@ -73,7 +73,7 @@ def test_build_fix_audit_session_sorts_records_by_fix_id():
 def test_load_and_write_fix_audit_sidecar_round_trip(tmp_path: Path):
     session = _sample_session()
     sidecar = FixAuditSidecar(scene_path=session.scene_path, sessions=(session,))
-    path = tmp_path / "hero.shader_health_fix_audit.json"
+    path = tmp_path / "hero.pipeline_inspector_fix_audit.json"
 
     write_fix_audit_sidecar(path, sidecar)
     loaded = load_fix_audit_sidecar(path)
@@ -83,7 +83,7 @@ def test_load_and_write_fix_audit_sidecar_round_trip(tmp_path: Path):
 
 
 def test_append_fix_audit_session_preserves_existing_sessions(tmp_path: Path):
-    path = tmp_path / "hero.shader_health_fix_audit.json"
+    path = tmp_path / "hero.pipeline_inspector_fix_audit.json"
     first = _sample_session(applied_at_utc="2026-07-03T12:00:00Z")
     second = _sample_session(
         applied_at_utc="2026-07-03T13:00:00Z",
@@ -128,7 +128,7 @@ def test_persist_fix_apply_audit_writes_sidecar_beside_scene(tmp_path: Path):
         applied_at_utc="2026-07-03T12:00:00Z",
     )
 
-    assert written_path == scene_path.with_name("hero.shader_health_fix_audit.json")
+    assert written_path == scene_path.with_name("hero.pipeline_inspector_fix_audit.json")
     assert session_dict["profile_id"] == "artist_relaxed"
     assert session_dict["records"][0]["fix_id"] == "fix.1"
     loaded = load_fix_audit_sidecar(written_path)
@@ -174,7 +174,7 @@ def _sample_session(
         applied_at_utc=applied_at_utc,
         scene_path="D:/show/asset/shading/hero.ma",
         profile_id="artist_relaxed",
-        undo_chunk_name="Shader Health Apply Fixes",
+        undo_chunk_name="Pipeline Inspector Apply Fixes",
         total=total,
         applied_count=applied_count,
         blocked_count=0,

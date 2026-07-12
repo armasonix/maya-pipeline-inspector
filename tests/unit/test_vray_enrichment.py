@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
@@ -11,8 +11,8 @@ from shader_health.core import (
     VrayMaterialMetadata,
     VraySceneMetadata,
 )
-from shader_health.maya.snapshot_enrichment import prepare_snapshot_for_validation
-from shader_health.maya.vray_enrichment import enrich_vray_metadata
+from pipeline_inspector.maya.snapshot_enrichment import prepare_snapshot_for_validation
+from pipeline_inspector.maya.vray_enrichment import enrich_vray_metadata
 
 FIXTURES_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "snapshots"
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from tests.unit.test_validate_rules_cli import make_rule, run_validator, write_rule_pack
 
-from shader_health.core.rule_wizard import (
+from pipeline_inspector.core.rule_wizard import (
     RULE_TEMPLATE_ATTRIBUTE_EQUALS,
     RULE_TEMPLATE_NUMERIC_MAX,
     RULE_TEMPLATE_PATH_EXISTS,

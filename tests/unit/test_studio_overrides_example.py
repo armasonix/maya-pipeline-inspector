@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core.rule_loader import load_profile, load_rule_stack
+from pipeline_inspector.core.rule_loader import load_profile, load_rule_stack
 
 ROOT = Path(__file__).resolve().parents[2]
 STUDIO_RULES = ROOT / "examples" / "studio" / "rules"

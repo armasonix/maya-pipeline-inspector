@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.advanced_settings_section import (
+from pipeline_inspector.ui.advanced_settings_section import (
     SETTINGS_DEBUG_LOGGING_TOGGLE_OBJECT_NAME,
     SETTINGS_EXTRA_RULE_PATHS_INPUT_OBJECT_NAME,
     SETTINGS_MAX_ISSUES_INPUT_OBJECT_NAME,
@@ -13,7 +13,7 @@ from shader_health.ui.advanced_settings_section import (
     read_advanced_user_preferences_from_view,
     update_advanced_settings_view,
 )
-from shader_health.user_config import DEFAULT_MAX_ISSUES_DISPLAYED, UserPreferences
+from pipeline_inspector.user_config import DEFAULT_MAX_ISSUES_DISPLAYED, UserPreferences
 
 
 class FakeWidget:
