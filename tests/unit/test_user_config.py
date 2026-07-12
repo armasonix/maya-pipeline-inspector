@@ -56,15 +56,17 @@ def test_enrich_user_preferences_infers_mayapy_from_executable(
 
     from shader_health.user_config import enrich_user_preferences, infer_local_mayapy_path
 
-    monkeypatch.setattr(
-        sys,
-        "executable",
-        r"C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe",
+    mayapy_executable = (
+        r"C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
+        if sys.platform == "win32"
+        else "/usr/autodesk/maya2025/bin/mayapy"
     )
-    assert infer_local_mayapy_path().endswith("mayapy.exe")
+    monkeypatch.setattr(sys, "executable", mayapy_executable)
+    inferred = infer_local_mayapy_path()
+    assert Path(inferred).stem == "mayapy"
 
     enriched = enrich_user_preferences(UserPreferences())
-    assert enriched.mayapy_path.endswith("mayapy.exe")
+    assert Path(enriched.mayapy_path).stem == "mayapy"
 
     preserved = enrich_user_preferences(UserPreferences(mayapy_path="D:/custom/mayapy.exe"))
     assert preserved.mayapy_path == "D:/custom/mayapy.exe"

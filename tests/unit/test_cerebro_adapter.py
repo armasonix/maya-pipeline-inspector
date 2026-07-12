@@ -34,14 +34,17 @@ def test_cerebro_service_tools_sys_paths_matches_core_paths(tmp_path: Path):
 
 def test_bundled_psycopg2_sys_path_points_at_platform_packages(tmp_path: Path):
     root = tmp_path / "service-tools"
-    (root / "py-site-packages" / "win").mkdir(parents=True)
+    if sys.platform == "win32":
+        platform_subdir = "win"
+    elif sys.platform == "darwin":
+        platform_subdir = "mac"
+    else:
+        platform_subdir = "linux64"
+    (root / "py-site-packages" / platform_subdir).mkdir(parents=True)
 
     bundled = bundled_psycopg2_sys_path(str(root))
 
-    if sys.platform == "win32":
-        assert bundled == str(root / "py-site-packages" / "win")
-    else:
-        assert bundled is not None
+    assert bundled == str(root / "py-site-packages" / platform_subdir)
 
 
 def test_probe_py_cerebro_import_reports_missing_service_tools_path():

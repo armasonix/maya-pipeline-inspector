@@ -198,12 +198,12 @@ def default_user_config_path() -> Path:
 
 
 def infer_local_mayapy_path() -> str:
-    """Return the running mayapy.exe path when launched from Maya."""
+    """Return the running mayapy executable path when launched from Maya."""
 
     import sys
 
     executable = Path(sys.executable).resolve()
-    if executable.name.lower() in {"mayapy", "mayapy.exe"}:
+    if executable.stem.lower() == "mayapy":
         return str(executable)
     return ""
 
