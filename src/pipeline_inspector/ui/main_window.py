@@ -2752,7 +2752,6 @@ def _apply_widget_width_constraint(
     """Clamp a widget to a compact panel width or restore the Qt default."""
 
     set_max_width = getattr(widget, "setMaximumWidth", None)
-    set_min_width = getattr(widget, "setMinimumWidth", None)
     set_policy = getattr(widget, "setSizePolicy", None)
     if max_width is None:
         if set_max_width is not None:
