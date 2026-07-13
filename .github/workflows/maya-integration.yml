@@ -63,8 +63,6 @@ jobs:
     env:
       DEMO_SCENE: examples/broken_scene/pipeline_inspector_demo_broken_headless.ma
       DEADLINE_PROFILE: src/pipeline_inspector/rules/profiles/deadline_critical.json
-      DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
-      DEBUG_RUN_ID: github-${{ github.run_id }}
 
     steps:
       - name: Checkout
@@ -88,8 +86,6 @@ jobs:
           MAYA_PY_SECRET: ${{ secrets.MAYA_PY }}
           MAYA_PY_VAR: ${{ vars.MAYA_PY }}
           MAYA_PY_INPUT: ${{ inputs.mayapy_path }}
-          DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
-          DEBUG_RUN_ID: github-${{ github.run_id }}
         run: python tools\ci\resolve_mayapy.py
 
       - name: Verify mayapy output
