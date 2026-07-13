@@ -429,6 +429,12 @@ def _maya_main_window_widget(qt_widgets: Any) -> Any | None:
 
 
 def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.ui.bug_report_dialog import BUG_REPORT_DIALOG_OBJECT_NAME
+    from pipeline_inspector.ui.settings_widgets import try_reactivate_modal_dialog
+
+    if try_reactivate_modal_dialog(BUG_REPORT_DIALOG_OBJECT_NAME):
+        return
+
     from pipeline_inspector import __version__
     from pipeline_inspector.integrations.bug_report import (
         build_bug_report_payload,
@@ -443,10 +449,7 @@ def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
         validation_result = getattr(content, "_pipeline_inspector_last_validation_result", None)
         scene_path = getattr(content, "_pipeline_inspector_scene_path", "") or _current_scene_path()
         profile_id = getattr(content, "_pipeline_inspector_profile_id", "")
-        maya_version = ""
-        snapshot = getattr(content, "_pipeline_inspector_snapshot", None)
-        if snapshot is not None:
-            maya_version = str(getattr(snapshot, "maya_version", "") or "")
+        maya_version = _resolve_maya_version_for_bug_report(content)
 
         health_score = None
         validation_summary = ""
@@ -479,9 +482,25 @@ def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
 
     show_bug_report_dialog(
         qt_widgets,
-        parent=content,
+        parent=_maya_main_window_widget(qt_widgets),
         on_submit=submit_form,
     )
+
+
+def _resolve_maya_version_for_bug_report(content: Any) -> str:
+    snapshot = getattr(content, "_pipeline_inspector_snapshot", None)
+    if snapshot is not None:
+        version = str(getattr(snapshot, "maya_version", "") or "").strip()
+        if version:
+            return version
+    try:
+        cmds = _maya_cmds()
+        version = str(cmds.about(version=True) or "").strip()
+        if version:
+            return version
+    except RuntimeError:
+        return ""
+    return ""
 
 
 def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:

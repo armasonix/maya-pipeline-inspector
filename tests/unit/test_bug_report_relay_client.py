@@ -71,6 +71,7 @@ def test_bug_report_relay_client_submits_multipart_payload_with_jpeg_and_returns
     assert request.method == "POST"
     assert request.url.endswith("/bug-report")
     assert request.headers["Authorization"] == "Bearer studio-secret"
+    assert request.headers["User-Agent"] == "maya-pipeline-inspector"
     assert request.headers["Content-Type"].startswith("multipart/form-data; boundary=")
     body = request.body.decode("utf-8", errors="replace")
     assert 'name="payload"' in body

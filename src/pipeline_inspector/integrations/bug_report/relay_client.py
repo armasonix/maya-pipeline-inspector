@@ -29,6 +29,7 @@ JPEG_MAGIC_PREFIX = b"\xff\xd8\xff"
 SCREENSHOT_FIELD_NAME = "screenshot"
 SCREENSHOT_FILENAME = "screenshot.jpg"
 PAYLOAD_FIELD_NAME = "payload"
+BUG_REPORT_USER_AGENT = "maya-pipeline-inspector"
 
 @dataclass(frozen=True)
 class HttpRequest:
@@ -113,6 +114,7 @@ class BugReportRelayClient:
         headers = {
             "Accept": "application/json",
             "Content-Type": content_type,
+            "User-Agent": BUG_REPORT_USER_AGENT,
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -280,6 +282,7 @@ def is_jpeg_bytes(data: bytes) -> bool:
 
     return len(data) >= 3 and data[:3] == JPEG_MAGIC_PREFIX
 
+
 def _relay_error_message(response: RelayResponse) -> str:
     if isinstance(response.json_data, dict):
         for key in ("error", "message", "detail"):
@@ -287,6 +290,12 @@ def _relay_error_message(response: RelayResponse) -> str:
             if value:
                 return value
     body = response.body.strip()
+    if body and "blocked access based on your browser" in body.lower():
+        return (
+            "Bug report relay blocked by Cloudflare bot protection. "
+            "Retry after plugin update; maintainer may need a WAF allow rule "
+            f"for User-Agent {BUG_REPORT_USER_AGENT}."
+        )
     if body:
         return body
     return f"relay_http_{response.status_code}"

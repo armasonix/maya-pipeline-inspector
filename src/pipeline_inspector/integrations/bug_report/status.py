@@ -8,8 +8,7 @@ def format_bug_report_success_headline() -> str:
     """Return the success headline shown after a relay accepts a report."""
 
     return (
-        "Plugin bug report sent to Pipeline Inspector maintainers. "
-        "Track the fix on GitHub:"
+        "Thank you for keeping us informed about plugin issues — it helps us improve."
     )
 
 def format_bug_report_issue_url_text(issue_url: str) -> str:
