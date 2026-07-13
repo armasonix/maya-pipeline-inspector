@@ -14,6 +14,7 @@ class FakeWidget:
         self.visible = True
         self.style_sheet = ""
         self.maximum_height: int | None = None
+        self.maximum_width: int | None = None
         self.minimum_width: int | None = None
 
     def setObjectName(self, object_name: str) -> None:
@@ -30,6 +31,12 @@ class FakeWidget:
 
     def setMaximumHeight(self, height: int) -> None:
         self.maximum_height = height
+
+    def setMaximumWidth(self, width: int) -> None:
+        self.maximum_width = width
+
+    def maximumWidth(self) -> int:
+        return self.maximum_width if self.maximum_width is not None else 16777215
 
     def setMinimumWidth(self, width: int) -> None:
         self.minimum_width = width

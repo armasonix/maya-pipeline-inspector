@@ -88,6 +88,7 @@ DETAILS_PANEL_OBJECT_NAME = "pipelineInspectorIssueDetailsPanel"
 DETAILS_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorIssueDetailsScrollArea"
 DETAILS_SCROLL_CONTENT_OBJECT_NAME = "pipelineInspectorIssueDetailsScrollContent"
 DETAILS_PANEL_MIN_WIDTH = 180
+_QT_WIDGETSIZE_MAX = 16777215
 DETAILS_MESSAGE_LABEL_OBJECT_NAME = "pipelineInspectorIssueDetailsMessage"
 DETAILS_WHY_LABEL_OBJECT_NAME = "pipelineInspectorIssueDetailsWhy"
 DETAILS_VALUES_LABEL_OBJECT_NAME = "pipelineInspectorIssueDetailsValues"
@@ -457,6 +458,8 @@ def build_validation_actions(
     qt_widgets: Any,
     callbacks: Optional[ValidationActionCallbacks] = None,
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
+    *,
+    on_make_waive: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build grouped validate controls: primary, pipeline, and issue triage actions."""
 
@@ -529,13 +532,25 @@ def build_validation_actions(
     )
     triage_group = _build_triage_action_group(qt_widgets, issue_callbacks)
     layout.addWidget(triage_group)
+    overflow_actions: list[tuple[str, Optional[Callable[[], None]]]] = [
+        ("Publish Preflight", validation_callbacks.on_publish_preflight),
+        ("Manifest Gate", validation_callbacks.on_manifest_gate),
+        ("Select Node", issue_callbacks.on_select_node),
+        ("Open in HyperShade", issue_callbacks.on_open_in_hypershade),
+        ("Copy Path", issue_callbacks.on_copy_path),
+        ("Reveal File", issue_callbacks.on_reveal_file),
+        ("Create Rule Draft", issue_callbacks.on_create_rule_draft),
+    ]
+    if on_make_waive is not None:
+        overflow_actions.append(("Make Waive", on_make_waive))
+    else:
+        overflow_actions.append(("Make Waive", None))
     layout.addWidget(
         _build_validate_action_overflow_button(
             qt_widgets,
             pipeline_group=pipeline_group,
             triage_group=triage_group,
-            validation_callbacks=validation_callbacks,
-            issue_callbacks=issue_callbacks,
+            overflow_actions=overflow_actions,
         )
     )
     layout.addStretch(1)
@@ -686,6 +701,8 @@ def build_issues_table(
     rows: Sequence[IssueTableRow] = (),
     *,
     on_make_waive: Optional[Callable[[], None]] = None,
+    show_make_waive_in_filters: bool = True,
+    filters_row_stretch: bool = True,
 ) -> Any:
     """Build the filterable/sortable issues table widget."""
 
@@ -741,7 +758,7 @@ def build_issues_table(
     ):
         filters_layout.addWidget(combo, 0)
 
-    if on_make_waive is not None:
+    if on_make_waive is not None and show_make_waive_in_filters:
         from pipeline_inspector.ui.settings_widgets import wire_button
         from pipeline_inspector.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
 
@@ -755,7 +772,8 @@ def build_issues_table(
         wire_button(make_waive_button, on_make_waive)
         filters_layout.addWidget(make_waive_button, 0)
 
-    filters_layout.addStretch(1)
+    if filters_row_stretch:
+        filters_layout.addStretch(1)
     layout.addWidget(filters_row)
 
     table = qt_widgets.QTableWidget()
@@ -1081,6 +1099,7 @@ def build_validate_sticky_chrome(
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
     *,
     user_config: Optional[UserPreferences] = None,
+    on_make_waive: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Build pinned summary + action bar chrome for the Validate tab."""
 
@@ -1109,6 +1128,7 @@ def build_validate_sticky_chrome(
             qt_widgets,
             callbacks=validation_callbacks,
             issue_details_callbacks=issue_details_callbacks,
+            on_make_waive=on_make_waive,
         )
     )
     return widget
@@ -1279,12 +1299,21 @@ def _build_validate_tab(
             validation_callbacks,
             issue_details_callbacks,
             user_config=user_config,
+            on_make_waive=waiver_callbacks.on_make_waive,
         )
+    )
+
+    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
+
+    pane_tokens = density_tokens(
+        normalize_density(user_config.ui_density if user_config is not None else "comfortable")
     )
 
     issues_table = build_issues_table(
         qt_widgets,
         on_make_waive=waiver_callbacks.on_make_waive,
+        show_make_waive_in_filters=pane_tokens.show_make_waive_in_filters,
+        filters_row_stretch=pane_tokens.filters_row_stretch,
     )
     details_panel = build_issue_details_panel(qt_widgets, callbacks=issue_details_callbacks)
     splitter_class = getattr(qt_widgets, "QSplitter", None)
@@ -1299,18 +1328,31 @@ def _build_validate_tab(
     else:
         splitter = splitter_class()
         splitter.setObjectName(VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
-        orientation = getattr(qt_widgets, "Qt", None)
-        if orientation is not None:
-            horizontal = getattr(orientation, "Horizontal", None)
-            set_orientation = getattr(splitter, "setOrientation", None)
-            if horizontal is not None and set_orientation is not None:
-                set_orientation(horizontal)
+        pane_orientation = _qt_splitter_orientation(
+            qt_widgets,
+            vertical=pane_tokens.issues_pane_vertical,
+        )
+        set_orientation = getattr(splitter, "setOrientation", None)
+        if pane_orientation is not None and set_orientation is not None:
+            set_orientation(pane_orientation)
         splitter.addWidget(issues_table)
         splitter.addWidget(details_panel)
         set_stretch = getattr(splitter, "setStretchFactor", None)
         if set_stretch is not None:
-            set_stretch(0, 3)
-            set_stretch(1, 2)
+            if pane_tokens.issues_pane_vertical:
+                set_stretch(0, 2)
+                set_stretch(1, 1)
+            else:
+                set_stretch(0, 3)
+                set_stretch(1, 2)
+        if pane_tokens.issues_pane_sizes is not None:
+            set_sizes = getattr(splitter, "setSizes", None)
+            if set_sizes is not None:
+                set_sizes(list(pane_tokens.issues_pane_sizes))
+        if pane_tokens.issues_pane_vertical:
+            set_minimum_width = getattr(details_panel, "setMinimumWidth", None)
+            if set_minimum_width is not None:
+                set_minimum_width(0)
         set_children_collapsible = getattr(splitter, "setChildrenCollapsible", None)
         if set_children_collapsible is not None:
             set_children_collapsible(False)
@@ -1854,7 +1896,9 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
     _apply_summary_header_density(content, qt_widgets, tokens)
     _apply_validate_action_bar_density(content, qt_widgets, tokens)
     _apply_issues_table_density(content, qt_widgets, tokens)
+    _apply_validate_issues_pane_layout(content, qt_widgets, tokens)
     _apply_validate_sticky_chrome_spacing(content, qt_widgets, tokens)
+    _apply_panel_shell_width(content, qt_widgets, tokens)
 
 
 def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -1923,6 +1967,19 @@ def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) ->
         if set_visible is not None:
             set_visible(tokens.show_publish_deadline_labels)
 
+    for row_object_name in (
+        SUMMARY_METRICS_ROW_OBJECT_NAME,
+        SUMMARY_PROFILE_ROW_OBJECT_NAME,
+    ):
+        row = _find_child_widget(summary, qt_widgets, row_object_name)
+        if row is None:
+            continue
+        set_max_width = getattr(row, "setMaximumWidth", None)
+        if tokens.panel_max_width is not None and set_max_width is not None:
+            set_max_width(tokens.panel_max_width)
+        elif set_max_width is not None:
+            set_max_width(_QT_WIDGETSIZE_MAX)
+
 
 def _apply_validate_action_bar_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
     action_bar = _find_child_widget(content, qt_widgets, VALIDATE_ACTION_BAR_OBJECT_NAME)
@@ -1979,11 +2036,250 @@ def _apply_issues_table_density(content: Any, qt_widgets: Any, tokens: Any) -> N
             continue
         set_hidden(column_index, column_index in tokens.hidden_issue_columns)
 
+    if tokens.issues_table_shrink_to_contents:
+        _shrink_issues_table_to_visible_columns(table, qt_widgets, tokens)
+
     vertical_header = getattr(table, "verticalHeader", lambda: None)()
     if vertical_header is not None:
         set_default_section_size = getattr(vertical_header, "setDefaultSectionSize", None)
         if set_default_section_size is not None:
             set_default_section_size(tokens.table_row_height)
+
+    from pipeline_inspector.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
+
+    make_waive_button = _find_child_widget(
+        content,
+        qt_widgets,
+        WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+    )
+    if make_waive_button is not None:
+        _set_filter_row_widget_visible(
+            content,
+            qt_widgets,
+            make_waive_button,
+            visible=tokens.show_make_waive_in_filters,
+        )
+
+    for object_name in (
+        ISSUES_VIEW_FILTER_OBJECT_NAME,
+        ISSUES_SORT_DROPDOWN_OBJECT_NAME,
+    ):
+        filter_widget = _find_child_widget(content, qt_widgets, object_name)
+        if filter_widget is None:
+            continue
+        _set_filter_row_widget_visible(
+            content,
+            qt_widgets,
+            filter_widget,
+            visible=object_name not in tokens.hidden_filter_object_names,
+        )
+
+    issues_host = _find_child_widget(content, qt_widgets, ISSUES_TABLE_WIDGET_OBJECT_NAME)
+    if issues_host is not None and tokens.panel_max_width is not None:
+        set_max_width = getattr(issues_host, "setMaximumWidth", None)
+        if set_max_width is not None:
+            set_max_width(tokens.panel_max_width)
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        hidden_columns = sorted(tokens.hidden_issue_columns)
+        make_waive_visible = None
+        if make_waive_button is not None:
+            is_visible = getattr(make_waive_button, "isVisible", None)
+            make_waive_visible = bool(is_visible()) if callable(is_visible) else None
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_issues_table_density",
+                        "message": "applied issues table density",
+                        "data": {
+                            "hidden_columns": hidden_columns,
+                            "hidden_filters": sorted(tokens.hidden_filter_object_names),
+                            "make_waive_visible": make_waive_visible,
+                            "shrink_to_contents": tokens.issues_table_shrink_to_contents,
+                            "panel_max_width": tokens.panel_max_width,
+                        },
+                        "hypothesisId": "compact-width",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "compact-narrow-v2",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
+
+
+def _shrink_issues_table_to_visible_columns(table: Any, qt_widgets: Any, tokens: Any) -> None:
+    """Keep only visible issue columns sized to contents in compact density."""
+
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_policy = getattr(table, "setSizePolicy", None)
+    if size_policy is not None and set_policy is not None:
+        set_policy(size_policy.Preferred, size_policy.Expanding)
+
+    horizontal_header = getattr(table, "horizontalHeader", lambda: None)()
+    if horizontal_header is None:
+        return
+
+    set_stretch_last = getattr(horizontal_header, "setStretchLastSection", None)
+    if set_stretch_last is not None:
+        set_stretch_last(False)
+
+    header_view = getattr(qt_widgets, "QHeaderView", None)
+    resize_to_contents = (
+        getattr(header_view, "ResizeToContents", None) if header_view is not None else None
+    )
+    set_section_resize_mode = getattr(horizontal_header, "setSectionResizeMode", None)
+    column_count = getattr(table, "columnCount", None)
+    columns = int(column_count()) if callable(column_count) else 0
+    for column_index in range(columns):
+        if column_index in tokens.hidden_issue_columns:
+            continue
+        if set_section_resize_mode is not None and resize_to_contents is not None:
+            set_section_resize_mode(column_index, resize_to_contents)
+
+
+def _set_filter_row_widget_visible(
+    content: Any,
+    qt_widgets: Any,
+    widget: Any,
+    *,
+    visible: bool,
+) -> None:
+    """Show or hide a filters-row widget and detach it from layout when hidden."""
+
+    set_visible = getattr(widget, "setVisible", None)
+    if set_visible is not None:
+        set_visible(visible)
+
+    filters_row = _find_child_widget(content, qt_widgets, ISSUES_FILTERS_ROW_OBJECT_NAME)
+    if filters_row is None:
+        return
+    filters_layout = _widget_layout(filters_row)
+    if filters_layout is None:
+        return
+
+    index_of = getattr(filters_layout, "indexOf", None)
+    remove_widget = getattr(filters_layout, "removeWidget", None)
+    add_widget = getattr(filters_layout, "addWidget", None)
+    if not callable(index_of) or not callable(remove_widget) or not callable(add_widget):
+        return
+
+    widget_index = index_of(widget)
+    if not visible and widget_index >= 0:
+        remove_widget(widget)
+        return
+    if visible and widget_index < 0:
+        add_widget(widget, 0)
+
+
+def _qt_splitter_orientation(qt_widgets: Any, *, vertical: bool) -> Any | None:
+    qt_module: Any | None = None
+    try:
+        from pipeline_inspector.ui.qt import load_qt_core
+
+        qt_module = load_qt_core().Qt
+    except RuntimeError:
+        qt_module = getattr(qt_widgets, "Qt", None)
+    if qt_module is None:
+        return None
+    return getattr(qt_module, "Vertical" if vertical else "Horizontal", None)
+
+
+def _apply_validate_issues_pane_layout(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    """Re-stack the issues table and details pane for compact density."""
+
+    splitter_class = getattr(qt_widgets, "QSplitter", None)
+    splitter = None
+    if splitter_class is not None:
+        from pipeline_inspector.ui.settings_widgets import find_child
+
+        splitter = find_child(content, splitter_class, VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
+    if splitter is None:
+        splitter = _find_child_widget(content, qt_widgets, VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
+    if splitter is None:
+        return
+
+    pane_orientation = _qt_splitter_orientation(
+        qt_widgets,
+        vertical=tokens.issues_pane_vertical,
+    )
+    set_orientation = getattr(splitter, "setOrientation", None)
+    if pane_orientation is not None and set_orientation is not None:
+        set_orientation(pane_orientation)
+
+    set_stretch = getattr(splitter, "setStretchFactor", None)
+    if set_stretch is not None:
+        if tokens.issues_pane_vertical:
+            set_stretch(0, 2)
+            set_stretch(1, 1)
+        else:
+            set_stretch(0, 3)
+            set_stretch(1, 2)
+
+    if tokens.issues_pane_sizes is not None:
+        set_sizes = getattr(splitter, "setSizes", None)
+        if set_sizes is not None:
+            set_sizes(list(tokens.issues_pane_sizes))
+    elif not tokens.issues_pane_vertical:
+        set_sizes = getattr(splitter, "setSizes", None)
+        if set_sizes is not None:
+            saved_sizes = getattr(content, "_pipeline_inspector_validate_splitter_sizes", None)
+            if saved_sizes:
+                set_sizes([int(size) for size in saved_sizes])
+            else:
+                set_sizes([520, 300])
+
+    details_panel = _find_child_widget(content, qt_widgets, DETAILS_PANEL_OBJECT_NAME)
+    if details_panel is not None:
+        set_minimum_width = getattr(details_panel, "setMinimumWidth", None)
+        if set_minimum_width is not None:
+            set_minimum_width(0 if tokens.issues_pane_vertical else DETAILS_PANEL_MIN_WIDTH)
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        orientation_fn = getattr(splitter, "orientation", None)
+        sizes_fn = getattr(splitter, "sizes", None)
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_validate_issues_pane_layout",
+                        "message": "applied issues pane layout",
+                        "data": {
+                            "vertical": tokens.issues_pane_vertical,
+                            "sizes": list(sizes_fn()) if callable(sizes_fn) else [],
+                            "orientation": int(orientation_fn())
+                            if callable(orientation_fn)
+                            else None,
+                        },
+                        "hypothesisId": "pane-layout",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "pane-fix",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
 
 
 def _apply_validate_sticky_chrome_spacing(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -1996,6 +2292,98 @@ def _apply_validate_sticky_chrome_spacing(content: Any, qt_widgets: Any, tokens:
     set_spacing = getattr(layout, "setSpacing", None)
     if set_spacing is not None:
         set_spacing(tokens.sticky_chrome_spacing)
+
+
+def _apply_widget_width_constraint(
+    widget: Any,
+    max_width: int | None,
+    size_policy: Any | None,
+) -> None:
+    """Clamp a widget to a compact panel width or restore the Qt default."""
+
+    set_max_width = getattr(widget, "setMaximumWidth", None)
+    set_min_width = getattr(widget, "setMinimumWidth", None)
+    set_policy = getattr(widget, "setSizePolicy", None)
+    if max_width is None:
+        if set_max_width is not None:
+            set_max_width(_QT_WIDGETSIZE_MAX)
+        if size_policy is not None and set_policy is not None:
+            preferred = getattr(size_policy, "Preferred", None)
+            expanding = getattr(size_policy, "Expanding", None)
+            if preferred is not None and expanding is not None:
+                set_policy(preferred, expanding)
+        return
+
+    if set_max_width is not None:
+        set_max_width(max_width)
+    if size_policy is not None and set_policy is not None:
+        maximum = getattr(size_policy, "Maximum", None)
+        expanding = getattr(size_policy, "Expanding", None)
+        if maximum is not None and expanding is not None:
+            set_policy(maximum, expanding)
+
+
+def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    """Clamp the dock shell and Validate body to the compact panel width."""
+
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    targets = [content]
+    for object_name in (
+        PANEL_BODY_STACK_OBJECT_NAME,
+        TAB_WIDGET_OBJECT_NAME,
+        VALIDATE_STICKY_CHROME_OBJECT_NAME,
+        SUMMARY_HEADER_OBJECT_NAME,
+        ISSUES_TABLE_WIDGET_OBJECT_NAME,
+        DETAILS_PANEL_OBJECT_NAME,
+        PANEL_HEADER_OBJECT_NAME,
+    ):
+        widget = _find_child_widget(content, qt_widgets, object_name)
+        if widget is not None:
+            targets.append(widget)
+
+    for target in targets:
+        _apply_widget_width_constraint(target, tokens.panel_max_width, size_policy)
+
+    dock = getattr(content, "_pipeline_inspector_dock", None)
+    if dock is not None:
+        _apply_widget_width_constraint(dock, tokens.panel_max_width, size_policy)
+        adjust_size = getattr(dock, "adjustSize", None)
+        if adjust_size is not None and tokens.panel_max_width is not None:
+            adjust_size()
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        content_max_width = None
+        get_max_width = getattr(content, "maximumWidth", None)
+        if callable(get_max_width):
+            content_max_width = int(get_max_width())
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_panel_shell_width",
+                        "message": "applied panel shell width",
+                        "data": {
+                            "panel_max_width": tokens.panel_max_width,
+                            "content_max_width": content_max_width,
+                        },
+                        "hypothesisId": "panel-width",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "compact-narrow-v2",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
 
 
 def _widget_layout(widget: Any) -> Any | None:
@@ -2143,24 +2531,15 @@ def _build_validate_action_overflow_button(
     *,
     pipeline_group: Any,
     triage_group: Any,
-    validation_callbacks: ValidationActionCallbacks,
-    issue_callbacks: IssueDetailsActionCallbacks,
+    overflow_actions: Sequence[tuple[str, Optional[Callable[[], None]]]],
 ) -> Any:
     _ = (pipeline_group, triage_group)
     return _build_overflow_menu_button(
         qt_widgets,
         label="More",
         object_name=VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME,
-        tooltip="Pipeline and issue triage actions",
-        actions=(
-            ("Publish Preflight", validation_callbacks.on_publish_preflight),
-            ("Manifest Gate", validation_callbacks.on_manifest_gate),
-            ("Select Node", issue_callbacks.on_select_node),
-            ("Open in HyperShade", issue_callbacks.on_open_in_hypershade),
-            ("Copy Path", issue_callbacks.on_copy_path),
-            ("Reveal File", issue_callbacks.on_reveal_file),
-            ("Create Rule Draft", issue_callbacks.on_create_rule_draft),
-        ),
+        tooltip="Pipeline, triage, and waiver actions",
+        actions=overflow_actions,
     )
 
 

@@ -217,6 +217,8 @@ def _create_dockable_panel() -> Any:
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
         _wire_validate_splitter_persistence(content, qt_widgets)
+        apply_user_preferences_to_panel(content, qt_widgets, user_config)
+        _sync_workspace_control_width(content)
         _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
         from pipeline_inspector.ui.theme_loader import apply_panel_theme
@@ -232,6 +234,31 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _sync_workspace_control_width(content: Any) -> None:
+    """Resize the Maya dock to the compact panel width token."""
+
+    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
+
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
+    tokens = density_tokens(normalize_density(density))
+    if tokens.panel_max_width is None:
+        return
+
+    cmds = _maya_cmds()
+    if not _workspace_control_exists(cmds):
+        return
+    try:
+        cmds.workspaceControl(
+            WORKSPACE_CONTROL_NAME,
+            edit=True,
+            width=tokens.panel_max_width,
+        )
+    except (RuntimeError, TypeError, ValueError):
+        return
 
 
 def _panel_navigation_callbacks(
@@ -833,6 +860,7 @@ def _set_user_config(content: Any, qt_widgets: Any, config: UserPreferences) -> 
         apply_user_preferences_to_panel(content, qt_widgets, config)
     finally:
         content._pipeline_inspector_settings_programmatic = False
+    _sync_workspace_control_width(content)
     _refresh_settings_view(content, qt_widgets)
 
 
@@ -2612,12 +2640,17 @@ def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
     if splitter is None:
         return
 
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
     set_sizes = getattr(splitter, "setSizes", None)
     saved_sizes = getattr(content, VALIDATE_SPLITTER_SIZES_ATTR, None)
-    if set_sizes is not None and saved_sizes:
+    if density != "compact" and set_sizes is not None and saved_sizes:
         set_sizes([int(size) for size in saved_sizes])
 
     def _persist_splitter_sizes(*_args: Any) -> None:
+        if str(getattr(content, "_pipeline_inspector_ui_density", "comfortable")) == "compact":
+            return
         sizes_fn = getattr(splitter, "sizes", None)
         if sizes_fn is None:
             return

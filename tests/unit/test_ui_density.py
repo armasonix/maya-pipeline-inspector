@@ -6,6 +6,10 @@ from tests.unit.test_maya_summary_header import FakePushButton, FakeQtWidgets, _
 
 from pipeline_inspector.ui import main_window
 from pipeline_inspector.ui.ui_density_tokens import (
+    COMPACT_PANEL_MAX_WIDTH,
+    ISSUES_TABLE_ISSUE_COLUMN_INDEX,
+    ISSUES_TABLE_MATERIAL_COLUMN_INDEX,
+    ISSUES_TABLE_NODE_COLUMN_INDEX,
     ISSUES_TABLE_OWNER_COLUMN_INDEX,
     ISSUES_TABLE_RULE_COLUMN_INDEX,
     density_tokens,
@@ -157,7 +161,7 @@ def test_apply_ui_density_compact_collapses_validate_action_bar_and_summary_cont
     assert publish_label.visible is False
 
 
-def test_apply_ui_density_compact_hides_low_priority_issue_columns_and_shortens_rows():
+def test_apply_ui_density_compact_hides_wide_issue_columns_and_shortens_rows():
     widget = main_window.build_main_widget(DensityFakeQtWidgets)
 
     apply_user_preferences_to_panel(
@@ -169,9 +173,87 @@ def test_apply_ui_density_compact_hides_low_priority_issue_columns_and_shortens_
     table = _find(widget, main_window.ISSUES_TABLE_OBJECT_NAME)
     tokens = density_tokens("compact")
 
+    assert table.hidden_columns[ISSUES_TABLE_MATERIAL_COLUMN_INDEX] is True
+    assert table.hidden_columns[ISSUES_TABLE_NODE_COLUMN_INDEX] is True
+    assert table.hidden_columns[ISSUES_TABLE_ISSUE_COLUMN_INDEX] is True
     assert table.hidden_columns[ISSUES_TABLE_OWNER_COLUMN_INDEX] is True
     assert table.hidden_columns[ISSUES_TABLE_RULE_COLUMN_INDEX] is True
+    assert table.hidden_columns.get(0, False) is False
     assert table.vertical_header.default_section_size == tokens.table_row_height
+
+
+def test_apply_ui_density_compact_clamps_panel_width_and_hides_extra_filters():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    view_filter = _find(widget, main_window.ISSUES_VIEW_FILTER_OBJECT_NAME)
+    sort_filter = _find(widget, main_window.ISSUES_SORT_DROPDOWN_OBJECT_NAME)
+
+    assert widget.maximum_width == COMPACT_PANEL_MAX_WIDTH
+    assert view_filter.visible is False
+    assert sort_filter.visible is False
+
+
+def test_apply_ui_density_compact_stacks_details_below_short_issues_table():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    splitter = _find(widget, main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
+    details = _find(widget, main_window.DETAILS_PANEL_OBJECT_NAME)
+    tokens = density_tokens("compact")
+
+    assert splitter.orientation == DensityFakeQtWidgets.Qt.Vertical
+    assert splitter.sizes == list(tokens.issues_pane_sizes or ())
+    assert details.minimum_width == 0
+
+
+def test_apply_ui_density_compact_omits_make_waive_filter_button_and_adds_it_to_more_menu():
+    from pipeline_inspector.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
+
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    make_waive = _find(widget, WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME)
+    overflow = _find(widget, main_window.VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME)
+
+    assert make_waive.visible is False
+    assert any(action.label == "Make Waive" for action in overflow.menu.actions)
+
+
+def test_apply_ui_density_comfortable_restores_horizontal_issues_pane():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="comfortable"),
+    )
+
+    splitter = _find(widget, main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
+    details = _find(widget, main_window.DETAILS_PANEL_OBJECT_NAME)
+
+    assert splitter.orientation == DensityFakeQtWidgets.Qt.Horizontal
+    assert details.minimum_width == main_window.DETAILS_PANEL_MIN_WIDTH
 
 
 def test_apply_ui_density_comfortable_restores_full_validate_chrome():

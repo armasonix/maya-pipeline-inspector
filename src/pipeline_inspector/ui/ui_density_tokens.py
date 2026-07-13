@@ -5,12 +5,31 @@ from dataclasses import dataclass
 
 from pipeline_inspector.user_config import SUPPORTED_UI_DENSITIES
 
+ISSUES_TABLE_MATERIAL_COLUMN_INDEX = 1
+ISSUES_TABLE_NODE_COLUMN_INDEX = 2
+ISSUES_TABLE_ISSUE_COLUMN_INDEX = 3
 ISSUES_TABLE_OWNER_COLUMN_INDEX = 4
 ISSUES_TABLE_RULE_COLUMN_INDEX = 5
 ISSUES_TABLE_LOW_PRIORITY_COLUMNS = (
     ISSUES_TABLE_OWNER_COLUMN_INDEX,
     ISSUES_TABLE_RULE_COLUMN_INDEX,
 )
+ISSUES_TABLE_COMPACT_HIDDEN_COLUMNS = (
+    ISSUES_TABLE_MATERIAL_COLUMN_INDEX,
+    ISSUES_TABLE_NODE_COLUMN_INDEX,
+    ISSUES_TABLE_ISSUE_COLUMN_INDEX,
+    ISSUES_TABLE_OWNER_COLUMN_INDEX,
+    ISSUES_TABLE_RULE_COLUMN_INDEX,
+)
+ISSUES_VIEW_FILTER_OBJECT_NAME = "pipelineInspectorIssuesViewFilter"
+ISSUES_SORT_DROPDOWN_OBJECT_NAME = "pipelineInspectorIssuesSortDropdown"
+ISSUES_TABLE_COMPACT_HIDDEN_FILTERS = frozenset(
+    {
+        ISSUES_VIEW_FILTER_OBJECT_NAME,
+        ISSUES_SORT_DROPDOWN_OBJECT_NAME,
+    }
+)
+COMPACT_PANEL_MAX_WIDTH = 300
 
 
 @dataclass(frozen=True)
@@ -39,6 +58,15 @@ class UiDensityTokens:
     panel_header_overflow: bool
     validate_action_overflow: bool
     hidden_issue_columns: frozenset[int]
+    hidden_filter_object_names: frozenset[str]
+    show_make_waive_in_filters: bool
+    filters_row_stretch: bool
+    issues_table_shrink_to_contents: bool
+    metrics_row_stretch: bool
+    profile_row_stretch: bool
+    panel_max_width: int | None
+    issues_pane_vertical: bool
+    issues_pane_sizes: tuple[int, int] | None
 
 
 _COMFORTABLE_TOKENS = UiDensityTokens(
@@ -64,6 +92,15 @@ _COMFORTABLE_TOKENS = UiDensityTokens(
     panel_header_overflow=False,
     validate_action_overflow=False,
     hidden_issue_columns=frozenset(),
+    hidden_filter_object_names=frozenset(),
+    show_make_waive_in_filters=True,
+    filters_row_stretch=True,
+    issues_table_shrink_to_contents=False,
+    metrics_row_stretch=True,
+    profile_row_stretch=True,
+    panel_max_width=None,
+    issues_pane_vertical=False,
+    issues_pane_sizes=None,
 )
 
 _COMPACT_TOKENS = UiDensityTokens(
@@ -88,7 +125,16 @@ _COMPACT_TOKENS = UiDensityTokens(
     table_row_height=18,
     panel_header_overflow=True,
     validate_action_overflow=True,
-    hidden_issue_columns=frozenset(ISSUES_TABLE_LOW_PRIORITY_COLUMNS),
+    hidden_issue_columns=frozenset(ISSUES_TABLE_COMPACT_HIDDEN_COLUMNS),
+    hidden_filter_object_names=ISSUES_TABLE_COMPACT_HIDDEN_FILTERS,
+    show_make_waive_in_filters=False,
+    filters_row_stretch=False,
+    issues_table_shrink_to_contents=True,
+    metrics_row_stretch=False,
+    profile_row_stretch=False,
+    panel_max_width=COMPACT_PANEL_MAX_WIDTH,
+    issues_pane_vertical=True,
+    issues_pane_sizes=(180, 120),
 )
 
 
