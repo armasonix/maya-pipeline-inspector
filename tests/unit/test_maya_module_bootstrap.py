@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
@@ -18,7 +20,16 @@ from pipeline_inspector.maya.snapshot_enrichment import enrich_snapshot
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_PATH = ROOT / "maya_module" / "scripts" / "pipeline_inspector_bootstrap.py"
 USER_SETUP_PATH = ROOT / "maya_module" / "scripts" / "userSetup.py"
-PLUGIN_PATH = ROOT / "maya_module" / "plug-ins" / "pipeline_inspector.py"
+PLUGIN_PATH = ROOT / "maya_module" / "plug-ins" / "fallback" / "pipeline_inspector.py"
+
+
+@pytest.fixture(autouse=True)
+def _reset_user_setup_main_flags() -> None:
+    import __main__
+
+    for name in ("_pipeline_inspector_deferred", "_pipeline_inspector_startup_done"):
+        if hasattr(__main__, name):
+            delattr(__main__, name)
 
 
 def load_module(path: Path, module_name: str) -> ModuleType:
@@ -109,30 +120,39 @@ def test_maya_year_from_version_extracts_four_digit_year():
     assert bootstrap.maya_year_from_version("unsupported") is None
 
 
-def test_plugin_load_candidates_prefers_native_binary_on_windows(monkeypatch):
+def _expected_candidates(bootstrap, maya_year: str | None) -> tuple[str, ...]:
+    canonical = bootstrap.canonical_plugin_path(maya_year)
+    if not canonical:
+        return ()
+    if canonical.endswith(".py"):
+        return (canonical,)
+    py_path = bootstrap.python_plugin_path()
+    if py_path.is_file():
+        return (canonical, str(py_path))
+    return (canonical,)
+
+
+def test_plugin_load_candidates_prefers_manager_copy_on_windows(monkeypatch):
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_candidates")
     monkeypatch.setattr("sys.platform", "win32")
 
     assert bootstrap.plugin_load_candidates("2024") == _expected_candidates(bootstrap, "2024")
     assert bootstrap.plugin_load_candidates(None) == _expected_candidates(bootstrap, None)
 
-
-def _expected_candidates(bootstrap, maya_year: str | None) -> tuple[str, ...]:
-    candidates: list[str] = []
-    seen: set[str] = set()
-    if maya_year:
-        year_path = bootstrap.native_plugin_path(maya_year)
-        if year_path.is_file():
-            text = str(year_path)
-            seen.add(text)
-            candidates.append(text)
     manager_path = bootstrap.manager_native_plugin_path()
     if manager_path.is_file():
-        text = str(manager_path)
-        if text not in seen:
-            candidates.append(text)
-    candidates.append("pipeline_inspector.py")
-    return tuple(candidates)
+        assert bootstrap.plugin_load_candidates("2024") == _expected_candidates(bootstrap, "2024")
+
+
+def test_canonical_plugin_path_prefers_manager_over_year(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_canonical")
+    plug_ins = tmp_path / "plug-ins"
+    (plug_ins / "2024").mkdir(parents=True)
+    (plug_ins / "2024" / "pipeline_inspector.mll").write_bytes(b"mll")
+    (plug_ins / "pipeline_inspector.mll").write_bytes(b"mll")
+    monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
+
+    assert bootstrap.canonical_plugin_path("2024") == str(plug_ins / "pipeline_inspector.mll")
 
 
 def test_detect_install_mode_native_year(monkeypatch, tmp_path: Path):
@@ -167,8 +187,8 @@ def test_detect_install_mode_native_manager(monkeypatch, tmp_path: Path):
 
 def test_detect_install_mode_python_only(monkeypatch, tmp_path: Path):
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_detect_python")
-    plug_ins = tmp_path / "plug-ins"
-    plug_ins.mkdir()
+    plug_ins = tmp_path / "plug-ins" / "fallback"
+    plug_ins.mkdir(parents=True)
     (plug_ins / "pipeline_inspector.py").write_text("# plugin", encoding="utf-8")
     monkeypatch.setattr(
         bootstrap,
@@ -200,18 +220,18 @@ def test_detect_install_mode_module_only(monkeypatch, tmp_path: Path):
 
 def test_describe_dual_install_reports_load_order(monkeypatch, tmp_path: Path):
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_describe")
-    plug_ins = tmp_path / "plug-ins"
-    plug_ins.mkdir()
+    plug_ins = tmp_path / "plug-ins" / "fallback"
+    plug_ins.mkdir(parents=True)
     (plug_ins / "pipeline_inspector.py").write_text("# plugin", encoding="utf-8")
     monkeypatch.setattr(
         bootstrap,
         "native_plugin_path",
-        lambda year: plug_ins / "2024" / "pipeline_inspector.mll",
+        lambda year: tmp_path / "plug-ins" / "2024" / "pipeline_inspector.mll",
     )
     monkeypatch.setattr(
         bootstrap,
         "manager_native_plugin_path",
-        lambda: plug_ins / "pipeline_inspector.mll",
+        lambda: tmp_path / "plug-ins" / "pipeline_inspector.mll",
     )
     monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
 
@@ -219,7 +239,7 @@ def test_describe_dual_install_reports_load_order(monkeypatch, tmp_path: Path):
 
     assert payload["maya_year"] == "2024"
     assert payload["install_mode"] == bootstrap.INSTALL_MODE_PYTHON
-    assert payload["load_candidates"] == ["pipeline_inspector.py"]
+    assert payload["load_candidates"] == [str(bootstrap.python_plugin_path())]
 
 
 def test_user_setup_prefers_native_plugin_load(monkeypatch):
@@ -227,9 +247,21 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -239,9 +271,9 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
             return ""
 
         @staticmethod
-        def pluginInfo(plugin_name, query=True, loaded=True):
-            _ = query, loaded
-            if plugin_name == "pipeline_inspector":
+        def pluginInfo(plugin_name, query=True, loaded=True, edit=False, autoload=False):
+            _ = edit, autoload
+            if query and loaded and plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -270,11 +302,15 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
     load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_native_plugin")
 
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_native_assert")
-    expected = str(bootstrap.native_plugin_path("2024"))
-    if Path(expected).is_file():
-        assert deferred == ["deferred", f"load:{expected}:True"]
+    manager_path = str(bootstrap.manager_native_plugin_path())
+    year_path = str(bootstrap.native_plugin_path("2024"))
+    if Path(manager_path).is_file():
+        expected_plugin = manager_path
+    elif Path(year_path).is_file():
+        expected_plugin = year_path
     else:
-        assert deferred == ["deferred", "load:pipeline_inspector.py:True"]
+        expected_plugin = str(bootstrap.python_plugin_path())
+    assert deferred == ["deferred", f"load:{expected_plugin}:True"]
 
 
 def test_user_setup_falls_back_to_py_plugin(monkeypatch):
@@ -282,9 +318,21 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -294,9 +342,9 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
             return ""
 
         @staticmethod
-        def pluginInfo(plugin_name, query=True, loaded=True):
-            _ = query, loaded
-            if plugin_name == "pipeline_inspector":
+        def pluginInfo(plugin_name, query=True, loaded=True, edit=False, autoload=False):
+            _ = edit, autoload
+            if query and loaded and plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -327,14 +375,20 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
     load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_py_fallback")
 
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_py_fallback_assert")
-    native_path = str(bootstrap.native_plugin_path("2024"))
     manager_path = str(bootstrap.manager_native_plugin_path())
+    year_path = str(bootstrap.native_plugin_path("2024"))
+    py_path = str(bootstrap.python_plugin_path())
     expected = ["deferred"]
-    if Path(native_path).is_file():
-        expected.append(f"load:{native_path}:True")
     if Path(manager_path).is_file():
         expected.append(f"load:{manager_path}:True")
-    expected.append("load:pipeline_inspector.py:True")
+        if Path(py_path).is_file():
+            expected.append(f"load:{py_path}:True")
+    elif Path(year_path).is_file():
+        expected.append(f"load:{year_path}:True")
+        if Path(py_path).is_file():
+            expected.append(f"load:{py_path}:True")
+    else:
+        expected.append(f"load:{py_path}:True")
     assert deferred == expected
 
 
@@ -343,9 +397,21 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -354,9 +420,9 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
             return ""
 
         @staticmethod
-        def pluginInfo(plugin_name, query=True, loaded=True):
-            _ = query, loaded
-            if plugin_name == "pipeline_inspector":
+        def pluginInfo(plugin_name, query=True, loaded=True, edit=False, autoload=False):
+            _ = edit, autoload
+            if query and loaded and plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -392,7 +458,7 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
     if Path(manager_path).is_file():
         expected.append(f"load:{manager_path}:True")
     else:
-        expected.append("load:pipeline_inspector.py:True")
+        expected.append(f"load:{bootstrap.python_plugin_path()}:True")
     assert deferred == expected
 
 
@@ -401,9 +467,21 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -413,9 +491,9 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
             return ""
 
         @staticmethod
-        def pluginInfo(plugin_name, query=True, loaded=True):
-            _ = query, loaded
-            if plugin_name == "pipeline_inspector":
+        def pluginInfo(plugin_name, query=True, loaded=True, edit=False, autoload=False):
+            _ = edit, autoload
+            if query and loaded and plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -606,3 +684,20 @@ def test_material_graph_fingerprint_uses_connection_fields():
 
     assert first == second
     assert first.startswith("sha256:")
+
+
+def test_apply_pending_native_plugin_binaries_replaces_staged_mll(tmp_path, monkeypatch):
+    module_root = tmp_path / "maya_module"
+    plug_ins = module_root / "plug-ins"
+    plug_ins.mkdir(parents=True)
+    pending = plug_ins / "pipeline_inspector.mll.pending"
+    pending.write_bytes(b"new-binary")
+    (plug_ins / "pipeline_inspector.mll").write_bytes(b"old-binary")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_pending_test")
+    monkeypatch.setattr(bootstrap, "module_root", lambda: module_root)
+
+    applied = bootstrap.apply_pending_native_plugin_binaries()
+
+    assert applied == 1
+    assert (plug_ins / "pipeline_inspector.mll").read_bytes() == b"new-binary"
+    assert not pending.exists()

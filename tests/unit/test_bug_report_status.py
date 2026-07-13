@@ -10,8 +10,8 @@ from pipeline_inspector.integrations.bug_report.status import (
 
 def test_format_bug_report_success_headline():
     headline = format_bug_report_success_headline()
-    assert "maintainers" in headline.lower()
-    assert "github" in headline.lower()
+    assert "thank you" in headline.lower()
+    assert "improve" in headline.lower()
 
 
 def test_format_bug_report_issue_url_text_trims_whitespace():

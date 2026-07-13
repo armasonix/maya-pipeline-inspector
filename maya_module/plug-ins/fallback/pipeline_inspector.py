@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 PLUGIN_VENDOR = "Pipeline Inspector"
-PLUGIN_VERSION = "0.3.0"
+PLUGIN_VERSION = "0.5.0"
 PLUGIN_NAME = "pipeline_inspector"
 
 

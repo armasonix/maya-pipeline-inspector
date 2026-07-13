@@ -8,8 +8,7 @@ def format_bug_report_success_headline() -> str:
     """Return the success headline shown after a relay accepts a report."""
 
     return (
-        "Plugin bug report sent to Pipeline Inspector maintainers. "
-        "Track the fix on GitHub:"
+        "Thank you for keeping us informed about plugin issues — it helps us improve."
     )
 
 def format_bug_report_issue_url_text(issue_url: str) -> str:
@@ -25,7 +24,7 @@ def format_bug_report_failure_status(result: BugReportRelayResult) -> str:
     if result.skipped_reason == "incomplete_config":
         return (
             "Plugin bug report relay is not configured. "
-            "Ask your TD to set relay URL and API key in Settings → Bug Report."
+            "Enable Bug Report in Settings or ask your TD to set a studio relay URL."
         )
     if result.skipped_reason == "rate_limited":
         if result.error_message:

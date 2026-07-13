@@ -197,11 +197,14 @@ class BugReportSettings:
     def to_bug_report_config(self) -> Any | None:
         """Convert connector settings into a bug report relay runtime config object."""
 
-        from pipeline_inspector.integrations.bug_report.config import BugReportRelayConfig
+        from pipeline_inspector.integrations.bug_report.config import (
+            BugReportRelayConfig,
+            effective_bug_report_relay_url,
+        )
 
-        relay_url = self.relay_url.strip()
+        relay_url = effective_bug_report_relay_url(self.relay_url)
         api_key = self.api_key.strip()
-        if not relay_url or not api_key:
+        if not relay_url:
             return None
         return BugReportRelayConfig(
             relay_url=relay_url,

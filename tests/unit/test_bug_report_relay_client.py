@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from pipeline_inspector.integrations.bug_report import (
+    DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
     BugReportPayload,
     BugReportRelayClient,
     BugReportRelayConfig,
@@ -70,6 +71,7 @@ def test_bug_report_relay_client_submits_multipart_payload_with_jpeg_and_returns
     assert request.method == "POST"
     assert request.url.endswith("/bug-report")
     assert request.headers["Authorization"] == "Bearer studio-secret"
+    assert request.headers["User-Agent"] == "maya-pipeline-inspector"
     assert request.headers["Content-Type"].startswith("multipart/form-data; boundary=")
     body = request.body.decode("utf-8", errors="replace")
     assert 'name="payload"' in body
@@ -121,6 +123,60 @@ def test_bug_report_relay_client_skips_screenshot_when_not_allowed():
     assert 'filename="screenshot.jpg"' not in captured[0].body.decode("utf-8", errors="replace")
 
 
+def test_bug_report_relay_client_submits_without_api_key_for_public_relay():
+    captured: list[HttpRequest] = []
+
+    def transport(request: HttpRequest, timeout: float) -> RelayResponse:
+        captured.append(request)
+        _ = timeout
+        return RelayResponse(
+            status_code=201,
+            body='{"issue_url":"https://github.com/org/repo/issues/11"}',
+            json_data={"issue_url": "https://github.com/org/repo/issues/11"},
+        )
+
+    client = BugReportRelayClient(
+        BugReportRelayConfig(
+            relay_url=DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
+            api_key="",
+        ),
+        transport=transport,
+    )
+
+    result = client.submit(_payload())
+
+    assert result.submitted is True
+    assert "Authorization" not in captured[0].headers
+
+
+def test_maybe_submit_bug_report_uses_public_relay_without_api_key(tmp_path: Path):
+    state_path = tmp_path / "bug_report_throttle.json"
+
+    def transport(request: HttpRequest, timeout: float) -> RelayResponse:
+        _ = (request, timeout)
+        return RelayResponse(
+            status_code=201,
+            body='{"issue_url":"https://github.com/org/repo/issues/88"}',
+            json_data={"issue_url": "https://github.com/org/repo/issues/88"},
+        )
+
+    result = maybe_submit_bug_report(
+        StudioConfig(
+            bug_report=BugReportSettings(
+                enabled=True,
+                relay_url="",
+                api_key="",
+            )
+        ),
+        _payload(),
+        transport=transport,
+        throttle_state_path=state_path,
+    )
+
+    assert result.submitted is True
+    assert result.issue_url.endswith("/issues/88")
+
+
 def test_maybe_submit_bug_report_returns_disabled_when_connector_off():
     result = maybe_submit_bug_report(
         StudioConfig(bug_report=BugReportSettings(enabled=False)),
@@ -131,20 +187,33 @@ def test_maybe_submit_bug_report_returns_disabled_when_connector_off():
     assert result.skipped_reason == "disabled"
 
 
-def test_maybe_submit_bug_report_returns_incomplete_config_when_relay_missing():
+def test_maybe_submit_bug_report_keeps_private_studio_relay_with_api_key(tmp_path: Path):
+    captured: list[HttpRequest] = []
+
+    def transport(request: HttpRequest, timeout: float) -> RelayResponse:
+        captured.append(request)
+        _ = timeout
+        return RelayResponse(
+            status_code=201,
+            body='{"issue_url":"https://github.com/org/repo/issues/33"}',
+            json_data={"issue_url": "https://github.com/org/repo/issues/33"},
+        )
+
     result = maybe_submit_bug_report(
         StudioConfig(
             bug_report=BugReportSettings(
                 enabled=True,
-                relay_url="",
-                api_key="secret",
+                relay_url="https://pipeline.studio.internal/shader-health/bug-report",
+                api_key="studio-secret",
             )
         ),
         _payload(),
+        transport=transport,
+        throttle_state_path=tmp_path / "bug_report_throttle.json",
     )
 
-    assert result.submitted is False
-    assert result.skipped_reason == "incomplete_config"
+    assert result.submitted is True
+    assert captured[0].headers["Authorization"] == "Bearer studio-secret"
 
 
 def test_maybe_submit_bug_report_blocks_when_local_daily_limit_reached(tmp_path: Path):

@@ -132,7 +132,7 @@ def _get_cmds(cmds_module: Optional[Any]) -> Any:
         return cmds_module
 
     try:
-        import maya.cmds as cmds  # type: ignore[import-not-found]
+        import maya.cmds as cmds
     except ImportError as exc:
         raise MayaUnavailableError(
             "maya.cmds is unavailable. Run this scanner inside Maya or pass "

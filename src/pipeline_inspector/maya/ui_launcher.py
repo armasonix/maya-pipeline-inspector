@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional
 
+from pipeline_inspector import __version__
 from pipeline_inspector.maya.panel_session import (
     load_runtime_configs_from_session,
+    remember_panel_visible,
+    remember_plugin_version,
     remember_studio_config_path,
     remember_user_config_path,
 )
@@ -80,6 +84,9 @@ from pipeline_inspector.user_config import (
 )
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
+OBSOLETE_WORKSPACE_CONTROL_NAMES = (
+    f"{main_window.PANEL_OBJECT_NAME}DockRightWorkspaceControl",
+)
 DEFAULT_DOCK_AREA = "right"
 
 VALIDATE_SPLITTER_SIZES_ATTR = "_pipeline_inspector_validate_splitter_sizes"
@@ -100,22 +107,29 @@ def show_panel() -> Any:
 
     global _PANEL
     cmds = _maya_cmds()
+    _purge_obsolete_workspace_controls(cmds)
 
     if _workspace_control_exists(cmds):
         if _PANEL is not None:
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
             _PANEL.show()
+            remember_plugin_version(__version__)
+            remember_panel_visible(True)
             return _PANEL
         cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
 
     panel = _create_dockable_panel()
     _PANEL = panel
+    if _workspace_control_exists(cmds):
+        cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
     panel.show(
         dockable=True,
         area=DEFAULT_DOCK_AREA,
         floating=False,
         retain=False,
     )
+    remember_plugin_version(__version__)
+    remember_panel_visible(True)
     return panel
 
 
@@ -141,7 +155,6 @@ def close_panel(*, delete: bool = True) -> None:
 
     global _PANEL
     cmds = _maya_cmds()
-
     if _workspace_control_exists(cmds):
         if delete:
             cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
@@ -152,12 +165,13 @@ def close_panel(*, delete: bool = True) -> None:
         _PANEL.close()
     _kill_script_jobs()
     _PANEL = None
+    remember_panel_visible(False)
 
 
 def _create_dockable_panel() -> Any:
     _kill_script_jobs()
     qt_widgets = load_qt_widgets()
-    from maya.app.general.mayaMixin import (  # type: ignore[import-not-found]
+    from maya.app.general.mayaMixin import (
         MayaQWidgetDockableMixin,
     )
 
@@ -210,6 +224,7 @@ def _create_dockable_panel() -> Any:
         apply_panel_theme(content, user_config.theme, dock=self)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
+        _maybe_run_startup_update_check(content, qt_widgets, user_config)
 
     panel_class = type(
         "PipelineInspectorDock",
@@ -246,55 +261,161 @@ def _panel_navigation_callbacks(
 
 def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.ui.settings_widgets import try_reactivate_modal_dialog
+    from pipeline_inspector.ui.update_progress_dialog import UPDATE_PROGRESS_DIALOG_OBJECT_NAME
 
-    if try_reactivate_modal_dialog("pipelineInspectorCheckForUpdates"):
+    if try_reactivate_modal_dialog(UPDATE_PROGRESS_DIALOG_OBJECT_NAME):
         return
-    try:
+
+    def _open_update_wizard() -> None:
         from pipeline_inspector import __version__
         from pipeline_inspector.studio_config import StudioConfig
+        from pipeline_inspector.ui.update_modal import show_update_modal_shell
         from pipeline_inspector.ui.update_wizard import (
             format_update_wizard_user_message,
             run_update_check_only,
         )
 
-        studio_config = getattr(content, "_pipeline_inspector_studio_config", None)
-        if studio_config is not None and not isinstance(studio_config, StudioConfig):
-            studio_config = None
+        try:
+            studio_config = getattr(content, "_pipeline_inspector_studio_config", None)
+            if studio_config is not None and not isinstance(studio_config, StudioConfig):
+                studio_config = None
 
+            maya_parent = _maya_main_window_widget(qt_widgets)
+            check_result = run_update_check_only(
+                installed_version=__version__,
+                studio_config=studio_config,
+            )
+            message = format_update_wizard_user_message(
+                check_result,
+                installed_version=__version__,
+            )
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                message.replace("\n", " "),
+            )
+
+            if check_result.up_to_date:
+                _show_information_dialog(
+                    qt_widgets,
+                    "Check for Updates",
+                    message,
+                    singleton_key="pipelineInspectorCheckForUpdates",
+                )
+                return
+
+            if check_result.skipped_reason == "disabled" or check_result.error_message:
+                _show_information_dialog(
+                    qt_widgets,
+                    "Check for Updates",
+                    message,
+                    singleton_key="pipelineInspectorCheckForUpdates",
+                )
+                return
+
+            if not check_result.update_available:
+                _show_information_dialog(
+                    qt_widgets,
+                    "Check for Updates",
+                    message,
+                    singleton_key="pipelineInspectorCheckForUpdates",
+                )
+                return
+
+            session = show_update_modal_shell(
+                qt_widgets,
+                parent=maya_parent,
+                installed_version=__version__,
+                studio_config=studio_config,
+            )
+            final_message = format_update_wizard_user_message(
+                session.result,
+                installed_version=__version__,
+            )
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                final_message.replace("\n", " "),
+            )
+        except Exception as exc:
+            _show_information_dialog(
+                qt_widgets,
+                "Check for Updates",
+                f"Update check failed: {exc}",
+                singleton_key="pipelineInspectorCheckForUpdates",
+            )
+            raise
+
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    if single_shot is not None:
+        single_shot(0, _open_update_wizard)
+        return
+    _open_update_wizard()
+
+
+def _maybe_run_startup_update_check(
+    content: Any,
+    qt_widgets: Any,
+    user_config: UserPreferences,
+) -> None:
+    """Run a deferred check-only update query when the user pref requests it."""
+
+    if not user_config.updates.check_on_startup:
+        return
+
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    if single_shot is None:
+        _run_startup_update_check(content, qt_widgets)
+        return
+
+    single_shot(0, lambda: _run_startup_update_check(content, qt_widgets))
+
+
+def _run_startup_update_check(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector import __version__
+    from pipeline_inspector.studio_config import StudioConfig
+    from pipeline_inspector.ui.update_wizard import (
+        format_update_wizard_user_message,
+        run_update_check_only,
+    )
+
+    studio_config = getattr(content, STUDIO_CONFIG_ATTR, None)
+    if studio_config is not None and not isinstance(studio_config, StudioConfig):
+        studio_config = None
+
+    try:
         result = run_update_check_only(
             installed_version=__version__,
             studio_config=studio_config,
         )
-        message = format_update_wizard_user_message(
-            result,
-            installed_version=__version__,
-        )
-        _set_label_text(
-            content,
-            qt_widgets,
-            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
-            message.replace("\n", " "),
-        )
-        _show_information_dialog(
-            qt_widgets,
-            "Check for Updates",
-            message,
-            singleton_key="pipelineInspectorCheckForUpdates",
-        )
-    except Exception as exc:
-        _show_information_dialog(
-            qt_widgets,
-            "Check for Updates",
-            f"Update check failed: {exc}",
-            singleton_key="pipelineInspectorCheckForUpdates",
-        )
-        raise
+    except Exception:
+        return
+
+    if result.up_to_date or result.skipped_reason == "disabled":
+        return
+    if not result.update_available and not result.error_message:
+        return
+
+    message = format_update_wizard_user_message(
+        result,
+        installed_version=__version__,
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        message.replace("\n", " "),
+    )
 
 
 def _maya_main_window_widget(qt_widgets: Any) -> Any | None:
     try:
         import shiboken2  # type: ignore[import-not-found]
-        from maya import OpenMayaUI as omui  # type: ignore[import-not-found]
+        from maya import OpenMayaUI as omui
 
         main_window_ptr = omui.MQtUtil.mainWindow()
         if main_window_ptr is None:
@@ -308,6 +429,12 @@ def _maya_main_window_widget(qt_widgets: Any) -> Any | None:
 
 
 def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.ui.bug_report_dialog import BUG_REPORT_DIALOG_OBJECT_NAME
+    from pipeline_inspector.ui.settings_widgets import try_reactivate_modal_dialog
+
+    if try_reactivate_modal_dialog(BUG_REPORT_DIALOG_OBJECT_NAME):
+        return
+
     from pipeline_inspector import __version__
     from pipeline_inspector.integrations.bug_report import (
         build_bug_report_payload,
@@ -322,10 +449,7 @@ def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
         validation_result = getattr(content, "_pipeline_inspector_last_validation_result", None)
         scene_path = getattr(content, "_pipeline_inspector_scene_path", "") or _current_scene_path()
         profile_id = getattr(content, "_pipeline_inspector_profile_id", "")
-        maya_version = ""
-        snapshot = getattr(content, "_pipeline_inspector_snapshot", None)
-        if snapshot is not None:
-            maya_version = str(getattr(snapshot, "maya_version", "") or "")
+        maya_version = _resolve_maya_version_for_bug_report(content)
 
         health_score = None
         validation_summary = ""
@@ -358,9 +482,25 @@ def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
 
     show_bug_report_dialog(
         qt_widgets,
-        parent=content,
+        parent=_maya_main_window_widget(qt_widgets),
         on_submit=submit_form,
     )
+
+
+def _resolve_maya_version_for_bug_report(content: Any) -> str:
+    snapshot = getattr(content, "_pipeline_inspector_snapshot", None)
+    if snapshot is not None:
+        version = str(getattr(snapshot, "maya_version", "") or "").strip()
+        if version:
+            return version
+    try:
+        cmds = _maya_cmds()
+        version = str(cmds.about(version=True) or "").strip()
+        if version:
+            return version
+    except RuntimeError:
+        return ""
+    return ""
 
 
 def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -3287,8 +3427,33 @@ def _print_export_result(result: Any) -> None:
     )
 
 
-def _workspace_control_exists(cmds: Any) -> bool:
-    return bool(cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True))
+def _purge_obsolete_workspace_controls(cmds: Any) -> None:
+    for name in OBSOLETE_WORKSPACE_CONTROL_NAMES:
+        _purge_named_workspace_control(cmds, name)
+
+
+def _purge_named_workspace_control(cmds: Any, name: str) -> None:
+    if not _workspace_control_exists(cmds, name):
+        _remove_workspace_control_state(cmds, name)
+        return
+    with suppress(Exception):
+        cmds.workspaceControl(name, edit=True, visible=False)
+    with suppress(Exception):
+        cmds.workspaceControl(name, edit=True, close=True)
+    with suppress(Exception):
+        cmds.deleteUI(name, control=True)
+    _remove_workspace_control_state(cmds, name)
+
+
+def _remove_workspace_control_state(cmds: Any, name: str) -> None:
+    with suppress(Exception):
+        if cmds.workspaceControlState(name, query=True, exists=True):
+            cmds.workspaceControlState(name, remove=True)
+
+
+def _workspace_control_exists(cmds: Any, name: str | None = None) -> bool:
+    control_name = name or WORKSPACE_CONTROL_NAME
+    return bool(cmds.workspaceControl(control_name, query=True, exists=True))
 
 
 def _maya_cmds() -> Any:

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
 from pipeline_inspector.core.rule_loader import RuleOverride
+from pipeline_inspector.integrations.bug_report.config import DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
 from pipeline_inspector.integrations.deadline.config import DeadlineConfig
 from pipeline_inspector.studio_config import (
     LEGACY_STUDIO_CONFIG_SCHEMA_VERSION,
@@ -24,6 +25,7 @@ from pipeline_inspector.studio_config import (
     WaiverDefaultsSettings,
     load_studio_config,
     merge_studio_rule_overrides,
+    resolve_bug_report_config,
     resolve_deadline_config,
     resolve_discord_config,
     resolve_slack_config,
@@ -31,6 +33,22 @@ from pipeline_inspector.studio_config import (
     resolve_telegram_config,
     save_studio_config,
 )
+
+
+def test_resolve_bug_report_config_uses_public_relay_without_api_key():
+    config = StudioConfig(
+        bug_report=BugReportSettings(
+            enabled=True,
+            relay_url="",
+            api_key="",
+        )
+    )
+
+    resolved = resolve_bug_report_config(config)
+
+    assert resolved is not None
+    assert resolved.relay_url == DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
+    assert resolved.api_key == ""
 
 
 def test_studio_config_disables_tx_rules_when_not_required():

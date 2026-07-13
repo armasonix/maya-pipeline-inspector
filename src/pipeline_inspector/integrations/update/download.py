@@ -13,6 +13,7 @@ DownloadTransport = Callable[[str, float], bytes]
 DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 120.0
 UPDATE_STAGING_DIRNAME = "updates"
 UPDATE_STAGING_SUBDIR = "staging"
+_GITHUB_API_BASE_URL = "https://api.github.com"
 
 
 def default_download_transport(url: str, timeout: float) -> bytes:
@@ -33,6 +34,69 @@ def default_download_transport(url: str, timeout: float) -> bytes:
         ) from exc
 
 
+def resolve_release_asset_download(
+    asset: ReleaseAsset,
+    *,
+    owner: str = "",
+    repo: str = "",
+    github_token: str = "",
+) -> tuple[str, dict[str, str]]:
+    """Return the download URL and headers for a GitHub release asset."""
+
+    headers = {"User-Agent": "maya-pipeline-inspector"}
+    token = str(github_token or "").strip()
+    owner_name = str(owner or "").strip()
+    repo_name = str(repo or "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if token and asset.asset_id and owner_name and repo_name:
+        api_url = (
+            f"{_GITHUB_API_BASE_URL}/repos/{owner_name}/{repo_name}"
+            f"/releases/assets/{asset.asset_id}"
+        )
+        headers["Accept"] = "application/octet-stream"
+        return api_url, headers
+    return asset.download_url, headers
+
+
+def _download_bytes_with_headers(
+    url: str,
+    headers: dict[str, str],
+    timeout: float,
+) -> bytes:
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.read()
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"GitHub asset download returned HTTP {exc.code}: {body or exc.reason}"
+        ) from exc
+
+
+def make_authenticated_download_transport(
+    asset: ReleaseAsset,
+    *,
+    owner: str,
+    repo: str,
+    github_token: str,
+) -> DownloadTransport:
+    """Build a transport that authenticates private GitHub release asset downloads."""
+
+    download_url, headers = resolve_release_asset_download(
+        asset,
+        owner=owner,
+        repo=repo,
+        github_token=github_token,
+    )
+
+    def _transport(_ignored_url: str, timeout: float) -> bytes:
+        return _download_bytes_with_headers(download_url, headers, timeout)
+
+    return _transport
+
+
 def select_update_asset(assets: tuple[ReleaseAsset, ...]) -> ReleaseAsset | None:
     """Pick the preferred install package from a GitHub release asset list."""
 
@@ -40,13 +104,35 @@ def select_update_asset(assets: tuple[ReleaseAsset, ...]) -> ReleaseAsset | None
         return None
 
     zip_assets = [asset for asset in assets if asset.name.lower().endswith(".zip")]
-    for asset in zip_assets:
+    if not zip_assets:
+        return None
+
+    def preference_key(asset: ReleaseAsset) -> tuple[int, str]:
         lowered = asset.name.lower()
+        if _is_legacy_shader_health_asset(lowered):
+            return (-1, lowered)
+        if lowered.startswith("maya-pipeline-inspector") and lowered.endswith(".zip"):
+            return (3, lowered)
         if "maya-pipeline-inspector" in lowered:
-            return asset
-    if zip_assets:
-        return zip_assets[0]
-    return assets[0]
+            return (2, lowered)
+        if "pipeline-inspector" in lowered or "pipeline_inspector" in lowered:
+            return (1, lowered)
+        return (0, lowered)
+
+    candidates = [asset for asset in zip_assets if preference_key(asset)[0] >= 0]
+    if not candidates:
+        return None
+
+    return max(candidates, key=preference_key)
+
+
+def _is_legacy_shader_health_asset(name: str) -> bool:
+    legacy_markers = (
+        "shader-health",
+        "shader_health",
+        "maya-shader-health",
+    )
+    return any(marker in name for marker in legacy_markers)
 
 
 def default_update_staging_root() -> Path:

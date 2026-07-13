@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pipeline_inspector.integrations.bug_report.config import BugReportRelayConfig
+from pipeline_inspector.integrations.bug_report.config import (
+    BugReportRelayConfig,
+    effective_bug_report_relay_url,
+)
 from pipeline_inspector.integrations.bug_report.payload import BugReportPayload
 from pipeline_inspector.integrations.bug_report.throttle import (
     RATE_LIMITED_SKIPPED_REASON,
@@ -26,6 +29,7 @@ JPEG_MAGIC_PREFIX = b"\xff\xd8\xff"
 SCREENSHOT_FIELD_NAME = "screenshot"
 SCREENSHOT_FILENAME = "screenshot.jpg"
 PAYLOAD_FIELD_NAME = "payload"
+BUG_REPORT_USER_AGENT = "maya-pipeline-inspector"
 
 @dataclass(frozen=True)
 class HttpRequest:
@@ -81,9 +85,9 @@ class BugReportRelayClient:
     ) -> BugReportRelayResult:
         """Submit a bug report payload to the configured relay URL."""
 
-        relay_url = self._config.relay_url.strip()
+        relay_url = effective_bug_report_relay_url(self._config.relay_url)
         api_key = self._config.api_key.strip()
-        if not relay_url or not api_key:
+        if not relay_url:
             return BugReportRelayResult(
                 submitted=False,
                 skipped_reason="incomplete_config",
@@ -107,15 +111,18 @@ class BugReportRelayClient:
                 else None
             ),
         )
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": content_type,
+            "User-Agent": BUG_REPORT_USER_AGENT,
+        }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         request = HttpRequest(
             method="POST",
             url=relay_url,
             body=body,
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": content_type,
-            },
+            headers=headers,
         )
         response = self._transport(request, self._config.timeout_seconds)
         issue_url = parse_issue_url(response)
@@ -275,6 +282,7 @@ def is_jpeg_bytes(data: bytes) -> bool:
 
     return len(data) >= 3 and data[:3] == JPEG_MAGIC_PREFIX
 
+
 def _relay_error_message(response: RelayResponse) -> str:
     if isinstance(response.json_data, dict):
         for key in ("error", "message", "detail"):
@@ -282,6 +290,12 @@ def _relay_error_message(response: RelayResponse) -> str:
             if value:
                 return value
     body = response.body.strip()
+    if body and "blocked access based on your browser" in body.lower():
+        return (
+            "Bug report relay blocked by Cloudflare bot protection. "
+            "Retry after plugin update; maintainer may need a WAF allow rule "
+            f"for User-Agent {BUG_REPORT_USER_AGENT}."
+        )
     if body:
         return body
     return f"relay_http_{response.status_code}"

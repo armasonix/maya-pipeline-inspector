@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Optional
 
+from pipeline_inspector.integrations.bug_report.config import DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
 from pipeline_inspector.studio_config import (
     DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY,
     BugReportSettings,
@@ -72,8 +73,8 @@ def build_bug_report_section(
 
     intro = qt_widgets.QLabel(
         "Enable artist reports when Pipeline Inspector itself misbehaves. "
-        "The studio relay forwards submissions to plugin maintainers as GitHub issues. "
-        "Configure relay URL and API key in pipeline_inspector_studio.json."
+        "By default submissions use the public maintainer relay; studios may override "
+        "relay URL and API key in pipeline_inspector_studio.json."
     )
     intro.setWordWrap(True)
     section_layout.addWidget(intro)
@@ -120,7 +121,7 @@ def build_bug_report_section(
             label="Relay URL",
             object_name=SETTINGS_BUG_REPORT_RELAY_URL_INPUT_OBJECT_NAME,
             value=bug_report.relay_url,
-            placeholder="https://pipeline.studio.internal/shader-health/bug-report",
+            placeholder=DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
             on_changed=on_settings_changed,
         )
     )
@@ -130,7 +131,7 @@ def build_bug_report_section(
             label="API key",
             object_name=SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME,
             value=bug_report.api_key,
-            placeholder="studio-relay-api-key",
+            placeholder="optional for public relay",
             secret=True,
             on_changed=on_settings_changed,
         )

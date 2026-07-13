@@ -62,6 +62,12 @@ def python_plugin_name() -> str:
     return "pipeline_inspector.py"
 
 
+def python_plugin_path() -> Path:
+    """Python fallback plug-in kept outside Plug-in Manager scan root."""
+
+    return module_root() / "plug-ins" / "fallback" / python_plugin_name()
+
+
 INSTALL_MODE_NATIVE_YEAR = "native_year"
 INSTALL_MODE_NATIVE_MANAGER = "native_manager"
 INSTALL_MODE_PYTHON = "python"
@@ -75,32 +81,70 @@ def detect_install_mode(maya_year: str | None = None) -> str:
         return INSTALL_MODE_NATIVE_YEAR
     if manager_native_plugin_path().is_file():
         return INSTALL_MODE_NATIVE_MANAGER
-    if (module_root() / "plug-ins" / python_plugin_name()).is_file():
+    if python_plugin_path().is_file():
         return INSTALL_MODE_PYTHON
     return INSTALL_MODE_MODULE_ONLY
 
 
-def plugin_load_candidates(maya_year: str | None = None) -> tuple[str, ...]:
-    """Plug-in paths to try in load order (native binary first, then .py fallback)."""
+def canonical_plugin_path(maya_year: str | None = None) -> str | None:
+    """Single plug-in path for Plug-in Manager and autoload persistence."""
 
-    candidates: list[str] = []
-    seen: set[str] = set()
-
-    def add(path: Path | str) -> None:
-        text = str(path)
-        if text not in seen:
-            seen.add(text)
-            candidates.append(text)
-
+    manager_path = manager_native_plugin_path()
+    if manager_path.is_file():
+        return str(manager_path)
     if maya_year:
         year_path = native_plugin_path(maya_year)
         if year_path.is_file():
-            add(year_path)
-    manager_path = manager_native_plugin_path()
-    if manager_path.is_file():
-        add(manager_path)
-    add(python_plugin_name())
-    return tuple(candidates)
+            return str(year_path)
+    py_path = python_plugin_path()
+    if py_path.is_file():
+        return str(py_path)
+    return None
+
+
+def plugin_load_candidates(maya_year: str | None = None) -> tuple[str, ...]:
+    """Return canonical native path first, then hidden .py only as a load fallback."""
+
+    path = canonical_plugin_path(maya_year)
+    if not path:
+        return ()
+    if path.endswith(".py"):
+        return (path,)
+    py_path = python_plugin_path()
+    if py_path.is_file():
+        return (path, str(py_path))
+    return (path,)
+
+
+def apply_pending_native_plugin_binaries() -> int:
+    """Apply staged native plug-in binaries before Maya loads the plug-in."""
+
+    plug_ins = module_root() / "plug-ins"
+    if not plug_ins.is_dir():
+        return 0
+
+    suffix = native_plugin_suffix()
+    applied = 0
+    for pending_path in plug_ins.rglob(f"*{suffix}.pending"):
+        target = Path(str(pending_path)[: -len(".pending")])
+        try:
+            if target.exists():
+                target.unlink()
+            pending_path.replace(target)
+            applied += 1
+        except OSError:
+            continue
+    return applied
+
+
+def enable_plugin_autoload(plugin_file: str, cmds_module: Any) -> bool:
+    """Persist Auto load for the plug-in path Maya actually registered."""
+
+    try:
+        cmds_module.pluginInfo(plugin_file, edit=True, autoload=True)
+        return True
+    except Exception:
+        return False
 
 
 def describe_dual_install(maya_year: str | None = None) -> dict[str, object]:

@@ -88,6 +88,7 @@ examples/**/generated/
 .DS_Store
 Thumbs.db
 desktop.ini
+/relay
 
 # IDE / editor
 .vscode/

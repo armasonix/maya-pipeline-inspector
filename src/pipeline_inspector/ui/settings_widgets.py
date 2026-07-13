@@ -174,10 +174,6 @@ def show_modal_dialog(
 
     configure_maya_modal_dialog(dialog, qt_widgets)
 
-    set_parent = getattr(dialog, "setParent", None)
-    if parent is not None and set_parent is not None:
-        set_parent(parent)
-
     if singleton_key:
         _ACTIVE_MAYA_MODAL_DIALOGS[singleton_key] = dialog
 

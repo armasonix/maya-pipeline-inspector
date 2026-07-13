@@ -8,7 +8,6 @@ from typing import Any
 from pipeline_inspector.integrations.bug_report.relay_client import BugReportRelayResult
 from pipeline_inspector.integrations.bug_report.status import (
     format_bug_report_failure_status,
-    format_bug_report_issue_url_text,
     format_bug_report_success_headline,
 )
 from pipeline_inspector.ui.settings_widgets import wire_button
@@ -49,6 +48,7 @@ class BugReportDialog:
     """Controller for the bug report submission dialog."""
 
     dialog: Any
+    intro_label: Any
     form_widget: Any
     success_widget: Any
     title_input: Any
@@ -170,6 +170,7 @@ class BugReportDialog:
 
         controller = cls(
             dialog=dialog,
+            intro_label=intro,
             form_widget=form_widget,
             success_widget=success_widget,
             title_input=title_input,
@@ -210,13 +211,16 @@ class BugReportDialog:
         self.apply_submit_result(result)
 
     def _show_success(self, issue_url: str) -> None:
+        _ = issue_url
+        _set_widget_visible(self.intro_label, False)
         _set_widget_visible(self.form_widget, False)
         _set_widget_visible(self.success_widget, True)
         _set_label_text(self.status_label, format_bug_report_success_headline())
-        _set_widget_visible(self.issue_url_caption, True)
-        _set_label_text(self.issue_url_label, format_bug_report_issue_url_text(issue_url))
-        _set_button_enabled(self.submit_button, False)
-        _set_button_text(self.submit_button, "Submitted")
+        _set_widget_visible(self.issue_url_caption, False)
+        _set_widget_visible(self.issue_url_label, False)
+        _set_label_text(self.issue_url_label, "")
+        _set_widget_visible(self.submit_button, False)
+        _compact_bug_report_dialog(self.dialog)
 
     def _show_failure(self, message: str) -> None:
         _set_widget_visible(self.form_widget, True)
@@ -235,17 +239,16 @@ def show_bug_report_dialog(
 
     controller = BugReportDialog.build(qt_widgets, on_submit=on_submit)
     dialog = controller.dialog
-    set_parent = getattr(dialog, "setParent", None)
-    if set_parent is not None and parent is not None:
-        set_parent(parent)
-    exec_dialog = getattr(dialog, "exec", None) or getattr(dialog, "exec_", None)
-    if exec_dialog is not None:
-        exec_dialog()
-    else:
-        show = getattr(dialog, "show", None)
-        if show is not None:
-            show()
+    from pipeline_inspector.ui.settings_widgets import show_modal_dialog
+
+    show_modal_dialog(
+        dialog,
+        qt_widgets,
+        parent=parent,
+        singleton_key=BUG_REPORT_DIALOG_OBJECT_NAME,
+    )
     return dialog
+
 
 def _build_line_edit(
     qt_widgets: Any,
@@ -304,6 +307,24 @@ def _set_widget_visible(widget: Any, visible: bool) -> None:
     set_visible = getattr(widget, "setVisible", None)
     if set_visible is not None:
         set_visible(visible)
+
+def _compact_bug_report_dialog(dialog: Any) -> None:
+    adjust_size = getattr(dialog, "adjustSize", None)
+    if adjust_size is not None:
+        adjust_size()
+    size_hint = getattr(dialog, "sizeHint", None)
+    set_fixed_size = getattr(dialog, "setFixedSize", None)
+    if size_hint is None or set_fixed_size is None:
+        return
+    hint = size_hint()
+    width_fn = getattr(hint, "width", None)
+    height_fn = getattr(hint, "height", None)
+    if width_fn is None or height_fn is None:
+        return
+    width = max(int(width_fn()), 320)
+    height = max(int(height_fn()), 100)
+    set_fixed_size(width, min(height, 160))
+
 
 def _close_dialog(dialog: Any) -> None:
     reject = getattr(dialog, "reject", None)

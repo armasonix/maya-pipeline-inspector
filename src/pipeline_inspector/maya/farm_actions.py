@@ -301,6 +301,6 @@ def _safe_current_scene_path() -> str:
         return ""
 
 def _maya_cmds() -> Any:
-    import maya.cmds as cmds  # type: ignore[import-not-found]
+    import maya.cmds as cmds
 
     return cmds

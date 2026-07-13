@@ -178,9 +178,11 @@ class FakeApplication:
 
 class FakeQt:
     ApplicationModal = 32
+    Window = 1
     Dialog = 2
     WindowTitleHint = 4
     WindowCloseButtonHint = 8
+    WindowStaysOnTopHint = 16
 
 
 class FakeQTimer:
@@ -271,7 +273,32 @@ def test_select_update_asset_prefers_maya_module_zip():
     selected = select_update_asset(assets)
 
     assert selected is not None
-    assert selected.name.endswith(".zip")
+    assert selected.name == "maya-pipeline-inspector-0.5.0.zip"
+
+
+def test_run_update_wizard_flow_reports_missing_install_package():
+    controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
+    payload = _release_payload(tag_name="v0.5.0")
+    payload["assets"] = [
+        {
+            "id": 99,
+            "name": "pipeline_inspector.mll",
+            "browser_download_url": "https://example.test/pipeline_inspector.mll",
+            "size": 64,
+            "content_type": "application/octet-stream",
+        }
+    ]
+
+    result = run_update_wizard_flow(
+        controller,
+        installed_version="0.4.0",
+        transport=_github_transport(payload),
+    )
+
+    assert result.completed is False
+    assert result.update_available is True
+    assert "maya-pipeline-inspector-" in result.error_message
+    assert "pipeline_inspector.mll" not in result.error_message
 
 
 def test_run_update_wizard_flow_reports_up_to_date_and_enables_close():
@@ -396,9 +423,12 @@ def test_show_update_wizard_runs_modal_flow_with_parent_and_process_events():
     )
 
     assert session.dialog.exec_called is True
-    assert session.dialog.parent is parent
+    assert session.dialog.parent is None
     assert session.dialog.window_flags == (
-        FakeQt.Dialog | FakeQt.WindowTitleHint | FakeQt.WindowCloseButtonHint
+        FakeQt.Window
+        | FakeQt.WindowTitleHint
+        | FakeQt.WindowCloseButtonHint
+        | FakeQt.WindowStaysOnTopHint
     )
     assert session.result.up_to_date is True
     assert app.process_events_calls >= 1

@@ -1,0 +1,49 @@
+# Build and attach release assets when a version tag is pushed.
+#
+# Requires a Windows self-hosted runner with labels `self-hosted` and `maya`
+# (same family as maya-integration.yml). The job builds native pipeline_inspector.mll
+# plug-ins for installed Maya years, then packages maya_module/ + src/ + .mll into one
+# zip consumed by the in-app Check for Updates wizard.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: powershell
+
+jobs:
+  release-assets:
+    name: Build native plug-ins and release zip
+    runs-on: [self-hosted, maya]
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build native plug-ins and release zip
+        run: |
+          .\tools\build_release_assets.ps1 -OutputDir dist
+
+      - name: Verify release zip bundles native plug-ins
+        run: |
+          python -c "from pathlib import Path; import zipfile; from tools.build_release_package import list_native_plugins_in_zip; dist=Path('dist'); zips=sorted(dist.glob('maya-pipeline-inspector-*.zip')); assert zips, 'Release zip not found'; archive=zipfile.ZipFile(zips[-1]); bundled=list_native_plugins_in_zip(archive); print('Bundled native plug-ins:'); [print('  ' + item) for item in bundled]; assert any('/2024/' in item for item in bundled), 'Missing 2024 .mll'; assert any('/2025/' in item for item in bundled), 'Missing 2025 .mll'; assert 'maya_module/plug-ins/pipeline_inspector.mll' in bundled, 'Missing manager .mll'"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/maya-pipeline-inspector-*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
