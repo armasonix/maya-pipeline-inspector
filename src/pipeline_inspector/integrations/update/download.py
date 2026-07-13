@@ -40,13 +40,35 @@ def select_update_asset(assets: tuple[ReleaseAsset, ...]) -> ReleaseAsset | None
         return None
 
     zip_assets = [asset for asset in assets if asset.name.lower().endswith(".zip")]
-    for asset in zip_assets:
+    if not zip_assets:
+        return None
+
+    def preference_key(asset: ReleaseAsset) -> tuple[int, str]:
         lowered = asset.name.lower()
+        if _is_legacy_shader_health_asset(lowered):
+            return (-1, lowered)
+        if lowered.startswith("maya-pipeline-inspector") and lowered.endswith(".zip"):
+            return (3, lowered)
         if "maya-pipeline-inspector" in lowered:
-            return asset
-    if zip_assets:
-        return zip_assets[0]
-    return assets[0]
+            return (2, lowered)
+        if "pipeline-inspector" in lowered or "pipeline_inspector" in lowered:
+            return (1, lowered)
+        return (0, lowered)
+
+    candidates = [asset for asset in zip_assets if preference_key(asset)[0] >= 0]
+    if not candidates:
+        return None
+
+    return max(candidates, key=preference_key)
+
+
+def _is_legacy_shader_health_asset(name: str) -> bool:
+    legacy_markers = (
+        "shader-health",
+        "shader_health",
+        "maya-shader-health",
+    )
+    return any(marker in name for marker in legacy_markers)
 
 
 def default_update_staging_root() -> Path:

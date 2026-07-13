@@ -271,7 +271,32 @@ def test_select_update_asset_prefers_maya_module_zip():
     selected = select_update_asset(assets)
 
     assert selected is not None
-    assert selected.name.endswith(".zip")
+    assert selected.name == "maya-pipeline-inspector-0.5.0.zip"
+
+
+def test_run_update_wizard_flow_reports_missing_install_package():
+    controller = UpdateProgressDialog.build(FakeQtWidgets, installed_version="0.4.0")
+    payload = _release_payload(tag_name="v0.5.0")
+    payload["assets"] = [
+        {
+            "id": 99,
+            "name": "pipeline_inspector.mll",
+            "browser_download_url": "https://example.test/pipeline_inspector.mll",
+            "size": 64,
+            "content_type": "application/octet-stream",
+        }
+    ]
+
+    result = run_update_wizard_flow(
+        controller,
+        installed_version="0.4.0",
+        transport=_github_transport(payload),
+    )
+
+    assert result.completed is False
+    assert result.update_available is True
+    assert "maya-pipeline-inspector-" in result.error_message
+    assert "pipeline_inspector.mll" not in result.error_message
 
 
 def test_run_update_wizard_flow_reports_up_to_date_and_enables_close():

@@ -58,7 +58,10 @@ UPDATE_WIZARD_STATUS_PINNED = (
     "Studio policy pins Pipeline Inspector to v{pinned_version}; skipping download."
 )
 UPDATE_WIZARD_STATUS_QUERY_FAILED = "Could not query GitHub Releases: {error}"
-UPDATE_WIZARD_STATUS_NO_ASSETS = "Latest release {tag_name} has no downloadable assets."
+UPDATE_WIZARD_STATUS_NO_ASSETS = (
+    "Latest release {tag_name} has no install package. "
+    "Expected a GitHub asset named maya-pipeline-inspector-<version>.zip."
+)
 UPDATE_WIZARD_STATUS_DOWNLOAD_FAILED = "Download failed: {error}"
 
 InstallHandler = Callable[[Path, GitHubRelease], "UpdateInstallOutcome"]
@@ -147,6 +150,7 @@ def run_update_wizard_flow(
     install_handler: InstallHandler | None = None,
     download_transport: Callable[[str, float], bytes] | None = None,
     process_ui: ProcessUiCallback | None = None,
+    compare_only: bool = False,
 ) -> UpdateWizardResult:
     """Advance the update dialog through check, download, install, and restart stages."""
 
@@ -228,6 +232,16 @@ def run_update_wizard_flow(
             completed=True,
             update_available=False,
             up_to_date=True,
+            installed_version=installed_version,
+            latest_version=check_result.latest_version,
+            tag_name=check_result.tag_name,
+        )
+
+    if compare_only:
+        _finish_wizard(controller, process_ui=_refresh_ui)
+        return UpdateWizardResult(
+            completed=True,
+            update_available=True,
             installed_version=installed_version,
             latest_version=check_result.latest_version,
             tag_name=check_result.tag_name,
@@ -448,6 +462,7 @@ def run_update_check_only(
         install_handler=install_handler,
         download_transport=download_transport,
         process_ui=lambda: None,
+        compare_only=True,
     )
 
 
@@ -465,10 +480,15 @@ def format_update_wizard_user_message(
         return f"Pipeline Inspector v{version} is already up to date."
     if result.error_message:
         return result.error_message
-    if result.completed and result.update_available:
+    if result.completed and result.update_available and result.staging_path:
         return (
             f"Update installed: v{result.installed_version} → v{result.latest_version}. "
             "Save your scene, restart Maya, and reopen Pipeline Inspector."
+        )
+    if result.update_available:
+        return (
+            f"Update available: v{result.installed_version or installed_version} "
+            f"→ v{result.latest_version}. Open Check for Updates to download and install."
         )
     return "Update check finished."
 

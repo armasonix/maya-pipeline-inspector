@@ -210,6 +210,7 @@ def _create_dockable_panel() -> Any:
         apply_panel_theme(content, user_config.theme, dock=self)
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
+        _maybe_run_startup_update_check(content, qt_widgets, user_config)
 
     panel_class = type(
         "PipelineInspectorDock",
@@ -246,27 +247,30 @@ def _panel_navigation_callbacks(
 
 def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.ui.settings_widgets import try_reactivate_modal_dialog
+    from pipeline_inspector.ui.update_modal import show_update_modal_shell
+    from pipeline_inspector.ui.update_progress_dialog import UPDATE_PROGRESS_DIALOG_OBJECT_NAME
 
-    if try_reactivate_modal_dialog("pipelineInspectorCheckForUpdates"):
+    if try_reactivate_modal_dialog(UPDATE_PROGRESS_DIALOG_OBJECT_NAME):
         return
+
     try:
         from pipeline_inspector import __version__
         from pipeline_inspector.studio_config import StudioConfig
-        from pipeline_inspector.ui.update_wizard import (
-            format_update_wizard_user_message,
-            run_update_check_only,
-        )
+        from pipeline_inspector.ui.update_wizard import format_update_wizard_user_message
 
         studio_config = getattr(content, "_pipeline_inspector_studio_config", None)
         if studio_config is not None and not isinstance(studio_config, StudioConfig):
             studio_config = None
 
-        result = run_update_check_only(
+        parent = _maya_main_window_widget(qt_widgets) or content
+        session = show_update_modal_shell(
+            qt_widgets,
+            parent=parent,
             installed_version=__version__,
             studio_config=studio_config,
         )
         message = format_update_wizard_user_message(
-            result,
+            session.result,
             installed_version=__version__,
         )
         _set_label_text(
@@ -274,12 +278,6 @@ def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None
             qt_widgets,
             main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
             message.replace("\n", " "),
-        )
-        _show_information_dialog(
-            qt_widgets,
-            "Check for Updates",
-            message,
-            singleton_key="pipelineInspectorCheckForUpdates",
         )
     except Exception as exc:
         _show_information_dialog(
@@ -289,6 +287,62 @@ def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None
             singleton_key="pipelineInspectorCheckForUpdates",
         )
         raise
+
+
+def _maybe_run_startup_update_check(
+    content: Any,
+    qt_widgets: Any,
+    user_config: UserPreferences,
+) -> None:
+    """Run a deferred check-only update query when the user pref requests it."""
+
+    if not user_config.updates.check_on_startup:
+        return
+
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    if single_shot is None:
+        _run_startup_update_check(content, qt_widgets)
+        return
+
+    single_shot(0, lambda: _run_startup_update_check(content, qt_widgets))
+
+
+def _run_startup_update_check(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector import __version__
+    from pipeline_inspector.studio_config import StudioConfig
+    from pipeline_inspector.ui.update_wizard import (
+        format_update_wizard_user_message,
+        run_update_check_only,
+    )
+
+    studio_config = getattr(content, STUDIO_CONFIG_ATTR, None)
+    if studio_config is not None and not isinstance(studio_config, StudioConfig):
+        studio_config = None
+
+    try:
+        result = run_update_check_only(
+            installed_version=__version__,
+            studio_config=studio_config,
+        )
+    except Exception:
+        return
+
+    if result.up_to_date or result.skipped_reason == "disabled":
+        return
+    if not result.update_available and not result.error_message:
+        return
+
+    message = format_update_wizard_user_message(
+        result,
+        installed_version=__version__,
+    )
+    _set_label_text(
+        content,
+        qt_widgets,
+        main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+        message.replace("\n", " "),
+    )
 
 
 def _maya_main_window_widget(qt_widgets: Any) -> Any | None:

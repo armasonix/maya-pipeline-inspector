@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
@@ -19,6 +21,15 @@ ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_PATH = ROOT / "maya_module" / "scripts" / "pipeline_inspector_bootstrap.py"
 USER_SETUP_PATH = ROOT / "maya_module" / "scripts" / "userSetup.py"
 PLUGIN_PATH = ROOT / "maya_module" / "plug-ins" / "pipeline_inspector.py"
+
+
+@pytest.fixture(autouse=True)
+def _reset_user_setup_main_flags() -> None:
+    import __main__
+
+    for name in ("_pipeline_inspector_deferred", "_pipeline_inspector_startup_done"):
+        if hasattr(__main__, name):
+            delattr(__main__, name)
 
 
 def load_module(path: Path, module_name: str) -> ModuleType:
@@ -109,30 +120,40 @@ def test_maya_year_from_version_extracts_four_digit_year():
     assert bootstrap.maya_year_from_version("unsupported") is None
 
 
-def test_plugin_load_candidates_prefers_native_binary_on_windows(monkeypatch):
+def _expected_candidates(bootstrap, maya_year: str | None) -> tuple[str, ...]:
+    canonical = bootstrap.canonical_plugin_path(maya_year)
+    if not canonical:
+        return ()
+    if canonical.endswith(".py"):
+        return (canonical,)
+    py_name = bootstrap.python_plugin_name()
+    py_path = bootstrap.module_root() / "plug-ins" / py_name
+    if py_path.is_file():
+        return (canonical, py_name)
+    return (canonical,)
+
+
+def test_plugin_load_candidates_prefers_manager_copy_on_windows(monkeypatch):
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_candidates")
     monkeypatch.setattr("sys.platform", "win32")
 
     assert bootstrap.plugin_load_candidates("2024") == _expected_candidates(bootstrap, "2024")
     assert bootstrap.plugin_load_candidates(None) == _expected_candidates(bootstrap, None)
 
-
-def _expected_candidates(bootstrap, maya_year: str | None) -> tuple[str, ...]:
-    candidates: list[str] = []
-    seen: set[str] = set()
-    if maya_year:
-        year_path = bootstrap.native_plugin_path(maya_year)
-        if year_path.is_file():
-            text = str(year_path)
-            seen.add(text)
-            candidates.append(text)
     manager_path = bootstrap.manager_native_plugin_path()
     if manager_path.is_file():
-        text = str(manager_path)
-        if text not in seen:
-            candidates.append(text)
-    candidates.append("pipeline_inspector.py")
-    return tuple(candidates)
+        assert bootstrap.plugin_load_candidates("2024") == _expected_candidates(bootstrap, "2024")
+
+
+def test_canonical_plugin_path_prefers_manager_over_year(monkeypatch, tmp_path: Path):
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_canonical")
+    plug_ins = tmp_path / "plug-ins"
+    (plug_ins / "2024").mkdir(parents=True)
+    (plug_ins / "2024" / "pipeline_inspector.mll").write_bytes(b"mll")
+    (plug_ins / "pipeline_inspector.mll").write_bytes(b"mll")
+    monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
+
+    assert bootstrap.canonical_plugin_path("2024") == str(plug_ins / "pipeline_inspector.mll")
 
 
 def test_detect_install_mode_native_year(monkeypatch, tmp_path: Path):
@@ -270,11 +291,15 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
     load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_native_plugin")
 
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_native_assert")
-    expected = str(bootstrap.native_plugin_path("2024"))
-    if Path(expected).is_file():
-        assert deferred == ["deferred", f"load:{expected}:True"]
+    manager_path = str(bootstrap.manager_native_plugin_path())
+    year_path = str(bootstrap.native_plugin_path("2024"))
+    if Path(manager_path).is_file():
+        expected_plugin = manager_path
+    elif Path(year_path).is_file():
+        expected_plugin = year_path
     else:
-        assert deferred == ["deferred", "load:pipeline_inspector.py:True"]
+        expected_plugin = "pipeline_inspector.py"
+    assert deferred == ["deferred", f"load:{expected_plugin}:True"]
 
 
 def test_user_setup_falls_back_to_py_plugin(monkeypatch):
@@ -327,14 +352,17 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
     load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_py_fallback")
 
     bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_py_fallback_assert")
-    native_path = str(bootstrap.native_plugin_path("2024"))
     manager_path = str(bootstrap.manager_native_plugin_path())
+    year_path = str(bootstrap.native_plugin_path("2024"))
     expected = ["deferred"]
-    if Path(native_path).is_file():
-        expected.append(f"load:{native_path}:True")
     if Path(manager_path).is_file():
         expected.append(f"load:{manager_path}:True")
-    expected.append("load:pipeline_inspector.py:True")
+        expected.append("load:pipeline_inspector.py:True")
+    elif Path(year_path).is_file():
+        expected.append(f"load:{year_path}:True")
+        expected.append("load:pipeline_inspector.py:True")
+    else:
+        expected.append("load:pipeline_inspector.py:True")
     assert deferred == expected
 
 

@@ -345,3 +345,91 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
     ui_launcher._maybe_notify_validation(content, object(), result)
 
     assert calls == [("studio-config", result)]
+
+
+def test_show_check_for_updates_opens_progress_wizard(monkeypatch: Any):
+    content = SimpleNamespace(_pipeline_inspector_studio_config=None)
+    calls: list[dict[str, Any]] = []
+
+    class FakeSession:
+        result = SimpleNamespace(
+            up_to_date=True,
+            completed=True,
+            update_available=False,
+            skipped_reason="",
+            error_message="",
+            installed_version="0.5.0",
+            latest_version="0.5.0",
+            tag_name="v0.5.0",
+            staging_path="",
+        )
+
+    def _fake_show_update_modal_shell(_qt_widgets: Any, **kwargs: Any) -> FakeSession:
+        calls.append(kwargs)
+        return FakeSession()
+
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.update_modal.show_update_modal_shell",
+        _fake_show_update_modal_shell,
+    )
+    monkeypatch.setattr(ui_launcher, "_maya_main_window_widget", lambda _qt: "main-window")
+    monkeypatch.setattr(ui_launcher, "_set_label_text", lambda *_args: None)
+
+    ui_launcher._show_check_for_updates_modal_from_ui(content, object())
+
+    assert len(calls) == 1
+    assert calls[0]["parent"] == "main-window"
+    assert calls[0]["installed_version"] == "0.5.0"
+
+
+def test_maybe_run_startup_update_check_skips_when_pref_disabled(monkeypatch: Any):
+    from pipeline_inspector.user_config import UserPreferences
+
+    calls: list[tuple[Any, Any]] = []
+    monkeypatch.setattr(
+        ui_launcher,
+        "_run_startup_update_check",
+        lambda content, qt_widgets: calls.append((content, qt_widgets)),
+    )
+
+    ui_launcher._maybe_run_startup_update_check(
+        SimpleNamespace(),
+        object(),
+        UserPreferences(),
+    )
+
+    assert calls == []
+
+
+def test_run_startup_update_check_sets_status_when_update_available(monkeypatch: Any):
+    content = SimpleNamespace()
+    status_calls: list[str] = []
+
+    class FakeResult:
+        up_to_date = False
+        skipped_reason = ""
+        update_available = True
+        completed = True
+        error_message = ""
+        installed_version = "0.4.0"
+        latest_version = "0.5.0"
+        tag_name = "v0.5.0"
+        staging_path = ""
+
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.update_wizard.run_update_check_only",
+        lambda **_kwargs: FakeResult(),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_set_label_text",
+        lambda _content, _qt, _name, message: status_calls.append(message),
+    )
+
+    ui_launcher._run_startup_update_check(
+        content,
+        object(),
+    )
+
+    assert status_calls
+    assert "0.5.0" in status_calls[0]

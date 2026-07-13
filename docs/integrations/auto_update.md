@@ -99,7 +99,54 @@ Then follow the [Maya restart checklist](#maya-restart-checklist-after-update) b
 }
 ```
 
-`check_on_startup` is stored for future silent **check-only** behavior. Download and install always require opening **Check for Updates** and confirming the wizard (GUI-first clarity per ADR 0007).
+`check_on_startup` triggers a **check-only** query when the panel opens (no download or install). If a newer release is available, the Validate tab status line shows a short message; use **Check for Updates** to open the full progress wizard and install.
+
+## Building release packages
+
+Maintainers build the auto-update zip from the repository root. The archive must include **native `.mll` plug-ins** so artists receive a complete module-path update from **Check for Updates** without manual rebuild steps.
+
+```powershell
+.\tools\build_release_assets.ps1
+```
+
+This script:
+
+1. Builds `pipeline_inspector.mll` for each installed Maya year (2024 / 2025 / 2026 when present)
+2. Produces `dist/maya-pipeline-inspector-{version}.zip` with `maya_module/`, `src/`, and the built `.mll` files
+
+Zip-only packaging without native binaries (not suitable for artist auto-update):
+
+```powershell
+python tools/build_release_package.py
+```
+
+### GitHub Actions release workflow
+
+Pushing a `v*` tag runs [`.github/workflows/release.yml`](../../.github/workflows/release.yml) on the **Windows self-hosted `maya` runner**:
+
+1. Builds native plug-ins for installed Maya years via `tools/build_release_assets.ps1`
+2. Packages `dist/maya-pipeline-inspector-{version}.zip` with `maya_module/`, `src/`, and `.mll` payloads
+3. Attaches that single zip to the GitHub Release for the tag
+
+The update wizard downloads **one zip**; `install.py` merges `maya_module/` (including year-specific `.mll` binaries and the Plug-in Manager copy) and `src/` into the live install root.
+
+### Release zip layout
+
+```text
+maya_module/
+  pipeline_inspector.mod
+  scripts/
+  plug-ins/
+    pipeline_inspector.mll
+    2024/pipeline_inspector.mll
+    2025/pipeline_inspector.mll
+  shelves/
+src/
+  pipeline_inspector/
+    ...
+```
+
+Single top-level folder wrappers (e.g. `maya-pipeline-inspector/maya_module/...`) are accepted.
 
 ## Local staging, backup, and rollback
 
@@ -118,23 +165,6 @@ These files are snapshotted before install and restored after a successful insta
 - `user.json` — discovered via `PIPELINE_INSPECTOR_USER_CONFIG` or `~/.pipeline_inspector/user.json`
 
 They are **not** part of the `maya_module/` / `src/` merge and are never deleted by the update installer.
-
-## Release package layout
-
-The wizard prefers a GitHub release asset named like `maya-pipeline-inspector-{version}.zip`. The archive must unpack to a tree containing:
-
-```text
-maya_module/
-  pipeline_inspector.mod
-  scripts/
-  plug-ins/
-  shelves/
-src/
-  pipeline_inspector/
-    ...
-```
-
-Single top-level folder wrappers (e.g. `maya-pipeline-inspector/maya_module/...`) are accepted.
 
 ## Maya restart checklist after update
 
@@ -160,6 +190,7 @@ If anything looks wrong after restart, TDs can restore from `~/.pipeline_inspect
 | Update available but install skipped (pinned) | `updates.pinned_version` blocks newer tags | TD clears pin or bumps pin after qualification |
 | Install failed; files restored | Bad zip, disk error, or permission issue | Read install-step message; fix permissions; retry or deploy manually from release |
 | Could not query GitHub Releases | Offline machine or proxy blocking GitHub | Use manual download from Releases page; TD deploys zip |
+| Latest release has no install package | Release missing `maya-pipeline-inspector-<version>.zip` asset | Maintainer runs `python tools/build_release_package.py` and attaches zip via release workflow or `gh release upload` |
 | Check works but install does nothing useful | **pip-only** or `src`-only layout | Use [pip upgrade](#option-b--pip-install-manual-update) or switch to module-path checkout |
 | Panel shows old version after restart | Maya still running during copy, or wrong install root | Close Maya fully; confirm `MAYA_MODULE_PATH` points at updated `maya_module/` |
 | Studio settings reverted | Unrelated edit to config file | Installer preserves JSON; restore from backup if file was edited outside the wizard |
