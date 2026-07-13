@@ -1,8 +1,6 @@
 """Download helpers for GitHub Releases update assets."""
 from __future__ import annotations
 
-import json
-import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -16,22 +14,6 @@ DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 120.0
 UPDATE_STAGING_DIRNAME = "updates"
 UPDATE_STAGING_SUBDIR = "staging"
 _GITHUB_API_BASE_URL = "https://api.github.com"
-_UPDATE_DOWNLOAD_TRACE = Path.home() / ".pipeline_inspector" / "update_download_trace.log"
-
-
-def _trace_update_download(event: str, data: dict[str, object]) -> None:
-    payload = {
-        "event": event,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-        "sessionId": "618f4f",
-    }
-    try:
-        _UPDATE_DOWNLOAD_TRACE.parent.mkdir(parents=True, exist_ok=True)
-        with _UPDATE_DOWNLOAD_TRACE.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
 
 
 def default_download_transport(url: str, timeout: float) -> bytes:
@@ -85,18 +67,9 @@ def _download_bytes_with_headers(
     request = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = response.read()
-            _trace_update_download(
-                "download_success",
-                {"status_code": response.status, "payload_bytes": len(payload)},
-            )
-            return payload
+            return response.read()
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        _trace_update_download(
-            "download_http_error",
-            {"status_code": exc.code, "reason": exc.reason, "body_excerpt": body[:200]},
-        )
         raise RuntimeError(
             f"GitHub asset download returned HTTP {exc.code}: {body or exc.reason}"
         ) from exc
@@ -116,17 +89,6 @@ def make_authenticated_download_transport(
         owner=owner,
         repo=repo,
         github_token=github_token,
-    )
-    _trace_update_download(
-        "authenticated_transport",
-        {
-            "asset_name": asset.name,
-            "asset_id": asset.asset_id,
-            "owner": owner,
-            "repo": repo,
-            "token_configured": bool(str(github_token or "").strip()),
-            "uses_api_asset_url": "/releases/assets/" in download_url,
-        },
     )
 
     def _transport(_ignored_url: str, timeout: float) -> bytes:

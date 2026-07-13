@@ -134,8 +134,6 @@ def default_install_handler(
     )
     if result.success:
         try:
-            from pathlib import Path
-
             from pipeline_inspector.integrations.update.install import resolve_default_install_root
             from pipeline_inspector.maya.update_install import finalize_maya_plugin_registration
 

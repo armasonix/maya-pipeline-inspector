@@ -14,7 +14,6 @@ def _install_pipeline_inspector_ui() -> None:
         return
     setattr(__main__, _STARTUP_FLAG, True)
 
-    bootstrap = None
     try:
         import pipeline_inspector_bootstrap as bootstrap
         from maya import cmds  # type: ignore[import-not-found]
@@ -23,20 +22,10 @@ def _install_pipeline_inspector_ui() -> None:
         bootstrap.apply_pending_native_plugin_binaries()
         canonical_path = bootstrap.canonical_plugin_path(maya_year)
 
-        def _enforce_panel_dock() -> None:
-            try:
-                bootstrap._ensure_source_path()
-                from pipeline_inspector.maya.ui_launcher import enforce_startup_panel_layout
-
-                enforce_startup_panel_layout()
-            except Exception:
-                return
-
         try:
             if cmds.pluginInfo(bootstrap.PLUGIN_NAME, query=True, loaded=True):
                 if canonical_path:
                     bootstrap.enable_plugin_autoload(canonical_path, cmds)
-                cmds.evalDeferred(_enforce_panel_dock)
                 return
         except Exception:
             pass
@@ -46,11 +35,9 @@ def _install_pipeline_inspector_ui() -> None:
             try:
                 if cmds.pluginInfo(bootstrap.PLUGIN_NAME, query=True, loaded=True):
                     bootstrap.enable_plugin_autoload(canonical_path or plugin_file, cmds)
-                    cmds.evalDeferred(_enforce_panel_dock)
                     return
                 cmds.loadPlugin(plugin_file, quiet=True)
                 bootstrap.enable_plugin_autoload(canonical_path or plugin_file, cmds)
-                cmds.evalDeferred(_enforce_panel_dock)
                 return
             except Exception as exc:
                 load_failures.append(

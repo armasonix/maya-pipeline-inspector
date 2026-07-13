@@ -86,3 +86,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "pycerebro.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "maya.*"
+ignore_missing_imports = true

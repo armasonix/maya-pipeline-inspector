@@ -5,7 +5,6 @@ from typing import Any, Optional
 
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
 from pipeline_inspector.maya import ui_launcher
-from pipeline_inspector.maya.panel_session import PanelSessionState
 from pipeline_inspector.ui import main_window
 
 
@@ -21,6 +20,17 @@ class FakePanel:
         self.closed = True
 
 
+def _panel_that_creates_workspace(cmds: FakeCmds, panel: FakePanel | None = None) -> FakePanel:
+    panel = panel or FakePanel()
+
+    def show(**kwargs: Any) -> None:
+        panel.show_calls.append(dict(kwargs))
+        cmds.workspace_exists = True
+
+    panel.show = show  # type: ignore[method-assign]
+    return panel
+
+
 class FakeCmds:
     def __init__(self, *, workspace_exists: bool) -> None:
         self.workspace_exists = workspace_exists
@@ -28,15 +38,20 @@ class FakeCmds:
         self.restored: list[str] = []
         self.closed: list[str] = []
         self.docked: list[tuple[str, tuple[str, int]]] = []
+        self.hidden: list[str] = []
 
     def workspaceControl(self, name: str, **kwargs: Any) -> Optional[bool]:
         if kwargs.get("query") and kwargs.get("exists"):
             return self.workspace_exists
+        if kwargs.get("edit") and kwargs.get("visible") is False:
+            self.hidden.append(name)
+            return None
         if kwargs.get("edit") and kwargs.get("restore"):
             self.restored.append(name)
             return None
         if kwargs.get("edit") and kwargs.get("close"):
             self.closed.append(name)
+            self.workspace_exists = False
             return None
         if kwargs.get("edit") and kwargs.get("dockToMainWindow"):
             self.docked.append((name, kwargs["dockToMainWindow"]))
@@ -50,23 +65,35 @@ class FakeCmds:
     def evalDeferred(self, callback: Any, *args: Any, **kwargs: Any) -> None:
         callback(*args, **kwargs)
 
+    def scriptJob(self, **kwargs: Any) -> int:
+        event = kwargs.get("event")
+        if isinstance(event, (list, tuple)) and len(event) == 2 and event[0] == "idle":
+            event[1]()
+        return 1
+
+    def workspaceControlState(self, name: str, **kwargs: Any) -> bool:
+        if kwargs.get("query") and kwargs.get("exists"):
+            return False
+        return False
+
 
 def test_show_panel_creates_dockable_panel(monkeypatch: Any):
     cmds = FakeCmds(workspace_exists=False)
-    panel = FakePanel()
+    panel = _panel_that_creates_workspace(cmds)
     monkeypatch.setattr(ui_launcher, "_PANEL", None)
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_create_dockable_panel", lambda: panel)
-    monkeypatch.setattr(
-        ui_launcher,
-        "load_panel_session",
-        lambda: PanelSessionState(last_plugin_version=ui_launcher.__version__),
-    )
     remembered: list[str] = []
+    visible_flags: list[bool] = []
     monkeypatch.setattr(
         ui_launcher,
         "remember_plugin_version",
         lambda version: remembered.append(version),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "remember_panel_visible",
+        lambda visible: visible_flags.append(visible),
     )
 
     result = ui_launcher.show_panel()
@@ -81,6 +108,8 @@ def test_show_panel_creates_dockable_panel(monkeypatch: Any):
         }
     ]
     assert remembered == [ui_launcher.__version__]
+    assert visible_flags == [True]
+    assert cmds.docked == []
 
 
 def test_show_panel_restores_existing_panel(monkeypatch: Any):
@@ -88,82 +117,15 @@ def test_show_panel_restores_existing_panel(monkeypatch: Any):
     panel = FakePanel()
     monkeypatch.setattr(ui_launcher, "_PANEL", panel)
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
-    monkeypatch.setattr(
-        ui_launcher,
-        "load_panel_session",
-        lambda: PanelSessionState(last_plugin_version=ui_launcher.__version__),
-    )
+    monkeypatch.setattr(ui_launcher, "_purge_obsolete_workspace_controls", lambda _cmds: None)
     monkeypatch.setattr(ui_launcher, "remember_plugin_version", lambda _version: None)
+    monkeypatch.setattr(ui_launcher, "remember_panel_visible", lambda _visible: None)
 
     result = ui_launcher.show_panel()
 
     assert result is panel
     assert cmds.restored == [ui_launcher.WORKSPACE_CONTROL_NAME]
-    assert cmds.docked == [
-        (ui_launcher.WORKSPACE_CONTROL_NAME, ("right", 1)),
-        (ui_launcher.WORKSPACE_CONTROL_NAME, ("right", 1)),
-    ]
     assert panel.show_calls == [{}]
-
-
-def test_enforce_startup_panel_layout_docks_restored_workspace(monkeypatch: Any):
-    cmds = FakeCmds(workspace_exists=True)
-    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
-    monkeypatch.setattr(
-        ui_launcher,
-        "load_panel_session",
-        lambda: PanelSessionState(last_plugin_version=ui_launcher.__version__),
-    )
-    monkeypatch.setattr(ui_launcher, "remember_plugin_version", lambda _version: None)
-
-    ui_launcher.enforce_startup_panel_layout()
-
-    assert cmds.docked == [
-        (ui_launcher.WORKSPACE_CONTROL_NAME, ("right", 1)),
-        (ui_launcher.WORKSPACE_CONTROL_NAME, ("right", 1)),
-    ]
-
-
-def test_enforce_startup_panel_layout_resets_workspace_on_version_change(monkeypatch: Any):
-    cmds = FakeCmds(workspace_exists=True)
-    remembered: list[str] = []
-    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
-    monkeypatch.setattr(
-        ui_launcher,
-        "load_panel_session",
-        lambda: PanelSessionState(last_plugin_version="0.4.0"),
-    )
-    monkeypatch.setattr(
-        ui_launcher,
-        "remember_plugin_version",
-        lambda version: remembered.append(version),
-    )
-
-    ui_launcher.enforce_startup_panel_layout()
-
-    assert cmds.deleted == [(ui_launcher.WORKSPACE_CONTROL_NAME, {"control": True})]
-    assert remembered == [ui_launcher.__version__]
-    assert cmds.docked == []
-
-
-def test_show_panel_resets_workspace_when_plugin_version_changes(monkeypatch: Any):
-    cmds = FakeCmds(workspace_exists=True)
-    panel = FakePanel()
-    monkeypatch.setattr(ui_launcher, "_PANEL", None)
-    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
-    monkeypatch.setattr(ui_launcher, "_create_dockable_panel", lambda: panel)
-    monkeypatch.setattr(
-        ui_launcher,
-        "load_panel_session",
-        lambda: PanelSessionState(last_plugin_version="0.4.0"),
-    )
-    monkeypatch.setattr(ui_launcher, "remember_plugin_version", lambda _version: None)
-
-    result = ui_launcher.show_panel()
-
-    assert result is panel
-    assert cmds.deleted == [(ui_launcher.WORKSPACE_CONTROL_NAME, {"control": True})]
-    assert panel.show_calls[0]["area"] == "right"
 
 
 def test_show_panel_recreates_stale_workspace_control(monkeypatch: Any):
@@ -172,18 +134,16 @@ def test_show_panel_recreates_stale_workspace_control(monkeypatch: Any):
     monkeypatch.setattr(ui_launcher, "_PANEL", None)
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_create_dockable_panel", lambda: panel)
-    monkeypatch.setattr(
-        ui_launcher,
-        "load_panel_session",
-        lambda: PanelSessionState(last_plugin_version=ui_launcher.__version__),
-    )
+    monkeypatch.setattr(ui_launcher, "_purge_obsolete_workspace_controls", lambda _cmds: None)
     monkeypatch.setattr(ui_launcher, "remember_plugin_version", lambda _version: None)
+    monkeypatch.setattr(ui_launcher, "remember_panel_visible", lambda _visible: None)
 
     result = ui_launcher.show_panel()
 
     assert result is panel
     assert cmds.deleted == [(ui_launcher.WORKSPACE_CONTROL_NAME, {"control": True})]
     assert panel.show_calls[0]["dockable"] is True
+    assert panel.show_calls[0]["area"] == "right"
 
 
 def test_show_farm_check_panel_selects_farm_tab_and_runs_preflight(monkeypatch: Any):

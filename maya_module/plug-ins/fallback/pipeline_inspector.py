@@ -23,22 +23,10 @@ def initializePlugin(mobject: object) -> None:
 
         pipeline_inspector_bootstrap.install_ui()
 
-    def _enforce_panel_dock_deferred() -> None:
-        try:
-            import pipeline_inspector_bootstrap as bootstrap
-
-            bootstrap._ensure_source_path()
-            from pipeline_inspector.maya.ui_launcher import enforce_startup_panel_layout
-
-            enforce_startup_panel_layout()
-        except Exception:
-            pass
-
     try:
         from maya import cmds  # type: ignore[import-not-found]
 
         cmds.evalDeferred(_install_ui_deferred)
-        cmds.evalDeferred(_enforce_panel_dock_deferred)
     except Exception:
         _install_ui_deferred()
 

@@ -15,11 +15,12 @@ _DEFAULT_RESTART_DELAY_SECONDS = 3.0
 def prepare_maya_for_update_install() -> dict[str, object]:
     """Close UI and unload Pipeline Inspector so native binaries can be replaced."""
 
+    errors: list[str] = []
     outcome: dict[str, object] = {
         "in_maya": False,
         "ui_uninstalled": False,
         "plugins_unloaded": [],
-        "errors": [],
+        "errors": errors,
     }
     try:
         import maya.cmds as cmds
@@ -34,7 +35,7 @@ def prepare_maya_for_update_install() -> dict[str, object]:
         reset_ui_install_state()
         outcome["ui_uninstalled"] = True
     except Exception as exc:
-        outcome["errors"].append(f"ui_uninstall: {exc}")
+        errors.append(f"ui_uninstall: {exc}")
 
     unloaded: list[str] = []
     for plugin_name in _loaded_pipeline_inspector_plugins(cmds):
@@ -42,7 +43,7 @@ def prepare_maya_for_update_install() -> dict[str, object]:
             cmds.unloadPlugin(plugin_name, force=True)
             unloaded.append(plugin_name)
         except Exception as exc:
-            outcome["errors"].append(f"unload:{plugin_name}: {exc}")
+            errors.append(f"unload:{plugin_name}: {exc}")
     outcome["plugins_unloaded"] = unloaded
     return outcome
 
@@ -59,33 +60,24 @@ def schedule_maya_restart(
         import maya.cmds as cmds
         import maya.utils
     except ImportError:
-        _trace_maya_restart("failed", {"reason": "not_in_maya"})
         return False
 
     executable = resolve_maya_executable()
     if executable is None:
-        _trace_maya_restart("failed", {"reason": "maya_executable_not_found"})
         return False
 
     single_shot = _qt_single_shot_callback(qt_widgets)
     if single_shot is None:
-        _trace_maya_restart("failed", {"reason": "qtimer_unavailable"})
         return False
 
     if dialog is not None:
         _close_dialog(dialog)
-        _trace_maya_restart("dialog_closed", {})
 
     def _restart_maya() -> None:
-        _trace_maya_restart("executing", {"executable": str(executable)})
         _launch_maya_and_quit(cmds, executable)
 
     def _arm_restart_timer() -> None:
         single_shot(int(delay_seconds * 1000), _restart_maya)
-        _trace_maya_restart(
-            "scheduled",
-            {"delay_seconds": delay_seconds, "executable": str(executable)},
-        )
 
     maya.utils.executeDeferred(_arm_restart_timer)
     return True
@@ -108,25 +100,6 @@ def _qt_single_shot_callback(qt_widgets: Any | None) -> Any | None:
     return getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
 
 
-def _trace_maya_restart(event: str, data: dict[str, object]) -> None:
-    try:
-        import json
-        import time
-
-        trace_path = Path.home() / ".pipeline_inspector" / "update_download_trace.log"
-        payload = {
-            "event": event,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-            "sessionId": "618f4f",
-        }
-        trace_path.parent.mkdir(parents=True, exist_ok=True)
-        with trace_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
-
-
 def resolve_maya_executable() -> Path | None:
     """Return the Maya GUI executable for the active session."""
 
@@ -146,6 +119,7 @@ def resolve_maya_executable() -> Path | None:
 def finalize_maya_plugin_registration(install_root: Path) -> dict[str, object]:
     """Re-enable autoload and load the canonical plug-in path after update install."""
 
+    errors: list[str] = []
     outcome: dict[str, object] = {
         "install_root": str(install_root),
         "mod_exists": False,
@@ -153,7 +127,7 @@ def finalize_maya_plugin_registration(install_root: Path) -> dict[str, object]:
         "autoload_enabled": False,
         "loaded": False,
         "pending_applied": 0,
-        "errors": [],
+        "errors": errors,
     }
     mod_path = install_root / "maya_module" / "pipeline_inspector.mod"
     outcome["mod_exists"] = mod_path.is_file()
@@ -164,7 +138,7 @@ def finalize_maya_plugin_registration(install_root: Path) -> dict[str, object]:
 
     bootstrap_path = install_root / "maya_module" / "scripts" / "pipeline_inspector_bootstrap.py"
     if not bootstrap_path.is_file():
-        outcome["errors"].append(f"missing bootstrap: {bootstrap_path}")
+        errors.append(f"missing bootstrap: {bootstrap_path}")
         return outcome
 
     bootstrap = _load_bootstrap_module(bootstrap_path)
@@ -173,7 +147,7 @@ def finalize_maya_plugin_registration(install_root: Path) -> dict[str, object]:
     canonical_path = bootstrap.canonical_plugin_path(maya_year)
     outcome["canonical_path"] = canonical_path or ""
     if not canonical_path:
-        outcome["errors"].append("canonical plug-in path not found on disk")
+        errors.append("canonical plug-in path not found on disk")
         return outcome
 
     outcome["autoload_enabled"] = bootstrap.enable_plugin_autoload(canonical_path, cmds)
@@ -182,7 +156,7 @@ def finalize_maya_plugin_registration(install_root: Path) -> dict[str, object]:
             cmds.loadPlugin(canonical_path, quiet=True)
         outcome["loaded"] = True
     except Exception as exc:
-        outcome["errors"].append(f"loadPlugin: {exc}")
+        errors.append(f"loadPlugin: {exc}")
     return outcome
 
 

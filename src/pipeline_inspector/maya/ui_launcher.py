@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector import __version__
 from pipeline_inspector.maya.panel_session import (
-    load_panel_session,
     load_runtime_configs_from_session,
+    remember_panel_visible,
     remember_plugin_version,
     remember_studio_config_path,
     remember_user_config_path,
@@ -83,6 +84,9 @@ from pipeline_inspector.user_config import (
 )
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
+OBSOLETE_WORKSPACE_CONTROL_NAMES = (
+    f"{main_window.PANEL_OBJECT_NAME}DockRightWorkspaceControl",
+)
 DEFAULT_DOCK_AREA = "right"
 
 VALIDATE_SPLITTER_SIZES_ATTR = "_pipeline_inspector_validate_splitter_sizes"
@@ -103,47 +107,30 @@ def show_panel() -> Any:
 
     global _PANEL
     cmds = _maya_cmds()
-    session = load_panel_session()
-    version_changed = session.last_plugin_version != __version__
-    if version_changed and _workspace_control_exists(cmds):
-        cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-        _PANEL = None
+    _purge_obsolete_workspace_controls(cmds)
 
     if _workspace_control_exists(cmds):
         if _PANEL is not None:
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
-            _schedule_dock_workspace_control_right(cmds)
             _PANEL.show()
             remember_plugin_version(__version__)
+            remember_panel_visible(True)
             return _PANEL
         cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
 
     panel = _create_dockable_panel()
     _PANEL = panel
+    if _workspace_control_exists(cmds):
+        cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
     panel.show(
         dockable=True,
         area=DEFAULT_DOCK_AREA,
         floating=False,
         retain=False,
     )
-    _schedule_dock_workspace_control_right(cmds)
-    if not _workspace_control_exists(cmds):
-        cmds.evalDeferred(lambda: _schedule_dock_workspace_control_right(_maya_cmds()))
     remember_plugin_version(__version__)
+    remember_panel_visible(True)
     return panel
-
-
-def enforce_startup_panel_layout() -> None:
-    """Re-dock or reset a workspace control restored by Maya before show_panel runs."""
-
-    cmds = _maya_cmds()
-    session = load_panel_session()
-    version_changed = session.last_plugin_version != __version__
-    if version_changed and _workspace_control_exists(cmds):
-        cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
-        remember_plugin_version(__version__)
-        return
-    _schedule_dock_workspace_control_right(cmds)
 
 
 def show_farm_check_panel() -> Any:
@@ -168,7 +155,6 @@ def close_panel(*, delete: bool = True) -> None:
 
     global _PANEL
     cmds = _maya_cmds()
-
     if _workspace_control_exists(cmds):
         if delete:
             cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
@@ -179,12 +165,13 @@ def close_panel(*, delete: bool = True) -> None:
         _PANEL.close()
     _kill_script_jobs()
     _PANEL = None
+    remember_panel_visible(False)
 
 
 def _create_dockable_panel() -> Any:
     _kill_script_jobs()
     qt_widgets = load_qt_widgets()
-    from maya.app.general.mayaMixin import (  # type: ignore[import-not-found]
+    from maya.app.general.mayaMixin import (
         MayaQWidgetDockableMixin,
     )
 
@@ -428,7 +415,7 @@ def _run_startup_update_check(content: Any, qt_widgets: Any) -> None:
 def _maya_main_window_widget(qt_widgets: Any) -> Any | None:
     try:
         import shiboken2  # type: ignore[import-not-found]
-        from maya import OpenMayaUI as omui  # type: ignore[import-not-found]
+        from maya import OpenMayaUI as omui
 
         main_window_ptr = omui.MQtUtil.mainWindow()
         if main_window_ptr is None:
@@ -3421,32 +3408,33 @@ def _print_export_result(result: Any) -> None:
     )
 
 
-def _workspace_control_exists(cmds: Any) -> bool:
-    return bool(cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True))
+def _purge_obsolete_workspace_controls(cmds: Any) -> None:
+    for name in OBSOLETE_WORKSPACE_CONTROL_NAMES:
+        _purge_named_workspace_control(cmds, name)
 
 
-def _dock_workspace_control_right(cmds: Any) -> None:
-    if not _workspace_control_exists(cmds):
+def _purge_named_workspace_control(cmds: Any, name: str) -> None:
+    if not _workspace_control_exists(cmds, name):
+        _remove_workspace_control_state(cmds, name)
         return
-    try:
-        cmds.workspaceControl(
-            WORKSPACE_CONTROL_NAME,
-            edit=True,
-            dockToMainWindow=(DEFAULT_DOCK_AREA, 1),
-            floating=False,
-        )
-    except Exception:
-        return
+    with suppress(Exception):
+        cmds.workspaceControl(name, edit=True, visible=False)
+    with suppress(Exception):
+        cmds.workspaceControl(name, edit=True, close=True)
+    with suppress(Exception):
+        cmds.deleteUI(name, control=True)
+    _remove_workspace_control_state(cmds, name)
 
 
-def _schedule_dock_workspace_control_right(cmds: Any) -> None:
-    if not _workspace_control_exists(cmds):
-        return
-    _dock_workspace_control_right(cmds)
-    try:
-        cmds.evalDeferred(lambda: _dock_workspace_control_right(_maya_cmds()))
-    except Exception:
-        _dock_workspace_control_right(cmds)
+def _remove_workspace_control_state(cmds: Any, name: str) -> None:
+    with suppress(Exception):
+        if cmds.workspaceControlState(name, query=True, exists=True):
+            cmds.workspaceControlState(name, remove=True)
+
+
+def _workspace_control_exists(cmds: Any, name: str | None = None) -> bool:
+    control_name = name or WORKSPACE_CONTROL_NAME
+    return bool(cmds.workspaceControl(control_name, query=True, exists=True))
 
 
 def _maya_cmds() -> Any:

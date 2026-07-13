@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from pipeline_inspector.integrations.update.download import (
     make_authenticated_download_transport,
     resolve_release_asset_download,

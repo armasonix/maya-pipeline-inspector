@@ -247,9 +247,21 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -298,7 +310,7 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
         expected_plugin = year_path
     else:
         expected_plugin = str(bootstrap.python_plugin_path())
-    assert deferred == ["deferred", f"load:{expected_plugin}:True", "deferred"]
+    assert deferred == ["deferred", f"load:{expected_plugin}:True"]
 
 
 def test_user_setup_falls_back_to_py_plugin(monkeypatch):
@@ -306,9 +318,21 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -365,7 +389,6 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
             expected.append(f"load:{py_path}:True")
     else:
         expected.append(f"load:{py_path}:True")
-    expected.append("deferred")
     assert deferred == expected
 
 
@@ -374,9 +397,21 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
@@ -424,7 +459,6 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
         expected.append(f"load:{manager_path}:True")
     else:
         expected.append(f"load:{bootstrap.python_plugin_path()}:True")
-    expected.append("deferred")
     assert deferred == expected
 
 
@@ -433,9 +467,21 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
 
     class FakeCmds:
         @staticmethod
-        def evalDeferred(callback):
+        def evalDeferred(callback, lowestPriority=False):
+            _ = lowestPriority
             deferred.append("deferred")
             callback()
+            return None
+
+        @staticmethod
+        def workspaceControl(name, **kwargs):
+            if kwargs.get("query") and kwargs.get("exists"):
+                return False
+            return None
+
+        @staticmethod
+        def deleteUI(name, **kwargs):
+            _ = name, kwargs
             return None
 
         @staticmethod
