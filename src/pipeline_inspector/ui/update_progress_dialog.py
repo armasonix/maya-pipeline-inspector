@@ -26,7 +26,7 @@ UPDATE_STAGE_LABELS: tuple[str, ...] = (
     "Compare installed version with release tag",
     "Download release package to staging",
     "Install update and preserve studio/user config",
-    "Show manual Maya restart checklist",
+    "Restart Maya to load the updated plugin",
 )
 
 DEFAULT_UPDATE_STEP_DESCRIPTIONS: tuple[str, ...] = (
@@ -34,7 +34,7 @@ DEFAULT_UPDATE_STEP_DESCRIPTIONS: tuple[str, ...] = (
     "Comparing the installed plugin version with the published tag.",
     "Downloading the release package to a local staging directory.",
     "Installing the update while preserving pipeline_inspector_studio.json and user.json.",
-    "Showing the manual Maya restart checklist for artists.",
+    "Maya will restart automatically in a few seconds. Save your scene now if needed.",
 )
 
 UPDATE_PROGRESS_SHELL_STATUS = (

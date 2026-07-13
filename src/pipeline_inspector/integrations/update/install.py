@@ -16,6 +16,7 @@ from pipeline_inspector.user_config import (
 INSTALL_DIRS = ("maya_module", "src")
 UPDATE_BACKUP_DIRNAME = "backups"
 PRESERVED_CONFIG_FILENAMES = frozenset({STUDIO_CONFIG_FILENAME, USER_CONFIG_FILENAME})
+_NATIVE_PLUGIN_SUFFIXES = (".mll", ".bundle", ".so")
 
 
 class UpdateInstallError(RuntimeError):
@@ -40,6 +41,7 @@ class UpdateInstallResult:
     backup_path: str = ""
     rolled_back: bool = False
     error_message: str = ""
+    pending_native_binaries: int = 0
 
 
 def install_staged_update(
@@ -59,7 +61,8 @@ def install_staged_update(
     try:
         payload_root = extract_staged_package(staging_path)
         create_install_backup(resolved_install_root, backup_path)
-        apply_install_payload(payload_root, resolved_install_root)
+        pending_native_binaries = apply_install_payload(payload_root, resolved_install_root)
+        ensure_maya_module_descriptor(resolved_install_root, tag_name)
         restore_preserved_config_snapshots(config_snapshots)
     except (OSError, UpdateInstallError, zipfile.BadZipFile) as exc:
         rolled_back = False
@@ -87,15 +90,22 @@ def install_staged_update(
             error_message=rollback_message,
         )
 
+    success_message = (
+        "Update installed to "
+        f"{resolved_install_root}. "
+        f"{STUDIO_CONFIG_FILENAME} and {USER_CONFIG_FILENAME} preserved."
+    )
+    if pending_native_binaries:
+        success_message += (
+            f" {pending_native_binaries} native plug-in binary(ies) will finish "
+            "applying when Maya restarts."
+        )
     return UpdateInstallResult(
         success=True,
-        message=(
-            "Update installed to "
-            f"{resolved_install_root}. "
-            f"{STUDIO_CONFIG_FILENAME} and {USER_CONFIG_FILENAME} preserved."
-        ),
+        message=success_message,
         install_root=str(resolved_install_root),
         backup_path=str(backup_path),
+        pending_native_binaries=pending_native_binaries,
     )
 
 
@@ -213,9 +223,10 @@ def create_install_backup(install_root: Path, backup_path: Path) -> None:
         )
 
 
-def apply_install_payload(payload_root: Path, install_root: Path) -> None:
+def apply_install_payload(payload_root: Path, install_root: Path) -> int:
     """Merge staged payload directories into the live install root."""
 
+    pending_count = 0
     for directory_name in INSTALL_DIRS:
         source = payload_root / directory_name
         if not source.is_dir():
@@ -224,12 +235,65 @@ def apply_install_payload(payload_root: Path, install_root: Path) -> None:
             )
         destination = install_root / directory_name
         destination.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(
-            source,
-            destination,
-            dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-        )
+        pending_count += _merge_install_directory(source, destination)
+    return pending_count
+
+
+def _merge_install_directory(source: Path, destination: Path) -> int:
+    pending_count = 0
+    for src_file in source.rglob("*"):
+        if not src_file.is_file():
+            continue
+        relative = src_file.relative_to(source)
+        if any(part == "__pycache__" for part in relative.parts):
+            continue
+        if relative.suffix == ".pyc":
+            continue
+        dest_file = destination / relative
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        pending_count += _copy_install_file(src_file, dest_file)
+    return pending_count
+
+
+def _copy_install_file(source: Path, destination: Path) -> int:
+    try:
+        shutil.copy2(source, destination)
+        return 0
+    except PermissionError as exc:
+        if not _is_native_plugin_binary(destination):
+            raise
+        pending_path = Path(f"{destination}.pending")
+        shutil.copy2(source, pending_path)
+        _ = exc
+        return 1
+
+
+def _is_native_plugin_binary(path: Path) -> bool:
+    return path.suffix.lower() in _NATIVE_PLUGIN_SUFFIXES
+
+
+def ensure_maya_module_descriptor(install_root: Path, tag_name: str = "") -> Path:
+    """Ensure ``maya_module/pipeline_inspector.mod`` exists after update install."""
+
+    from pipeline_inspector.integrations.update.github_releases import normalize_release_tag
+
+    version = normalize_release_tag(tag_name) if tag_name else "0.0.0"
+    mod_path = install_root / "maya_module" / "pipeline_inspector.mod"
+    mod_path.parent.mkdir(parents=True, exist_ok=True)
+    mod_path.write_text(
+        "\n".join(
+            (
+                f"+ pipeline_inspector {version} .",
+                "PYTHONPATH +:= ../src",
+                "scripts: scripts",
+                "shelves: shelves",
+                "plug-ins: plug-ins",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    return mod_path
 
 
 def rollback_install(install_root: Path, backup_path: Path) -> None:

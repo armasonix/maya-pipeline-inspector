@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from pipeline_inspector.integrations.update.install import install_staged_update
+from pipeline_inspector.integrations.update.install import (
+    ensure_maya_module_descriptor,
+    install_staged_update,
+)
 from pipeline_inspector.studio_config import STUDIO_CONFIG_FILENAME
 from pipeline_inspector.user_config import USER_CONFIG_DIRNAME, USER_CONFIG_FILENAME
 
@@ -108,6 +111,17 @@ def test_install_staged_update_rolls_back_when_apply_fails(
     assert (
         install_root / "src" / "pipeline_inspector" / "version_marker.txt"
     ).read_text(encoding="utf-8") == "0.4.0"
+
+
+def test_ensure_maya_module_descriptor_writes_mod_file(tmp_path: Path):
+    install_root = tmp_path / "install"
+
+    mod_path = ensure_maya_module_descriptor(install_root, "v0.5.0")
+
+    assert mod_path.is_file()
+    text = mod_path.read_text(encoding="utf-8")
+    assert "+ pipeline_inspector 0.5.0 ." in text
+    assert "plug-ins: plug-ins" in text
 
 
 def test_install_staged_update_returns_failure_for_invalid_package(tmp_path: Path):

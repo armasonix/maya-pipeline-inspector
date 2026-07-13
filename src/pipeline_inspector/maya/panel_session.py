@@ -29,6 +29,7 @@ class PanelSessionState:
 
     studio_config_path: str = ""
     user_config_path: str = ""
+    last_plugin_version: str = ""
 
 
 def panel_session_path() -> Path:
@@ -58,6 +59,7 @@ def load_panel_session() -> PanelSessionState:
     return PanelSessionState(
         studio_config_path=str(payload.get("studio_config_path", "") or "").strip(),
         user_config_path=str(payload.get("user_config_path", "") or "").strip(),
+        last_plugin_version=str(payload.get("last_plugin_version", "") or "").strip(),
     )
 
 
@@ -65,6 +67,7 @@ def save_panel_session(
     *,
     studio_config_path: Path | None = None,
     user_config_path: Path | None = None,
+    last_plugin_version: str | None = None,
 ) -> None:
     """Write remembered config paths, preserving the other path when omitted."""
 
@@ -79,11 +82,17 @@ def save_panel_session(
         if user_config_path is not None
         else current.user_config_path
     )
+    version_value = (
+        str(last_plugin_version or "").strip()
+        if last_plugin_version is not None
+        else current.last_plugin_version
+    )
     path = panel_session_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "studio_config_path": studio_value,
         "user_config_path": user_value,
+        "last_plugin_version": version_value,
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -98,6 +107,10 @@ def remember_user_config_path(config_path: Path | None) -> None:
     if config_path is None:
         return
     save_panel_session(user_config_path=config_path)
+
+
+def remember_plugin_version(version: str) -> None:
+    save_panel_session(last_plugin_version=str(version or "").strip())
 
 
 def load_runtime_configs_from_session() -> tuple[StudioConfig, UserPreferences]:

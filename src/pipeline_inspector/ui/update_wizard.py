@@ -10,6 +10,7 @@ from pipeline_inspector import __version__
 from pipeline_inspector.integrations.update.config import GitHubReleasesConfig
 from pipeline_inspector.integrations.update.download import (
     download_release_asset,
+    make_authenticated_download_transport,
     select_update_asset,
 )
 from pipeline_inspector.integrations.update.github_releases import (
@@ -50,9 +51,13 @@ UPDATE_WIZARD_STATUS_INSTALL_FAILED = (
     "Install failed and previous plugin files were restored: {error}"
 )
 UPDATE_WIZARD_STATUS_RESTART = (
-    "Manual Maya restart checklist: save your scene, close Maya, relaunch Maya, "
-    "and reopen Pipeline Inspector."
+    "Update installed. Maya will restart automatically in a few seconds. "
+    "Save your scene now if needed."
 )
+
+_LEGACY_GITHUB_REPOS = {
+    "maya-shader-health-inspector": "maya-pipeline-inspector",
+}
 UPDATE_WIZARD_STATUS_DISABLED = "Studio policy disables in-app update checks."
 UPDATE_WIZARD_STATUS_PINNED = (
     "Studio policy pins Pipeline Inspector to v{pinned_version}; skipping download."
@@ -116,11 +121,27 @@ def default_install_handler(
 
     from pipeline_inspector.integrations.update.install import install_staged_update
 
+    try:
+        from pipeline_inspector.maya.update_install import prepare_maya_for_update_install
+
+        prepare_maya_for_update_install()
+    except ImportError:
+        pass
+
     result = install_staged_update(
         staging_path,
         tag_name=release.tag_name,
     )
     if result.success:
+        try:
+            from pathlib import Path
+
+            from pipeline_inspector.integrations.update.install import resolve_default_install_root
+            from pipeline_inspector.maya.update_install import finalize_maya_plugin_registration
+
+            finalize_maya_plugin_registration(resolve_default_install_root())
+        except Exception:
+            pass
         return UpdateInstallOutcome(
             success=True,
             message=result.message,
@@ -151,6 +172,8 @@ def run_update_wizard_flow(
     download_transport: Callable[[str, float], bytes] | None = None,
     process_ui: ProcessUiCallback | None = None,
     compare_only: bool = False,
+    qt_widgets: Any | None = None,
+    update_dialog: Any | None = None,
 ) -> UpdateWizardResult:
     """Advance the update dialog through check, download, install, and restart stages."""
 
@@ -297,11 +320,19 @@ def run_update_wizard_flow(
     _refresh_ui()
 
     try:
+        effective_transport = download_transport
+        if effective_transport is None:
+            effective_transport = make_authenticated_download_transport(
+                asset,
+                owner=client.config.owner,
+                repo=client.config.repo,
+                github_token=client.config.github_token,
+            )
         staging_path = download_release_asset(
             asset,
             tag_name=release.tag_name,
             staging_root=staging_root,
-            transport=download_transport,
+            transport=effective_transport,
         )
     except (OSError, RuntimeError) as exc:
         message = UPDATE_WIZARD_STATUS_DOWNLOAD_FAILED.format(error=exc)
@@ -396,6 +427,16 @@ def run_update_wizard_flow(
         ),
     )
     _finish_wizard(controller, process_ui=_refresh_ui)
+    try:
+        from pipeline_inspector.maya.update_install import schedule_maya_restart
+
+        schedule_maya_restart(
+            qt_widgets=qt_widgets,
+            dialog=update_dialog or getattr(controller, "dialog", None),
+            delay_seconds=3.0,
+        )
+    except ImportError:
+        pass
     return UpdateWizardResult(
         completed=True,
         update_available=True,
@@ -430,9 +471,11 @@ def github_config_from_studio(studio_config: StudioConfig | None) -> GitHubRelea
     if studio_config is None:
         return config
     updates = studio_config.updates
+    repo = (updates.github_repo or config.repo).strip()
+    repo = _LEGACY_GITHUB_REPOS.get(repo, repo)
     return config.with_overrides(
         owner=(updates.github_owner or config.owner).strip(),
-        repo=(updates.github_repo or config.repo).strip(),
+        repo=repo,
         github_token=updates.github_token.strip(),
     )
 
@@ -483,7 +526,7 @@ def format_update_wizard_user_message(
     if result.completed and result.update_available and result.staging_path:
         return (
             f"Update installed: v{result.installed_version} → v{result.latest_version}. "
-            "Save your scene, restart Maya, and reopen Pipeline Inspector."
+            "Maya will restart automatically in a few seconds."
         )
     if result.update_available:
         return (
@@ -550,6 +593,8 @@ def show_update_wizard(
                 install_handler=install_handler,
                 download_transport=download_transport,
                 process_ui=process_ui,
+                qt_widgets=qt_widgets,
+                update_dialog=controller.dialog,
             )
         except Exception as exc:
             message = f"Update check failed: {exc}"

@@ -116,6 +116,27 @@ def plugin_load_candidates(maya_year: str | None = None) -> tuple[str, ...]:
     return (path,)
 
 
+def apply_pending_native_plugin_binaries() -> int:
+    """Apply staged native plug-in binaries before Maya loads the plug-in."""
+
+    plug_ins = module_root() / "plug-ins"
+    if not plug_ins.is_dir():
+        return 0
+
+    suffix = native_plugin_suffix()
+    applied = 0
+    for pending_path in plug_ins.rglob(f"*{suffix}.pending"):
+        target = Path(str(pending_path)[: -len(".pending")])
+        try:
+            if target.exists():
+                target.unlink()
+            pending_path.replace(target)
+            applied += 1
+        except OSError:
+            continue
+    return applied
+
+
 def enable_plugin_autoload(plugin_file: str, cmds_module: Any) -> bool:
     """Persist Auto load for the plug-in path Maya actually registered."""
 

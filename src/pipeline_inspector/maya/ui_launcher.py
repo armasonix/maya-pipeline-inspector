@@ -6,8 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional
 
+from pipeline_inspector import __version__
 from pipeline_inspector.maya.panel_session import (
+    load_panel_session,
     load_runtime_configs_from_session,
+    remember_plugin_version,
     remember_studio_config_path,
     remember_user_config_path,
 )
@@ -100,11 +103,18 @@ def show_panel() -> Any:
 
     global _PANEL
     cmds = _maya_cmds()
+    session = load_panel_session()
+    version_changed = session.last_plugin_version != __version__
+    if version_changed and _workspace_control_exists(cmds):
+        cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
+        _PANEL = None
 
     if _workspace_control_exists(cmds):
         if _PANEL is not None:
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
+            _schedule_dock_workspace_control_right(cmds)
             _PANEL.show()
+            remember_plugin_version(__version__)
             return _PANEL
         cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
 
@@ -116,7 +126,24 @@ def show_panel() -> Any:
         floating=False,
         retain=False,
     )
+    _schedule_dock_workspace_control_right(cmds)
+    if not _workspace_control_exists(cmds):
+        cmds.evalDeferred(lambda: _schedule_dock_workspace_control_right(_maya_cmds()))
+    remember_plugin_version(__version__)
     return panel
+
+
+def enforce_startup_panel_layout() -> None:
+    """Re-dock or reset a workspace control restored by Maya before show_panel runs."""
+
+    cmds = _maya_cmds()
+    session = load_panel_session()
+    version_changed = session.last_plugin_version != __version__
+    if version_changed and _workspace_control_exists(cmds):
+        cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
+        remember_plugin_version(__version__)
+        return
+    _schedule_dock_workspace_control_right(cmds)
 
 
 def show_farm_check_panel() -> Any:
@@ -3396,6 +3423,30 @@ def _print_export_result(result: Any) -> None:
 
 def _workspace_control_exists(cmds: Any) -> bool:
     return bool(cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, exists=True))
+
+
+def _dock_workspace_control_right(cmds: Any) -> None:
+    if not _workspace_control_exists(cmds):
+        return
+    try:
+        cmds.workspaceControl(
+            WORKSPACE_CONTROL_NAME,
+            edit=True,
+            dockToMainWindow=(DEFAULT_DOCK_AREA, 1),
+            floating=False,
+        )
+    except Exception:
+        return
+
+
+def _schedule_dock_workspace_control_right(cmds: Any) -> None:
+    if not _workspace_control_exists(cmds):
+        return
+    _dock_workspace_control_right(cmds)
+    try:
+        cmds.evalDeferred(lambda: _dock_workspace_control_right(_maya_cmds()))
+    except Exception:
+        _dock_workspace_control_right(cmds)
 
 
 def _maya_cmds() -> Any:

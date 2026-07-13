@@ -298,7 +298,7 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
         expected_plugin = year_path
     else:
         expected_plugin = str(bootstrap.python_plugin_path())
-    assert deferred == ["deferred", f"load:{expected_plugin}:True"]
+    assert deferred == ["deferred", f"load:{expected_plugin}:True", "deferred"]
 
 
 def test_user_setup_falls_back_to_py_plugin(monkeypatch):
@@ -365,6 +365,7 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
             expected.append(f"load:{py_path}:True")
     else:
         expected.append(f"load:{py_path}:True")
+    expected.append("deferred")
     assert deferred == expected
 
 
@@ -423,6 +424,7 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
         expected.append(f"load:{manager_path}:True")
     else:
         expected.append(f"load:{bootstrap.python_plugin_path()}:True")
+    expected.append("deferred")
     assert deferred == expected
 
 
@@ -636,3 +638,20 @@ def test_material_graph_fingerprint_uses_connection_fields():
 
     assert first == second
     assert first.startswith("sha256:")
+
+
+def test_apply_pending_native_plugin_binaries_replaces_staged_mll(tmp_path, monkeypatch):
+    module_root = tmp_path / "maya_module"
+    plug_ins = module_root / "plug-ins"
+    plug_ins.mkdir(parents=True)
+    pending = plug_ins / "pipeline_inspector.mll.pending"
+    pending.write_bytes(b"new-binary")
+    (plug_ins / "pipeline_inspector.mll").write_bytes(b"old-binary")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_pending_test")
+    monkeypatch.setattr(bootstrap, "module_root", lambda: module_root)
+
+    applied = bootstrap.apply_pending_native_plugin_binaries()
+
+    assert applied == 1
+    assert (plug_ins / "pipeline_inspector.mll").read_bytes() == b"new-binary"
+    assert not pending.exists()
