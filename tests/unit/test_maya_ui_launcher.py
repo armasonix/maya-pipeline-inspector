@@ -3,9 +3,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, Optional
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.maya import ui_launcher
-from shader_health.ui import main_window
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.maya import ui_launcher
+from pipeline_inspector.ui import main_window
 
 
 class FakePanel:
@@ -91,7 +91,7 @@ def test_show_panel_recreates_stale_workspace_control(monkeypatch: Any):
 
 
 def test_show_farm_check_panel_selects_farm_tab_and_runs_preflight(monkeypatch: Any):
-    panel = SimpleNamespace(_shader_health_content=object())
+    panel = SimpleNamespace(_pipeline_inspector_content=object())
     calls: list[str] = []
     monkeypatch.setattr(ui_launcher, "show_panel", lambda: panel)
     monkeypatch.setattr(ui_launcher, "load_qt_widgets", lambda: object())
@@ -126,7 +126,7 @@ def test_close_panel_deletes_workspace_control(monkeypatch: Any):
 
 
 def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
-    content = SimpleNamespace(_shader_health_validate_running=False)
+    content = SimpleNamespace(_pipeline_inspector_validate_running=False)
     calls: list[str] = []
 
     class FakeCmds:
@@ -155,11 +155,11 @@ def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
     assert len(cmds.deferred) == 1
     cmds.deferred[0]()
     assert calls == ["busy", "run", "busy"]
-    assert content._shader_health_validate_running is False
+    assert content._pipeline_inspector_validate_running is False
 
 
 def test_update_severity_filter_options_restores_saved_preference(monkeypatch: Any):
-    from shader_health.ui.issues_triage import IssueFilterPrefs, write_issue_filter_prefs
+    from pipeline_inspector.ui.issues_triage import IssueFilterPrefs, write_issue_filter_prefs
 
     class FakeCombo:
         def __init__(self) -> None:
@@ -276,10 +276,10 @@ def test_validate_splitter_persistence_saves_sizes_on_move():
 
 
 def test_run_validation_job_notifies_connectors_after_successful_validation(monkeypatch: Any):
-    from shader_health.core.scoring import HealthScore
+    from pipeline_inspector.core.scoring import HealthScore
 
     content = SimpleNamespace(
-        _shader_health_studio_config=ui_launcher.StudioConfig.default(),
+        _pipeline_inspector_studio_config=ui_launcher.StudioConfig.default(),
     )
     result = SimpleNamespace(
         succeeded=True,
@@ -293,7 +293,7 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
     calls: list[tuple[Any, Any]] = []
 
     monkeypatch.setattr(
-        "shader_health.maya.commands.validate_scene_action",
+        "pipeline_inspector.maya.commands.validate_scene_action",
         lambda **_kwargs: result,
     )
     monkeypatch.setattr(ui_launcher, "_selected_asset_class_id", lambda *_args: "")
@@ -322,18 +322,18 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
 
     def _fake_dispatch(studio_config: Any, validation_result: Any) -> Any:
         calls.append((studio_config, validation_result))
-        from shader_health.integrations.notify.dispatcher import (
+        from pipeline_inspector.integrations.notify.dispatcher import (
             ValidationNotificationDispatchResult,
         )
 
         return ValidationNotificationDispatchResult(outcomes=())
 
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.dispatch_validation_notifications",
+        "pipeline_inspector.integrations.notify.dispatcher.dispatch_validation_notifications",
         _fake_dispatch,
     )
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.report_validation_notification_outcomes",
+        "pipeline_inspector.integrations.notify.dispatcher.report_validation_notification_outcomes",
         lambda *_args: None,
     )
     monkeypatch.setattr(

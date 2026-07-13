@@ -4,7 +4,7 @@
 **Baseline release:** [CHANGELOG.md](../CHANGELOG.md) — `[0.4.0]`  
 **Release playbook:** [V0_5_RELEASE.md](V0_5_RELEASE.md)
 
-**GitHub tracking:** issues [#147–#198](https://github.com/armasonix/maya-shader-health-inspector/issues) (plan ids #113–#164).
+**GitHub tracking:** issues [#147–#198](https://github.com/armasonix/maya-pipeline-inspector/issues) (plan ids #113–#164).
 
 ---
 
@@ -81,7 +81,7 @@ Work in order. One issue = one commit on `dev`.
 | #159 | #193 | Create rule draft from issue details |
 | #160 | #194 | Export incident rule draft to studio extra_rules |
 | #161 | #195 | Incident-to-rule workflow documentation |
-| #162 | #196 | shader_health rules validate CLI subcommand |
+| #162 | #196 | pipeline_inspector rules validate CLI subcommand |
 | #163 | #197 | Studio overrides docs for v0.5 settings and connectors |
 | #164 | #198 | Prepare v0.5.0 public release |
 

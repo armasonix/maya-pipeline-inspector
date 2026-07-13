@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from shader_health.integrations.ftrack import FtrackClient, FtrackConfig, FtrackResponse
-from shader_health.integrations.ftrack.client import HttpRequest
-from shader_health.integrations.ftrack.queries import list_projects_expression
+from pipeline_inspector.integrations.ftrack import FtrackClient, FtrackConfig, FtrackResponse
+from pipeline_inspector.integrations.ftrack.client import HttpRequest
+from pipeline_inspector.integrations.ftrack.queries import list_projects_expression
 
 
 def test_ftrack_config_normalizes_endpoint_url():
@@ -147,7 +147,7 @@ def test_ftrack_client_create_task_note_posts_note_payload():
         transport=transport,
     )
 
-    note_result = client.create_task_note(task_id="task-42", content="Shader Health summary")
+    note_result = client.create_task_note(task_id="task-42", content="Pipeline Inspector summary")
 
     assert note_result.entity == {"id": "note-1"}
     assert note_result.exception_message == ""
@@ -155,7 +155,7 @@ def test_ftrack_client_create_task_note_posts_note_payload():
     op = create_payload[0]
     assert op["entity_type"] == "Note"
     assert op["entity_data"]["__entity_type__"] == "Note"
-    assert op["entity_data"]["content"] == "Shader Health summary"
+    assert op["entity_data"]["content"] == "Pipeline Inspector summary"
     assert op["entity_data"]["parent_id"] == "task-42"
     assert op["entity_data"]["parent_type"] == "Task"
     assert op["entity_data"]["author"] == {"__entity_type__": "User", "id": "user-1"}
@@ -204,7 +204,7 @@ def test_ftrack_client_create_task_note_surfaces_top_level_exception_content():
         transport=transport,
     )
 
-    note_result = client.create_task_note(task_id="task-42", content="Shader Health summary")
+    note_result = client.create_task_note(task_id="task-42", content="Pipeline Inspector summary")
 
     assert note_result.entity is None
     assert "Invalid parent_type None for Note" in note_result.exception_message

@@ -4,8 +4,8 @@ import copy
 import json
 from pathlib import Path
 
-from shader_health import cli
-from shader_health.reports.manifest_diff import (
+from pipeline_inspector import cli
+from pipeline_inspector.reports.manifest_diff import (
     MANIFEST_DIFF_SCHEMA_VERSION,
     build_manifest_diff,
     dumps_manifest_diff,
@@ -204,7 +204,7 @@ def test_manifest_diff_command_writes_json_output(tmp_path: Path):
     }
 
 
-def test_shader_health_diff_cli_writes_json_to_stdout(tmp_path: Path, capsys):
+def test_pipeline_inspector_diff_cli_writes_json_to_stdout(tmp_path: Path, capsys):
     old_path = tmp_path / "old_manifest.json"
     new_path = tmp_path / "new_manifest.json"
     old_path.write_text(json.dumps(old_manifest()), encoding="utf-8")
@@ -224,7 +224,7 @@ def test_shader_health_diff_cli_writes_json_to_stdout(tmp_path: Path, capsys):
     assert captured.err == ""
 
 
-def test_shader_health_diff_cli_writes_json_and_html_outputs(tmp_path: Path):
+def test_pipeline_inspector_diff_cli_writes_json_and_html_outputs(tmp_path: Path):
     old_path = tmp_path / "old_manifest.json"
     new_path = tmp_path / "new_manifest.json"
     out_path = tmp_path / "diff" / "manifest_diff.json"
@@ -254,11 +254,11 @@ def test_shader_health_diff_cli_writes_json_and_html_outputs(tmp_path: Path):
         "fingerprint_changes": 1,
     }
     assert html.startswith("<!doctype html>")
-    assert "Maya Shader Health Manifest Diff" in html
+    assert "Maya Pipeline Inspector Manifest Diff" in html
     assert "file_roughness" in html
 
 
-def test_shader_health_diff_cli_returns_config_error_for_missing_manifest(
+def test_pipeline_inspector_diff_cli_returns_config_error_for_missing_manifest(
     tmp_path: Path,
     capsys,
 ):
@@ -274,7 +274,7 @@ def test_shader_health_diff_cli_returns_config_error_for_missing_manifest(
     assert "does not exist" in captured.err
 
 
-def test_shader_health_diff_cli_returns_config_error_for_invalid_json(
+def test_pipeline_inspector_diff_cli_returns_config_error_for_invalid_json(
     tmp_path: Path,
     capsys,
 ):

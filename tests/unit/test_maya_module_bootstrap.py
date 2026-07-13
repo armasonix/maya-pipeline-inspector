@@ -5,20 +5,20 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
 )
-from shader_health.core.graph_fingerprint import material_graph_fingerprint
-from shader_health.maya.snapshot_enrichment import enrich_snapshot
+from pipeline_inspector.core.graph_fingerprint import material_graph_fingerprint
+from pipeline_inspector.maya.snapshot_enrichment import enrich_snapshot
 
 ROOT = Path(__file__).resolve().parents[2]
-BOOTSTRAP_PATH = ROOT / "maya_module" / "scripts" / "shader_health_inspector_bootstrap.py"
+BOOTSTRAP_PATH = ROOT / "maya_module" / "scripts" / "pipeline_inspector_bootstrap.py"
 USER_SETUP_PATH = ROOT / "maya_module" / "scripts" / "userSetup.py"
-PLUGIN_PATH = ROOT / "maya_module" / "plug-ins" / "shader_health_inspector.py"
+PLUGIN_PATH = ROOT / "maya_module" / "plug-ins" / "pipeline_inspector.py"
 
 
 def load_module(path: Path, module_name: str) -> ModuleType:
@@ -30,16 +30,16 @@ def load_module(path: Path, module_name: str) -> ModuleType:
 
 
 def test_bootstrap_repo_root_resolves_to_repository_root():
-    load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_root")
+    load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_root")
 
     repo_root = BOOTSTRAP_PATH.resolve().parents[2]
 
     assert repo_root == ROOT
-    assert (repo_root / "src" / "shader_health").is_dir()
+    assert (repo_root / "src" / "pipeline_inspector").is_dir()
 
 
 def test_ensure_source_path_adds_repo_src_directory():
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_path")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_path")
     src_path = str((ROOT / "src").resolve())
     original_sys_path = list(sys.path)
 
@@ -51,8 +51,8 @@ def test_ensure_source_path_adds_repo_src_directory():
         sys.path[:] = original_sys_path
 
 
-def test_bootstrap_install_ui_delegates_to_shader_health_commands(monkeypatch):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_install")
+def test_bootstrap_install_ui_delegates_to_pipeline_inspector_commands(monkeypatch):
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_install")
     calls: list[str] = []
 
     class FakeCommands:
@@ -62,7 +62,7 @@ def test_bootstrap_install_ui_delegates_to_shader_health_commands(monkeypatch):
 
     monkeypatch.setitem(
         sys.modules,
-        "shader_health.maya.commands",
+        "pipeline_inspector.maya.commands",
         FakeCommands(),
     )
     monkeypatch.setattr(bootstrap, "_ensure_source_path", lambda: None)
@@ -72,8 +72,8 @@ def test_bootstrap_install_ui_delegates_to_shader_health_commands(monkeypatch):
     assert calls == ["install_ui"]
 
 
-def test_bootstrap_uninstall_ui_delegates_to_shader_health_commands(monkeypatch):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_uninstall")
+def test_bootstrap_uninstall_ui_delegates_to_pipeline_inspector_commands(monkeypatch):
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_uninstall")
     calls: list[str] = []
 
     class FakeCommands:
@@ -87,7 +87,7 @@ def test_bootstrap_uninstall_ui_delegates_to_shader_health_commands(monkeypatch)
 
     monkeypatch.setitem(
         sys.modules,
-        "shader_health.maya.commands",
+        "pipeline_inspector.maya.commands",
         FakeCommands(),
     )
     monkeypatch.setattr(bootstrap, "_ensure_source_path", lambda: None)
@@ -98,11 +98,11 @@ def test_bootstrap_uninstall_ui_delegates_to_shader_health_commands(monkeypatch)
 
 
 def test_user_setup_import_is_harmless_outside_maya():
-    load_module(USER_SETUP_PATH, "shader_health_user_setup_outside_maya")
+    load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_outside_maya")
 
 
 def test_maya_year_from_version_extracts_four_digit_year():
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_year")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_year")
 
     assert bootstrap.maya_year_from_version("2025") == "2025"
     assert bootstrap.maya_year_from_version("Maya 2024 Update 3") == "2024"
@@ -110,7 +110,7 @@ def test_maya_year_from_version_extracts_four_digit_year():
 
 
 def test_plugin_load_candidates_prefers_native_binary_on_windows(monkeypatch):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_candidates")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_candidates")
     monkeypatch.setattr("sys.platform", "win32")
 
     assert bootstrap.plugin_load_candidates("2024") == _expected_candidates(bootstrap, "2024")
@@ -131,12 +131,12 @@ def _expected_candidates(bootstrap, maya_year: str | None) -> tuple[str, ...]:
         text = str(manager_path)
         if text not in seen:
             candidates.append(text)
-    candidates.append("shader_health_inspector.py")
+    candidates.append("pipeline_inspector.py")
     return tuple(candidates)
 
 
 def test_detect_install_mode_native_year(monkeypatch, tmp_path: Path):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_year")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_detect_year")
     year_file = tmp_path / "2024.mll"
     year_file.write_bytes(b"native")
     monkeypatch.setattr(bootstrap, "native_plugin_path", lambda year: year_file)
@@ -151,13 +151,13 @@ def test_detect_install_mode_native_year(monkeypatch, tmp_path: Path):
 
 
 def test_detect_install_mode_native_manager(monkeypatch, tmp_path: Path):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_manager")
-    manager_file = tmp_path / "shader_health_inspector.mll"
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_detect_manager")
+    manager_file = tmp_path / "pipeline_inspector.mll"
     manager_file.write_bytes(b"native")
     monkeypatch.setattr(
         bootstrap,
         "native_plugin_path",
-        lambda year: tmp_path / "missing" / "shader_health_inspector.mll",
+        lambda year: tmp_path / "missing" / "pipeline_inspector.mll",
     )
     monkeypatch.setattr(bootstrap, "manager_native_plugin_path", lambda: manager_file)
     monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
@@ -166,10 +166,10 @@ def test_detect_install_mode_native_manager(monkeypatch, tmp_path: Path):
 
 
 def test_detect_install_mode_python_only(monkeypatch, tmp_path: Path):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_python")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_detect_python")
     plug_ins = tmp_path / "plug-ins"
     plug_ins.mkdir()
-    (plug_ins / "shader_health_inspector.py").write_text("# plugin", encoding="utf-8")
+    (plug_ins / "pipeline_inspector.py").write_text("# plugin", encoding="utf-8")
     monkeypatch.setattr(
         bootstrap,
         "native_plugin_path",
@@ -186,7 +186,7 @@ def test_detect_install_mode_python_only(monkeypatch, tmp_path: Path):
 
 
 def test_detect_install_mode_module_only(monkeypatch, tmp_path: Path):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_detect_module")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_detect_module")
     monkeypatch.setattr(
         bootstrap,
         "native_plugin_path",
@@ -199,19 +199,19 @@ def test_detect_install_mode_module_only(monkeypatch, tmp_path: Path):
 
 
 def test_describe_dual_install_reports_load_order(monkeypatch, tmp_path: Path):
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_describe")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_describe")
     plug_ins = tmp_path / "plug-ins"
     plug_ins.mkdir()
-    (plug_ins / "shader_health_inspector.py").write_text("# plugin", encoding="utf-8")
+    (plug_ins / "pipeline_inspector.py").write_text("# plugin", encoding="utf-8")
     monkeypatch.setattr(
         bootstrap,
         "native_plugin_path",
-        lambda year: plug_ins / "2024" / "shader_health_inspector.mll",
+        lambda year: plug_ins / "2024" / "pipeline_inspector.mll",
     )
     monkeypatch.setattr(
         bootstrap,
         "manager_native_plugin_path",
-        lambda: plug_ins / "shader_health_inspector.mll",
+        lambda: plug_ins / "pipeline_inspector.mll",
     )
     monkeypatch.setattr(bootstrap, "module_root", lambda: tmp_path)
 
@@ -219,7 +219,7 @@ def test_describe_dual_install_reports_load_order(monkeypatch, tmp_path: Path):
 
     assert payload["maya_year"] == "2024"
     assert payload["install_mode"] == bootstrap.INSTALL_MODE_PYTHON
-    assert payload["load_candidates"] == ["shader_health_inspector.py"]
+    assert payload["load_candidates"] == ["pipeline_inspector.py"]
 
 
 def test_user_setup_prefers_native_plugin_load(monkeypatch):
@@ -241,7 +241,7 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
         @staticmethod
         def pluginInfo(plugin_name, query=True, loaded=True):
             _ = query, loaded
-            if plugin_name == "shader_health_inspector":
+            if plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -249,7 +249,7 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
         @staticmethod
         def loadPlugin(plugin_name, quiet=True):
             deferred.append(f"load:{plugin_name}:{quiet}")
-            return "shader_health_inspector"
+            return "pipeline_inspector"
 
         @staticmethod
         def warning(message: str):
@@ -261,20 +261,20 @@ def test_user_setup_prefers_native_plugin_load(monkeypatch):
     monkeypatch.setattr("sys.platform", "win32")
     monkeypatch.setitem(
         sys.modules,
-        "shader_health_inspector_bootstrap",
-        load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_native_user_setup"),
+        "pipeline_inspector_bootstrap",
+        load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_native_user_setup"),
     )
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
 
-    load_module(USER_SETUP_PATH, "shader_health_user_setup_native_plugin")
+    load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_native_plugin")
 
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_native_assert")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_native_assert")
     expected = str(bootstrap.native_plugin_path("2024"))
     if Path(expected).is_file():
         assert deferred == ["deferred", f"load:{expected}:True"]
     else:
-        assert deferred == ["deferred", "load:shader_health_inspector.py:True"]
+        assert deferred == ["deferred", "load:pipeline_inspector.py:True"]
 
 
 def test_user_setup_falls_back_to_py_plugin(monkeypatch):
@@ -296,7 +296,7 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
         @staticmethod
         def pluginInfo(plugin_name, query=True, loaded=True):
             _ = query, loaded
-            if plugin_name == "shader_health_inspector":
+            if plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -306,7 +306,7 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
             deferred.append(f"load:{plugin_name}:{quiet}")
             if str(plugin_name).endswith(".mll"):
                 raise RuntimeError("native plug-in missing")
-            return "shader_health_inspector"
+            return "pipeline_inspector"
 
         @staticmethod
         def warning(message: str):
@@ -318,15 +318,15 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
     monkeypatch.setattr("sys.platform", "win32")
     monkeypatch.setitem(
         sys.modules,
-        "shader_health_inspector_bootstrap",
-        load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_native_user_setup"),
+        "pipeline_inspector_bootstrap",
+        load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_native_user_setup"),
     )
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
 
-    load_module(USER_SETUP_PATH, "shader_health_user_setup_py_fallback")
+    load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_py_fallback")
 
-    bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_py_fallback_assert")
+    bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_py_fallback_assert")
     native_path = str(bootstrap.native_plugin_path("2024"))
     manager_path = str(bootstrap.manager_native_plugin_path())
     expected = ["deferred"]
@@ -334,7 +334,7 @@ def test_user_setup_falls_back_to_py_plugin(monkeypatch):
         expected.append(f"load:{native_path}:True")
     if Path(manager_path).is_file():
         expected.append(f"load:{manager_path}:True")
-    expected.append("load:shader_health_inspector.py:True")
+    expected.append("load:pipeline_inspector.py:True")
     assert deferred == expected
 
 
@@ -356,7 +356,7 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
         @staticmethod
         def pluginInfo(plugin_name, query=True, loaded=True):
             _ = query, loaded
-            if plugin_name == "shader_health_inspector":
+            if plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -364,7 +364,7 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
         @staticmethod
         def loadPlugin(plugin_name, quiet=True):
             deferred.append(f"load:{plugin_name}:{quiet}")
-            return "shader_health_inspector"
+            return "pipeline_inspector"
 
         @staticmethod
         def warning(message: str):
@@ -375,24 +375,24 @@ def test_user_setup_prefers_plugin_load(monkeypatch):
 
     monkeypatch.setitem(
         sys.modules,
-        "shader_health_inspector_bootstrap",
-        load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_py_user_setup"),
+        "pipeline_inspector_bootstrap",
+        load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_py_user_setup"),
     )
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
 
-    load_module(USER_SETUP_PATH, "shader_health_user_setup_plugin")
+    load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_plugin")
 
     bootstrap = load_module(
         BOOTSTRAP_PATH,
-        "shader_health_inspector_bootstrap_py_user_setup_assert",
+        "pipeline_inspector_bootstrap_py_user_setup_assert",
     )
     expected = ["deferred"]
     manager_path = str(bootstrap.manager_native_plugin_path())
     if Path(manager_path).is_file():
         expected.append(f"load:{manager_path}:True")
     else:
-        expected.append("load:shader_health_inspector.py:True")
+        expected.append("load:pipeline_inspector.py:True")
     assert deferred == expected
 
 
@@ -415,7 +415,7 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
         @staticmethod
         def pluginInfo(plugin_name, query=True, loaded=True):
             _ = query, loaded
-            if plugin_name == "shader_health_inspector":
+            if plugin_name == "pipeline_inspector":
                 return False
             _ = plugin_name
             return False
@@ -429,15 +429,15 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
         def warning(message: str):
             _ = message
 
-    fake_bootstrap = ModuleType("shader_health_inspector_bootstrap")
+    fake_bootstrap = ModuleType("pipeline_inspector_bootstrap")
 
     def install_ui() -> None:
         deferred.append("install_ui")
 
     fake_bootstrap.install_ui = install_ui
     fake_bootstrap.resolve_maya_year = lambda provider: "2025"
-    fake_bootstrap.PLUGIN_NAME = "shader_health_inspector"
-    real_bootstrap = load_module(BOOTSTRAP_PATH, "shader_health_inspector_bootstrap_fallback_paths")
+    fake_bootstrap.PLUGIN_NAME = "pipeline_inspector"
+    real_bootstrap = load_module(BOOTSTRAP_PATH, "pipeline_inspector_bootstrap_fallback_paths")
     fake_bootstrap.plugin_load_candidates = real_bootstrap.plugin_load_candidates
 
     fake_maya = ModuleType("maya")
@@ -445,9 +445,9 @@ def test_user_setup_falls_back_to_bootstrap_install(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
-    monkeypatch.setitem(sys.modules, "shader_health_inspector_bootstrap", fake_bootstrap)
+    monkeypatch.setitem(sys.modules, "pipeline_inspector_bootstrap", fake_bootstrap)
 
-    load_module(USER_SETUP_PATH, "shader_health_user_setup_fallback")
+    load_module(USER_SETUP_PATH, "pipeline_inspector_user_setup_fallback")
 
     assert deferred == ["deferred", "install_ui"]
 
@@ -474,12 +474,12 @@ def test_plugin_initialize_deferred_install(monkeypatch):
     fake_maya = ModuleType("maya")
     fake_maya.cmds = FakeCmds
 
-    monkeypatch.setitem(sys.modules, "shader_health_inspector_bootstrap", FakeBootstrap())
+    monkeypatch.setitem(sys.modules, "pipeline_inspector_bootstrap", FakeBootstrap())
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.cmds", FakeCmds)
     monkeypatch.setitem(sys.modules, "maya.OpenMayaMPx", fake_mpx)
 
-    plugin = load_module(PLUGIN_PATH, "shader_health_inspector_plugin_fresh")
+    plugin = load_module(PLUGIN_PATH, "pipeline_inspector_plugin_fresh")
     plugin.initializePlugin(object())
 
     assert calls == ["install_ui"]
@@ -501,11 +501,11 @@ def test_plugin_uninitialize_calls_uninstall(monkeypatch):
     fake_mpx.MFnPlugin = FakePlugin
     fake_maya = ModuleType("maya")
 
-    monkeypatch.setitem(sys.modules, "shader_health_inspector_bootstrap", FakeBootstrap())
+    monkeypatch.setitem(sys.modules, "pipeline_inspector_bootstrap", FakeBootstrap())
     monkeypatch.setitem(sys.modules, "maya", fake_maya)
     monkeypatch.setitem(sys.modules, "maya.OpenMayaMPx", fake_mpx)
 
-    plugin = load_module(PLUGIN_PATH, "shader_health_inspector_plugin_uninit_fresh")
+    plugin = load_module(PLUGIN_PATH, "pipeline_inspector_plugin_uninit_fresh")
     plugin.uninitializePlugin(object())
 
     assert calls == ["uninstall_ui"]

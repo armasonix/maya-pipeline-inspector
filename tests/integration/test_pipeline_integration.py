@@ -5,12 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pipeline_inspector import cli
+from pipeline_inspector.maya.validation_pipeline import run_validation
+from pipeline_inspector.reports.html_report import build_html_report, write_html_report
+from pipeline_inspector.reports.json_report import write_json_report
 from tests.integration.fixtures import broken_scene_snapshot
-
-from shader_health import cli
-from shader_health.maya.validation_pipeline import run_validation
-from shader_health.reports.html_report import build_html_report, write_html_report
-from shader_health.reports.json_report import write_json_report
 
 
 def test_packaged_pipeline_produces_failed_results_and_reports(tmp_path: Path):

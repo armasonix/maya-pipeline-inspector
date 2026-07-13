@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from shader_health.integrations.ftrack import FtrackClient, FtrackResponse
-from shader_health.integrations.ftrack.client import HttpRequest
-from shader_health.integrations.ftrack.queries import list_projects_expression, ping_user_expression
-from shader_health.integrations.ftrack.verify import verify_ftrack_connection
-from shader_health.studio_config import ConnectorSettings, FtrackConnectorSettings, StudioConfig
+from pipeline_inspector.integrations.ftrack import FtrackClient, FtrackResponse
+from pipeline_inspector.integrations.ftrack.client import HttpRequest
+from pipeline_inspector.integrations.ftrack.queries import (
+    list_projects_expression,
+    ping_user_expression,
+)
+from pipeline_inspector.integrations.ftrack.verify import verify_ftrack_connection
+from pipeline_inspector.studio_config import (
+    ConnectorSettings,
+    FtrackConnectorSettings,
+    StudioConfig,
+)
 
 
 def _studio(ftrack: FtrackConnectorSettings) -> StudioConfig:

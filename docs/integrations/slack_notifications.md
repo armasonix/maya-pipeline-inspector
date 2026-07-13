@@ -1,6 +1,6 @@
 # Slack notifications
 
-Shader Health Inspector can post validation summaries to Slack using **incoming webhooks** with **severity routing**:
+Pipeline Inspector can post validation summaries to Slack using **incoming webhooks** with **severity routing**:
 
 - **Publish block** events route to `connectors.slack.publish_webhook_url`
 - **Deadline block** events route to `connectors.slack.deadline_webhook_url`
@@ -57,17 +57,17 @@ Messages use Slack Block Kit via `integrations/slack/blocks.py`:
 
 ## Optional report link
 
-When `include_report_link` is true and `studio_environment.render_root` is set, Shader Health builds:
+When `include_report_link` is true and `studio_environment.render_root` is set, Pipeline Inspector builds:
 
 ```
-{render_root}/{scene_stem}_shader_health_report.json
+{render_root}/{scene_stem}_pipeline_inspector_report.json
 ```
 
 Example:
 
 - Scene: `\\farm\assets\hero\hero.ma`
 - `render_root`: `\\farm\render`
-- Link: `\\farm\render\hero_shader_health_report.json`
+- Link: `\\farm\render\hero_pipeline_inspector_report.json`
 
 The link is informational. Studios typically mirror or publish JSON reports to that location from their own export or farm pipeline.
 
@@ -83,7 +83,7 @@ Open **Settings → Connectors → Slack** in the Maya panel:
 ## Package layout
 
 ```
-src/shader_health/integrations/slack/
+src/pipeline_inspector/integrations/slack/
   config.py    # SlackConfig
   client.py    # SlackClient (incoming webhook POST)
   blocks.py    # Block Kit formatter + routing helpers
@@ -94,5 +94,5 @@ Runtime wiring from validation and farm events is handled by `integrations/notif
 ## Security notes
 
 - Use incoming webhooks only; OAuth Slack apps are out of scope for v0.5.
-- Do not commit webhook URLs to git. Store them in `shader_health_studio.json` on a controlled network share.
+- Do not commit webhook URLs to git. Store them in `pipeline_inspector_studio.json` on a controlled network share.
 - Treat webhook responses as untrusted network data.

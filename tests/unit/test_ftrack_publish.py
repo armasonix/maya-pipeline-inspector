@@ -3,17 +3,17 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.ftrack import FtrackClient, FtrackConfig, FtrackResponse
-from shader_health.integrations.ftrack.client import HttpRequest
-from shader_health.integrations.ftrack.publish import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.ftrack import FtrackClient, FtrackConfig, FtrackResponse
+from pipeline_inspector.integrations.ftrack.client import HttpRequest
+from pipeline_inspector.integrations.ftrack.publish import (
     maybe_publish_validation_summary,
     publish_validation_summary,
     resolve_task_id,
 )
-from shader_health.integrations.trackers.publish import ValidationPublishPayload
-from shader_health.studio_config import (
+from pipeline_inspector.integrations.trackers.publish import ValidationPublishPayload
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     FtrackConnectorSettings,
     StudioConfig,

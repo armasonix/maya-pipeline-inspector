@@ -1,4 +1,4 @@
-# Maya Shader Health Inspector — v0.2 Development Plan
+# Maya Pipeline Inspector — v0.2 Development Plan
 
 **Status:** **v0.2.0 shipped** (2026-07-06)  
 **Target release:** v0.2.0 — Production Hardening & Studio Readiness  
@@ -34,7 +34,7 @@ v0.1.0 (Milestone 9 — Demo and Release, Issue #48) delivered a working Texture
 | Safe fixes | Fix planner, Safe Auto-Fix Queue, **`set_attr` applier only**, reference/lock blocking |
 | Waivers | Sidecar JSON, load on validate, **Waive** action from issue details |
 | Reports | JSON/HTML reports, shader manifest export, **JSON manifest diff** (`tools/diff_manifests.py`) |
-| Headless | `python -m shader_health validate …`, documented exit codes |
+| Headless | `python -m pipeline_inspector validate …`, documented exit codes |
 | Integration | Deadline submit preflight example ([integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md)) |
 | Demo & docs | Broken demo scene, README captures, USER_GUIDE, ARCHITECTURE, RULE_AUTHORING, ADRs 0001–0003 |
 | Testing | Unit tests, integration tests for pipeline/CLI/renderer packs, GitHub Actions (no Maya in CI) |
@@ -50,9 +50,9 @@ From [CHANGELOG.md](../CHANGELOG.md):
 
 Additional gaps identified in code review:
 
-- Fix applier supports only `set_attr` ([`fix_applier.py`](../src/shader_health/maya/fix_applier.py)); `relink_path`, `normalize_path`, and `disable_feature` exist in the fix model but are not applied.
+- Fix applier supports only `set_attr` ([`fix_applier.py`](../src/pipeline_inspector/maya/fix_applier.py)); `relink_path`, `normalize_path`, and `disable_feature` exist in the fix model but are not applied.
 - No fix apply audit log or Export Fix Plan workflow ([ADR 0003](adr/0003-safe-fix-reference-safety-policy.md)).
-- Manifest diff is JSON-only; no HTML diff report or `shader_health diff` CLI subcommand.
+- Manifest diff is JSON-only; no HTML diff report or `pipeline_inspector diff` CLI subcommand.
 - No publish preflight example (Deadline example exists).
 - No dedicated Maya module install guide (`maya_module/` exists but is undocumented as a standalone guide).
 - Waiver UI supports create-only; no list/revoke/expiry management panel.
@@ -136,15 +136,15 @@ flowchart LR
 
 | Module | v0.2 change |
 |---|---|
-| [`src/shader_health/maya/fix_applier.py`](../src/shader_health/maya/fix_applier.py) | Add `relink_path`, `normalize_path`, `disable_feature` |
-| [`src/shader_health/core/fix_plan.py`](../src/shader_health/core/fix_plan.py) | Export fix plan serialization; audit record types |
-| [`src/shader_health/maya/snapshot_enrichment.py`](../src/shader_health/maya/snapshot_enrichment.py) | V-Ray/Arnold material metadata fields |
-| [`src/shader_health/rules/vray/`](../src/shader_health/rules/vray/) | Production policy rules |
-| [`src/shader_health/rules/arnold/`](../src/shader_health/rules/arnold/) | Production policy rules |
-| [`src/shader_health/reports/manifest_diff.py`](../src/shader_health/reports/manifest_diff.py) | HTML diff report |
-| [`src/shader_health/cli.py`](../src/shader_health/cli.py) | `diff` subcommand |
-| [`src/shader_health/ui/fix_queue.py`](../src/shader_health/ui/fix_queue.py) | Export Fix Plan; confirmation dialog hook |
-| [`src/shader_health/ui/main_window.py`](../src/shader_health/ui/main_window.py) | Waiver manager; manifest diff export |
+| [`src/pipeline_inspector/maya/fix_applier.py`](../src/pipeline_inspector/maya/fix_applier.py) | Add `relink_path`, `normalize_path`, `disable_feature` |
+| [`src/pipeline_inspector/core/fix_plan.py`](../src/pipeline_inspector/core/fix_plan.py) | Export fix plan serialization; audit record types |
+| [`src/pipeline_inspector/maya/snapshot_enrichment.py`](../src/pipeline_inspector/maya/snapshot_enrichment.py) | V-Ray/Arnold material metadata fields |
+| [`src/pipeline_inspector/rules/vray/`](../src/pipeline_inspector/rules/vray/) | Production policy rules |
+| [`src/pipeline_inspector/rules/arnold/`](../src/pipeline_inspector/rules/arnold/) | Production policy rules |
+| [`src/pipeline_inspector/reports/manifest_diff.py`](../src/pipeline_inspector/reports/manifest_diff.py) | HTML diff report |
+| [`src/pipeline_inspector/cli.py`](../src/pipeline_inspector/cli.py) | `diff` subcommand |
+| [`src/pipeline_inspector/ui/fix_queue.py`](../src/pipeline_inspector/ui/fix_queue.py) | Export Fix Plan; confirmation dialog hook |
+| [`src/pipeline_inspector/ui/main_window.py`](../src/pipeline_inspector/ui/main_window.py) | Waiver manager; manifest diff export |
 | [`examples/publish/`](../examples/) | Publish preflight example (new) |
 | [`maya_module/`](../maya_module/) | Documented install path |
 | [`docs/integrations/`](../docs/integrations/) | Publish preflight doc |
@@ -224,11 +224,11 @@ GitHub milestones (open):
 
 | Plan milestone | GitHub milestone | URL |
 |---:|---|---|
-| 10 | [#12](https://github.com/armasonix/maya-shader-health-inspector/milestone/12) | Safe Fix Expansion and Audit Trail |
-| 11 | [#13](https://github.com/armasonix/maya-shader-health-inspector/milestone/13) | Renderer Policy Packs |
-| 12 | [#14](https://github.com/armasonix/maya-shader-health-inspector/milestone/14) | Change Review and Manifest Diff UX |
-| 13 | [#15](https://github.com/armasonix/maya-shader-health-inspector/milestone/15) | Studio Integration and Install |
-| 14 | [#16](https://github.com/armasonix/maya-shader-health-inspector/milestone/16) | Waiver Workflow Polish and v0.2 Release |
+| 10 | [#12](https://github.com/armasonix/maya-pipeline-inspector/milestone/12) | Safe Fix Expansion and Audit Trail |
+| 11 | [#13](https://github.com/armasonix/maya-pipeline-inspector/milestone/13) | Renderer Policy Packs |
+| 12 | [#14](https://github.com/armasonix/maya-pipeline-inspector/milestone/14) | Change Review and Manifest Diff UX |
+| 13 | [#15](https://github.com/armasonix/maya-pipeline-inspector/milestone/15) | Studio Integration and Install |
+| 14 | [#16](https://github.com/armasonix/maya-pipeline-inspector/milestone/16) | Waiver Workflow Polish and v0.2 Release |
 
 Utility script to recreate issues (milestones must exist): [`tools/create_v02_github_backlog.ps1`](../tools/create_v02_github_backlog.ps1)
 
@@ -246,7 +246,7 @@ Utility script to recreate issues (milestones must exist): [`tools/create_v02_gi
 
 Labels: `fixes`, `maya`, `safety`  
 Depends on: —  
-Related: [`fix_applier.py`](../src/shader_health/maya/fix_applier.py), [`fix_plan.py`](../src/shader_health/core/fix_plan.py), [ADR 0003](adr/0003-safe-fix-reference-safety-policy.md)
+Related: [`fix_applier.py`](../src/pipeline_inspector/maya/fix_applier.py), [`fix_plan.py`](../src/pipeline_inspector/core/fix_plan.py), [ADR 0003](adr/0003-safe-fix-reference-safety-policy.md)
 
 Acceptance criteria:
 
@@ -262,7 +262,7 @@ Acceptance criteria:
 
 Labels: `fixes`, `maya`, `safety`  
 Depends on: —  
-Related: [`fix_applier.py`](../src/shader_health/maya/fix_applier.py), [`texture_paths.json`](../src/shader_health/rules/common/texture_paths.json)
+Related: [`fix_applier.py`](../src/pipeline_inspector/maya/fix_applier.py), [`texture_paths.json`](../src/pipeline_inspector/rules/common/texture_paths.json)
 
 Acceptance criteria:
 
@@ -278,7 +278,7 @@ Acceptance criteria:
 
 Labels: `fixes`, `maya`, `safety`, `ui`  
 Depends on: #068 (confirmation dialog may land in parallel; applier must respect `high_risk_requires_explicit_confirmation`)  
-Related: [`fix_applier.py`](../src/shader_health/maya/fix_applier.py), [`fix_queue.py`](../src/shader_health/ui/fix_queue.py)
+Related: [`fix_applier.py`](../src/pipeline_inspector/maya/fix_applier.py), [`fix_queue.py`](../src/pipeline_inspector/ui/fix_queue.py)
 
 Acceptance criteria:
 
@@ -294,12 +294,12 @@ Acceptance criteria:
 
 Labels: `fixes`, `reports`, `audit`  
 Depends on: #049, #050, #051 (audit schema should cover all fix types)  
-Related: [`fix_applier.py`](../src/shader_health/maya/fix_applier.py), [`json_report.py`](../src/shader_health/reports/)
+Related: [`fix_applier.py`](../src/pipeline_inspector/maya/fix_applier.py), [`json_report.py`](../src/pipeline_inspector/reports/)
 
 Acceptance criteria:
 
 - Each apply session writes a deterministic audit record: timestamp (UTC), scene path, profile id, fix records (fix_id, rule_id, fix_type, target, before, after, applied/blocked, block_reasons, undo chunk name).
-- Audit log persisted as `{scene_stem}.shader_health_fix_audit.json` beside the scene (or path override API).
+- Audit log persisted as `{scene_stem}.pipeline_inspector_fix_audit.json` beside the scene (or path override API).
 - Validation JSON report includes an optional `fix_audit` section when fixes were applied in-session.
 - Reloading audit log round-trips through JSON schema tests.
 - Headless validate does not write fix audit unless an explicit future apply mode is added (out of v0.2 scope).
@@ -310,7 +310,7 @@ Acceptance criteria:
 
 Labels: `fixes`, `ui`, `cli`  
 Depends on: —  
-Related: [`fix_plan.py`](../src/shader_health/core/fix_plan.py), [`fix_queue.py`](../src/shader_health/ui/fix_queue.py), [`main_window.py`](../src/shader_health/ui/main_window.py)
+Related: [`fix_plan.py`](../src/pipeline_inspector/core/fix_plan.py), [`fix_queue.py`](../src/pipeline_inspector/ui/fix_queue.py), [`main_window.py`](../src/pipeline_inspector/ui/main_window.py)
 
 Acceptance criteria:
 
@@ -334,7 +334,7 @@ Acceptance criteria:
 
 Labels: `maya`, `scanner`, `vray`  
 Depends on: —  
-Related: [`snapshot_enrichment.py`](../src/shader_health/maya/snapshot_enrichment.py), [`SNAPSHOT_SCHEMA.md`](SNAPSHOT_SCHEMA.md)
+Related: [`snapshot_enrichment.py`](../src/pipeline_inspector/maya/snapshot_enrichment.py), [`SNAPSHOT_SCHEMA.md`](SNAPSHOT_SCHEMA.md)
 
 Acceptance criteria:
 
@@ -349,7 +349,7 @@ Acceptance criteria:
 
 Labels: `rules`, `vray`  
 Depends on: #054  
-Related: [`rules/vray/renderer_health.json`](../src/shader_health/rules/vray/renderer_health.json)
+Related: [`rules/vray/renderer_health.json`](../src/pipeline_inspector/rules/vray/renderer_health.json)
 
 Acceptance criteria:
 
@@ -365,7 +365,7 @@ Acceptance criteria:
 
 Labels: `maya`, `scanner`, `arnold`  
 Depends on: —  
-Related: [`snapshot_enrichment.py`](../src/shader_health/maya/snapshot_enrichment.py), [`SNAPSHOT_SCHEMA.md`](SNAPSHOT_SCHEMA.md)
+Related: [`snapshot_enrichment.py`](../src/pipeline_inspector/maya/snapshot_enrichment.py), [`SNAPSHOT_SCHEMA.md`](SNAPSHOT_SCHEMA.md)
 
 Acceptance criteria:
 
@@ -380,7 +380,7 @@ Acceptance criteria:
 
 Labels: `rules`, `arnold`  
 Depends on: #056  
-Related: [`rules/arnold/renderer_health.json`](../src/shader_health/rules/arnold/renderer_health.json)
+Related: [`rules/arnold/renderer_health.json`](../src/pipeline_inspector/rules/arnold/renderer_health.json)
 
 Acceptance criteria:
 
@@ -418,7 +418,7 @@ Acceptance criteria:
 
 Labels: `reports`, `html`  
 Depends on: —  
-Related: [`manifest_diff.py`](../src/shader_health/reports/manifest_diff.py), [`html_report.py`](../src/shader_health/reports/html_report.py)
+Related: [`manifest_diff.py`](../src/pipeline_inspector/reports/manifest_diff.py), [`html_report.py`](../src/pipeline_inspector/reports/html_report.py)
 
 Acceptance criteria:
 
@@ -429,15 +429,15 @@ Acceptance criteria:
 
 ---
 
-#### Issue 60 — Add `shader_health diff` CLI subcommand
+#### Issue 60 — Add `pipeline_inspector diff` CLI subcommand
 
 Labels: `cli`, `headless`  
 Depends on: #059 (for `--html` output)  
-Related: [`cli.py`](../src/shader_health/cli.py), [`tools/diff_manifests.py`](../tools/diff_manifests.py)
+Related: [`cli.py`](../src/pipeline_inspector/cli.py), [`tools/diff_manifests.py`](../tools/diff_manifests.py)
 
 Acceptance criteria:
 
-- `python -m shader_health diff OLD.json NEW.json` writes JSON diff to stdout or `--out`.
+- `python -m pipeline_inspector diff OLD.json NEW.json` writes JSON diff to stdout or `--out`.
 - `--html PATH` writes HTML diff report using #059 template.
 - Exit code 0 on success; non-zero on invalid inputs with clear stderr message.
 - `tools/diff_manifests.py` delegates to shared implementation or documents deprecation path.
@@ -449,7 +449,7 @@ Acceptance criteria:
 
 Labels: `ui`, `reports`  
 Depends on: #59, #60  
-Related: [`main_window.py`](../src/shader_health/ui/main_window.py), [`export_actions.py`](../src/shader_health/maya/export_actions.py)
+Related: [`main_window.py`](../src/pipeline_inspector/ui/main_window.py), [`export_actions.py`](../src/pipeline_inspector/maya/export_actions.py)
 
 Acceptance criteria:
 
@@ -464,7 +464,7 @@ Acceptance criteria:
 
 Labels: `rules`, `testing`  
 Depends on: —  
-Related: [`texture_freshness.json`](../src/shader_health/rules/common/texture_freshness.json), [USER_GUIDE.md](USER_GUIDE.md)
+Related: [`texture_freshness.json`](../src/pipeline_inspector/rules/common/texture_freshness.json), [USER_GUIDE.md](USER_GUIDE.md)
 
 Acceptance criteria:
 
@@ -502,7 +502,7 @@ Acceptance criteria:
 
 Labels: `docs`, `maya`  
 Depends on: —  
-Related: [`maya_module/shader_health_inspector.mod`](../maya_module/shader_health_inspector.mod), [`maya_module/scripts/`](../maya_module/scripts/)
+Related: [`maya_module/pipeline_inspector.mod`](../maya_module/pipeline_inspector.mod), [`maya_module/scripts/`](../maya_module/scripts/)
 
 Acceptance criteria:
 
@@ -517,7 +517,7 @@ Acceptance criteria:
 
 Labels: `docs`, `rules`  
 Depends on: —  
-Related: [RULE_AUTHORING.md](RULE_AUTHORING.md), [`rule_loader.py`](../src/shader_health/core/rule_loader.py), [`validation_pipeline.py`](../src/shader_health/maya/validation_pipeline.py)
+Related: [RULE_AUTHORING.md](RULE_AUTHORING.md), [`rule_loader.py`](../src/pipeline_inspector/core/rule_loader.py), [`validation_pipeline.py`](../src/pipeline_inspector/maya/validation_pipeline.py)
 
 Acceptance criteria:
 
@@ -555,7 +555,7 @@ Acceptance criteria:
 
 Labels: `waivers`, `ui`  
 Depends on: —  
-Related: [`waivers.py`](../src/shader_health/core/waivers.py), [`commands.py`](../src/shader_health/maya/commands.py), [`main_window.py`](../src/shader_health/ui/main_window.py)
+Related: [`waivers.py`](../src/pipeline_inspector/core/waivers.py), [`commands.py`](../src/pipeline_inspector/maya/commands.py), [`main_window.py`](../src/pipeline_inspector/ui/main_window.py)
 
 Acceptance criteria:
 
@@ -571,7 +571,7 @@ Acceptance criteria:
 
 Labels: `fixes`, `ui`, `safety`  
 Depends on: —  
-Related: [`fix_queue.py`](../src/shader_health/ui/fix_queue.py), [`ui_launcher.py`](../src/shader_health/maya/ui_launcher.py), [ADR 0003](adr/0003-safe-fix-reference-safety-policy.md)
+Related: [`fix_queue.py`](../src/pipeline_inspector/ui/fix_queue.py), [`ui_launcher.py`](../src/pipeline_inspector/maya/ui_launcher.py), [ADR 0003](adr/0003-safe-fix-reference-safety-policy.md)
 
 Acceptance criteria:
 
@@ -695,7 +695,7 @@ v0.2.0 is ready when:
 | 57 | 11 | Add Arnold production policy rules |
 | 58 | 11 | Renderer policy pack fixture tests |
 | 59 | 12 | HTML manifest diff report template |
-| 60 | 12 | Add `shader_health diff` CLI subcommand |
+| 60 | 12 | Add `pipeline_inspector diff` CLI subcommand |
 | 61 | 12 | UI export manifest diff |
 | 62 | 12 | Improve texture freshness checks |
 | 63 | 13 | Publish preflight hook example + docs |
@@ -715,25 +715,25 @@ Plan ids in issue titles map to GitHub issues as follows:
 
 | Plan id | GitHub issue | Title |
 |--------:|-------------:|-------|
-| 049 | [#64](https://github.com/armasonix/maya-shader-health-inspector/issues/64) | Implement `relink_path` fix applier |
-| 050 | [#65](https://github.com/armasonix/maya-shader-health-inspector/issues/65) | Implement `normalize_path` fix applier |
-| 051 | [#66](https://github.com/armasonix/maya-shader-health-inspector/issues/66) | Implement `disable_feature` fix applier with confirmation gate |
-| 052 | [#67](https://github.com/armasonix/maya-shader-health-inspector/issues/67) | Persist fix apply audit log |
-| 053 | [#68](https://github.com/armasonix/maya-shader-health-inspector/issues/68) | Add Export Fix Plan (UI + CLI) |
-| 054 | [#69](https://github.com/armasonix/maya-shader-health-inspector/issues/69) | Extend snapshot enrichment for V-Ray |
-| 055 | [#70](https://github.com/armasonix/maya-shader-health-inspector/issues/70) | Add V-Ray production policy rules |
-| 056 | [#71](https://github.com/armasonix/maya-shader-health-inspector/issues/71) | Extend snapshot enrichment for Arnold |
-| 057 | [#72](https://github.com/armasonix/maya-shader-health-inspector/issues/72) | Add Arnold production policy rules |
-| 058 | [#73](https://github.com/armasonix/maya-shader-health-inspector/issues/73) | Renderer policy pack fixture tests |
-| 059 | [#74](https://github.com/armasonix/maya-shader-health-inspector/issues/74) | HTML manifest diff report template |
-| 060 | [#75](https://github.com/armasonix/maya-shader-health-inspector/issues/75) | Add `shader_health diff` CLI subcommand |
-| 061 | [#76](https://github.com/armasonix/maya-shader-health-inspector/issues/76) | UI export manifest diff |
-| 062 | [#77](https://github.com/armasonix/maya-shader-health-inspector/issues/77) | Improve texture freshness checks |
-| 063 | [#78](https://github.com/armasonix/maya-shader-health-inspector/issues/78) | Publish preflight hook example + docs |
-| 064 | [#79](https://github.com/armasonix/maya-shader-health-inspector/issues/79) | Maya module install guide |
-| 065 | [#80](https://github.com/armasonix/maya-shader-health-inspector/issues/80) | Studio custom rules and profile overrides guide |
-| 066 | [#81](https://github.com/armasonix/maya-shader-health-inspector/issues/81) | Optional Maya integration CI job |
-| 067 | [#82](https://github.com/armasonix/maya-shader-health-inspector/issues/82) | Waiver management UI |
-| 068 | [#83](https://github.com/armasonix/maya-shader-health-inspector/issues/83) | High-risk fix confirmation dialog |
-| 069 | [#84](https://github.com/armasonix/maya-shader-health-inspector/issues/84) | Reconcile DEVELOPMENT_PLAN §27 |
-| 070 | [#85](https://github.com/armasonix/maya-shader-health-inspector/issues/85) | Prepare v0.2 public release |
+| 049 | [#64](https://github.com/armasonix/maya-pipeline-inspector/issues/64) | Implement `relink_path` fix applier |
+| 050 | [#65](https://github.com/armasonix/maya-pipeline-inspector/issues/65) | Implement `normalize_path` fix applier |
+| 051 | [#66](https://github.com/armasonix/maya-pipeline-inspector/issues/66) | Implement `disable_feature` fix applier with confirmation gate |
+| 052 | [#67](https://github.com/armasonix/maya-pipeline-inspector/issues/67) | Persist fix apply audit log |
+| 053 | [#68](https://github.com/armasonix/maya-pipeline-inspector/issues/68) | Add Export Fix Plan (UI + CLI) |
+| 054 | [#69](https://github.com/armasonix/maya-pipeline-inspector/issues/69) | Extend snapshot enrichment for V-Ray |
+| 055 | [#70](https://github.com/armasonix/maya-pipeline-inspector/issues/70) | Add V-Ray production policy rules |
+| 056 | [#71](https://github.com/armasonix/maya-pipeline-inspector/issues/71) | Extend snapshot enrichment for Arnold |
+| 057 | [#72](https://github.com/armasonix/maya-pipeline-inspector/issues/72) | Add Arnold production policy rules |
+| 058 | [#73](https://github.com/armasonix/maya-pipeline-inspector/issues/73) | Renderer policy pack fixture tests |
+| 059 | [#74](https://github.com/armasonix/maya-pipeline-inspector/issues/74) | HTML manifest diff report template |
+| 060 | [#75](https://github.com/armasonix/maya-pipeline-inspector/issues/75) | Add `pipeline_inspector diff` CLI subcommand |
+| 061 | [#76](https://github.com/armasonix/maya-pipeline-inspector/issues/76) | UI export manifest diff |
+| 062 | [#77](https://github.com/armasonix/maya-pipeline-inspector/issues/77) | Improve texture freshness checks |
+| 063 | [#78](https://github.com/armasonix/maya-pipeline-inspector/issues/78) | Publish preflight hook example + docs |
+| 064 | [#79](https://github.com/armasonix/maya-pipeline-inspector/issues/79) | Maya module install guide |
+| 065 | [#80](https://github.com/armasonix/maya-pipeline-inspector/issues/80) | Studio custom rules and profile overrides guide |
+| 066 | [#81](https://github.com/armasonix/maya-pipeline-inspector/issues/81) | Optional Maya integration CI job |
+| 067 | [#82](https://github.com/armasonix/maya-pipeline-inspector/issues/82) | Waiver management UI |
+| 068 | [#83](https://github.com/armasonix/maya-pipeline-inspector/issues/83) | High-risk fix confirmation dialog |
+| 069 | [#84](https://github.com/armasonix/maya-pipeline-inspector/issues/84) | Reconcile DEVELOPMENT_PLAN §27 |
+| 070 | [#85](https://github.com/armasonix/maya-pipeline-inspector/issues/85) | Prepare v0.2 public release |

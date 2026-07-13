@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from shader_health.integrations.bug_report.relay_client import BugReportRelayResult
-from shader_health.integrations.bug_report.status import (
+from pipeline_inspector.integrations.bug_report.relay_client import BugReportRelayResult
+from pipeline_inspector.integrations.bug_report.status import (
     format_bug_report_failure_status,
     format_bug_report_issue_url_text,
     format_bug_report_success_headline,

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 
-from shader_health.integrations.bug_report.payload import (
+from pipeline_inspector.integrations.bug_report.payload import (
     BUG_REPORT_PAYLOAD_SCHEMA_VERSION,
     BugReportPayload,
     build_bug_report_payload,
     scene_basename,
 )
-from shader_health.integrations.bug_report.relay_client import build_multipart_body
-from shader_health.version import APP_NAME, __version__
+from pipeline_inspector.integrations.bug_report.relay_client import build_multipart_body
+from pipeline_inspector.version import APP_NAME, __version__
 
 
 def test_scene_basename_normalizes_windows_and_posix_paths():

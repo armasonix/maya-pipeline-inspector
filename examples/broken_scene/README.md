@@ -1,11 +1,11 @@
 # Broken demo scene
 
-This folder contains the v0.1 broken demo scene for Maya Shader Health Inspector.
+This folder contains the v0.1 broken demo scene for Maya Pipeline Inspector.
 
 The final scene should be created manually in Maya and saved as:
 
 ```text
-examples/broken_scene/shader_health_demo_broken.ma
+examples/broken_scene/pipeline_inspector_demo_broken.ma
 ```
 
 The goal is not to create a beautiful render scene. The goal is to create a compact, readable portfolio/demo scene that exercises the validator, Maya UI, JSON/HTML reports, safe-fix queue, and Deadline preflight path.
@@ -220,14 +220,14 @@ common.shader.unassigned_material or orphan/dead shader network rule => failed
 8. Save as Maya ASCII:
 
 ```text
-examples/broken_scene/shader_health_demo_broken.ma
+examples/broken_scene/pipeline_inspector_demo_broken.ma
 ```
 
 ## Local validation checklist
 
 From Maya:
 
-1. Launch Shader Health Inspector.
+1. Launch Pipeline Inspector.
 2. Validate Scene.
 3. Confirm all six acceptance categories appear in the issues table.
 4. Select each issue and confirm the details panel shows message, why, current/expected values, and graph trace where available.
@@ -238,10 +238,10 @@ From Maya:
 Headless smoke:
 
 ```bash
-mayapy -m shader_health validate examples/broken_scene/shader_health_demo_broken.ma \
+mayapy -m pipeline_inspector validate examples/broken_scene/pipeline_inspector_demo_broken.ma \
   --input-kind scene \
-  --profile src/shader_health/rules/profiles/deadline_critical.json \
-  --report examples/broken_scene/reports/shader_health_demo_broken_deadline.json
+  --profile src/pipeline_inspector/rules/profiles/deadline_critical.json \
+  --report examples/broken_scene/reports/pipeline_inspector_demo_broken_deadline.json
 ```
 
 If the packaged `deadline_critical` profile does not exist yet, use the current local profile path or a temporary profile matching the [Deadline integration guide](../../docs/integrations/deadline_submit_preflight.md).
@@ -251,8 +251,8 @@ If the packaged `deadline_critical` profile does not exist yet, use the current 
 Commit these artifacts when the scene is ready:
 
 ```text
-examples/broken_scene/shader_health_demo_broken.ma
-examples/broken_scene/shader_health_demo_broken_headless.ma
+examples/broken_scene/pipeline_inspector_demo_broken.ma
+examples/broken_scene/pipeline_inspector_demo_broken_headless.ma
 examples/broken_scene/textures/*
 examples/broken_scene/README.md
 ```
@@ -260,17 +260,17 @@ examples/broken_scene/README.md
 Optional **curated** report artifacts for README screenshots (regenerate after rule-pack changes):
 
 ```text
-examples/broken_scene/shader_health_demo_broken_shader_health_report.html
-examples/broken_scene/shader_health_demo_broken_shader_health_report.json
-examples/broken_scene/shader_health_demo_broken_shader_health_manifest.json
+examples/broken_scene/pipeline_inspector_demo_broken_pipeline_inspector_report.html
+examples/broken_scene/pipeline_inspector_demo_broken_pipeline_inspector_report.json
+examples/broken_scene/pipeline_inspector_demo_broken_pipeline_inspector_manifest.json
 ```
 
 Do **not** commit machine-local outputs (covered by `.gitignore`):
 
 ```text
-examples/broken_scene/*.shader_health_fix_audit.json
-examples/broken_scene/*_shader_health_manifest_diff.*
-examples/broken_scene/*_shader_health_deadline_command.txt
+examples/broken_scene/*.pipeline_inspector_fix_audit.json
+examples/broken_scene/*_pipeline_inspector_manifest_diff.*
+examples/broken_scene/*_pipeline_inspector_deadline_command.txt
 examples/broken_scene/*_fixed.ma
 examples/broken_scene/reports/
 ```

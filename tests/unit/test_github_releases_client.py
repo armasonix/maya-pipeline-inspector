@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from shader_health.integrations.update import (
+from pipeline_inspector.integrations.update import (
     GitHubReleasesClient,
     GitHubReleasesConfig,
     compare_semver,
@@ -13,7 +13,7 @@ from shader_health.integrations.update import (
     parse_release_payload,
     parse_semver,
 )
-from shader_health.integrations.update.github_releases import (
+from pipeline_inspector.integrations.update.github_releases import (
     GitHubReleasesResponse,
     HttpRequest,
 )
@@ -23,26 +23,26 @@ def _latest_release_payload() -> dict[str, object]:
     return {
         "tag_name": "v0.5.0",
         "name": "v0.5.0 — Settings Core v2",
-        "html_url": "https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.5.0",
+        "html_url": "https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.5.0",
         "published_at": "2026-07-11T07:00:00Z",
         "body": "Release notes",
         "assets": [
             {
                 "id": 42,
-                "name": "maya-shader-health-inspector-v0.5.0.zip",
+                "name": "maya-pipeline-inspector-v0.5.0.zip",
                 "browser_download_url": (
-                    "https://github.com/armasonix/maya-shader-health-inspector/"
-                    "releases/download/v0.5.0/maya-shader-health-inspector-v0.5.0.zip"
+                    "https://github.com/armasonix/maya-pipeline-inspector/"
+                    "releases/download/v0.5.0/maya-pipeline-inspector-v0.5.0.zip"
                 ),
                 "size": 123456,
                 "content_type": "application/zip",
             },
             {
                 "id": 43,
-                "name": "shader_health_inspector.mll",
+                "name": "pipeline_inspector.mll",
                 "browser_download_url": (
-                    "https://github.com/armasonix/maya-shader-health-inspector/"
-                    "releases/download/v0.5.0/shader_health_inspector.mll"
+                    "https://github.com/armasonix/maya-pipeline-inspector/"
+                    "releases/download/v0.5.0/pipeline_inspector.mll"
                 ),
                 "size": 11776,
                 "content_type": "application/octet-stream",
@@ -91,9 +91,9 @@ def test_parse_release_payload_extracts_assets():
     assert release.version == "0.5.0"
     assert release.html_url.endswith("/releases/tag/v0.5.0")
     assert len(release.assets) == 2
-    assert release.assets[0].name == "maya-shader-health-inspector-v0.5.0.zip"
+    assert release.assets[0].name == "maya-pipeline-inspector-v0.5.0.zip"
     assert release.assets[0].asset_id == 42
-    assert release.assets[1].download_url.endswith("shader_health_inspector.mll")
+    assert release.assets[1].download_url.endswith("pipeline_inspector.mll")
 
 
 def test_github_releases_client_fetches_latest_release_metadata_and_assets():
@@ -113,7 +113,7 @@ def test_github_releases_client_fetches_latest_release_metadata_and_assets():
 
     assert len(captured) == 1
     assert captured[0].method == "GET"
-    assert captured[0].url.endswith("/repos/armasonix/maya-shader-health-inspector/releases/latest")
+    assert captured[0].url.endswith("/repos/armasonix/maya-pipeline-inspector/releases/latest")
     assert captured[0].headers["Accept"] == "application/vnd.github+json"
     assert release.version == "0.5.0"
     assert release.assets[0].content_type == "application/zip"

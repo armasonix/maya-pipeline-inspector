@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from shader_health.maya import commands, navigation
+from pipeline_inspector.maya import commands, navigation
 
 
 class FakeCmds:

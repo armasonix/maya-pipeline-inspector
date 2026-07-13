@@ -8,7 +8,7 @@ from tests.unit.test_maya_summary_header import (
     _find,
 )
 
-from shader_health.ui import farm_tab, main_window
+from pipeline_inspector.ui import farm_tab, main_window
 
 
 class FakeSignal:

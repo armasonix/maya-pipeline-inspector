@@ -31,7 +31,7 @@ on:
     - cron: "0 6 * * 1"
   pull_request:
     paths:
-      - "src/shader_health/maya/**"
+      - "src/pipeline_inspector/maya/**"
       - "maya_module/**"
       - "native/**"
       - "tests/integration/**"
@@ -61,10 +61,8 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
 
     env:
-      DEMO_SCENE: examples/broken_scene/shader_health_demo_broken_headless.ma
-      DEADLINE_PROFILE: src/shader_health/rules/profiles/deadline_critical.json
-      DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
-      DEBUG_RUN_ID: github-${{ github.run_id }}
+      DEMO_SCENE: examples/broken_scene/pipeline_inspector_demo_broken_headless.ma
+      DEADLINE_PROFILE: src/pipeline_inspector/rules/profiles/deadline_critical.json
 
     steps:
       - name: Checkout
@@ -88,8 +86,6 @@ jobs:
           MAYA_PY_SECRET: ${{ secrets.MAYA_PY }}
           MAYA_PY_VAR: ${{ vars.MAYA_PY }}
           MAYA_PY_INPUT: ${{ inputs.mayapy_path }}
-          DEBUG_SESSION_LOG: ${{ github.workspace }}/debug-ee1eca.log
-          DEBUG_RUN_ID: github-${{ github.run_id }}
         run: python tools\ci\resolve_mayapy.py
 
       - name: Verify mayapy output
@@ -125,11 +121,11 @@ jobs:
 
       - name: Validate scene smoke (headless demo)
         env:
-          REPORT: ${{ runner.temp }}/shader_health_validate_smoke.json
+          REPORT: ${{ runner.temp }}/pipeline_inspector_validate_smoke.json
         run: |
           $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           $report = $env:REPORT
-          & $mayapy -m shader_health validate $env:DEMO_SCENE `
+          & $mayapy -m pipeline_inspector validate $env:DEMO_SCENE `
             --input-kind scene `
             --profile-id publish_strict `
             --report $report
@@ -148,8 +144,8 @@ jobs:
 
       - name: Manifest export and gate smoke
         env:
-          OUT_MANIFEST: ${{ runner.temp }}/shader_health_manifest_smoke.json
-          GATE_REPORT: ${{ runner.temp }}/shader_health_gate_smoke.json
+          OUT_MANIFEST: ${{ runner.temp }}/pipeline_inspector_manifest_smoke.json
+          GATE_REPORT: ${{ runner.temp }}/pipeline_inspector_gate_smoke.json
         run: |
           $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           $manifest = $env:OUT_MANIFEST
@@ -172,7 +168,7 @@ jobs:
 
       - name: Deadline preflight smoke
         env:
-          PREFLIGHT_REPORT: ${{ runner.temp }}/shader_health_deadline_preflight_smoke.json
+          PREFLIGHT_REPORT: ${{ runner.temp }}/pipeline_inspector_deadline_preflight_smoke.json
         run: |
           $mayapy = '${{ steps.mayapy.outputs.mayapy_path }}'
           $report = $env:PREFLIGHT_REPORT

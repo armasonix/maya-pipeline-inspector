@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui import settings_widgets
+from pipeline_inspector.ui import settings_widgets
 
 
 class FakeQt:

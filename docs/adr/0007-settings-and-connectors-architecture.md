@@ -10,27 +10,27 @@ Accepted
 
 ## Context
 
-v0.4 ships a Settings screen with six category tabs, but only **Connectors → Deadline** and **Studio → Require .tx** are functional. Basic and Advanced tabs are placeholders. All persistent settings live in a single [`studio_config.py`](../../src/shader_health/studio_config.py) model at **schema 1.0** (`pipeline`, `connectors.deadline`, `studio_name`). Deadline connector UI is hard-coded in [`settings_panel.py`](../../src/shader_health/ui/settings_panel.py) via `_build_connectors_tab` and `_read_deadline_connector_from_view`.
+v0.4 ships a Settings screen with six category tabs, but only **Connectors → Deadline** and **Studio → Require .tx** are functional. Basic and Advanced tabs are placeholders. All persistent settings live in a single [`studio_config.py`](../../src/pipeline_inspector/studio_config.py) model at **schema 1.0** (`pipeline`, `connectors.deadline`, `studio_name`). Deadline connector UI is hard-coded in [`settings_panel.py`](../../src/pipeline_inspector/ui/settings_panel.py) via `_build_connectors_tab` and `_read_deadline_connector_from_view`.
 
 v0.5 expands Settings into a **studio platform hub**: artist/TD preferences, studio pipeline policy, network path constants, notification connectors (Telegram, Discord, Slack), task trackers (Ftrack, ShotGrid, Cerebro), Bug Report via a studio HTTPS relay, and Check for Updates via GitHub Releases. ADR 0005 requires GUI-first delivery; ADR 0001 requires the validation core to stay Maya-independent and testable. Settings architecture must therefore:
 
 - separate **studio-wide policy** from **per-user preferences** without duplicating validation logic;
 - scale Connectors beyond Deadline without copy-pasting settings UI code;
 - keep secrets out of artist-visible files and out of the open-source plugin binary;
-- let headless CLI respect studio policy (known v0.4 limitation: `SHADER_HEALTH_STUDIO_CONFIG` not wired into `shader_health validate`).
+- let headless CLI respect studio policy (known v0.4 limitation: `PIPELINE_INSPECTOR_STUDIO_CONFIG` not wired into `pipeline_inspector validate`).
 
 This ADR defines the v0.5 configuration model, merge semantics, connector registry, secret handling, and Bug Report relay security contract. Implementation issues #114–#118 depend on these decisions.
 
 ## Decision
 
-Shader Health Inspector v0.5 adopts a **two-layer configuration architecture** with a **connector registry**, explicit **save/load split**, and **studio-hosted relay** for Bug Report.
+Pipeline Inspector v0.5 adopts a **two-layer configuration architecture** with a **connector registry**, explicit **save/load split**, and **studio-hosted relay** for Bug Report.
 
 ### 1. Two configuration layers
 
 | Layer | File | Discovery | Owner | Typical contents |
 |---|---|---|---|---|
-| **StudioConfig** | `shader_health_studio.json` | `SHADER_HEALTH_STUDIO_CONFIG` env var, then `~/.shader_health/shader_health_studio.json`, then `~/shader_health_studio.json` | Pipeline TD / studio IT | `studio_name`, `pipeline`, `studio_environment`, `connectors`, studio-locked `bug_report` relay URL, optional embedded defaults |
-| **UserPreferences** | `~/.shader_health/user.json` | Fixed per-machine path | Artist / local TD | `default_profile_id`, `theme`, `ui_density`, `extra_rule_paths`, `debug_logging`, `mayapy_path`, `docs_url` |
+| **StudioConfig** | `pipeline_inspector_studio.json` | `PIPELINE_INSPECTOR_STUDIO_CONFIG` env var, then `~/.pipeline_inspector/pipeline_inspector_studio.json`, then `~/pipeline_inspector_studio.json` | Pipeline TD / studio IT | `studio_name`, `pipeline`, `studio_environment`, `connectors`, studio-locked `bug_report` relay URL, optional embedded defaults |
+| **UserPreferences** | `~/.pipeline_inspector/user.json` | Fixed per-machine path | Artist / local TD | `default_profile_id`, `theme`, `ui_density`, `extra_rule_paths`, `debug_logging`, `mayapy_path`, `docs_url` |
 
 Both layers are plain JSON with `schema_version`. Studio config bumps to **2.0** in issue #114; user config starts at **1.0**.
 
@@ -59,12 +59,12 @@ When both files are present, fields resolve by **ownership**, not deep JSON merg
 
 The Settings screen exposes **two explicit actions** (issue #117):
 
-- **Save Studio Config** — writes `shader_health_studio.json` to the path shown in the status banner (or prompts for path on first save).
-- **Save User Preferences** — writes `~/.shader_health/user.json`.
+- **Save Studio Config** — writes `pipeline_inspector_studio.json` to the path shown in the status banner (or prompts for path on first save).
+- **Save User Preferences** — writes `~/.pipeline_inspector/user.json`.
 
 A single combined Save is **rejected** — it blurs rollout responsibility (studio JSON often lives on a network share deployed by IT; user JSON is per-workstation).
 
-Load actions mirror save: **Load Studio Config** (file picker) and **Load User Preferences** (file picker, defaulting to `~/.shader_health/user.json`).
+Load actions mirror save: **Load Studio Config** (file picker) and **Load User Preferences** (file picker, defaulting to `~/.pipeline_inspector/user.json`).
 
 Dirty-state banner (issue #123) tracks each layer independently.
 
@@ -117,14 +117,14 @@ Migration from 1.0 → 2.0 is **additive**: missing sections receive defaults; `
   "debug_logging": false,
   "max_issues_displayed": 500,
   "mayapy_path": "",
-  "docs_url": "https://github.com/armasonix/maya-shader-health-inspector/wiki",
+  "docs_url": "https://github.com/armasonix/maya-pipeline-inspector/wiki",
   "updates": { "check_on_startup": false }
 }
 ```
 
 ### 5. Connector registry pattern
 
-New module [`connectors_registry.py`](../../src/shader_health/connectors_registry.py) (issue #115) defines a frozen **ConnectorDefinition** per integration:
+New module [`connectors_registry.py`](../../src/pipeline_inspector/connectors_registry.py) (issue #115) defines a frozen **ConnectorDefinition** per integration:
 
 ```python
 @dataclass(frozen=True)
@@ -141,7 +141,7 @@ class ConnectorDefinition:
 
 **Settings panel loop:** `read_connectors_from_settings_view` and `update_settings_view` iterate `iter_connectors()` instead of Deadline-specific helpers. Deadline is refactored first; new connectors add a definition + `integrations/<name>/` package without editing the tab loop.
 
-**Resolve semantics:** `resolve_fn(config)` returns `None` when `enabled` is false — same rule as [`resolve_deadline_config`](../../src/shader_health/studio_config.py) today (no env fallback when explicitly disabled).
+**Resolve semantics:** `resolve_fn(config)` returns `None` when `enabled` is false — same rule as [`resolve_deadline_config`](../../src/pipeline_inspector/studio_config.py) today (no env fallback when explicitly disabled).
 
 **Notification fan-out:** `integrations/notify/dispatcher.py` (issue #140) queries enabled notification connectors after validation/farm events; trackers use separate explicit actions (Reports tab, issue #145).
 
@@ -155,7 +155,7 @@ Credentials must not appear in plaintext in artist-editable files beyond what st
 | UI | Secret fields use password echo mode (`QLineEdit.EchoMode.Password`); show/hide toggle optional |
 | Serialization | Secrets are stored in studio JSON on disk (studio responsibility); user JSON **must not** contain connector secrets |
 | Logs | Never log secret values; relay client logs relay URL host only, not API key |
-| Version control | `shader_health_studio.json` with secrets stays out of git (document in `STUDIO_OVERRIDES.md`) |
+| Version control | `pipeline_inspector_studio.json` with secrets stays out of git (document in `STUDIO_OVERRIDES.md`) |
 | Bug Report | No GitHub PAT in Maya — relay holds GitHub App / PAT server-side |
 
 Optional v0.5.1 enhancement (out of scope here): OS keychain storage for user-entered secrets on solo-artist machines.
@@ -185,7 +185,7 @@ Maya panel (Bug Report form)
 | SSRF | No arbitrary URL fields in payload; relay does not fetch user-supplied URLs |
 | Privacy | Scene path sent as basename only; no env dump |
 | GitHub scope | Optional allowlist of target repo, labels, milestones on relay |
-| Abuse | Client-side throttle in `integrations/bug_report/throttle.py` mirrors `max_reports_per_day` per machine/user in `~/.shader_health/bug_report_throttle.json` before calling the relay; relay 429 responses surface as `rate_limited` in the Maya panel |
+| Abuse | Client-side throttle in `integrations/bug_report/throttle.py` mirrors `max_reports_per_day` per machine/user in `~/.pipeline_inspector/bug_report_throttle.json` before calling the relay; relay 429 responses surface as `rate_limited` in the Maya panel |
 
 Bug Report is **disabled by default** until `bug_report.relay_url` and `api_key` are set in studio config.
 
@@ -193,8 +193,8 @@ Bug Report is **disabled by default** until `bug_report.relay_url` and `api_key`
 
 Per v0.5 plan decision (issues #152–#155):
 
-- Compare [`version.py`](../../src/shader_health/version.py) against `GET /repos/{owner}/{repo}/releases/latest` tag_name (semver).
-- Download release asset to a staging directory; install preserves `shader_health_studio.json` and `user.json`.
+- Compare [`version.py`](../../src/pipeline_inspector/version.py) against `GET /repos/{owner}/{repo}/releases/latest` tag_name (semver).
+- Download release asset to a staging directory; install preserves `pipeline_inspector_studio.json` and `user.json`.
 - Maya restart is **manual** — show checklist dialog; no fake auto-restart.
 
 User-facing guide: [`docs/integrations/auto_update.md`](../integrations/auto_update.md).
@@ -218,7 +218,7 @@ Header additions (M33): Documentation button (`user.docs_url`), Check for Update
 
 Issue #118 wires studio config into CLI:
 
-- Respect `SHADER_HEALTH_STUDIO_CONFIG` and `--studio-config` on `validate`, `gate`, `manifest`.
+- Respect `PIPELINE_INSPECTOR_STUDIO_CONFIG` and `--studio-config` on `validate`, `gate`, `manifest`.
 - Apply `pipeline` rule overrides and `studio_environment` path substitution where relevant.
 - User preferences are **not** loaded in headless mode in v0.5.
 
@@ -268,7 +268,7 @@ Deferred. v0.5 uses incoming webhooks and bot tokens only.
 
 ### Positive
 
-- Clear split between studio rollout (`shader_health_studio.json`) and per-machine prefs (`user.json`).
+- Clear split between studio rollout (`pipeline_inspector_studio.json`) and per-machine prefs (`user.json`).
 - Connector registry lets M34–M35 add integrations without rewriting `settings_panel.py`.
 - Bug Report works for open-source distribution without embedding maintainer GitHub tokens.
 - Secret policy and relay checklist give studios a security review starting point.
@@ -287,7 +287,7 @@ Deferred. v0.5 uses incoming webhooks and bot tokens only.
 ### Target modules (v0.5)
 
 ```text
-src/shader_health/
+src/pipeline_inspector/
 ├── studio_config.py       # schema 2.0, StudioConfig
 ├── user_config.py         # NEW — UserPreferences load/save/discover
 ├── connectors_registry.py # NEW — ConnectorDefinition registry
@@ -342,7 +342,7 @@ Implement in order: **#114** schema → **#115** registry + Deadline refactor �
 - Bug Report: `#147`–`#151` (GitHub #181–#185)
 - ADR: `0001-snapshot-first-core.md`
 - ADR: `0005-gui-first-product-philosophy.md`
-- Module: `src/shader_health/studio_config.py`
-- Module: `src/shader_health/ui/settings_panel.py`
+- Module: `src/pipeline_inspector/studio_config.py`
+- Module: `src/pipeline_inspector/ui/settings_panel.py`
 - Document: `docs/V0_5_DEVELOPMENT_PLAN.md` (to be added)
 - Document: `docs/integrations/bug_report_relay.md` (issue #150)

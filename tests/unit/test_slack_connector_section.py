@@ -6,13 +6,13 @@ from tests.unit.test_telegram_connector_section import (
     _find,
 )
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     SlackConnectorSettings,
     StudioConfig,
 )
-from shader_health.ui.slack_connector_section import (
+from pipeline_inspector.ui.slack_connector_section import (
     SETTINGS_SLACK_DEADLINE_WEBHOOK_INPUT_OBJECT_NAME,
     SETTINGS_SLACK_DETAILS_OBJECT_NAME,
     SETTINGS_SLACK_ENABLED_TOGGLE_OBJECT_NAME,

@@ -4,7 +4,7 @@ import os
 import time
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     FileDependencySnapshot,
     GraphSnapshot,
     NodeSnapshot,
@@ -14,11 +14,13 @@ from shader_health.core import (
     load_profile,
     load_rule_file,
 )
-from shader_health.maya.snapshot_enrichment import prepare_snapshot_for_validation
+from pipeline_inspector.maya.snapshot_enrichment import prepare_snapshot_for_validation
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "optimized_textures.json"
-DEADLINE_PROFILE = ROOT / "src" / "shader_health" / "rules" / "profiles" / "deadline_critical.json"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "optimized_textures.json"
+DEADLINE_PROFILE = (
+    ROOT / "src" / "pipeline_inspector" / "rules" / "profiles" / "deadline_critical.json"
+)
 
 
 def load_optimized_rule(rule_id: str) -> RuleDefinition:

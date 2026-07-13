@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Maya Shader Health Inspector must validate material and texture problems in Maya scenes, but most validation logic should be testable without launching Maya.
+Maya Pipeline Inspector must validate material and texture problems in Maya scenes, but most validation logic should be testable without launching Maya.
 
 Maya-dependent APIs are expensive to test, difficult to run in public CI, and sensitive to installed Maya/render plugin versions. At the same time, the project must support several execution modes:
 
@@ -140,7 +140,7 @@ Initial core model names:
 Expected module location:
 
 ```text
-src/shader_health/core/models.py
+src/pipeline_inspector/core/models.py
 ```
 
 Expected fixture location:

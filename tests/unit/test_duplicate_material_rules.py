@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
@@ -12,14 +12,14 @@ from shader_health.core import (
     ValidationEngine,
     load_rule_file,
 )
-from shader_health.core.graph_fingerprint import (
+from pipeline_inspector.core.graph_fingerprint import (
     material_graph_content_fingerprint,
     material_graph_fingerprint,
 )
-from shader_health.maya.snapshot_enrichment import _material_texture_paths, enrich_snapshot
+from pipeline_inspector.maya.snapshot_enrichment import _material_texture_paths, enrich_snapshot
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "duplicate_materials.json"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "duplicate_materials.json"
 
 
 def load_duplicate_material_rules() -> dict[str, RuleDefinition]:

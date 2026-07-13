@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core import GraphSnapshot, RuleResult
-from shader_health.reports import (
+from pipeline_inspector.core import GraphSnapshot, RuleResult
+from pipeline_inspector.reports import (
     REPORT_SCHEMA_VERSION,
     build_json_report,
     dumps_json_report,
@@ -143,7 +143,7 @@ def test_json_report_includes_optional_fix_audit_section():
         "applied_at_utc": "2026-07-03T12:00:00Z",
         "scene_path": snapshot.scene_path,
         "profile_id": "artist_relaxed",
-        "undo_chunk_name": "Shader Health Apply Fixes",
+        "undo_chunk_name": "Pipeline Inspector Apply Fixes",
         "total": 1,
         "applied_count": 1,
         "blocked_count": 0,

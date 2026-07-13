@@ -4,8 +4,8 @@ from typing import Any
 
 from tests.unit.test_maya_summary_header import FakeQtWidgets, _find
 
-from shader_health import __version__
-from shader_health.ui import main_window
+from pipeline_inspector import __version__
+from pipeline_inspector.ui import main_window
 
 
 def _panel_header_widgets(header: Any) -> list[Any]:

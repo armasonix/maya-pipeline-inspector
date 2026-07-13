@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     ArnoldMaterialMetadata,
     ArnoldSceneMetadata,
     GraphSnapshot,
@@ -11,8 +11,8 @@ from shader_health.core import (
     NodeSnapshot,
     ShadingEngineSnapshot,
 )
-from shader_health.maya.arnold_enrichment import enrich_arnold_metadata
-from shader_health.maya.snapshot_enrichment import prepare_snapshot_for_validation
+from pipeline_inspector.maya.arnold_enrichment import enrich_arnold_metadata
+from pipeline_inspector.maya.snapshot_enrichment import prepare_snapshot_for_validation
 
 FIXTURES_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "snapshots"
 

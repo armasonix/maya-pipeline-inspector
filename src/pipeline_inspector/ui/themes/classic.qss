@@ -1,0 +1,148 @@
+/* Classic theme — matches Maya default dark-gray UI chrome. */
+
+QWidget#pipelineInspectorPanel,
+QWidget#pipelineInspectorPanelContent,
+QWidget#pipelineInspectorPanel QWidget,
+QWidget#pipelineInspectorPanelContent QWidget {
+    background-color: #535353;
+    color: #cccccc;
+}
+
+QWidget#pipelineInspectorPanelHeader {
+    background-color: #535353;
+}
+
+QLabel {
+    color: #cccccc;
+    background-color: transparent;
+}
+
+QWidget#pipelineInspectorPanel QPushButton,
+QWidget#pipelineInspectorPanelContent QPushButton {
+    background-color: #606060;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    padding: 4px 10px;
+    min-height: 20px;
+}
+
+QWidget#pipelineInspectorPanel QPushButton:hover,
+QWidget#pipelineInspectorPanelContent QPushButton:hover {
+    background-color: #6a6a6a;
+    border-color: #808080;
+}
+
+QWidget#pipelineInspectorPanel QPushButton:pressed,
+QWidget#pipelineInspectorPanelContent QPushButton:pressed {
+    background-color: #4a4a4a;
+    border-color: #2a2a2a;
+    padding-top: 5px;
+    padding-left: 11px;
+}
+
+QWidget#pipelineInspectorPanel QPushButton:disabled,
+QWidget#pipelineInspectorPanelContent QPushButton:disabled {
+    background-color: #4a4a4a;
+    color: #888888;
+}
+
+QWidget#pipelineInspectorPanel QComboBox,
+QWidget#pipelineInspectorPanelContent QComboBox {
+    background-color: #454545;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 2px 6px;
+}
+
+QWidget#pipelineInspectorPanel QLineEdit,
+QWidget#pipelineInspectorPanel QTextEdit,
+QWidget#pipelineInspectorPanel QPlainTextEdit,
+QWidget#pipelineInspectorPanelContent QLineEdit,
+QWidget#pipelineInspectorPanelContent QTextEdit,
+QWidget#pipelineInspectorPanelContent QPlainTextEdit {
+    background-color: #454545;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    selection-background-color: #4a90d9;
+    selection-color: #ffffff;
+}
+
+QTabWidget::pane {
+    border: 1px solid #3a3a3a;
+    background-color: #535353;
+}
+
+QTabBar::tab {
+    background-color: #454545;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
+    border-bottom: none;
+    padding: 4px 10px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #535353;
+}
+
+QWidget#pipelineInspectorPanel QTableWidget,
+QWidget#pipelineInspectorPanelContent QTableWidget {
+    background-color: #454545;
+    color: #cccccc;
+    gridline-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+    selection-background-color: #4a90d9;
+    selection-color: #ffffff;
+    alternate-background-color: #4a4a4a;
+}
+
+QHeaderView::section {
+    background-color: #606060;
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
+    padding: 3px 6px;
+}
+
+QGroupBox {
+    color: #cccccc;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    background-color: #535353;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+}
+
+QScrollArea {
+    background-color: #535353;
+    border: none;
+}
+
+QCheckBox {
+    color: #cccccc;
+    background-color: transparent;
+}
+
+QSplitter::handle {
+    background-color: #3a3a3a;
+}
+
+QProgressBar {
+    background-color: #454545;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    text-align: center;
+    color: #cccccc;
+}
+
+QProgressBar::chunk {
+    background-color: #4a90d9;
+}

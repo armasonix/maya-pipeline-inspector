@@ -71,8 +71,8 @@ Invoke-NativeBuildStep -VcVars $vcvars -CMake $cmake -Command (
 Invoke-NativeBuildStep -VcVars $vcvars -CMake $cmake -Command "--build `"$buildDir`" --config Release"
 Invoke-NativeBuildStep -VcVars $vcvars -CMake $cmake -Command "--install `"$buildDir`" --config Release"
 
-$artifact = Join-Path $repoRoot "maya_module\plug-ins\$MayaVersion\shader_health_inspector.mll"
-$managerArtifact = Join-Path $repoRoot "maya_module\plug-ins\shader_health_inspector.mll"
+$artifact = Join-Path $repoRoot "maya_module\plug-ins\$MayaVersion\pipeline_inspector.mll"
+$managerArtifact = Join-Path $repoRoot "maya_module\plug-ins\pipeline_inspector.mll"
 if (Test-Path -LiteralPath $artifact) {
     Copy-Item -LiteralPath $artifact -Destination $managerArtifact -Force
     Write-Host "Plug-in Manager copy: $managerArtifact"

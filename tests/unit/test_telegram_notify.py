@@ -3,11 +3,15 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.telegram import TelegramClient, TelegramConfig, TelegramResponse
-from shader_health.integrations.telegram.client import HttpRequest
-from shader_health.integrations.telegram.notify import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.telegram import (
+    TelegramClient,
+    TelegramConfig,
+    TelegramResponse,
+)
+from pipeline_inspector.integrations.telegram.client import HttpRequest
+from pipeline_inspector.integrations.telegram.notify import (
     format_validation_summary_message,
     matched_notify_events,
     maybe_send_telegram_validation_notification,
@@ -15,7 +19,7 @@ from shader_health.integrations.telegram.notify import (
     should_send_telegram_notification,
     validation_notification_context_from_run,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     StudioConfig,
     TelegramConnectorSettings,
@@ -37,7 +41,7 @@ def _context(**overrides: object):
         "block_deadline": False,
     }
     defaults.update(overrides)
-    from shader_health.integrations.telegram.notify import ValidationNotificationContext
+    from pipeline_inspector.integrations.telegram.notify import ValidationNotificationContext
 
     return ValidationNotificationContext(**defaults)
 

@@ -17,6 +17,7 @@ native/build/
 .eggs/
 
 # Native Maya plug-in binaries (build locally or attach to releases)
+maya_module/plug-ins/pipeline_inspector.mll
 maya_module/plug-ins/shader_health_inspector.mll
 maya_module/plug-ins/2024/*.mll
 maya_module/plug-ins/2025/*.mll
@@ -49,13 +50,19 @@ config.local.yml
 _cli_test_out/
 _parity_out/
 debug-*.log
+.pipeline_inspector_cache/
 .shader_health_cache/
+*.pipeline_inspector_waivers.json
 *.shader_health_waivers.json
+*.pipeline_inspector_fix_audit.json
 *.shader_health_fix_audit.json
 
 # Local/generated demo scene outputs (keep committed report/manifest samples only)
+examples/broken_scene/*.pipeline_inspector_fix_audit.json
 examples/broken_scene/*.shader_health_fix_audit.json
+examples/broken_scene/*_pipeline_inspector_manifest_diff.*
 examples/broken_scene/*_shader_health_manifest_diff.*
+examples/broken_scene/*_pipeline_inspector_deadline_command.txt
 examples/broken_scene/*_shader_health_deadline_command.txt
 examples/broken_scene/*_fixed.ma
 examples/broken_scene/reports/

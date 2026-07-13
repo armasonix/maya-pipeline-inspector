@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.notify.dispatcher import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.notify.dispatcher import (
     NOTIFICATION_CONNECTOR_IDS,
     ConnectorNotificationOutcome,
     ValidationNotificationDispatchResult,
     dispatch_validation_notifications,
     report_validation_notification_outcomes,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DiscordConnectorSettings,
     SlackConnectorSettings,
@@ -45,31 +45,31 @@ def test_dispatch_validation_notifications_fans_out_to_all_connectors(monkeypatc
     calls: list[str] = []
 
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
         lambda *_args, **_kwargs: (
             calls.append("telegram"),
             __import__(
-                "shader_health.integrations.telegram.notify",
+                "pipeline_inspector.integrations.telegram.notify",
                 fromlist=["TelegramNotificationResult"],
             ).TelegramNotificationResult(sent=True),
         )[1],
     )
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
         lambda *_args, **_kwargs: (
             calls.append("discord"),
             __import__(
-                "shader_health.integrations.discord.notify",
+                "pipeline_inspector.integrations.discord.notify",
                 fromlist=["DiscordNotificationResult"],
             ).DiscordNotificationResult(sent=False, skipped_reason="disabled"),
         )[1],
     )
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
         lambda *_args, **_kwargs: (
             calls.append("slack"),
             __import__(
-                "shader_health.integrations.slack.notify",
+                "pipeline_inspector.integrations.slack.notify",
                 fromlist=["SlackNotificationResult"],
             ).SlackNotificationResult(sent=True, routes_sent=1),
         )[1],
@@ -122,20 +122,20 @@ def test_dispatch_validation_notifications_passes_studio_config_to_connectors(mo
 
     def _capture_config(studio_config: StudioConfig | None, *_args, **_kwargs):
         captured_configs.append(studio_config)
-        from shader_health.integrations.telegram.notify import TelegramNotificationResult
+        from pipeline_inspector.integrations.telegram.notify import TelegramNotificationResult
 
         return TelegramNotificationResult(sent=False, skipped_reason="disabled")
 
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
         _capture_config,
     )
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
         _capture_config,
     )
     monkeypatch.setattr(
-        "shader_health.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
         _capture_config,
     )
 

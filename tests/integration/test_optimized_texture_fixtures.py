@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from shader_health.core import FileDependencySnapshot, GraphSnapshot, NodeSnapshot, RuleResult
-from shader_health.maya.validation_pipeline import ValidationRunResult, run_validation
+from pipeline_inspector.core import FileDependencySnapshot, GraphSnapshot, NodeSnapshot, RuleResult
+from pipeline_inspector.maya.validation_pipeline import ValidationRunResult, run_validation
 
 FIXTURES_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "snapshots"
 

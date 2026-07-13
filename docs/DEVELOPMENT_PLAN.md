@@ -1,4 +1,4 @@
-# Maya Shader Health Inspector — Production Development Plan
+# Maya Pipeline Inspector — Production Development Plan
 
 > **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4.0 shipped** (2026-07-08). **v0.5.0 shipped** (2026-07-12). **v1.0+** — see [§27](#27-roadmap). v0.5 detail: [V0_5_DEVELOPMENT_PLAN.md](V0_5_DEVELOPMENT_PLAN.md) (Milestones 29–41, Issues #113–#164).
 
@@ -13,7 +13,7 @@
 
 ## 1. Executive Summary
 
-**Maya Shader Health Inspector** is a production-oriented material QA framework for Maya. It scans shading networks, texture dependencies, renderer-specific material settings, displacement setups, UDIM sets, texture versions, path policies, and shader graph complexity before publish or Deadline submission.
+**Maya Pipeline Inspector** is a production-oriented material QA framework for Maya. It scans shading networks, texture dependencies, renderer-specific material settings, displacement setups, UDIM sets, texture versions, path policies, and shader graph complexity before publish or Deadline submission.
 
 The tool answers a practical production question:
 
@@ -216,7 +216,7 @@ Value:
 
 ### 7.1 MVP Name
 
-**Maya Shader Health Inspector v0.1 — Texture & Shader Preflight MVP**
+**Maya Pipeline Inspector v0.1 — Texture & Shader Preflight MVP**
 
 ### 7.2 MVP Must Ship
 
@@ -964,7 +964,7 @@ Every fix must show:
 Use sidecar JSON:
 
 ```text
-scene_name.shader_health_waivers.json
+scene_name.pipeline_inspector_waivers.json
 ```
 
 ### 17.2 Waiver Schema
@@ -1039,7 +1039,7 @@ scene_name.shader_health_waivers.json
 
 ```text
 +--------------------------------------------------------------------------------+
-| Maya Shader Health Inspector                                                    |
+| Maya Pipeline Inspector                                                    |
 | Scene: char_cinderella_shading_v042.ma    Renderer: V-Ray    Profile: Publish  |
 | Health: 78/100   Critical:2 Error:5 Warning:17 Info:31   Farm Block: YES       |
 | [Validate Scene] [Validate Selection] [Apply Safe Fixes] [Export Report]        |
@@ -1099,11 +1099,11 @@ flowchart TD
 ### 20.1 Commands
 
 ```bash
-mayapy -m shader_health validate scene.ma --profile publish_strict --report report.json
-mayapy -m shader_health validate scene.ma --profile deadline_critical --critical-only
-mayapy -m shader_health validate scene.ma --renderer vray --html report.html
-mayapy -m shader_health manifest scene.ma --out shader_manifest.json
-mayapy -m shader_health diff old_manifest.json new_manifest.json --html diff.html
+mayapy -m pipeline_inspector validate scene.ma --profile publish_strict --report report.json
+mayapy -m pipeline_inspector validate scene.ma --profile deadline_critical --critical-only
+mayapy -m pipeline_inspector validate scene.ma --renderer vray --html report.html
+mayapy -m pipeline_inspector manifest scene.ma --out shader_manifest.json
+mayapy -m pipeline_inspector diff old_manifest.json new_manifest.json --html diff.html
 ```
 
 ### 20.2 Exit Codes
@@ -1223,7 +1223,7 @@ Changed:
 ## 23. Project Repository Structure
 
 ```text
-maya-shader-health-inspector/
+maya-pipeline-inspector/
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
@@ -1247,14 +1247,14 @@ maya-shader-health-inspector/
 │   ├── RELEASE_CHECKLIST.md
 │   └── images/
 ├── maya_module/
-│   ├── shader_health_inspector.mod
+│   ├── pipeline_inspector.mod
 │   ├── scripts/
-│   │   └── shader_health_inspector_bootstrap.py
+│   │   └── pipeline_inspector_bootstrap.py
 │   ├── shelves/
-│   │   └── shelf_ShaderHealth.mel
+│   │   └── shelf_PipelineInspector.mel
 │   └── icons/
 ├── src/
-│   └── shader_health/
+│   └── pipeline_inspector/
 │       ├── __init__.py
 │       ├── __main__.py
 │       ├── version.py
@@ -1306,7 +1306,7 @@ maya-shader-health-inspector/
 │           └── json_io.py
 ├── examples/
 │   ├── broken_scene/
-│   │   ├── shader_health_demo_broken.ma
+│   │   ├── pipeline_inspector_demo_broken.ma
 │   │   ├── textures/
 │   │   └── expected_report.json
 │   ├── rules/
@@ -1480,7 +1480,7 @@ Tasks:
 
 Deliverable:
 
-- `shader_health.scan_current_scene()` returns deterministic snapshot.
+- `pipeline_inspector.scan_current_scene()` returns deterministic snapshot.
 
 ### Phase 3 — Renderer Adapters
 
@@ -1583,7 +1583,7 @@ Goal: production automation.
 
 Tasks:
 
-1. `mayapy -m shader_health validate` command.
+1. `mayapy -m pipeline_inspector validate` command.
 2. Exit code contract.
 3. Deadline preflight example.
 4. Publish hook example.
@@ -1620,7 +1620,7 @@ Tasks:
 Labels: `setup`, `infrastructure`  
 Acceptance criteria:
 
-- `src/shader_health` package exists;
+- `src/pipeline_inspector` package exists;
 - package imports successfully;
 - README has project description;
 - MIT license added.
@@ -2099,7 +2099,7 @@ Acceptance criteria:
 
 **Target release:** v0.2.0  
 **Authoritative detail:** [V0_2_DEVELOPMENT_PLAN.md §7–§8](V0_2_DEVELOPMENT_PLAN.md)  
-**GitHub milestones:** [#12–#16](https://github.com/armasonix/maya-shader-health-inspector/milestones) (plan id ↔ GitHub issue mapping in v0.2 plan Appendix B)
+**GitHub milestones:** [#12–#16](https://github.com/armasonix/maya-pipeline-inspector/milestones) (plan id ↔ GitHub issue mapping in v0.2 plan Appendix B)
 
 | Milestone | Theme | Plan issues |
 |---:|---|---|
@@ -2151,11 +2151,11 @@ Delivered (Milestones 10–14, Issues #049–#070):
 Delivered (Milestones 15–21, Issues #071–#090):
 
 - Python MPx plugin dual install; manifest schema 1.1 and graph fingerprinting.
-- Manifest regression gates (`shader_health gate`, profile `manifest_diff_policy`, publish preflight gate).
-- Headless `shader_health apply-fixes` (ADR 0004) with fix audit integration.
+- Manifest regression gates (`pipeline_inspector gate`, profile `manifest_diff_policy`, publish preflight gate).
+- Headless `pipeline_inspector apply-fixes` (ADR 0004) with fix audit integration.
 - Texture resolution metadata, asset class profiles, and UI/CLI `--asset-class-id` overlay.
-- Compare to Approved Manifest UI shortcut, `shader_health manifest` CLI, Maya CI manifest smoke.
-- Headless CLI hardening: `mayapy` standalone init, `shader_health.util.paths`, `ci_headless` profile fix.
+- Compare to Approved Manifest UI shortcut, `pipeline_inspector manifest` CLI, Maya CI manifest smoke.
+- Headless CLI hardening: `mayapy` standalone init, `pipeline_inspector.util.paths`, `ci_headless` profile fix.
 
 ### v0.4 — GUI-First Farm Integration & Render Risk Depth (shipped)
 
@@ -2169,7 +2169,7 @@ Delivered (Milestones 23–28, Issues #119–#145):
 - Deadline 10 on-prem package: config, REST client, eligibility, CommandScript submit.
 - Farm tab, menu/shelf farm check shortcuts, Deadline studio guide.
 - Render-risk depth: displacement enrichment, optimized texture / `.tx` rules, duplicate material/texture detection.
-- Settings screen, `shader_health_studio.json`, Require `.tx` toggle, Thinkbox Deadline connector (Remote Farm ↔ Farm tab).
+- Settings screen, `pipeline_inspector_studio.json`, Require `.tx` toggle, Thinkbox Deadline connector (Remote Farm ↔ Farm tab).
 - UX Wave 1: Issue Details polish, double-click select node, splitter persistence.
 
 ### v0.5 — Studio Settings Hub, Connectors, Rule Authoring & Incident Workflow (shipped)
@@ -2185,7 +2185,7 @@ Delivered (Milestones 29–41, Issues #113–#164):
 - Task trackers: Ftrack, ShotGrid, Cerebro; Reports **Send to Tracker**.
 - Bug Report relay client, payload schema, and studio relay specification.
 - GitHub Releases auto-update wizard with rollback backup.
-- Rule browser, new rule wizard, incident-to-rule draft export; `shader_health rules validate`.
+- Rule browser, new rule wizard, incident-to-rule draft export; `pipeline_inspector rules validate`.
 - Studio overrides documentation refresh for v0.5 settings and connectors.
 
 ### v1.0 — Production Ready Public Release
@@ -2315,12 +2315,12 @@ A release is done when:
 
 Suggested short pitch:
 
-> Maya Shader Health Inspector is an open-source material QA framework for Maya. It validates shader graphs, texture dependencies, color management, UDIM sets, displacement risk, and renderer-specific material policies before publish or Deadline submission. It supports data-driven rule packs for Common Maya, V-Ray, and Arnold, with a dockable Maya UI, safe auto-fixes, headless reports, and pipeline integration hooks.
+> Maya Pipeline Inspector is an open-source material QA framework for Maya. It validates shader graphs, texture dependencies, color management, UDIM sets, displacement risk, and renderer-specific material policies before publish or Deadline submission. It supports data-driven rule packs for Common Maya, V-Ray, and Arnold, with a dockable Maya UI, safe auto-fixes, headless reports, and pipeline integration hooks.
 
 Suggested portfolio framing:
 
 ```text
-Maya Shader Health Inspector
+Maya Pipeline Inspector
 Production material QA framework for Maya pipelines.
 
 Built to prevent render-time material failures by detecting missing textures,
@@ -2336,7 +2336,7 @@ Create a compact but convincing demo:
 
 ```text
 examples/broken_scene/
-├── shader_health_demo_broken.ma
+├── pipeline_inspector_demo_broken.ma
 ├── textures/
 │   ├── dress_albedo_v001.1001.exr
 │   ├── dress_albedo_v001.1002.exr
@@ -2448,4 +2448,4 @@ The first release should be narrow but polished:
 Scan -> Diagnose -> Explain -> Fix safely -> Report -> Block bad submissions
 ```
 
-That is the core promise of Maya Shader Health Inspector.
+That is the core promise of Maya Pipeline Inspector.

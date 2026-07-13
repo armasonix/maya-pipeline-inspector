@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.basic_settings_section import (
+from pipeline_inspector.ui.basic_settings_section import (
     SETTINGS_DEFAULT_ASSET_CLASS_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_PROFILE_COMBO_OBJECT_NAME,
     SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME,
@@ -11,7 +11,7 @@ from shader_health.ui.basic_settings_section import (
     read_basic_user_preferences_from_view,
     update_basic_settings_view,
 )
-from shader_health.user_config import DEFAULT_USER_DOCS_URL, UserPreferences
+from pipeline_inspector.user_config import DEFAULT_USER_DOCS_URL, UserPreferences
 
 
 class FakeWidget:

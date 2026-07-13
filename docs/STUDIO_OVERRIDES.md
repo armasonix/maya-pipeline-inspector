@@ -1,10 +1,10 @@
 # Studio custom rules and profile overrides
 
-This guide explains how studios extend Maya Shader Health Inspector with show-specific rule packs and profile JSON without forking the core validator. It also documents how to roll out the studio-wide settings file `shader_health_studio.json` via `SHADER_HEALTH_STUDIO_CONFIG`.
+This guide explains how studios extend Maya Pipeline Inspector with show-specific rule packs and profile JSON without forking the core validator. It also documents how to roll out the studio-wide settings file `pipeline_inspector_studio.json` via `PIPELINE_INSPECTOR_STUDIO_CONFIG`.
 
 Use it together with:
 
-- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and setting `SHADER_HEALTH_STUDIO_CONFIG` in facility launchers
+- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and setting `PIPELINE_INSPECTOR_STUDIO_CONFIG` in facility launchers
 - [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split and schema 2.0
 - [RULE_AUTHORING.md](RULE_AUTHORING.md) — rule schema, incident-to-rule workflow, and profile override syntax
 - [adr/0002-renderer-adapter-boundary.md](adr/0002-renderer-adapter-boundary.md) — where renderer-specific logic belongs
@@ -13,18 +13,18 @@ Use it together with:
 - [integrations/bug_report_relay.md](integrations/bug_report_relay.md) — studio HTTPS relay for plugin bug reports
 - [integrations/auto_update.md](integrations/auto_update.md) — Check for Updates wizard and studio update policy
 
-## Studio config file (`shader_health_studio.json`)
+## Studio config file (`pipeline_inspector_studio.json`)
 
 Studios roll out pipeline policy, network paths, and connector settings through a single JSON file. That file is separate from the custom rule packs and profile overrides covered later in this guide.
 
 | Concern | File | Rollout mechanism |
 | --- | --- | --- |
-| Studio-wide policy | `shader_health_studio.json` | `SHADER_HEALTH_STUDIO_CONFIG` env var (recommended) |
-| Per-machine UI prefs | `~/.shader_health/user.json` | Local user home (not synced by IT) |
+| Studio-wide policy | `pipeline_inspector_studio.json` | `PIPELINE_INSPECTOR_STUDIO_CONFIG` env var (recommended) |
+| Per-machine UI prefs | `~/.pipeline_inspector/user.json` | Local user home (not synced by IT) |
 
 ### Studio vs user preferences (v0.5)
 
-Shader Health Inspector uses **two JSON layers**. Studio policy cannot be overridden from `user.json`.
+Pipeline Inspector uses **two JSON layers**. Studio policy cannot be overridden from `user.json`.
 
 | Domain | File | User override? |
 | --- | --- | --- |
@@ -51,38 +51,38 @@ The Settings screen exposes **Save Studio Config** and **Save User Preferences**
 
 Headless CLI loads **StudioConfig only** (env, discovery paths, or `--studio-config`). User preferences apply inside the Maya panel.
 
-### Deploy via `SHADER_HEALTH_STUDIO_CONFIG`
+### Deploy via `PIPELINE_INSPECTOR_STUDIO_CONFIG`
 
 Set the environment variable to an **absolute path** (local or UNC/network) before Maya or `mayapy` starts:
 
 ```powershell
 # Windows — facility launcher or user profile
-$env:SHADER_HEALTH_STUDIO_CONFIG = "\\pipeline\config\shader_health\shader_health_studio.json"
+$env:PIPELINE_INSPECTOR_STUDIO_CONFIG = "\\pipeline\config\pipeline_inspector\pipeline_inspector_studio.json"
 ```
 
 ```bash
 # Linux / macOS
-export SHADER_HEALTH_STUDIO_CONFIG="/pipeline/config/shader_health/shader_health_studio.json"
+export PIPELINE_INSPECTOR_STUDIO_CONFIG="/pipeline/config/pipeline_inspector/pipeline_inspector_studio.json"
 ```
 
 Discovery precedence (same in the Maya panel and headless CLI):
 
-1. `SHADER_HEALTH_STUDIO_CONFIG` when the file exists
-2. `~/.shader_health/shader_health_studio.json`
-3. `~/shader_health_studio.json`
+1. `PIPELINE_INSPECTOR_STUDIO_CONFIG` when the file exists
+2. `~/.pipeline_inspector/pipeline_inspector_studio.json`
+3. `~/pipeline_inspector_studio.json`
 
 Headless CLI also accepts `--studio-config <path>`, which takes priority over env and default paths.
 
 Validate that a workstation picked up the rollout:
 
 ```bash
-python -c "from shader_health.studio_config import discover_studio_config_path; print(discover_studio_config_path())"
+python -c "from pipeline_inspector.studio_config import discover_studio_config_path; print(discover_studio_config_path())"
 ```
 
 In Maya Script Editor after launch:
 
 ```python
-from shader_health.studio_config import StudioConfig
+from pipeline_inspector.studio_config import StudioConfig
 
 print(StudioConfig.default().config_path)
 print(StudioConfig.default().studio_name)
@@ -108,7 +108,7 @@ print(StudioConfig.default().studio_name)
     },
     "pinned_workflow_profile_ids": ["publish_strict", "deadline_critical"],
     "pinned_asset_class_profile_ids": [],
-    "extra_rules_folder": "//studio/share/shader_health/extra_rules"
+    "extra_rules_folder": "//studio/share/pipeline_inspector/extra_rules"
   },
   "studio_environment": {
     "texture_root": "\\\\farm\\textures",
@@ -220,17 +220,17 @@ Per-connector field tables and notification routing live in [Connectors (schema 
 
 | Rule | Detail |
 | --- | --- |
-| Do not commit | `shader_health_studio.json` with connector tokens, relay API keys, or internal URLs |
+| Do not commit | `pipeline_inspector_studio.json` with connector tokens, relay API keys, or internal URLs |
 | Do commit | Sanitized templates (`.example.json`) and facility deployment runbooks |
-| Prefer | Network share + `SHADER_HEALTH_STUDIO_CONFIG`; restrict write access to pipeline TD / IT |
+| Prefer | Network share + `PIPELINE_INSPECTOR_STUDIO_CONFIG`; restrict write access to pipeline TD / IT |
 | User JSON | `user.json` holds theme, local `extra_rule_paths`, and TD debug prefs only — never connector secrets |
 
 ### How studio config relates to custom rules
 
 | Mechanism | What it controls |
 | --- | --- |
-| `shader_health_studio.json` → `pipeline` | Require `.tx`, waiver defaults, manifest gate defaults, pinned profile lists, `extra_rules_folder` |
-| `shader_health_studio.json` → `studio_environment` | `${STUDIO_*_ROOT}` and custom alias substitution during validation |
+| `pipeline_inspector_studio.json` → `pipeline` | Require `.tx`, waiver defaults, manifest gate defaults, pinned profile lists, `extra_rules_folder` |
+| `pipeline_inspector_studio.json` → `studio_environment` | `${STUDIO_*_ROOT}` and custom alias substitution during validation |
 | `pipeline.extra_rules_folder` | Studio export folder for incident rule sidecars ([RULE_AUTHORING.md](RULE_AUTHORING.md#incident-to-rule-workflow-maya-ui)) |
 | `--extra-rules` / user `extra_rule_paths` | Additional rule JSON layered on packaged rules (below) |
 | Custom profile JSON | Per-step `rule_overrides` (below) |
@@ -250,7 +250,7 @@ Studios centralize network roots in `studio_environment` so rule packs, fix plan
 | `cache_root` | `${STUDIO_CACHE_ROOT}` | Local cache / intermediate paths |
 | `render_root` | `${STUDIO_RENDER_ROOT}` | Optional JSON report links in Slack notifications |
 
-During validation, [`resolve_studio_path()`](../src/shader_health/util/paths.py) expands `${VAR}` tokens using the loaded studio config. Legacy `${TEXTURE_ROOT}` / `${ASSET_ROOT}` tokens are normalized to the `STUDIO_*` names.
+During validation, [`resolve_studio_path()`](../src/pipeline_inspector/util/paths.py) expands `${VAR}` tokens using the loaded studio config. Legacy `${TEXTURE_ROOT}` / `${ASSET_ROOT}` tokens are normalized to the `STUDIO_*` names.
 
 ### Custom aliases
 
@@ -267,13 +267,13 @@ Aliases override built-in names when both are present. Use them in rule `match` 
 
 ### Headless CLI and Maya panel
 
-Both entrypoints pass `studio_environment` into [`run_validation()`](../src/shader_health/maya/validation_pipeline.py) when `SHADER_HEALTH_STUDIO_CONFIG` (or `--studio-config`) resolves. Without a studio file, paths containing `${STUDIO_*}` tokens are left unchanged.
+Both entrypoints pass `studio_environment` into [`run_validation()`](../src/pipeline_inspector/maya/validation_pipeline.py) when `PIPELINE_INSPECTOR_STUDIO_CONFIG` (or `--studio-config`) resolves. Without a studio file, paths containing `${STUDIO_*}` tokens are left unchanged.
 
 Configure roots in **Settings → Studio Environment**, then **Save Studio Config** to the facility JSON path.
 
 ## Connectors (schema 2.0)
 
-All connectors live under `connectors` in `shader_health_studio.json`. Each block has an `enabled` flag; when `enabled` is `false`, the integration resolves to `None` and does not fall back to environment variables.
+All connectors live under `connectors` in `pipeline_inspector_studio.json`. Each block has an `enabled` flag; when `enabled` is `false`, the integration resolves to `None` and does not fall back to environment variables.
 
 Secret fields (tokens, API keys, webhook URLs, passwords) are masked in the Settings UI and must not be committed to git.
 
@@ -329,7 +329,7 @@ Bug report stays disabled until both `relay_url` and `api_key` are set. Updates 
 | --- | --- |
 | Add show/facility rules | Extra rule file or folder via `--extra-rules` / `extra_rule_paths` |
 | Tune severity and blocking per pipeline step | Custom profile JSON with `rule_overrides` |
-| Replace packaged rule packs entirely | `--rule-root` pointing at a studio mirror of `src/shader_health/rules/` |
+| Replace packaged rule packs entirely | `--rule-root` pointing at a studio mirror of `src/pipeline_inspector/rules/` |
 | Keep base rules upstream | Leave packaged `common/`, `vray/`, `arnold/` untouched; layer extras on top |
 
 The validation pipeline always loads rules in this order:
@@ -343,7 +343,7 @@ Later rule files replace earlier rules with the same `id`.
 
 ## Packaged rule pack layout
 
-The reference layout lives under [`src/shader_health/rules/`](../src/shader_health/rules/):
+The reference layout lives under [`src/pipeline_inspector/rules/`](../src/pipeline_inspector/rules/):
 
 ```text
 rules/
@@ -361,7 +361,7 @@ rules/
 Studio mirrors often copy this skeleton into a facility config repo:
 
 ```text
-/show/config/shader_health/
+/show/config/pipeline_inspector/
 ├── common/
 ├── vray/
 ├── arnold/
@@ -373,13 +373,13 @@ Studio mirrors often copy this skeleton into a facility config repo:
 Validate studio rule JSON before rollout:
 
 ```bash
-python -m shader_health rules validate examples/studio/rules
+python -m pipeline_inspector rules validate examples/studio/rules
 python tools/validate_rules.py examples/studio/rules
 ```
 
-Both commands share the same validation logic (`shader_health.rules_cli.validate_rule_paths`).
+Both commands share the same validation logic (`pipeline_inspector.rules_cli.validate_rule_paths`).
 
-Profile overrides are validated against the loaded rule stack in unit tests and when `shader_health rules validate` (or `tools/validate_rules.py`) validates the packaged rule root (it checks packaged `profiles/` entries against packaged rules). For studio profiles, load the same rule stack production uses and call `validate_profile_overrides()` — see [`tests/unit/test_studio_overrides_example.py`](../tests/unit/test_studio_overrides_example.py).
+Profile overrides are validated against the loaded rule stack in unit tests and when `pipeline_inspector rules validate` (or `tools/validate_rules.py`) validates the packaged rule root (it checks packaged `profiles/` entries against packaged rules). For studio profiles, load the same rule stack production uses and call `validate_profile_overrides()` — see [`tests/unit/test_studio_overrides_example.py`](../tests/unit/test_studio_overrides_example.py).
 
 Fixture examples for valid/invalid rule JSON live under [`tests/fixtures/rules/`](../tests/fixtures/rules/).
 
@@ -390,7 +390,7 @@ Fixture examples for valid/invalid rule JSON live under [`tests/fixtures/rules/`
 Pass one or more rule files or folders after the packaged rule root is resolved:
 
 ```bash
-mayapy -m shader_health validate scene.ma \
+mayapy -m pipeline_inspector validate scene.ma \
   --profile examples/studio/profiles/show_publish_strict.json \
   --extra-rules examples/studio/rules \
   --report report.json
@@ -403,12 +403,12 @@ mayapy -m shader_health validate scene.ma \
 
 ### Python API
 
-[`run_validation()`](../src/shader_health/maya/validation_pipeline.py) exposes the same hook:
+[`run_validation()`](../src/pipeline_inspector/maya/validation_pipeline.py) exposes the same hook:
 
 ```python
 from pathlib import Path
 
-from shader_health.maya.validation_pipeline import run_validation
+from pipeline_inspector.maya.validation_pipeline import run_validation
 
 run = run_validation(
     snapshot,
@@ -427,11 +427,11 @@ Studios can also wire custom rules through a facility bootstrap script:
 ```python
 from pathlib import Path
 
-from shader_health.maya.validation_pipeline import run_validation
-from shader_health.maya.scanner import scan_scene
+from pipeline_inspector.maya.validation_pipeline import run_validation
+from pipeline_inspector.maya.scanner import scan_scene
 
-SHOW_RULES = Path("/show/config/shader_health/studio")
-SHOW_PROFILE = Path("/show/config/shader_health/profiles/show_publish_strict.json")
+SHOW_RULES = Path("/show/config/pipeline_inspector/studio")
+SHOW_PROFILE = Path("/show/config/pipeline_inspector/profiles/show_publish_strict.json")
 
 snapshot = scan_scene()
 run = run_validation(
@@ -490,7 +490,7 @@ This repository ships a minimal studio overlay used in docs and unit tests.
 ### 3. Run the example headlessly
 
 ```bash
-python -m shader_health validate \
+python -m pipeline_inspector validate \
   tests/fixtures/snapshots/texture_freshness_outdated.json \
   --input-kind snapshot \
   --profile examples/studio/profiles/show_publish_strict.json \
@@ -510,7 +510,7 @@ After loading the example stack:
 
 ## Profile validation and unknown rule ids
 
-`shader_health rules validate` (and `tools/validate_rules.py`) loads the packaged rule stack and verifies that every `rule_overrides` key exists in the loaded rule set. Unknown ids fail validation:
+`pipeline_inspector rules validate` (and `tools/validate_rules.py`) loads the packaged rule stack and verifies that every `rule_overrides` key exists in the loaded rule set. Unknown ids fail validation:
 
 ```text
 profile 'show_publish_strict' references unknown rule(s): missing.rule.id
@@ -525,13 +525,13 @@ When you validate a studio profile, include the same `--extra-rules` folders (or
 1. Author or copy base rule packs using [RULE_AUTHORING.md](RULE_AUTHORING.md).
 2. Place show-only rules in a dedicated folder (for example `studio/` or `show_xyz/`).
 3. Create profile JSON per pipeline step: publish, daily review, farm preflight.
-4. Validate JSON with `python -m shader_health rules validate` (or `python tools/validate_rules.py`).
+4. Validate JSON with `python -m pipeline_inspector rules validate` (or `python tools/validate_rules.py`).
 5. Wire headless gates through [`publish_submit_preflight.md`](integrations/publish_submit_preflight.md) or [`deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md).
 6. Keep renderer-specific material semantics inside renderer adapters and renderer packs per [ADR 0002](adr/0002-renderer-adapter-boundary.md).
 
 ## Related docs
 
-- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and `SHADER_HEALTH_STUDIO_CONFIG` in launchers
+- [MAYA_INSTALL.md](MAYA_INSTALL.md) — loading the tool inside Maya and `PIPELINE_INSPECTOR_STUDIO_CONFIG` in launchers
 - [adr/0007-settings-and-connectors-architecture.md](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split, connector registry, secrets
 - [RULE_AUTHORING.md](RULE_AUTHORING.md) — authoring individual rules, incident-to-rule workflow, profile override syntax
 - [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md) — Deadline connector and farm gate

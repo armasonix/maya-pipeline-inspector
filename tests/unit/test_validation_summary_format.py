@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.integrations.messaging.validation_summary import (
+from pipeline_inspector.integrations.messaging.validation_summary import (
     CHAT_SEPARATOR,
     FTRACK_CRITICAL_EMOJI,
     FTRACK_HEADLINE,

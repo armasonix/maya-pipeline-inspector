@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from shader_health.studio_config import StudioConfig
-from shader_health.user_config import (
+from pipeline_inspector.studio_config import StudioConfig
+from pipeline_inspector.user_config import (
     USER_CONFIG_FILENAME,
     UserPreferences,
     UserUpdatesSettings,
@@ -21,7 +21,7 @@ from shader_health.user_config import (
 def test_user_preferences_round_trips_through_json_file(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setenv("HOME", str(tmp_path))
-    path = tmp_path / ".shader_health" / USER_CONFIG_FILENAME
+    path = tmp_path / ".pipeline_inspector" / USER_CONFIG_FILENAME
     original = UserPreferences(
         default_profile_id="lookdev",
         default_asset_class_id="character",
@@ -54,7 +54,7 @@ def test_enrich_user_preferences_infers_mayapy_from_executable(
 ):
     import sys
 
-    from shader_health.user_config import enrich_user_preferences, infer_local_mayapy_path
+    from pipeline_inspector.user_config import enrich_user_preferences, infer_local_mayapy_path
 
     mayapy_executable = (
         r"C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
@@ -75,7 +75,7 @@ def test_enrich_user_preferences_infers_mayapy_from_executable(
 def test_user_preferences_default_uses_default_path_when_missing(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.delenv("SHADER_HEALTH_USER_CONFIG", raising=False)
+    monkeypatch.delenv("PIPELINE_INSPECTOR_USER_CONFIG", raising=False)
 
     config = UserPreferences.default()
 
@@ -86,7 +86,7 @@ def test_user_preferences_default_uses_default_path_when_missing(tmp_path: Path,
 def test_discover_user_config_path_honors_env_var(tmp_path: Path, monkeypatch):
     path = tmp_path / "custom_user.json"
     path.write_text("{}\n", encoding="utf-8")
-    monkeypatch.setenv("SHADER_HEALTH_USER_CONFIG", str(path))
+    monkeypatch.setenv("PIPELINE_INSPECTOR_USER_CONFIG", str(path))
 
     assert discover_user_config_path() == path
 

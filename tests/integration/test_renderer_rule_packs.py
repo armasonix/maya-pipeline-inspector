@@ -8,13 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pipeline_inspector.maya.validation_pipeline import run_validation
 from tests.integration.fixtures import (
     arnold_policy_scene_snapshot,
     arnold_scene_snapshot,
     broken_scene_snapshot,
 )
-
-from shader_health.maya.validation_pipeline import run_validation
 
 
 def test_vray_renderer_pack_flags_missing_plugin_node(tmp_path: Path):

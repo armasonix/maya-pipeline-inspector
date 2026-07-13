@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from shader_health.core import GraphSnapshot
-from shader_health.maya import commands
+from pipeline_inspector.core import GraphSnapshot
+from pipeline_inspector.maya import commands
 
 
 class FakeCmds:
@@ -99,7 +99,7 @@ def test_show_farm_check_ui_delegates_to_farm_check_launcher(monkeypatch: Any):
 
 
 def test_validate_scene_action_runs_scanner_and_validator(monkeypatch: Any):
-    from shader_health.maya import scanner
+    from pipeline_inspector.maya import scanner
 
     monkeypatch.setattr(
         scanner,
@@ -117,7 +117,7 @@ def test_validate_scene_action_runs_scanner_and_validator(monkeypatch: Any):
 
 
 def test_validate_selection_action_reports_empty_selection(monkeypatch: Any):
-    from shader_health.maya import scanner
+    from pipeline_inspector.maya import scanner
 
     monkeypatch.setattr(scanner, "selection_node_names", lambda: [])
 
@@ -128,7 +128,7 @@ def test_validate_selection_action_reports_empty_selection(monkeypatch: Any):
 
 
 def test_validate_selection_action_reports_missing_shader_networks(monkeypatch: Any):
-    from shader_health.maya import scanner
+    from pipeline_inspector.maya import scanner
 
     monkeypatch.setattr(scanner, "selection_node_names", lambda: ["pCube1"])
     monkeypatch.setattr(

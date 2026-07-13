@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.table_widgets import connect_qt_signal
+from pipeline_inspector.ui.table_widgets import connect_qt_signal
 
 
 class FakeSignal:

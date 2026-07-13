@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Maya Shader Health Inspector will eventually offer safe auto-fixes for common material QA issues such as wrong color space, unsafe paths, outdated texture links, and low-risk attribute corrections.
+Maya Pipeline Inspector will eventually offer safe auto-fixes for common material QA issues such as wrong color space, unsafe paths, outdated texture links, and low-risk attribute corrections.
 
 However, scene mutation in production Maya scenes is dangerous. Maya scenes often contain referenced assets, locked nodes, render-layer or namespace complexity, and shot-level overrides. A validator that silently edits scene data can damage production files, introduce unintended reference edits, or make artists distrust the tool.
 
@@ -25,7 +25,7 @@ The tool should help users fix problems, but it must never behave like an uncont
 
 ## Decision
 
-Maya Shader Health Inspector will be non-destructive by default.
+Maya Pipeline Inspector will be non-destructive by default.
 
 All automatic fixes must go through a Safe Auto-Fix Queue. Fixes must be previewable, explainable, risk-rated, and blocked for referenced or locked nodes unless the active profile explicitly allows that behavior.
 
@@ -147,15 +147,15 @@ Accepted.
 Expected core modules:
 
 ```text
-src/shader_health/core/fix_plan.py
-src/shader_health/core/waivers.py
+src/pipeline_inspector/core/fix_plan.py
+src/pipeline_inspector/core/waivers.py
 ```
 
 Expected Maya modules:
 
 ```text
-src/shader_health/maya/fix_applier.py
-src/shader_health/maya/reference_safety.py
+src/pipeline_inspector/maya/fix_applier.py
+src/pipeline_inspector/maya/reference_safety.py
 ```
 
 Expected UI behavior:

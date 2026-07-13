@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shader_health.ui.table_widgets import (
+from pipeline_inspector.ui.table_widgets import (
     FIX_QUEUE_SELECT_BUTTON_OBJECT_NAME,
     _find_fix_queue_select_button,
     is_fix_queue_select_checked,
@@ -31,7 +31,7 @@ class FakeCell:
         button: FakeButton | None = None,
         children: tuple[FakeButton, ...] = (),
     ) -> None:
-        self._shader_health_select_button = button
+        self._pipeline_inspector_select_button = button
         self._children = children
 
     def children(self) -> tuple[FakeButton, ...]:

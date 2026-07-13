@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from shader_health.integrations.cerebro.adapter import (
+from pipeline_inspector.integrations.cerebro.adapter import (
     bundled_psycopg2_sys_path,
     cerebro_core_sys_paths,
     cerebro_service_tools_sys_paths,

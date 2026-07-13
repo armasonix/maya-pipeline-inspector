@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from shader_health import cli
-from shader_health.core import (
+from pipeline_inspector import cli
+from pipeline_inspector.core import (
     RuleLoadError,
     apply_profile_overrides,
     build_rule_search_paths,
@@ -17,7 +17,7 @@ from shader_health.core import (
     load_rule_stack,
     load_rules_from_path,
 )
-from shader_health.core.rule_loader import validate_profile_overrides
+from pipeline_inspector.core.rule_loader import validate_profile_overrides
 
 ROOT = Path(__file__).resolve().parents[2]
 VALID_RULES = ROOT / "tests" / "fixtures" / "rules" / "valid"
@@ -99,7 +99,7 @@ def test_validate_rules_cli_default_rule_pack_path_is_valid():
     assert result.stderr == ""
 
 
-def test_shader_health_rules_validate_accepts_valid_fixture(capsys):
+def test_pipeline_inspector_rules_validate_accepts_valid_fixture(capsys):
     code = cli.main(["rules", "validate", str(VALID_RULES)])
 
     captured = capsys.readouterr()
@@ -108,7 +108,7 @@ def test_shader_health_rules_validate_accepts_valid_fixture(capsys):
     assert captured.err == ""
 
 
-def test_shader_health_rules_validate_rejects_invalid_fixture(capsys):
+def test_pipeline_inspector_rules_validate_rejects_invalid_fixture(capsys):
     code = cli.main(["rules", "validate", str(INVALID_RULES)])
 
     captured = capsys.readouterr()
@@ -117,7 +117,7 @@ def test_shader_health_rules_validate_rejects_invalid_fixture(capsys):
     assert "missing required field(s): why" in captured.err
 
 
-def test_shader_health_rules_validate_defaults_to_packaged_rules(capsys):
+def test_pipeline_inspector_rules_validate_defaults_to_packaged_rules(capsys):
     code = cli.main(["rules", "validate"])
 
     captured = capsys.readouterr()
@@ -127,7 +127,7 @@ def test_shader_health_rules_validate_defaults_to_packaged_rules(capsys):
     assert captured.err == ""
 
 
-def test_shader_health_rules_without_subcommand_returns_config_error(capsys):
+def test_pipeline_inspector_rules_without_subcommand_returns_config_error(capsys):
     code = cli.main(["rules"])
 
     captured = capsys.readouterr()

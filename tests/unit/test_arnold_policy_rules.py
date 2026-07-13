@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
@@ -10,12 +10,12 @@ from shader_health.core import (
     ValidationEngine,
     load_rule_file,
 )
-from shader_health.core.rule_loader import apply_profile_overrides, load_profile
-from shader_health.maya.snapshot_enrichment import prepare_snapshot_for_validation
+from pipeline_inspector.core.rule_loader import apply_profile_overrides, load_profile
+from pipeline_inspector.maya.snapshot_enrichment import prepare_snapshot_for_validation
 
 ROOT = Path(__file__).resolve().parents[2]
-ARNOLD_RULES = ROOT / "src" / "shader_health" / "rules" / "arnold" / "renderer_health.json"
-PUBLISH_STRICT = ROOT / "src" / "shader_health" / "rules" / "profiles" / "publish_strict.json"
+ARNOLD_RULES = ROOT / "src" / "pipeline_inspector" / "rules" / "arnold" / "renderer_health.json"
+PUBLISH_STRICT = ROOT / "src" / "pipeline_inspector" / "rules" / "profiles" / "publish_strict.json"
 
 
 def _policy_rules() -> dict[str, RuleDefinition]:

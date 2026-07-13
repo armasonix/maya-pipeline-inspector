@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.adapters import (
+from pipeline_inspector.adapters import (
     ArnoldAdapter,
     CommonMayaAdapter,
     RendererAdapterRegistry,
     VrayAdapter,
 )
-from shader_health.core import GraphSnapshot
-from shader_health.maya.complexity_profiler import profile_material_complexity
-from shader_health.maya.snapshot_enrichment import enrich_snapshot
+from pipeline_inspector.core import GraphSnapshot
+from pipeline_inspector.maya.complexity_profiler import profile_material_complexity
+from pipeline_inspector.maya.snapshot_enrichment import enrich_snapshot
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "snapshots"

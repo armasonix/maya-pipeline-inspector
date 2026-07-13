@@ -24,7 +24,7 @@ def test_build_validator_command_runs_validator_for_publish_gate(tmp_path: Path)
     assert command == (
         "mayapy",
         "-m",
-        "shader_health",
+        "pipeline_inspector",
         "validate",
         str(tmp_path / "scene.ma"),
         "--input-kind",
@@ -100,7 +100,7 @@ def test_build_manifest_gate_command_writes_gate_report(tmp_path: Path):
     assert command == (
         "mayapy",
         "-m",
-        "shader_health",
+        "pipeline_inspector",
         "gate",
         str(tmp_path / "scene.ma"),
         str(tmp_path / "baseline_manifest.json"),
@@ -128,7 +128,7 @@ def test_publish_preflight_forwards_baseline_manifest_to_validator(tmp_path: Pat
 
     assert "--baseline-manifest" in calls[0]
     assert str(tmp_path / "baseline_manifest.json") in calls[0]
-    assert calls[1][2:4] == ("shader_health", "gate")
+    assert calls[1][2:4] == ("pipeline_inspector", "gate")
 
 
 def test_publish_preflight_blocks_on_manifest_gate_failure(tmp_path: Path):

@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Maya Shader Health Inspector must support multiple renderer families. The initial targets are Common Maya, V-Ray, and Arnold. Future targets may include RenderMan, Redshift, USD, and MaterialX inspection.
+Maya Pipeline Inspector must support multiple renderer families. The initial targets are Common Maya, V-Ray, and Arnold. Future targets may include RenderMan, Redshift, USD, and MaterialX inspection.
 
 Renderer-specific behavior includes:
 
@@ -35,10 +35,10 @@ The core engine will not hardcode V-Ray, Arnold, RenderMan, Redshift, USD, or Ma
 Initial adapter locations:
 
 ```text
-src/shader_health/adapters/base.py
-src/shader_health/adapters/common_maya.py
-src/shader_health/adapters/vray.py
-src/shader_health/adapters/arnold.py
+src/pipeline_inspector/adapters/base.py
+src/pipeline_inspector/adapters/common_maya.py
+src/pipeline_inspector/adapters/vray.py
+src/pipeline_inspector/adapters/arnold.py
 ```
 
 Renderer adapters may classify data such as:

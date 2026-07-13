@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from tests.unit.test_settings_panel import FakeQtWidgets
 
-from shader_health.connectors_registry import (
+from pipeline_inspector.connectors_registry import (
     CONNECTORS,
     get_connector,
     iter_connectors,
     read_connectors_from_settings_view,
     resolve_connector,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
@@ -20,7 +20,7 @@ from shader_health.studio_config import (
     resolve_slack_config,
     resolve_telegram_config,
 )
-from shader_health.ui import settings_panel
+from pipeline_inspector.ui import settings_panel
 
 
 def test_iter_connectors_includes_deadline_telegram_discord_and_slack():

@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.slack.blocks import ValidationBlocksContext
-from shader_health.integrations.slack.client import HttpRequest, SlackClient, SlackResponse
-from shader_health.integrations.slack.notify import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.slack.blocks import ValidationBlocksContext
+from pipeline_inspector.integrations.slack.client import HttpRequest, SlackClient, SlackResponse
+from pipeline_inspector.integrations.slack.notify import (
     matched_notify_events,
     maybe_send_slack_validation_notification,
     send_slack_validation_notification,
     should_send_slack_notification,
     validation_notification_context_from_run,
 )
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     SlackConnectorSettings,
     StudioConfig,

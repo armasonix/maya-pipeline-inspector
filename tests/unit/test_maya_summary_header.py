@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from shader_health.ui import main_window
+from pipeline_inspector.ui import main_window
 
 
 class FakeWidget:
@@ -530,7 +530,7 @@ def test_summary_header_formats_failed_blocking_state():
 
 
 def test_summary_header_accepts_custom_profile_options():
-    from shader_health.maya.validation_pipeline import ProfileOption
+    from pipeline_inspector.maya.validation_pipeline import ProfileOption
 
     state = main_window.SummaryHeaderState(profile_id="publish_strict")
 
@@ -674,7 +674,7 @@ def test_panel_header_includes_version_settings_gear_documentation_and_updates_b
     report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
 
-    assert "Maya Shader Health Inspector" in title.text
+    assert "Maya Pipeline Inspector" in title.text
     assert "v0.3.0" in title.text
     assert gear.tooltip == main_window.SETTINGS_GEAR_TOOLTIP
     assert docs.text == "Documentation"

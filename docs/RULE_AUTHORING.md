@@ -1,6 +1,6 @@
 # Rule Authoring Guide
 
-Maya Shader Health Inspector is intended to be data-driven. Most validation behavior should be defined in JSON rule packs rather than hardcoded directly into the core validator.
+Maya Pipeline Inspector is intended to be data-driven. Most validation behavior should be defined in JSON rule packs rather than hardcoded directly into the core validator.
 
 Status: early development for the JSON schema; the Maya **incident-to-rule** UI workflow is available from v0.5 (see [Incident-to-Rule Workflow](#incident-to-rule-workflow-maya-ui)).
 
@@ -282,18 +282,18 @@ Prefer **Rule Editor** session overrides first when you only need a temporary se
 
 | Setting | Where | Purpose |
 | --- | --- | --- |
-| `pipeline.extra_rules_folder` | Settings → **Studio Policy** (from `shader_health_studio.json`) | Target folder for **Export to Studio extra_rules** |
+| `pipeline.extra_rules_folder` | Settings → **Studio Policy** (from `pipeline_inspector_studio.json`) | Target folder for **Export to Studio extra_rules** |
 | `extra_rule_paths` | Settings → **Advanced** → Extra rule roots (stored in `user.json`) | Local rule packs layered at validation time; default save path when no studio folder is set |
 | Validation run | Validate tab | Populates the issue list and keeps source rule definitions available for prefill |
 
-Facility rollout example for the export folder inside `shader_health_studio.json`:
+Facility rollout example for the export folder inside `pipeline_inspector_studio.json`:
 
 ```json
 {
   "schema_version": "2.0",
   "studio_name": "Example Studio",
   "pipeline": {
-    "extra_rules_folder": "//studio/share/shader_health/extra_rules"
+    "extra_rules_folder": "//studio/share/pipeline_inspector/extra_rules"
   }
 }
 ```

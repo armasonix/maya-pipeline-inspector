@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from shader_health.core import GraphSnapshot, MaterialSnapshot
-from shader_health.core.rule_loader import RuleLoadError
-from shader_health.maya.validation_pipeline import (
+from pipeline_inspector.core import GraphSnapshot, MaterialSnapshot
+from pipeline_inspector.core.rule_loader import RuleLoadError
+from pipeline_inspector.maya.validation_pipeline import (
     ASSET_CLASS_PROFILE_IDS,
     WORKFLOW_PROFILE_IDS,
     compose_profiles,

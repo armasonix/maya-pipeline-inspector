@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from shader_health.ui.fix_queue import (
+from pipeline_inspector.ui.fix_queue import (
     FixQueueRow,
     allows_batch_risky_confirmation,
     confirm_risky_fixes,
@@ -195,8 +195,8 @@ def test_risky_fix_rows_includes_requires_confirmation_medium_risk():
 def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
     from types import SimpleNamespace
 
-    from shader_health.maya import ui_launcher
-    from shader_health.ui.fix_queue import FIX_QUEUE_TABLE_OBJECT_NAME
+    from pipeline_inspector.maya import ui_launcher
+    from pipeline_inspector.ui.fix_queue import FIX_QUEUE_TABLE_OBJECT_NAME
 
     apply_calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
 
@@ -205,7 +205,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
         return SimpleNamespace(applied_count=1)
 
     monkeypatch.setattr(
-        "shader_health.maya.fix_applier.apply_fix_actions",
+        "pipeline_inspector.maya.fix_applier.apply_fix_actions",
         fake_apply,
     )
     monkeypatch.setattr(ui_launcher, "confirm_risky_fixes", lambda *_a, **_k: False)
@@ -227,7 +227,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
 
     description_label = FakeLabel()
     content = SimpleNamespace(
-        _shader_health_fix_plan=SimpleNamespace(
+        _pipeline_inspector_fix_plan=SimpleNamespace(
             actions=(
                 SimpleNamespace(
                     fix_id="common.displacement.amount.max:file1:disable_feature",
@@ -238,16 +238,16 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
                 ),
             )
         ),
-        _shader_health_fix_rows=(
+        _pipeline_inspector_fix_rows=(
             _high_risk_row(),
         ),
-        _shader_health_profile_id="artist_relaxed",
+        _pipeline_inspector_profile_id="artist_relaxed",
     )
 
     def fake_find_child(_content, _widget_type, object_name: str):
         if object_name == FIX_QUEUE_TABLE_OBJECT_NAME:
             return FakeTable()
-        if object_name == "shaderHealthInspectorDescription":
+        if object_name == "pipelineInspectorDescription":
             return description_label
         return None
 

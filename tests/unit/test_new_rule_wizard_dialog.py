@@ -14,15 +14,15 @@ from tests.unit.test_advanced_settings_section import (
 )
 from tests.unit.test_telegram_connector_section import _find
 
-from shader_health.core.rule_browser import load_packaged_rules_catalog
-from shader_health.core.rule_schema import RuleResult
-from shader_health.core.rule_wizard import (
+from pipeline_inspector.core.rule_browser import load_packaged_rules_catalog
+from pipeline_inspector.core.rule_schema import RuleResult
+from pipeline_inspector.core.rule_wizard import (
     RULE_TEMPLATE_NUMERIC_MAX,
     RULE_TEMPLATE_PATH_EXISTS,
     build_draft_prefill_from_issue,
     optional_fields_for_template,
 )
-from shader_health.ui.new_rule_wizard_dialog import (
+from pipeline_inspector.ui.new_rule_wizard_dialog import (
     NEW_RULE_WIZARD_DIALOG_OBJECT_NAME,
     NEW_RULE_WIZARD_EXPORT_STUDIO_BUTTON_OBJECT_NAME,
     NEW_RULE_WIZARD_STATUS_LABEL_OBJECT_NAME,
@@ -173,7 +173,7 @@ def test_new_rule_wizard_dialog_applies_issue_prefill():
 
 
 def test_new_rule_wizard_dialog_exports_to_studio_extra_rules(tmp_path: Path):
-    from shader_health.core.rule_wizard import (
+    from pipeline_inspector.core.rule_wizard import (
         RULE_TEMPLATE_PATH_EXISTS,
         IncidentRuleExportContext,
         NewRuleDraftInput,
@@ -215,7 +215,7 @@ def test_new_rule_wizard_dialog_exports_to_studio_extra_rules(tmp_path: Path):
 
 
 def test_new_rule_wizard_dialog_save_writes_json(tmp_path: Path):
-    from shader_health.core.rule_wizard import (
+    from pipeline_inspector.core.rule_wizard import (
         RULE_TEMPLATE_PATH_EXISTS,
         NewRuleDraftInput,
         build_rule_draft,

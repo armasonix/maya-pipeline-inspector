@@ -3,18 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.core.scoring import HealthScore
-from shader_health.integrations.cerebro import CerebroClient, CerebroConfig
-from shader_health.integrations.cerebro.publish import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.cerebro import CerebroClient, CerebroConfig
+from pipeline_inspector.integrations.cerebro.publish import (
     build_task_url,
     maybe_publish_validation_summary,
     publish_validation_summary,
     resolve_task_id,
     task_url_candidates,
 )
-from shader_health.integrations.trackers.publish import ValidationPublishPayload
-from shader_health.studio_config import (
+from pipeline_inspector.integrations.trackers.publish import ValidationPublishPayload
+from pipeline_inspector.studio_config import (
     CerebroConnectorSettings,
     ConnectorSettings,
     StudioConfig,
@@ -115,20 +115,20 @@ def test_task_url_candidates_try_scene_stem_before_full_filename():
     assert config is not None
     candidates = task_url_candidates(
         config,
-        _payload(scene_name="shader_health_demo_broken.ma"),
+        _payload(scene_name="pipeline_inspector_demo_broken.ma"),
     )
     assert candidates == (
-        "/Demo Project/shader_health_demo_broken",
-        "/Demo Project/shader_health_demo_broken/",
-        "/Demo Project/shader_health_demo_broken.ma",
-        "/Demo Project/shader_health_demo_broken.ma/",
+        "/Demo Project/pipeline_inspector_demo_broken",
+        "/Demo Project/pipeline_inspector_demo_broken/",
+        "/Demo Project/pipeline_inspector_demo_broken.ma",
+        "/Demo Project/pipeline_inspector_demo_broken.ma/",
     )
 
 
 def test_resolve_task_id_falls_back_to_project_children():
     database = FakeCerebroDatabase(
         task_urls={"/Demo Project": 10},
-        project_children={10: {"shader_health_demo_broken": 55}},
+        project_children={10: {"pipeline_inspector_demo_broken": 55}},
         definition_message_ids={55: 7},
     )
     client = CerebroClient(
@@ -144,7 +144,7 @@ def test_resolve_task_id_falls_back_to_project_children():
     task_id = resolve_task_id(
         client,
         client.config,
-        _payload(scene_name="shader_health_demo_broken.ma"),
+        _payload(scene_name="pipeline_inspector_demo_broken.ma"),
     )
 
     assert task_id == 55
@@ -225,7 +225,7 @@ def test_publish_validation_summary_skips_when_task_not_found():
 
     assert result.published is False
     assert result.skipped_reason == "task_not_found"
-    assert "shader_health_demo_broken" not in (result.error_message or "")
+    assert "pipeline_inspector_demo_broken" not in (result.error_message or "")
 
 
 def test_publish_validation_summary_reports_missing_py_cerebro():

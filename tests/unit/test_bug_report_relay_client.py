@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from shader_health.integrations.bug_report import (
+from pipeline_inspector.integrations.bug_report import (
     BugReportPayload,
     BugReportRelayClient,
     BugReportRelayConfig,
@@ -12,9 +12,9 @@ from shader_health.integrations.bug_report import (
     maybe_submit_bug_report,
     parse_issue_url,
 )
-from shader_health.integrations.bug_report.relay_client import is_jpeg_bytes
-from shader_health.integrations.bug_report.throttle import record_bug_report_submission
-from shader_health.studio_config import BugReportSettings, StudioConfig
+from pipeline_inspector.integrations.bug_report.relay_client import is_jpeg_bytes
+from pipeline_inspector.integrations.bug_report.throttle import record_bug_report_submission
+from pipeline_inspector.studio_config import BugReportSettings, StudioConfig
 
 
 def _config() -> BugReportRelayConfig:
@@ -27,7 +27,7 @@ def _config() -> BugReportRelayConfig:
 
 def _payload() -> BugReportPayload:
     return BugReportPayload(
-        title="Shader Health bug",
+        title="Pipeline Inspector bug",
         description="Issue details from the Maya panel.",
         plugin_version="0.5.0",
         scene_basename="hero.ma",
@@ -73,7 +73,7 @@ def test_bug_report_relay_client_submits_multipart_payload_with_jpeg_and_returns
     assert request.headers["Content-Type"].startswith("multipart/form-data; boundary=")
     body = request.body.decode("utf-8", errors="replace")
     assert 'name="payload"' in body
-    assert "Shader Health bug" in body
+    assert "Pipeline Inspector bug" in body
     assert 'filename="screenshot.jpg"' in body
     assert b"jpeg-body" in request.body
 
@@ -151,7 +151,7 @@ def test_maybe_submit_bug_report_blocks_when_local_daily_limit_reached(tmp_path:
     state_path = tmp_path / "bug_report_throttle.json"
     now = datetime.now(timezone.utc)
     payload = BugReportPayload(
-        title="Shader Health bug",
+        title="Pipeline Inspector bug",
         description="Issue details from the Maya panel.",
         plugin_version="0.5.0",
         scene_basename="hero.ma",
@@ -202,7 +202,7 @@ def test_maybe_submit_bug_report_records_successful_submission(tmp_path: Path):
         )
 
     payload = BugReportPayload(
-        title="Shader Health bug",
+        title="Pipeline Inspector bug",
         description="Issue details from the Maya panel.",
         plugin_version="0.5.0",
         scene_basename="hero.ma",

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from shader_health.integrations.cerebro import CerebroClient, CerebroConfig
-from shader_health.integrations.cerebro.client import format_note_html
+from pipeline_inspector.integrations.cerebro import CerebroClient, CerebroConfig
+from pipeline_inspector.integrations.cerebro.client import format_note_html
 
 
 @dataclass
@@ -63,10 +63,10 @@ def test_cerebro_client_create_task_note_posts_html_note():
         database_port=database,
     )
 
-    note = client.create_task_note(task_id=42, content="Shader Health summary\nline 2")
+    note = client.create_task_note(task_id=42, content="Pipeline Inspector summary\nline 2")
 
     assert note == {"id": 100, "task_id": 42}
-    assert database.notes == [(42, 7, "Shader Health summary<br/>line 2")]
+    assert database.notes == [(42, 7, "Pipeline Inspector summary<br/>line 2")]
 
 
 def test_format_note_html_escapes_markup():

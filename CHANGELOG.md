@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] - 2026-07-12
 
-**Maya Shader Health Inspector v0.5 — Studio Settings Hub, Connectors, Rule Authoring & Incident Workflow**
+**Maya Pipeline Inspector v0.5 — Studio Settings Hub, Connectors, Rule Authoring & Incident Workflow**
 
 Extends v0.4 with a two-layer configuration model (studio + user preferences), connector registry for notifications and task trackers, Bug Report relay, GitHub Releases auto-update, GUI rule authoring, and incident-to-rule workflow.
 
@@ -18,7 +18,7 @@ Extends v0.4 with a two-layer configuration model (studio + user preferences), c
 #### Settings and configuration architecture (M29)
 
 - [ADR 0007](docs/adr/0007-settings-and-connectors-architecture.md) — settings and connectors architecture (studio vs user layers, connector registry, secret handling).
-- Studio config **schema 2.0** migration for `shader_health_studio.json`.
+- Studio config **schema 2.0** migration for `pipeline_inspector_studio.json`.
 - Connector registry with Deadline refactor onto shared integration pattern.
 - Settings tab model expansion; **save/load split** for studio vs user config files.
 - Headless CLI **`--studio-config`** support (studio policy in farm/CI jobs).
@@ -63,7 +63,7 @@ Extends v0.4 with a two-layer configuration model (studio + user preferences), c
 - **New Rule Wizard** from template; rule editor entry from Settings → Advanced.
 - **Create rule draft from issue details** and export incident rule draft to studio `extra_rules`.
 - [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) — incident-to-rule workflow documentation.
-- Headless **`shader_health rules validate`** subcommand for rule pack QA.
+- Headless **`pipeline_inspector rules validate`** subcommand for rule pack QA.
 
 #### Header polish (M32)
 
@@ -84,9 +84,9 @@ Extends v0.4 with a two-layer configuration model (studio + user preferences), c
 
 ### Known limitations (v0.5)
 
-- User preferences (`shader_health_user.json`) are **not** loaded in headless CLI — studio config only.
+- User preferences (`pipeline_inspector_user.json`) are **not** loaded in headless CLI — studio config only.
 - Bug Report requires a studio-hosted HTTPS relay; no built-in SaaS backend.
-- Notification and tracker connectors need studio-supplied credentials in `shader_health_studio.json`.
+- Notification and tracker connectors need studio-supplied credentials in `pipeline_inspector_studio.json`.
 - Rule editor is an MVP — complex rule JSON may still require hand-editing or TD review.
 - Cerebro cloud API requires optional `pycerebro` / `py_cerebro` from Cerebro service-tools.
 - Native `.mll` binaries are built locally or attached to releases; repo ships CMake scaffolding only.
@@ -100,7 +100,7 @@ Same as v0.4 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/U
 
 ## [0.4.0] - 2026-07-08
 
-**Maya Shader Health Inspector v0.4 — GUI-First Farm Integration & Render Risk Depth**
+**Maya Pipeline Inspector v0.4 — GUI-First Farm Integration & Render Risk Depth**
 
 Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), native `.mll` plugin Phase 1, Maya integration CI activation, expanded render-risk rules, and UX Wave 1 (settings screen, studio config, Connectors).
 
@@ -123,14 +123,14 @@ Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), nat
 
 #### Deadline 10 integration core (M25)
 
-- Package `shader_health.integrations.deadline`: `DeadlineConfig`, `DeadlineClient`, preflight, eligibility gate, CommandScript submit API.
+- Package `pipeline_inspector.integrations.deadline`: `DeadlineConfig`, `DeadlineClient`, preflight, eligibility gate, CommandScript submit API.
 - [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md) — studio guide (Web Service, pool/group, GUI + headless).
-- Example scripts: `examples/deadline/submit_preflight.py`, `submit_to_farm.py`, `shader_health_deadline_validate.py`.
+- Example scripts: `examples/deadline/submit_preflight.py`, `submit_to_farm.py`, `pipeline_inspector_deadline_validate.py`.
 
 #### Deadline GUI & Farm tab (M26)
 
 - **Farm** tab: connection lamp (Online/Offline), scene readiness, eligibility, preflight and submit actions.
-- Menu + shelf **Shader Health Farm Check** — opens Farm tab and runs `deadline_critical` preflight.
+- Menu + shelf **Pipeline Inspector Farm Check** — opens Farm tab and runs `deadline_critical` preflight.
 
 #### Render risk & optimization depth (M27)
 
@@ -141,7 +141,7 @@ Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), nat
 #### UX Wave 1 & studio settings (M28)
 
 - Settings screen (gear icon): **Basic / Advanced / Connectors / Studio** tabs with persistent panel header.
-- Studio config file `shader_health_studio.json`: **Require .tx** pipeline toggle; **Thinkbox Deadline** connector with **Remote Farm** ON/OFF.
+- Studio config file `pipeline_inspector_studio.json`: **Require .tx** pipeline toggle; **Thinkbox Deadline** connector with **Remote Farm** ON/OFF.
 - Connectors ↔ Farm tab linkage: disabled connector forces Farm **Offline** and disables farm actions.
 - Issue Details layout polish (splitter persistence, borderless scroll, stable panel width).
 - Issue triage: double-click row selects node; fix queue and export action wiring tests expanded.
@@ -159,7 +159,7 @@ Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), nat
 ### Known limitations (v0.4)
 
 - Native `.mll` binaries are built locally or attached to releases; repository ships CMake scaffolding and Python fallback only.
-- Deadline connector settings are Maya UI / studio JSON today — headless `shader_health validate` does not yet accept `--studio-config`.
+- Deadline connector settings are Maya UI / studio JSON today — headless `pipeline_inspector validate` does not yet accept `--studio-config`.
 - Public CI still requires a self-hosted runner with `mayapy` for Maya integration smoke.
 - Rule authoring remains JSON-only (no rule editor UI).
 
@@ -171,7 +171,7 @@ Same as v0.3 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/U
 
 ## [0.3.0] - 2026-07-07
 
-**Maya Shader Health Inspector v0.3 — Pipeline Automation & Manifest Depth**
+**Maya Pipeline Inspector v0.3 — Pipeline Automation & Manifest Depth**
 
 Extends v0.2 with manifest schema 1.1, graph fingerprinting, manifest regression gates, headless `apply-fixes`, texture resolution budgets by asset class, and Maya plugin dual-install.
 
@@ -179,7 +179,7 @@ Extends v0.2 with manifest schema 1.1, graph fingerprinting, manifest regression
 
 #### Plugin and install (M15)
 
-- Python MPx plugin stub (`shader_health_inspector.py`) with dual install path (plugin + module bootstrap).
+- Python MPx plugin stub (`pipeline_inspector.py`) with dual install path (plugin + module bootstrap).
 - [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) — Plug-in Manager vs module-only policy and `autoLoad` studio guidance.
 
 #### Manifest fingerprint and schema 1.1 (M16)
@@ -192,13 +192,13 @@ Extends v0.2 with manifest schema 1.1, graph fingerprinting, manifest regression
 #### Manifest gates and preflight (M17)
 
 - Profile `manifest_diff_policy` overrides per workflow profile.
-- `shader_health gate` CLI and `validate --baseline-manifest` regression evaluation.
+- `pipeline_inspector gate` CLI and `validate --baseline-manifest` regression evaluation.
 - Publish preflight optional manifest gate in [`examples/publish/submit_preflight.py`](examples/publish/submit_preflight.py).
 
 #### Headless apply-fixes (M18)
 
 - [ADR 0004](docs/adr/0004-headless-apply-fixes-policy.md) — headless apply-fixes policy.
-- `shader_health apply-fixes` subcommand with `--dry-run`, `--confirm-risky`, and supervisor policy flags.
+- `pipeline_inspector apply-fixes` subcommand with `--dry-run`, `--confirm-risky`, and supervisor policy flags.
 - Fix apply audit integration and documented exit codes.
 
 #### Texture resolution budgets (M19)
@@ -210,12 +210,12 @@ Extends v0.2 with manifest schema 1.1, graph fingerprinting, manifest regression
 #### Pipeline UX and automation polish (M20)
 
 - **Compare to Approved Manifest** UI shortcut (sidecar-first, no file picker).
-- `shader_health manifest` headless CLI subcommand.
+- `pipeline_inspector manifest` headless CLI subcommand.
 - Maya CI manifest export + gate smoke in [`.github/workflows/maya-integration.yml`](.github/workflows/maya-integration.yml) (`workflow_dispatch`).
 - Maya UI: **Publish Preflight**, **Manifest Gate**, tabbed panel layout polish.
 - [`docs/CLI_TESTING.md`](docs/CLI_TESTING.md) and [`tools/compare_parity.py`](tools/compare_parity.py) for GUI↔CLI parity smoke.
-- `shader_health.util.paths` — `normalize_cli_path()` / `resolve_cli_path()` for Git Bash MSYS paths on Windows.
-- Headless demo scene: `examples/broken_scene/shader_health_demo_broken_headless.ma`.
+- `pipeline_inspector.util.paths` — `normalize_cli_path()` / `resolve_cli_path()` for Git Bash MSYS paths on Windows.
+- Headless demo scene: `examples/broken_scene/pipeline_inspector_demo_broken_headless.ma`.
 
 ### Fixed
 
@@ -238,7 +238,7 @@ Same as v0.2 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/U
 
 ## [0.2.0] - 2026-07-06
 
-**Maya Shader Health Inspector v0.2 — Production Hardening & Studio Readiness**
+**Maya Pipeline Inspector v0.2 — Production Hardening & Studio Readiness**
 
 Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, supervisor change review, pipeline integration docs, and waiver/fix UX polish.
 
@@ -247,7 +247,7 @@ Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, superv
 #### Safe fixes and audit
 
 - `relink_path`, `normalize_path`, and `disable_feature` fix appliers with undo-chunk apply.
-- Fix apply audit log (`*.shader_health_fix_audit.json`) with JSON round-trip tests.
+- Fix apply audit log (`*.pipeline_inspector_fix_audit.json`) with JSON round-trip tests.
 - **Export Fix Plan** from Maya UI and headless CLI.
 - Rule packs expose `normalize_path` / `relink_path` / `disable_feature` fixes (not only `set_attr`).
 
@@ -260,7 +260,7 @@ Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, superv
 #### Change review and manifests
 
 - HTML manifest diff report template.
-- `shader_health diff` CLI subcommand.
+- `pipeline_inspector diff` CLI subcommand.
 - **Export Manifest Diff** from Maya UI (baseline picker + JSON/HTML output).
 
 #### Pipeline integration and studio docs
@@ -281,7 +281,7 @@ Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, superv
 
 ### Changed
 
-- `normalize_path` resolves local checkout paths via detected project root (`src/shader_health/`) and maps standalone user paths to `${ASSET_ROOT}/textures/<filename>`.
+- `normalize_path` resolves local checkout paths via detected project root (`src/pipeline_inspector/`) and maps standalone user paths to `${ASSET_ROOT}/textures/<filename>`.
 - Fix queue apply matches actions by `fix_id`; blocked selections show explicit description messages.
 - Reconciled long-term roadmap in [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md); Milestones 10–14 indexed in §26.
 
@@ -304,7 +304,7 @@ Same as v0.1 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/U
 
 ## [0.1.0] - 2026-07-03
 
-**Maya Shader Health Inspector v0.1 — Texture & Shader Preflight MVP**
+**Maya Pipeline Inspector v0.1 — Texture & Shader Preflight MVP**
 
 First public proof-of-concept release. Validates material and texture health in Maya before publish or render-farm submission, with a snapshot-first architecture shared by the dockable UI and headless CLI.
 
@@ -318,7 +318,7 @@ First public proof-of-concept release. Validates material and texture health in 
 - Material health score and severity summary with publish/deadline block flags.
 - Packaged rule packs: Common Maya, V-Ray, and Arnold (basic info-audit rules).
 - Five validation profiles: `artist_relaxed`, `publish_strict`, `deadline_critical`, `supervisor_full`, `ci_headless`.
-- Waiver sidecar support (`*.shader_health_waivers.json`).
+- Waiver sidecar support (`*.pipeline_inspector_waivers.json`).
 
 #### Checks (v0.1)
 
@@ -331,7 +331,7 @@ First public proof-of-concept release. Validates material and texture health in 
 
 #### Maya UI
 
-- Dockable **Shader Health Inspector** panel (menu + shelf entry).
+- Dockable **Pipeline Inspector** panel (menu + shelf entry).
 - **Validate Scene** and **Validate Selection** with profile dropdown.
 - Issue table with severity, owner, and blocking/auto-fix filters.
 - Issue details: what/why/current/expected, graph trace, waive action.
@@ -344,12 +344,12 @@ First public proof-of-concept release. Validates material and texture health in 
 - Deterministic JSON validation reports.
 - Self-contained HTML reports (full-width layout, collapsible severity groups).
 - Shader manifest export and manifest diff tooling.
-- Headless CLI: `python -m shader_health validate …`
+- Headless CLI: `python -m pipeline_inspector validate …`
 - Deadline submit preflight example (`examples/deadline/`).
 
 #### Demo and documentation
 
-- Broken demo scene: `examples/broken_scene/shader_health_demo_broken.ma`
+- Broken demo scene: `examples/broken_scene/pipeline_inspector_demo_broken.ma`
 - Sample JSON/HTML/manifest artifacts in the demo folder.
 - README with UI, HTML report, and safe-fix GIF captures.
 - User guide, architecture notes, rule authoring guide, snapshot schema, ADRs.
@@ -370,8 +370,8 @@ First public proof-of-concept release. Validates material and texture health in 
 ### Install
 
 ```bash
-git clone https://github.com/armasonix/maya-shader-health-inspector.git
-cd maya-shader-health-inspector
+git clone https://github.com/armasonix/maya-pipeline-inspector.git
+cd maya-pipeline-inspector
 python -m pip install -e ".[dev]"
 ```
 
@@ -380,7 +380,7 @@ In Maya, add the repo to `MAYA_MODULE_PATH` or install the package into the Maya
 Quick manual session setup:
 
 ```python
-from shader_health.maya.commands import install_ui, show_ui
+from pipeline_inspector.maya.commands import install_ui, show_ui
 install_ui()
 show_ui()
 ```
@@ -392,7 +392,7 @@ See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for the full workflow.
 ### Headless example
 
 ```bash
-python -m shader_health validate examples/broken_scene/shader_health_demo_broken.ma \
+python -m pipeline_inspector validate examples/broken_scene/pipeline_inspector_demo_broken.ma \
   --input-kind scene \
   --profile-id publish_strict \
   --report report.json
@@ -407,8 +407,8 @@ python -m shader_health validate examples/broken_scene/shader_health_demo_broken
 - Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Deadline preflight: [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md)
 
-[0.5.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.5.0
-[0.4.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.4.0
-[0.3.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.3.0
-[0.2.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.2.0
-[0.1.0]: https://github.com/armasonix/maya-shader-health-inspector/releases/tag/v0.1.0
+[0.5.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.5.0
+[0.4.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.4.0
+[0.3.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.3.0
+[0.2.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.2.0
+[0.1.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.1.0

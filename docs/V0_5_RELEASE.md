@@ -11,14 +11,14 @@ Manual steps for **#164** / **#198** — prepare `v0.5.0` on branch `dev`, then 
 ### Git Bash
 
 ```bash
-export REPO="/d/Workspace/portfolio/maya-shader-health-inspector"
+export REPO="/d/Workspace/portfolio/maya-pipeline-inspector"
 cd "$REPO"
 
 python -m pip install -e ".[dev]"
 python -m pytest tests -q
 python -m ruff check src tests tools
 python -m mypy src
-python -m shader_health validate tests/fixtures/snapshots/vray_policy_scene.json \
+python -m pipeline_inspector validate tests/fixtures/snapshots/vray_policy_scene.json \
   --input-kind snapshot --profile-id ci_headless \
   --report _cli_test_out/pre_release_smoke.json
 echo "validate exit=$?"
@@ -27,14 +27,14 @@ echo "validate exit=$?"
 ### PowerShell
 
 ```powershell
-$REPO = "D:\Workspace\portfolio\maya-shader-health-inspector"
+$REPO = "D:\Workspace\portfolio\maya-pipeline-inspector"
 Set-Location $REPO
 
 python -m pip install -e ".[dev]"
 python -m pytest tests -q
 python -m ruff check src tests tools
 python -m mypy src
-python -m shader_health validate (Join-Path $REPO "tests\fixtures\snapshots\vray_policy_scene.json") `
+python -m pipeline_inspector validate (Join-Path $REPO "tests\fixtures\snapshots\vray_policy_scene.json") `
   --input-kind snapshot --profile-id ci_headless `
   --report (Join-Path $REPO "_cli_test_out\pre_release_smoke.json")
 $LASTEXITCODE
@@ -116,10 +116,10 @@ git checkout main
 git pull origin main
 
 # sanity check
-python -c "import shader_health; print(shader_health.__version__)"
+python -c "import pipeline_inspector; print(pipeline_inspector.__version__)"
 # expect: 0.5.0
 
-git tag -a v0.5.0 -m "Maya Shader Health Inspector v0.5.0"
+git tag -a v0.5.0 -m "Maya Pipeline Inspector v0.5.0"
 git push origin v0.5.0
 ```
 
@@ -130,10 +130,10 @@ Set-Location $REPO
 git checkout main
 git pull origin main
 
-python -c "import shader_health; print(shader_health.__version__)"
+python -c "import pipeline_inspector; print(pipeline_inspector.__version__)"
 # expect: 0.5.0
 
-git tag -a v0.5.0 -m "Maya Shader Health Inspector v0.5.0"
+git tag -a v0.5.0 -m "Maya Pipeline Inspector v0.5.0"
 git push origin v0.5.0
 ```
 
@@ -162,7 +162,7 @@ git log -1 --oneline v0.5.0
 3. **Target:** `main`
 4. **Title:** `v0.5.0 — Studio Settings Hub, Connectors & Rule Authoring`
 5. **Description:** paste from [Release notes template](#release-notes-template) below
-6. Optional: attach `maya-shader-health-inspector-0.5.0.zip` source bundle and native `.mll` if built
+6. Optional: attach `maya-pipeline-inspector-0.5.0.zip` source bundle and native `.mll` if built
 7. **Publish release**
 
 ### Option B — `gh` CLI
@@ -182,7 +182,7 @@ gh release create v0.5.0 \
 Copy into GitHub Release description:
 
 ```markdown
-## Maya Shader Health Inspector v0.5.0
+## Maya Pipeline Inspector v0.5.0
 
 **Theme:** Studio settings hub, notifications & task trackers, rule authoring, incident-to-rule, auto-update.
 
@@ -194,13 +194,13 @@ Copy into GitHub Release description:
 - **Task trackers** — Ftrack, ShotGrid, Cerebro + **Send to Tracker** from Reports
 - **Bug Report** — HTTPS relay client + [studio relay spec](docs/integrations/bug_report_relay.md)
 - **Check for Updates** — GitHub Releases wizard with rollback backup
-- **Rule authoring** — rule browser, new rule wizard, incident-to-rule export; `shader_health rules validate`
+- **Rule authoring** — rule browser, new rule wizard, incident-to-rule export; `pipeline_inspector rules validate`
 
 ### Install
 
 ```bash
-git clone https://github.com/armasonix/maya-shader-health-inspector.git
-cd maya-shader-health-inspector
+git clone https://github.com/armasonix/maya-pipeline-inspector.git
+cd maya-pipeline-inspector
 git checkout v0.5.0
 python -m pip install -e ".[dev]"
 ```
@@ -210,10 +210,10 @@ Maya module path: [docs/MAYA_INSTALL.md](docs/MAYA_INSTALL.md).
 ### Headless smoke
 
 ```bash
-python -m shader_health validate tests/fixtures/snapshots/vray_policy_scene.json \
+python -m pipeline_inspector validate tests/fixtures/snapshots/vray_policy_scene.json \
   --input-kind snapshot --profile-id publish_strict --report report.json
 
-python -m shader_health rules validate src/shader_health/rules/common
+python -m pipeline_inspector rules validate src/pipeline_inspector/rules/common
 ```
 
 ### Known limitations
@@ -226,7 +226,7 @@ python -m shader_health rules validate src/shader_health/rules/common
 
 ### Full changelog
 
-[CHANGELOG.md — v0.5.0](https://github.com/armasonix/maya-shader-health-inspector/blob/v0.5.0/CHANGELOG.md#050---2026-07-12)
+[CHANGELOG.md — v0.5.0](https://github.com/armasonix/maya-pipeline-inspector/blob/v0.5.0/CHANGELOG.md#050---2026-07-12)
 ```
 
 ---
@@ -246,13 +246,13 @@ Close Milestone 41 / v0.5 cycle issues on GitHub.
 
 ## 8. Optional: release zip asset
 
-For the auto-update wizard, attach a zip named like `maya-shader-health-inspector-0.5.0.zip`:
+For the auto-update wizard, attach a zip named like `maya-pipeline-inspector-0.5.0.zip`:
 
 ```bash
-git archive --format=zip --prefix=maya-shader-health-inspector-0.5.0/ v0.5.0 \
-  -o maya-shader-health-inspector-0.5.0.zip
+git archive --format=zip --prefix=maya-pipeline-inspector-0.5.0/ v0.5.0 \
+  -o maya-pipeline-inspector-0.5.0.zip
 
-gh release upload v0.5.0 maya-shader-health-inspector-0.5.0.zip
+gh release upload v0.5.0 maya-pipeline-inspector-0.5.0.zip
 ```
 
 ---
@@ -261,7 +261,7 @@ gh release upload v0.5.0 maya-shader-health-inspector-0.5.0.zip
 
 | File | Field |
 |------|--------|
-| `src/shader_health/version.py` | `__version__` |
+| `src/pipeline_inspector/version.py` | `__version__` |
 | `pyproject.toml` | `version` |
 | `tests/unit/test_import.py` | assert |
 | `CHANGELOG.md` | `[0.5.0]` section |

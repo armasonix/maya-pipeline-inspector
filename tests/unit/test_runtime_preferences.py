@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.runtime_preferences import (
+from pipeline_inspector.runtime_preferences import (
     resolved_profile_id,
     resolved_scan_scope,
     user_extra_rule_paths,
     user_validation_preferences,
 )
-from shader_health.user_config import UserPreferences
+from pipeline_inspector.user_config import UserPreferences
 
 
 def test_resolved_profile_id_falls_back_to_default_when_blank():

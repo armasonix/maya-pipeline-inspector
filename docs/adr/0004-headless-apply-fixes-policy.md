@@ -10,15 +10,15 @@ Accepted
 
 ## Context
 
-v0.2 shipped preview-only fix planning and Maya UI apply with undo chunks. Studios can validate scenes headlessly (`shader_health validate`), export fix plans, and gate publish or farm submission without opening the dockable panel.
+v0.2 shipped preview-only fix planning and Maya UI apply with undo chunks. Studios can validate scenes headlessly (`pipeline_inspector validate`), export fix plans, and gate publish or farm submission without opening the dockable panel.
 
-Pipeline automation increasingly needs a headless `shader_health apply-fixes` path for supervised batch repair, but scene mutation from batch jobs carries higher risk than validation-only preflight. ADR 0003 established that headless validation must not mutate scenes by default and that referenced nodes, locked nodes, and high-risk fixes require explicit policy.
+Pipeline automation increasingly needs a headless `pipeline_inspector apply-fixes` path for supervised batch repair, but scene mutation from batch jobs carries higher risk than validation-only preflight. ADR 0003 established that headless validation must not mutate scenes by default and that referenced nodes, locked nodes, and high-risk fixes require explicit policy.
 
 The project must define how headless apply differs from UI apply while reusing the same fix planner, `FixAction` metadata, Maya fix applier, and fix audit sidecar.
 
 ## Decision
 
-Maya Shader Health Inspector will add an explicit headless `shader_health apply-fixes` subcommand that mutates scenes only when callers opt in with clear inputs and policy flags.
+Maya Pipeline Inspector will add an explicit headless `pipeline_inspector apply-fixes` subcommand that mutates scenes only when callers opt in with clear inputs and policy flags.
 
 The headless apply policy is:
 
@@ -26,13 +26,13 @@ The headless apply policy is:
 2. **Dry-run is first-class** — `--dry-run` prints the would-apply action set and optional apply report JSON without opening Maya undo chunks or mutating the scene.
 3. **Reference safety inherits ADR 0003** — referenced targets remain blocked unless `--allow-referenced` is set.
 4. **High-risk fixes require explicit opt-in** — `--allow-high-risk` is required for actions flagged `requires_supervisor` (for example `disable_feature`).
-5. **Audit is mandatory on real apply** — successful non-dry-run sessions append to `{scene_stem}.shader_health_fix_audit.json` beside the scene via the existing fix audit sidecar helpers.
-6. **Undo stays Maya-local** — headless apply opens one undo chunk per invocation (`Shader Health Apply Fixes`). Batch pipelines must not assume cross-scene undo.
+5. **Audit is mandatory on real apply** — successful non-dry-run sessions append to `{scene_stem}.pipeline_inspector_fix_audit.json` beside the scene via the existing fix audit sidecar helpers.
+6. **Undo stays Maya-local** — headless apply opens one undo chunk per invocation (`Pipeline Inspector Apply Fixes`). Batch pipelines must not assume cross-scene undo.
 7. **Non-goals for v0.3** — `cleanup_orphan` auto-delete remains preview-only per ADR 0003.
 
 ### Exit codes
 
-Headless `apply-fixes` aligns with `shader_health validate` where practical:
+Headless `apply-fixes` aligns with `pipeline_inspector validate` where practical:
 
 | Code | Meaning |
 | --- | --- |
@@ -109,7 +109,7 @@ Accepted.
 Expected CLI surface (Milestone 18, issues #081–#083):
 
 ```text
-shader_health apply-fixes scene.ma [--fix-plan plan.json] [--dry-run]
+pipeline_inspector apply-fixes scene.ma [--fix-plan plan.json] [--dry-run]
   [--profile publish_strict] [--fix-ids FIX_ID ...]
   [--allow-referenced] [--allow-high-risk] [--report apply_report.json]
 ```
@@ -117,21 +117,21 @@ shader_health apply-fixes scene.ma [--fix-plan plan.json] [--dry-run]
 Expected modules:
 
 ```text
-src/shader_health/cli.py                  # apply-fixes subcommand
-src/shader_health/maya/fix_applier.py     # apply_fix_actions()
-src/shader_health/maya/validation_pipeline.py  # persist_fix_apply_audit()
-src/shader_health/core/fix_plan.py        # FixPlan / FixAction
-src/shader_health/core/fix_audit.py       # fix audit sidecar schema
+src/pipeline_inspector/cli.py                  # apply-fixes subcommand
+src/pipeline_inspector/maya/fix_applier.py     # apply_fix_actions()
+src/pipeline_inspector/maya/validation_pipeline.py  # persist_fix_apply_audit()
+src/pipeline_inspector/core/fix_plan.py        # FixPlan / FixAction
+src/pipeline_inspector/core/fix_audit.py       # fix audit sidecar schema
 ```
 
 Recommended studio workflow:
 
 ```text
-1. shader_health validate scene.ma --report report.json --export-fix-plan plan.json
-2. shader_health apply-fixes scene.ma --fix-plan plan.json --dry-run --report dry_run.json
+1. pipeline_inspector validate scene.ma --report report.json --export-fix-plan plan.json
+2. pipeline_inspector apply-fixes scene.ma --fix-plan plan.json --dry-run --report dry_run.json
 3. Supervisor reviews dry_run.json and fix audit policy.
-4. shader_health apply-fixes scene.ma --fix-plan plan.json --report apply.json
-5. Fix audit appended to scene.shader_health_fix_audit.json
+4. pipeline_inspector apply-fixes scene.ma --fix-plan plan.json --report apply.json
+5. Fix audit appended to scene.pipeline_inspector_fix_audit.json
 ```
 
 Farm jobs should prefer fix-plan JSON produced by an earlier validated run rather than re-planning inside unattended apply jobs.
@@ -139,7 +139,7 @@ Farm jobs should prefer fix-plan JSON produced by an earlier validated run rathe
 ## Related
 
 - Issue: `#080 - ADR 0004 headless apply-fixes policy`
-- Issue: `#081 - shader_health apply-fixes subcommand`
+- Issue: `#081 - pipeline_inspector apply-fixes subcommand`
 - Issue: `#082 - apply-fixes policy flags`
 - Issue: `#083 - fix_audit integration and exit codes`
 - ADR: `0003-safe-fix-reference-safety-policy.md`

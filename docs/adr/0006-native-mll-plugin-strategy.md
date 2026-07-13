@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-v0.3 ships Shader Health Inspector as a **Python OpenMayaMPx plugin** ([`maya_module/plug-ins/shader_health_inspector.py`](../../maya_module/plug-ins/shader_health_inspector.py)) plus a `userSetup.py` fallback that calls [`shader_health_inspector_bootstrap.install_ui()`](../../maya_module/scripts/shader_health_inspector_bootstrap.py). This works for development and small-studio rollout, but production facilities often expect:
+v0.3 ships Pipeline Inspector as a **Python OpenMayaMPx plugin** ([`maya_module/plug-ins/pipeline_inspector.py`](../../maya_module/plug-ins/pipeline_inspector.py)) plus a `userSetup.py` fallback that calls [`pipeline_inspector_bootstrap.install_ui()`](../../maya_module/scripts/pipeline_inspector_bootstrap.py). This works for development and small-studio rollout, but production facilities often expect:
 
 - a **native compiled plugin** visible in Maya **Plug-in Manager** with a clear vendor/version;
 - **per-Maya-year binaries** (2024 / 2025 / 2026) built against the matching Autodesk devkit;
@@ -23,10 +23,10 @@ v0.4 Milestone 24 (issues #096–#097) will add CMake scaffolding and the first 
 
 ## Decision
 
-Shader Health Inspector adopts a **phased native-plugin strategy**:
+Pipeline Inspector adopts a **phased native-plugin strategy**:
 
 1. **Thin C++ bootstrap only** — The `.mll` (Windows), `.so` (Linux), or `.bundle` (macOS) plugin registers with the Maya API and delegates all product behavior to existing Python modules. No validation, rule loading, Qt UI, or scene mutation logic lives in C++.
-2. **Python remains authoritative** — `shader_health.maya.commands`, `shader_health.maya.ui_launcher`, and `shader_health.maya.validation_pipeline` stay the implementation. The native plugin's `initializePlugin` / `uninitializePlugin` call the same bootstrap functions the `.py` plugin uses today.
+2. **Python remains authoritative** — `pipeline_inspector.maya.commands`, `pipeline_inspector.maya.ui_launcher`, and `pipeline_inspector.maya.validation_pipeline` stay the implementation. The native plugin's `initializePlugin` / `uninitializePlugin` call the same bootstrap functions the `.py` plugin uses today.
 3. **Dual delivery with explicit fallback** — Installers and `maya_module/` ship **both** native binaries (when built for the target Maya year) and the existing `.py` plugin. Runtime load order prefers the native plugin; if load fails, fall back to `.py`; if that fails, fall back to direct `install_ui()` from `userSetup.py` (current v0.3 behavior).
 4. **Per-year artifacts** — Each supported Maya release gets its own compiled binary linked against that release's devkit. Binaries are **not** portable across Maya years.
 5. **CMake as the single build entrypoint** — Issue #096 introduces `native/CMakeLists.txt` (or equivalent) with devkit discovery, Maya version selection, and install/copy rules. Issue #097 implements the minimal `MPxPlugin` source.
@@ -37,9 +37,9 @@ Shader Health Inspector adopts a **phased native-plugin strategy**:
 | Responsibility | Owner |
 |---|---|
 | `MFnPlugin` registration (name, vendor, version) | C++ `.mll` |
-| `initializePlugin` → defer UI install | C++ → Python `shader_health_inspector_bootstrap.install_ui()` |
-| `uninitializePlugin` → remove menu/shelf/panel | C++ → Python `shader_health_inspector_bootstrap.uninstall_ui()` |
-| Menu, shelf, dockable panel, validation | Python (`shader_health.*`) |
+| `initializePlugin` → defer UI install | C++ → Python `pipeline_inspector_bootstrap.install_ui()` |
+| `uninitializePlugin` → remove menu/shelf/panel | C++ → Python `pipeline_inspector_bootstrap.uninstall_ui()` |
+| Menu, shelf, dockable panel, validation | Python (`pipeline_inspector.*`) |
 
 ### Native plugin non-responsibilities (out of scope for v0.4 and foreseeable releases)
 
@@ -53,9 +53,9 @@ Shader Health Inspector adopts a **phased native-plugin strategy**:
 ```text
 Maya startup (maya_module/scripts/userSetup.py)
   1. Resolve Maya year (e.g. 2024 / 2025 / 2026)
-  2. Try cmds.loadPlugin("<year>/shader_health_inspector.mll")  [preferred]
-  3. Else try cmds.loadPlugin("shader_health_inspector.py")       [fallback]
-  4. Else shader_health_inspector_bootstrap.install_ui()          [last resort]
+  2. Try cmds.loadPlugin("<year>/pipeline_inspector.mll")  [preferred]
+  3. Else try cmds.loadPlugin("pipeline_inspector.py")       [fallback]
+  4. Else pipeline_inspector_bootstrap.install_ui()          [last resort]
 ```
 
 The year-qualified path keeps multiple prebuilt binaries in one module tree without filename collisions. Exact folder names are defined in **Implementation Notes** below.
@@ -66,11 +66,11 @@ Phase 1 targets **Windows x64** first (matches current self-hosted Maya CI runne
 
 | Maya year | Platform | Toolchain (documented) | Devkit input | Output artifact | CI / release |
 |---|---|---|---|---|---|
-| 2024 | Windows x64 | MSVC 2019+ (VS 2019/2022) | `MAYA_DEVKIT_ROOT` → Maya 2024 | `shader_health_inspector.mll` | Release asset; optional self-hosted build |
-| 2025 | Windows x64 | MSVC 2019+ | Maya 2025 devkit | `shader_health_inspector.mll` | Release asset; optional self-hosted build |
-| 2026 | Windows x64 | MSVC 2022+ (per Autodesk release notes) | Maya 2026 devkit | `shader_health_inspector.mll` | Release asset when devkit available |
-| 2024–2026 | Linux x64 | GCC 11+ (studio-dependent) | Matching devkit | `shader_health_inspector.so` | Best-effort; not a v0.4.0 blocker |
-| 2024–2026 | macOS arm64 / x64 | Xcode / clang per devkit | Matching devkit | `shader_health_inspector.bundle` | Best-effort; not a v0.4.0 blocker |
+| 2024 | Windows x64 | MSVC 2019+ (VS 2019/2022) | `MAYA_DEVKIT_ROOT` → Maya 2024 | `pipeline_inspector.mll` | Release asset; optional self-hosted build |
+| 2025 | Windows x64 | MSVC 2019+ | Maya 2025 devkit | `pipeline_inspector.mll` | Release asset; optional self-hosted build |
+| 2026 | Windows x64 | MSVC 2022+ (per Autodesk release notes) | Maya 2026 devkit | `pipeline_inspector.mll` | Release asset when devkit available |
+| 2024–2026 | Linux x64 | GCC 11+ (studio-dependent) | Matching devkit | `pipeline_inspector.so` | Best-effort; not a v0.4.0 blocker |
+| 2024–2026 | macOS arm64 / x64 | Xcode / clang per devkit | Matching devkit | `pipeline_inspector.bundle` | Best-effort; not a v0.4.0 blocker |
 
 **Devkit requirements (all platforms):**
 
@@ -172,44 +172,44 @@ native/
 ├── cmake/
 │   └── FindMayaDevkit.cmake
 └── src/
-    └── shader_health_inspector_plugin.cpp
+    └── pipeline_inspector_plugin.cpp
 
 maya_module/
 ├── plug-ins/
-│   ├── shader_health_inspector.py          # fallback (existing)
+│   ├── pipeline_inspector.py          # fallback (existing)
 │   ├── 2024/
-│   │   └── shader_health_inspector.mll     # built artifact copied here
+│   │   └── pipeline_inspector.mll     # built artifact copied here
 │   ├── 2025/
-│   │   └── shader_health_inspector.mll
+│   │   └── pipeline_inspector.mll
 │   └── 2026/
-│       └── shader_health_inspector.mll
+│       └── pipeline_inspector.mll
 └── scripts/
     ├── userSetup.py                        # year-aware load order (update in #097)
-    └── shader_health_inspector_bootstrap.py
+    └── pipeline_inspector_bootstrap.py
 ```
 
 ### C++ bootstrap sketch (illustrative — implemented in #097)
 
 ```cpp
 MStatus initializePlugin(MObject obj) {
-    MFnPlugin plugin(obj, "Shader Health Inspector", "0.4.0", "Any");
+    MFnPlugin plugin(obj, "Pipeline Inspector", "0.4.0", "Any");
     MGlobal::executePythonCommand(
         "import maya.utils; maya.utils.executeDeferred("
-        "'import shader_health_inspector_bootstrap; "
-        "shader_health_inspector_bootstrap.install_ui()')"
+        "'import pipeline_inspector_bootstrap; "
+        "pipeline_inspector_bootstrap.install_ui()')"
     );
     return MStatus::kSuccess;
 }
 ```
 
-Unload must call `shader_health_inspector_bootstrap.uninstall_ui()` synchronously (no defer) so menu/shelf/panel teardown completes before the plug-in unloads.
+Unload must call `pipeline_inspector_bootstrap.uninstall_ui()` synchronously (no defer) so menu/shelf/panel teardown completes before the plug-in unloads.
 
 ### Bootstrap contract (unchanged)
 
-[`shader_health_inspector_bootstrap.py`](../../maya_module/scripts/shader_health_inspector_bootstrap.py) continues to:
+[`pipeline_inspector_bootstrap.py`](../../maya_module/scripts/pipeline_inspector_bootstrap.py) continues to:
 
 - prepend `repo_root/src` to `sys.path` when present;
-- delegate to `shader_health.maya.commands` for menu, shelf, panel, and uninstall;
+- delegate to `pipeline_inspector.maya.commands` for menu, shelf, panel, and uninstall;
 - remain importable from both `.mll` and `.py` plug-in entrypoints.
 
 ### Testing expectations
@@ -223,17 +223,17 @@ Unload must call `shader_health_inspector_bootstrap.uninstall_ui()` synchronousl
 
 ### Release packaging
 
-- GitHub Release `v0.4.0` may attach `shader_health_inspector-maya{YEAR}-win64.zip` per supported year.
+- GitHub Release `v0.4.0` may attach `pipeline_inspector-maya{YEAR}-win64.zip` per supported year.
 - Source checkout without built `.mll` files continues to work via `.py` fallback (documented in `MAYA_INSTALL.md`).
 
 ## Related
 
 - Issue: `#095 - ADR 0006 native Maya plugin (.mll) strategy` (GitHub #123)
-- Issue: `#096 - CMake scaffold + shader_health_inspector.mll bootstrap` (GitHub #124)
+- Issue: `#096 - CMake scaffold + pipeline_inspector.mll bootstrap` (GitHub #124)
 - Issue: `#097 - Dual install docs + detection in userSetup` (GitHub #125)
 - ADR: `0001-snapshot-first-core.md`
 - ADR: `0005-gui-first-product-philosophy.md`
 - Document: `docs/ARCHITECTURE.md`
 - Document: `docs/MAYA_INSTALL.md`
-- Module: `maya_module/plug-ins/shader_health_inspector.py`
-- Module: `maya_module/scripts/shader_health_inspector_bootstrap.py`
+- Module: `maya_module/plug-ins/pipeline_inspector.py`
+- Module: `maya_module/scripts/pipeline_inspector_bootstrap.py`

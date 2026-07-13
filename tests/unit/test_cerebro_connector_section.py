@@ -6,13 +6,13 @@ from tests.unit.test_telegram_connector_section import (
     _find,
 )
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.studio_config import (
     CerebroConnectorSettings,
     ConnectorSettings,
     StudioConfig,
 )
-from shader_health.ui.cerebro_connector_section import (
+from pipeline_inspector.ui.cerebro_connector_section import (
     SETTINGS_CEREBRO_API_PASSWORD_INPUT_OBJECT_NAME,
     SETTINGS_CEREBRO_API_USER_INPUT_OBJECT_NAME,
     SETTINGS_CEREBRO_DETAILS_OBJECT_NAME,
@@ -40,7 +40,7 @@ def test_build_cerebro_connector_section_exposes_toggle_and_collapsed_details():
     hint = next(
         child
         for child in section.children
-        if getattr(child, "text", "").startswith("When enabled, Shader Health")
+        if getattr(child, "text", "").startswith("When enabled, Pipeline Inspector")
     )
     assert "Connection is tested when you save or edit Cerebro settings." in hint.text
     assert len(hint.text) < 320

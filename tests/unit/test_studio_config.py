@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core.manifest_gate import ManifestGatePolicy
-from shader_health.core.rule_loader import RuleOverride
-from shader_health.integrations.deadline.config import DeadlineConfig
-from shader_health.studio_config import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
+from pipeline_inspector.core.rule_loader import RuleOverride
+from pipeline_inspector.integrations.deadline.config import DeadlineConfig
+from pipeline_inspector.studio_config import (
     LEGACY_STUDIO_CONFIG_SCHEMA_VERSION,
     STUDIO_CONFIG_FILENAME,
     STUDIO_CONFIG_SCHEMA_VERSION,
@@ -260,7 +260,7 @@ def test_connector_settings_round_trips_tracker_connectors():
             "shotgrid": {
                 "enabled": True,
                 "site_url": "https://studio.shotgrid.autodesk.com",
-                "script_name": "shader_health",
+                "script_name": "pipeline_inspector",
                 "api_key": "secret",
                 "project": "Demo Project",
                 "entity_type": "Shot",
@@ -329,7 +329,7 @@ def test_deadline_connector_round_trips_in_studio_config_file(tmp_path):
 
 def test_resolve_deadline_config_uses_connector_when_enabled():
     config = StudioConfig(
-        config_path=Path("C:/studio/shader_health_studio.json"),
+        config_path=Path("C:/studio/pipeline_inspector_studio.json"),
         connectors=ConnectorSettings(
             deadline=DeadlineConnectorSettings(
                 enabled=True,
@@ -347,7 +347,7 @@ def test_resolve_deadline_config_uses_connector_when_enabled():
 
 def test_resolve_deadline_config_returns_none_when_disabled_in_saved_file():
     config = StudioConfig(
-        config_path=Path("C:/studio/shader_health_studio.json"),
+        config_path=Path("C:/studio/pipeline_inspector_studio.json"),
         connectors=ConnectorSettings(
             deadline=DeadlineConnectorSettings(enabled=False),
         ),
@@ -357,7 +357,7 @@ def test_resolve_deadline_config_returns_none_when_disabled_in_saved_file():
 
 
 def test_resolve_deadline_config_returns_none_when_disabled(monkeypatch):
-    monkeypatch.delenv("SHADER_HEALTH_DEADLINE_API_URL", raising=False)
+    monkeypatch.delenv("PIPELINE_INSPECTOR_DEADLINE_API_URL", raising=False)
     config = StudioConfig(
         connectors=ConnectorSettings(
             deadline=DeadlineConnectorSettings(enabled=False),
@@ -527,7 +527,7 @@ def test_resolve_studio_config_for_headless_raises_when_cli_path_missing(tmp_pat
 def test_resolve_studio_config_for_headless_discovers_env_path(tmp_path: Path, monkeypatch):
     path = tmp_path / "env_studio.json"
     save_studio_config(path, StudioConfig(studio_name="Env Studio"))
-    monkeypatch.setenv("SHADER_HEALTH_STUDIO_CONFIG", str(path))
+    monkeypatch.setenv("PIPELINE_INSPECTOR_STUDIO_CONFIG", str(path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setenv("HOME", str(tmp_path))
 

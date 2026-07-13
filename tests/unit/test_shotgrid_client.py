@@ -3,14 +3,18 @@ from __future__ import annotations
 import json
 import urllib.parse
 
-from shader_health.integrations.shotgrid import ShotGridClient, ShotGridConfig, ShotGridResponse
-from shader_health.integrations.shotgrid.client import HttpRequest
+from pipeline_inspector.integrations.shotgrid import (
+    ShotGridClient,
+    ShotGridConfig,
+    ShotGridResponse,
+)
+from pipeline_inspector.integrations.shotgrid.client import HttpRequest
 
 
 def test_shotgrid_config_normalizes_api_base_url():
     config = ShotGridConfig(
         site_url="https://studio.shotgrid.autodesk.com",
-        script_name="shader_health",
+        script_name="pipeline_inspector",
         api_key="secret",
         project="Demo Project",
     )
@@ -23,7 +27,7 @@ def test_shotgrid_config_normalizes_api_base_url():
 def test_shotgrid_config_supports_asset_entity_type():
     config = ShotGridConfig(
         site_url="https://studio.shotgrid.autodesk.com/api/v1",
-        script_name="shader_health",
+        script_name="pipeline_inspector",
         api_key="secret",
         project="Demo Project",
         entity_type="asset",
@@ -54,7 +58,7 @@ def test_shotgrid_client_ping_requests_access_token_and_projects():
     client = ShotGridClient(
         ShotGridConfig(
             site_url="https://studio.shotgrid.autodesk.com",
-            script_name="shader_health",
+            script_name="pipeline_inspector",
             api_key="secret",
             project="Demo Project",
         ),
@@ -92,7 +96,7 @@ def test_shotgrid_client_create_entity_note_posts_note_payload():
     client = ShotGridClient(
         ShotGridConfig(
             site_url="https://studio.shotgrid.autodesk.com",
-            script_name="shader_health",
+            script_name="pipeline_inspector",
             api_key="secret",
             project="Demo Project",
         ),
@@ -100,7 +104,7 @@ def test_shotgrid_client_create_entity_note_posts_note_payload():
     )
 
     note = client.create_entity_note(
-        content="Shader Health summary",
+        content="Pipeline Inspector summary",
         project_id=12,
         entity_type="Shot",
         entity_id=34,
@@ -108,6 +112,6 @@ def test_shotgrid_client_create_entity_note_posts_note_payload():
 
     assert note == {"type": "Note", "id": 99}
     payload = json.loads(captured[-1].body.decode("utf-8"))
-    assert payload["content"] == "Shader Health summary"
+    assert payload["content"] == "Pipeline Inspector summary"
     assert payload["project"] == {"type": "Project", "id": 12}
     assert payload["note_links"] == [{"type": "Shot", "id": 34}]

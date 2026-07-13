@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from shader_health.studio_config import (
+from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
     PipelineSettings,
     StudioConfig,
 )
-from shader_health.ui.settings_dirty_state import (
+from pipeline_inspector.ui.settings_dirty_state import (
     SettingsDirtyState,
     dirty_indicator_text,
     evaluate_settings_dirty_state,
     user_preferences_content_equal,
 )
-from shader_health.user_config import UserPreferences
+from pipeline_inspector.user_config import UserPreferences
 
 
 def test_dirty_indicator_text_describes_single_and_dual_layers():
@@ -56,7 +56,7 @@ def test_user_preferences_content_equal_ignores_config_path():
     )
     right = UserPreferences(
         default_profile_id="deadline_critical",
-        config_path=__import__("pathlib").Path("C:/Users/me/.shader_health/user.json"),
+        config_path=__import__("pathlib").Path("C:/Users/me/.pipeline_inspector/user.json"),
     )
 
     assert user_preferences_content_equal(left, right) is True

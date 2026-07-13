@@ -6,9 +6,9 @@ from tests.unit.test_telegram_connector_section import (
     _find,
 )
 
-from shader_health.core.manifest_gate import ManifestGatePolicy  # noqa: F401
-from shader_health.studio_config import BugReportSettings, StudioConfig
-from shader_health.ui.bug_report_section import (
+from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
+from pipeline_inspector.studio_config import BugReportSettings, StudioConfig
+from pipeline_inspector.ui.bug_report_section import (
     BUG_REPORT_PRIVACY_NOTICE,
     SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
     SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME,

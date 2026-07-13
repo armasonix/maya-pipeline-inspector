@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from shader_health.integrations.slack import SlackClient, SlackResponse
-from shader_health.integrations.slack.client import HttpRequest
+from pipeline_inspector.integrations.slack import SlackClient, SlackResponse
+from pipeline_inspector.integrations.slack.client import HttpRequest
 
 
 def test_slack_client_ping_returns_true_for_ok_response():
@@ -45,7 +45,7 @@ def test_slack_client_send_blocks_posts_block_kit_payload():
         "blocks": [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "Shader Health: Publish block"},
+                "text": {"type": "plain_text", "text": "Pipeline Inspector: Publish block"},
             }
         ]
     }

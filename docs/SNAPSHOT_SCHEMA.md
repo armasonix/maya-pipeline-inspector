@@ -1,6 +1,6 @@
 # GraphSnapshot JSON Schema
 
-This document describes the MVP JSON shape for `GraphSnapshot`, the renderer-agnostic data contract used by Maya Shader Health Inspector.
+This document describes the MVP JSON shape for `GraphSnapshot`, the renderer-agnostic data contract used by Maya Pipeline Inspector.
 
 Status: early development. The schema is intentionally simple and will be versioned as the scanner, rule engine, reports, and manifest systems evolve.
 
@@ -469,7 +469,7 @@ A minimal fixture should include:
 ```json
 {
   "schema_version": "1.0",
-  "scene_path": "examples/broken_scene/shader_health_demo_broken.ma",
+  "scene_path": "examples/broken_scene/pipeline_inspector_demo_broken.ma",
   "maya_version": "2025",
   "renderer": "vray",
   "scan_scope": "scene",
@@ -537,7 +537,7 @@ Future migrations should provide compatibility loaders where practical.
 
 ## Shader Manifest Schema
 
-The Material Passport / Shader Manifest is a separate JSON artifact from `GraphSnapshot`. It is produced by `shader_health.reports.manifest.build_shader_manifest()` and exported from the Maya UI or headless tools.
+The Material Passport / Shader Manifest is a separate JSON artifact from `GraphSnapshot`. It is produced by `pipeline_inspector.reports.manifest.build_shader_manifest()` and exported from the Maya UI or headless tools.
 
 Manifest schema is versioned independently via `manifest_schema_version`.
 
@@ -564,7 +564,7 @@ Readers that only understand 1.0 may ignore `health_score` and per-material `iss
 Implementation:
 
 ```text
-src/shader_health/reports/manifest.py
+src/pipeline_inspector/reports/manifest.py
 ```
 
 ## Implementation Notes
@@ -572,7 +572,7 @@ src/shader_health/reports/manifest.py
 Current model implementation:
 
 ```text
-src/shader_health/core/models.py
+src/pipeline_inspector/core/models.py
 ```
 
 Current round-trip tests:

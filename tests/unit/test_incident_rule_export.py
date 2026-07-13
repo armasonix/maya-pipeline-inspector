@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from shader_health.core.rule_wizard import (
+from pipeline_inspector.core.rule_wizard import (
     RULE_TEMPLATE_PATH_EXISTS,
     IncidentRuleExportContext,
     NewRuleDraftInput,
@@ -13,7 +13,7 @@ from shader_health.core.rule_wizard import (
     incident_rule_sidecar_path,
     studio_extra_rules_folder,
 )
-from shader_health.studio_config import PipelineSettings, StudioConfig
+from pipeline_inspector.studio_config import PipelineSettings, StudioConfig
 
 
 def test_build_incident_rule_sidecar_payload_includes_metadata():

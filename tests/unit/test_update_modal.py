@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 
-from shader_health.integrations.update.github_releases import GitHubReleasesResponse, HttpRequest
-from shader_health.ui.update_modal import (
+from pipeline_inspector.integrations.update.github_releases import (
+    GitHubReleasesResponse,
+    HttpRequest,
+)
+from pipeline_inspector.ui.update_modal import (
     UPDATE_MODAL_CLOSE_BUTTON_OBJECT_NAME,
     UPDATE_MODAL_PROGRESS_BAR_OBJECT_NAME,
     UPDATE_MODAL_SHELL_STATUS,
@@ -17,10 +20,10 @@ from shader_health.ui.update_modal import (
     show_update_modal_shell,
     update_stage_object_name,
 )
-from shader_health.ui.update_progress_dialog import (
+from pipeline_inspector.ui.update_progress_dialog import (
     update_progress_step_description_object_name,
 )
-from shader_health.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
+from pipeline_inspector.ui.update_wizard import UPDATE_WIZARD_STATUS_UP_TO_DATE
 
 
 class FakeWidget:

@@ -1,6 +1,6 @@
-# Contributing to Maya Shader Health Inspector
+# Contributing to Maya Pipeline Inspector
 
-Thank you for your interest in contributing to Maya Shader Health Inspector.
+Thank you for your interest in contributing to Maya Pipeline Inspector.
 
 This project is an open-source, production-oriented Maya material QA framework. Contributions are welcome, but they must preserve the project's core principles: production safety, data-driven validation, explainable results, testable core logic, and clean renderer boundaries.
 
@@ -107,19 +107,19 @@ The core validation engine should operate on plain Python models and JSON-compat
 Maya-dependent code belongs under:
 
 ```text
-src/shader_health/maya/
+src/pipeline_inspector/maya/
 ```
 
 UI code belongs under:
 
 ```text
-src/shader_health/ui/
+src/pipeline_inspector/ui/
 ```
 
 Renderer-specific code belongs under:
 
 ```text
-src/shader_health/adapters/
+src/pipeline_inspector/adapters/
 ```
 
 ### Prefer Data-Driven Rules

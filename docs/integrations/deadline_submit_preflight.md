@@ -1,8 +1,8 @@
 # Deadline 10 integration guide (v0.4)
 
-Studio guide for connecting **Maya Shader Health Inspector** to **Thinkbox Deadline 10 on-prem** via the Web Service REST API. Covers Web Service setup, routing (pool/group), artist GUI workflows, headless preflight, farm eligibility, and CommandScript utility submit.
+Studio guide for connecting **Maya Pipeline Inspector** to **Thinkbox Deadline 10 on-prem** via the Web Service REST API. Covers Web Service setup, routing (pool/group), artist GUI workflows, headless preflight, farm eligibility, and CommandScript utility submit.
 
-**Package:** `shader_health.integrations.deadline`  
+**Package:** `pipeline_inspector.integrations.deadline`  
 **Default Web Service URL:** `http://localhost:8081`  
 **Default validation profile:** `deadline_critical`
 
@@ -22,9 +22,9 @@ Related docs:
 | REST client | `DeadlineClient` | `ping`, `get_job`, `submit_job` |
 | Preflight | `run_deadline_preflight()` | Headless `mayapy` validation gate |
 | Eligibility | `evaluate_farm_submit_eligibility()` | Scene state + validation matrix (#099) |
-| Submit API | `submit_shader_health_validation_job()` | CommandScript / MayaBatch utility jobs (#100) |
+| Submit API | `submit_pipeline_inspector_validation_job()` | CommandScript / MayaBatch utility jobs (#100) |
 | Maya GUI | **Farm** tab (#101) | Connection status, preflight, submit |
-| Shortcuts | Menu + shelf **Shader Health Farm Check** (#102) | Open Farm tab + run preflight |
+| Shortcuts | Menu + shelf **Pipeline Inspector Farm Check** (#102) | Open Farm tab + run preflight |
 
 The example scripts under `examples/deadline/` are thin CLI wrappers around the shared package.
 
@@ -44,11 +44,11 @@ flowchart LR
         SUB[submit_to_farm.py]
         HOOK[Custom_submitter]
     end
-    subgraph core [shader_health.integrations.deadline]
+    subgraph core [pipeline_inspector.integrations.deadline]
         CFG[DeadlineConfig]
         CLI[DeadlineClient]
         ELIG[Eligibility_gate]
-        API[submit_shader_health_validation_job]
+        API[submit_pipeline_inspector_validation_job]
     end
     subgraph farm [Deadline_10_on_prem]
         WS[Web_Service]
@@ -73,7 +73,7 @@ All paths call the same validation pipeline (`validation_pipeline` / headless CL
 
 ## Deadline Web Service setup
 
-Shader Health talks to Deadline through the **standalone Web Service** (`deadlinewebservice`), not directly to workers.
+Pipeline Inspector talks to Deadline through the **standalone Web Service** (`deadlinewebservice`), not directly to workers.
 
 ### Prerequisites
 
@@ -93,7 +93,7 @@ Global Web Service settings live in **Repository Options → Web Service Setting
 
 ### Default port and health check
 
-Thinkbox defaults the unsecured port to **8081**. Shader Health uses the same default in `DeadlineConfig`.
+Thinkbox defaults the unsecured port to **8081**. Pipeline Inspector uses the same default in `DeadlineConfig`.
 
 **Browser smoke test** (legacy landing page):
 
@@ -106,7 +106,7 @@ Expected response: `This is the Deadline web service!`
 **API smoke test** (what the Farm tab uses):
 
 ```python
-from shader_health.integrations.deadline import DeadlineClient, DeadlineConfig
+from pipeline_inspector.integrations.deadline import DeadlineClient, DeadlineConfig
 
 client = DeadlineClient(DeadlineConfig(api_url="http://farm-controller:8081"))
 assert client.ping()  # GET /api/jobs?IdOnly=true → HTTP 200
@@ -115,7 +115,7 @@ assert client.ping()  # GET /api/jobs?IdOnly=true → HTTP 200
 Set the studio default for artists:
 
 ```text
-SHADER_HEALTH_DEADLINE_API_URL=http://farm-controller:8081
+PIPELINE_INSPECTOR_DEADLINE_API_URL=http://farm-controller:8081
 ```
 
 ### Windows namespace reservation
@@ -145,7 +145,7 @@ Thinkbox recommends running the REST API **with authentication enabled** on any 
 
 If your Web Service returns **HTTP 401**, the Farm tab shows **Offline** and submit is blocked until connectivity is fixed. Studios requiring authenticated REST should either:
 
-- place Shader Health clients on an authenticated proxy segment and point `SHADER_HEALTH_DEADLINE_API_URL` at the proxy, or
+- place Pipeline Inspector clients on an authenticated proxy segment and point `PIPELINE_INSPECTOR_DEADLINE_API_URL` at the proxy, or
 - extend `DeadlineClient` transport with studio auth headers (future enhancement).
 
 Document your facility's Web Service URL, TLS port, and credential policy in the studio JSON config (see below); do not commit secrets to scene or repo files.
@@ -156,20 +156,20 @@ Document your facility's Web Service URL, TLS port, and credential policy in the
 
 Studios load defaults from environment variables or a JSON file.
 
-### Environment variables (`SHADER_HEALTH_DEADLINE_*`)
+### Environment variables (`PIPELINE_INSPECTOR_DEADLINE_*`)
 
 | Variable | Purpose |
 | --- | --- |
-| `SHADER_HEALTH_DEADLINE_API_URL` | Web Service base URL (default `http://localhost:8081`) |
-| `SHADER_HEALTH_DEADLINE_TIMEOUT` | HTTP timeout in seconds |
-| `SHADER_HEALTH_DEADLINE_PROFILE_ID` | Packaged profile id (default `deadline_critical`) |
-| `SHADER_HEALTH_DEADLINE_PROFILE_PATH` | Optional explicit profile JSON path |
-| `SHADER_HEALTH_DEADLINE_MAYAPY` | `mayapy` executable for scene validation |
-| `SHADER_HEALTH_DEADLINE_REPO_ROOT` | Working directory for validator subprocess / `StartupDirectory` |
-| `SHADER_HEALTH_DEADLINE_QUEUE` | Fallback routing name written to `JobInfo.Pool` when `pool` is unset |
-| `SHADER_HEALTH_DEADLINE_POOL` | Primary pool name → `JobInfo.Pool` |
-| `SHADER_HEALTH_DEADLINE_GROUP` | Group name → `JobInfo.Group` |
-| `SHADER_HEALTH_DEADLINE_USER_NAME` | Optional `JobInfo.UserName` override for submitted utility jobs |
+| `PIPELINE_INSPECTOR_DEADLINE_API_URL` | Web Service base URL (default `http://localhost:8081`) |
+| `PIPELINE_INSPECTOR_DEADLINE_TIMEOUT` | HTTP timeout in seconds |
+| `PIPELINE_INSPECTOR_DEADLINE_PROFILE_ID` | Packaged profile id (default `deadline_critical`) |
+| `PIPELINE_INSPECTOR_DEADLINE_PROFILE_PATH` | Optional explicit profile JSON path |
+| `PIPELINE_INSPECTOR_DEADLINE_MAYAPY` | `mayapy` executable for scene validation |
+| `PIPELINE_INSPECTOR_DEADLINE_REPO_ROOT` | Working directory for validator subprocess / `StartupDirectory` |
+| `PIPELINE_INSPECTOR_DEADLINE_QUEUE` | Fallback routing name written to `JobInfo.Pool` when `pool` is unset |
+| `PIPELINE_INSPECTOR_DEADLINE_POOL` | Primary pool name → `JobInfo.Pool` |
+| `PIPELINE_INSPECTOR_DEADLINE_GROUP` | Group name → `JobInfo.Group` |
+| `PIPELINE_INSPECTOR_DEADLINE_USER_NAME` | Optional `JobInfo.UserName` override for submitted utility jobs |
 
 ### JSON config example
 
@@ -180,7 +180,7 @@ Deploy per show or site (path is studio-specific):
   "api_url": "http://deadline-web:8081",
   "profile_id": "deadline_critical",
   "mayapy": "C:/Program Files/Autodesk/Maya2026/bin/mayapy.exe",
-  "repo_root": "//farm/share/tools/maya-shader-health-inspector",
+  "repo_root": "//farm/share/tools/maya-pipeline-inspector",
   "pool": "utility",
   "group": "lookdev",
   "user_name": "pipeline_td",
@@ -193,11 +193,11 @@ Load in Python:
 ```python
 from pathlib import Path
 
-from shader_health.integrations.deadline import DeadlineConfig
+from pipeline_inspector.integrations.deadline import DeadlineConfig
 
 config = DeadlineConfig.from_env()
 # or
-config = DeadlineConfig.from_json(Path("/show/config/shader_health/deadline.json"))
+config = DeadlineConfig.from_json(Path("/show/config/pipeline_inspector/deadline.json"))
 profile_path = config.resolved_profile_path()
 ```
 
@@ -205,7 +205,7 @@ profile_path = config.resolved_profile_path()
 
 ## Pool, group, and queue mapping
 
-`submit_shader_health_validation_job()` builds `JobInfo` through `_base_job_info()`:
+`submit_pipeline_inspector_validation_job()` builds `JobInfo` through `_base_job_info()`:
 
 | `DeadlineConfig` field | `JobInfo` key | Notes |
 | --- | --- | --- |
@@ -218,7 +218,7 @@ Example utility job fragment:
 
 ```json
 {
-  "Name": "Shader Health | hero_lighting.ma",
+  "Name": "Pipeline Inspector | hero_lighting.ma",
   "Plugin": "CommandScript",
   "Frames": "0",
   "ChunkSize": 1,
@@ -234,7 +234,7 @@ Map facility policy in the JSON config:
 | --- | --- |
 | Utility validation on lookdev workers | `"pool": "utility"`, `"group": "lookdev"` |
 | Per-show queue name legacy | `"queue": "seq010"` (writes `Pool=seq010` when `pool` omitted) |
-| Attribute jobs to pipeline service account | `"user_name": "shader_health_svc"` |
+| Attribute jobs to pipeline service account | `"user_name": "pipeline_inspector_svc"` |
 
 ---
 
@@ -242,7 +242,7 @@ Map facility policy in the JSON config:
 
 ### Farm tab (#101)
 
-Open **Shader Health Inspector → Farm**:
+Open **Pipeline Inspector → Farm**:
 
 | Step | Action |
 | --- | --- |
@@ -257,8 +257,8 @@ The tab persists last JSON report path and last submitted job id.
 
 | Entrypoint | Behavior |
 | --- | --- |
-| **Shader Health → Shader Health Farm Check** | Opens panel on **Farm** tab and runs preflight |
-| Shelf **Shader Health Farm Check** | Same as menu shortcut |
+| **Pipeline Inspector → Pipeline Inspector Farm Check** | Opens panel on **Farm** tab and runs preflight |
+| Shelf **Pipeline Inspector Farm Check** | Same as menu shortcut |
 
 See [USER_GUIDE.md — Farm Submit](../USER_GUIDE.md#farm-submit) for the artist checklist.
 
@@ -278,7 +278,7 @@ sequenceDiagram
     participant DL as Deadline_render_submit
 
     SUB->>SH: scene_path, report_path, deadline_critical
-    SH->>MY: shader_health validate
+    SH->>MY: pipeline_inspector validate
     MY-->>SH: exit_code, JSON report
     alt exit 0 or publish-only warn
         SH-->>SUB: allowed
@@ -295,9 +295,9 @@ Example CLI:
 ```bash
 mayapy examples/deadline/submit_preflight.py \
   D:/show/seq010/shot020/lighting/shot020_lighting.ma \
-  --report D:/show/seq010/shot020/reports/shader_health_deadline.json \
-  --profile D:/show/config/shader_health/profiles/deadline_critical.json \
-  --repo-root D:/tools/maya-shader-health-inspector \
+  --report D:/show/seq010/shot020/reports/pipeline_inspector_deadline.json \
+  --profile D:/show/config/pipeline_inspector/profiles/deadline_critical.json \
+  --repo-root D:/tools/maya-pipeline-inspector \
   --mayapy "C:/Program Files/Autodesk/Maya2026/bin/mayapy.exe" \
   --renderer vray
 ```
@@ -309,7 +309,7 @@ Use when validation must run on a farm worker (same scene paths as render jobs).
 ```mermaid
 sequenceDiagram
     participant ART as Artist_or_TD
-    participant SH as submit_shader_health_validation_job
+    participant SH as submit_pipeline_inspector_validation_job
     participant WS as Deadline_Web_Service
     participant WRK as Worker
     participant MY as mayapy_on_worker
@@ -326,8 +326,8 @@ Example CLI:
 
 ```bash
 python examples/deadline/submit_to_farm.py D:/show/scene.ma \
-  --report D:/show/reports/shader_health_farm.json \
-  --command-script //farm/share/deadline/shader_health_command.txt \
+  --report D:/show/reports/pipeline_inspector_farm.json \
+  --command-script //farm/share/deadline/pipeline_inspector_command.txt \
   --check-eligibility
 ```
 
@@ -336,7 +336,7 @@ python examples/deadline/submit_to_farm.py D:/show/scene.ma \
 ```python
 from pathlib import Path
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     DeadlineConfig,
     FarmSceneState,
     FarmValidationResult,
@@ -414,7 +414,7 @@ Tune per show in packaged profiles or studio overrides — see [RULE_AUTHORING.m
 Combine validator output with Maya scene readiness before enabling **Submit to Farm**:
 
 ```python
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     FarmSceneState,
     FarmValidationResult,
     evaluate_farm_submit_eligibility,
@@ -445,19 +445,19 @@ Publish-only issues do not block farm submission; surface `eligibility.warnings`
 ```python
 from pathlib import Path
 
-from shader_health.integrations.deadline import (
+from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
     DeadlineConfig,
-    submit_shader_health_validation_job,
+    submit_pipeline_inspector_validation_job,
 )
 
 config = DeadlineConfig.from_env()
 client = DeadlineClient(config)
-result = submit_shader_health_validation_job(
+result = submit_pipeline_inspector_validation_job(
     client=client,
     scene_path=Path("D:/show/shot/scene.ma"),
-    report_path=Path("D:/show/shot/reports/shader_health_farm.json"),
-    command_script_path=Path("//farm/share/deadline/shader_health_command.txt"),
+    report_path=Path("D:/show/shot/reports/pipeline_inspector_farm.json"),
+    command_script_path=Path("//farm/share/deadline/pipeline_inspector_command.txt"),
     config=config,
 )
 print(result.job_id, result.report_path)
@@ -467,7 +467,7 @@ print(result.job_id, result.report_path)
 
 | Mode | Plugin | Worker runs |
 | --- | --- | --- |
-| `command_script` (default) | `CommandScript` | `mayapy -m shader_health validate ...` from aux `.txt` |
+| `command_script` (default) | `CommandScript` | `mayapy -m pipeline_inspector validate ...` from aux `.txt` |
 | `maya_batch` | `MayaBatch` | Opens `SceneFile`, executes `ScriptFile` |
 
 CommandScript REST shape:
@@ -475,7 +475,7 @@ CommandScript REST shape:
 ```json
 {
   "JobInfo": {
-    "Name": "Shader Health | scene.ma",
+    "Name": "Pipeline Inspector | scene.ma",
     "Plugin": "CommandScript",
     "Frames": "0",
     "ChunkSize": 1
@@ -483,7 +483,7 @@ CommandScript REST shape:
   "PluginInfo": {
     "StartupDirectory": "D:/show/shot"
   },
-  "AuxFiles": ["//farm/share/deadline/shader_health_command.txt"],
+  "AuxFiles": ["//farm/share/deadline/pipeline_inspector_command.txt"],
   "IdOnly": true
 }
 ```
@@ -497,11 +497,11 @@ CommandScript REST shape:
 | # | Task |
 | --- | --- |
 | 1 | Run Web Service on a stable host; confirm port **8081** (or studio port) is reachable from Maya workstations |
-| 2 | Deploy `SHADER_HEALTH_DEADLINE_API_URL` (or JSON config) via show environment / `userSetup.py` |
+| 2 | Deploy `PIPELINE_INSPECTOR_DEADLINE_API_URL` (or JSON config) via show environment / `userSetup.py` |
 | 3 | Set `mayapy`, `repo_root`, `pool`/`group` for utility validation jobs |
 | 4 | Place CommandScript aux files on a share visible to the Web Service |
 | 5 | Confirm `deadline_critical` profile matches facility blocking policy |
-| 6 | Train artists: **Farm** tab or **Shader Health Farm Check** shortcut before farm submit |
+| 6 | Train artists: **Farm** tab or **Pipeline Inspector Farm Check** shortcut before farm submit |
 | 7 | Wire custom render submitters to `run_deadline_preflight()` before Deadline render jobs |
 | 8 | Archive JSON reports beside scenes for audit |
 

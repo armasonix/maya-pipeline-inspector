@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     FileDependencySnapshot,
     GraphSnapshot,
     RuleDefinition,
@@ -13,8 +13,8 @@ from shader_health.core import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "texture_resolution.json"
-RULE_ROOT = ROOT / "src" / "shader_health" / "rules"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "texture_resolution.json"
+RULE_ROOT = ROOT / "src" / "pipeline_inspector" / "rules"
 HERO_PROFILE = RULE_ROOT / "profiles" / "asset_class_hero.json"
 PROP_PROFILE = RULE_ROOT / "profiles" / "asset_class_prop.json"
 BACKGROUND_PROFILE = RULE_ROOT / "profiles" / "asset_class_background.json"

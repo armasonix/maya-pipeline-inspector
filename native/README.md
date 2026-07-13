@@ -1,6 +1,6 @@
 # Native Maya plug-in build
 
-Thin C++ bootstrap that registers in Plug-in Manager and calls the existing Python module `shader_health_inspector_bootstrap`. Validation, UI, and rules stay in `src/shader_health/`.
+Thin C++ bootstrap that registers in Plug-in Manager and calls the existing Python module `pipeline_inspector_bootstrap`. Validation, UI, and rules stay in `src/pipeline_inspector/`.
 
 Architecture: [docs/adr/0006-native-mll-plugin-strategy.md](../docs/adr/0006-native-mll-plugin-strategy.md)
 
@@ -43,7 +43,7 @@ Or use the helper script (auto-detects Visual Studio `cmake` and `vcvars64` when
 Output is copied to:
 
 ```text
-maya_module/plug-ins/{year}/shader_health_inspector.mll
+maya_module/plug-ins/{year}/pipeline_inspector.mll
 ```
 
 ## Linux / macOS
@@ -62,18 +62,18 @@ Artifact suffix: `.so` (Linux) or `.bundle` (macOS).
 
 ## Runtime load order
 
-`maya_module/scripts/userSetup.py` calls `shader_health_inspector_bootstrap.plugin_load_candidates()`:
+`maya_module/scripts/userSetup.py` calls `pipeline_inspector_bootstrap.plugin_load_candidates()`:
 
-1. `plug-ins/{year}/shader_health_inspector.mll` when the year-specific binary exists (absolute path load)
-2. `plug-ins/shader_health_inspector.mll` when the Plug-in Manager copy exists
-3. `shader_health_inspector.py` (Python fallback)
-4. `shader_health_inspector_bootstrap.install_ui()` when all plug-in loads fail
+1. `plug-ins/{year}/pipeline_inspector.mll` when the year-specific binary exists (absolute path load)
+2. `plug-ins/pipeline_inspector.mll` when the Plug-in Manager copy exists
+3. `pipeline_inspector.py` (Python fallback)
+4. `pipeline_inspector_bootstrap.install_ui()` when all plug-in loads fail
 
 Use `describe_dual_install()` in Script Editor to inspect detection output. See [docs/MAYA_INSTALL.md](../docs/MAYA_INSTALL.md).
 
 ## Version string
 
-`SHADER_HEALTH_PLUGIN_VERSION` in `native/CMakeLists.txt` should match `version` in `pyproject.toml` at release time.
+`PIPELINE_INSPECTOR_PLUGIN_VERSION` in `native/CMakeLists.txt` should match `version` in `pyproject.toml` at release time.
 
 ## CI note
 

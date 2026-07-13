@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shader_health.core import (
+from pipeline_inspector.core import (
     GraphSnapshot,
     MaterialSnapshot,
     RuleDefinition,
@@ -12,7 +12,7 @@ from shader_health.core import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = ROOT / "src" / "shader_health" / "rules" / "common" / "shader_network_health.json"
+RULE_PATH = ROOT / "src" / "pipeline_inspector" / "rules" / "common" / "shader_network_health.json"
 
 
 def load_shader_network_rule(rule_id: str) -> RuleDefinition:
