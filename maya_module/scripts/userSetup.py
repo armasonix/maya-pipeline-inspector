@@ -1,21 +1,8 @@
 """Maya startup hook for Pipeline Inspector development module."""
 from __future__ import annotations
 
-import os
-from typing import Any
-
 _DEFERRED_FLAG = "_pipeline_inspector_deferred"
 _STARTUP_FLAG = "_pipeline_inspector_startup_done"
-
-
-def _log_bootstrap(bootstrap: Any, *args: object, **kwargs: object) -> None:
-    logger = getattr(bootstrap, "_debug_log", None)
-    if logger is None:
-        return
-    try:
-        logger(*args, **kwargs)
-    except Exception:
-        return
 
 
 def _install_pipeline_inspector_ui() -> None:
@@ -25,6 +12,7 @@ def _install_pipeline_inspector_ui() -> None:
 
     if getattr(__main__, _STARTUP_FLAG, False):
         return
+    setattr(__main__, _STARTUP_FLAG, True)
 
     bootstrap = None
     try:
@@ -32,104 +20,39 @@ def _install_pipeline_inspector_ui() -> None:
         from maya import cmds  # type: ignore[import-not-found]
 
         maya_year = bootstrap.resolve_maya_year(lambda: cmds.about(version=True))
-        diagnostics: dict[str, object] = {"maya_year": maya_year}
-        describe = getattr(bootstrap, "describe_dual_install", None)
-        if callable(describe):
-            diagnostics.update(describe(maya_year))
-        module_root = getattr(bootstrap, "module_root", None)
-        _log_bootstrap(
-            bootstrap,
-            "userSetup.py:_install_pipeline_inspector_ui",
-            "deferred install started",
-            {
-                "MAYA_MODULE_PATH": os.environ.get("MAYA_MODULE_PATH"),
-                "module_root": str(module_root() if callable(module_root) else ""),
-                **diagnostics,
-            },
-            "A",
-        )
+        canonical_path = bootstrap.canonical_plugin_path(maya_year)
 
         try:
             if cmds.pluginInfo(bootstrap.PLUGIN_NAME, query=True, loaded=True):
-                _log_bootstrap(
-                    bootstrap,
-                    "userSetup.py:_install_pipeline_inspector_ui",
-                    "plugin already loaded",
-                    {"plugin_name": bootstrap.PLUGIN_NAME},
-                    "D",
-                )
-                setattr(__main__, _STARTUP_FLAG, True)
+                if canonical_path:
+                    bootstrap.enable_plugin_autoload(canonical_path, cmds)
                 return
-        except Exception as exc:
-            _log_bootstrap(
-                bootstrap,
-                "userSetup.py:_install_pipeline_inspector_ui",
-                "pluginInfo check failed",
-                {"error": str(exc)},
-                "D",
-            )
+        except Exception:
+            pass
 
         load_failures: list[dict[str, str]] = []
         for plugin_file in bootstrap.plugin_load_candidates(maya_year):
             try:
+                if cmds.pluginInfo(bootstrap.PLUGIN_NAME, query=True, loaded=True):
+                    bootstrap.enable_plugin_autoload(canonical_path or plugin_file, cmds)
+                    return
                 cmds.loadPlugin(plugin_file, quiet=True)
-                autoload_set = bootstrap.enable_plugin_autoload(plugin_file, cmds)
-                _log_bootstrap(
-                    bootstrap,
-                    "userSetup.py:_install_pipeline_inspector_ui",
-                    "loadPlugin succeeded",
-                    {"plugin_file": plugin_file, "autoload_set": autoload_set},
-                    "C",
-                )
-                setattr(__main__, _STARTUP_FLAG, True)
+                bootstrap.enable_plugin_autoload(canonical_path or plugin_file, cmds)
                 return
             except Exception as exc:
                 load_failures.append(
                     {"plugin_file": plugin_file, "error": str(exc)},
                 )
                 continue
-        _log_bootstrap(
-            bootstrap,
-            "userSetup.py:_install_pipeline_inspector_ui",
-            "all loadPlugin candidates failed",
-            {"failures": load_failures},
-            "C",
-        )
-    except Exception as exc:
-        if bootstrap is not None:
-            _log_bootstrap(
-                bootstrap,
-                "userSetup.py:_install_pipeline_inspector_ui",
-                "plugin load loop failed",
-                {"error": str(exc)},
-                "B",
-            )
+        _ = load_failures
+    except Exception:
+        pass
 
     try:
         import pipeline_inspector_bootstrap as bootstrap
 
         bootstrap.install_ui()
-        _log_bootstrap(
-            bootstrap,
-            "userSetup.py:_install_pipeline_inspector_ui",
-            "module-only fallback succeeded",
-            {},
-            "E",
-        )
-        setattr(__main__, _STARTUP_FLAG, True)
     except Exception as exc:  # pragma: no cover - Maya startup visibility only.
-        try:
-            import pipeline_inspector_bootstrap as bootstrap
-
-            _log_bootstrap(
-                bootstrap,
-                "userSetup.py:_install_pipeline_inspector_ui",
-                "module-only fallback failed",
-                {"error": str(exc)},
-                "E",
-            )
-        except Exception:
-            pass
         try:
             from maya import cmds  # type: ignore[import-not-found]
 
@@ -140,19 +63,6 @@ def _install_pipeline_inspector_ui() -> None:
 
 try:
     from maya import cmds  # type: ignore[import-not-found]
-
-    try:
-        import pipeline_inspector_bootstrap as bootstrap
-
-        _log_bootstrap(
-            bootstrap,
-            "userSetup.py:module_import",
-            "userSetup imported",
-            {"MAYA_MODULE_PATH": os.environ.get("MAYA_MODULE_PATH")},
-            "A",
-        )
-    except Exception:
-        pass
 
     import __main__
 

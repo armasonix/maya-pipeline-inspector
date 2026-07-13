@@ -1,37 +1,9 @@
 """Maya module bootstrap helpers for Pipeline Inspector."""
 from __future__ import annotations
 
-import json
 import sys
-import time
 from pathlib import Path
 from typing import Any, Callable
-
-
-def _debug_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    hypothesis_id: str,
-    run_id: str = "plugin-visibility",
-) -> None:
-    # region agent log
-    try:
-        payload = {
-            "sessionId": "618f4f",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, default=str) + "\n")
-    except Exception:
-        pass
-    # endregion agent log
 
 
 def resolve_maya_year(version_provider: Callable[[], Any]) -> str | None:
@@ -90,6 +62,12 @@ def python_plugin_name() -> str:
     return "pipeline_inspector.py"
 
 
+def python_plugin_path() -> Path:
+    """Python fallback plug-in kept outside Plug-in Manager scan root."""
+
+    return module_root() / "plug-ins" / "fallback" / python_plugin_name()
+
+
 INSTALL_MODE_NATIVE_YEAR = "native_year"
 INSTALL_MODE_NATIVE_MANAGER = "native_manager"
 INSTALL_MODE_PYTHON = "python"
@@ -103,7 +81,7 @@ def detect_install_mode(maya_year: str | None = None) -> str:
         return INSTALL_MODE_NATIVE_YEAR
     if manager_native_plugin_path().is_file():
         return INSTALL_MODE_NATIVE_MANAGER
-    if (module_root() / "plug-ins" / python_plugin_name()).is_file():
+    if python_plugin_path().is_file():
         return INSTALL_MODE_PYTHON
     return INSTALL_MODE_MODULE_ONLY
 
@@ -118,23 +96,23 @@ def canonical_plugin_path(maya_year: str | None = None) -> str | None:
         year_path = native_plugin_path(maya_year)
         if year_path.is_file():
             return str(year_path)
-    py_path = module_root() / "plug-ins" / python_plugin_name()
+    py_path = python_plugin_path()
     if py_path.is_file():
-        return python_plugin_name()
+        return str(py_path)
     return None
 
 
 def plugin_load_candidates(maya_year: str | None = None) -> tuple[str, ...]:
-    """Return canonical native path first, then .py only as a load fallback."""
+    """Return canonical native path first, then hidden .py only as a load fallback."""
 
     path = canonical_plugin_path(maya_year)
     if not path:
         return ()
     if path.endswith(".py"):
         return (path,)
-    py_name = python_plugin_name()
-    if (module_root() / "plug-ins" / py_name).is_file():
-        return (path, py_name)
+    py_path = python_plugin_path()
+    if py_path.is_file():
+        return (path, str(py_path))
     return (path,)
 
 

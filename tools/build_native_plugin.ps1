@@ -64,9 +64,22 @@ function Invoke-NativeBuildStep {
 $cmake = Resolve-CMakeExecutable
 $vcvars = Resolve-VcVarsBatch
 
+function Read-ProjectVersion {
+    $versionFile = Join-Path $repoRoot "src\pipeline_inspector\version.py"
+    if (-not (Test-Path -LiteralPath $versionFile)) {
+        throw "Missing version file: $versionFile"
+    }
+    $content = Get-Content -LiteralPath $versionFile -Raw
+    if ($content -match '__version__\s*=\s*["'']([^"'']+)["'']') {
+        return $Matches[1]
+    }
+    throw "Could not parse __version__ from $versionFile"
+}
+
+$pluginVersion = Read-ProjectVersion
 $nativeDir = Join-Path $repoRoot "native"
 Invoke-NativeBuildStep -VcVars $vcvars -CMake $cmake -Command (
-    "-S `"$nativeDir`" -B `"$buildDir`" -DMAYA_VERSION=$MayaVersion -DMAYA_DEVKIT_ROOT=`"$devkit`""
+    "-S `"$nativeDir`" -B `"$buildDir`" -DMAYA_VERSION=$MayaVersion -DMAYA_DEVKIT_ROOT=`"$devkit`" -DPIPELINE_INSPECTOR_PLUGIN_VERSION=$pluginVersion"
 )
 Invoke-NativeBuildStep -VcVars $vcvars -CMake $cmake -Command "--build `"$buildDir`" --config Release"
 Invoke-NativeBuildStep -VcVars $vcvars -CMake $cmake -Command "--install `"$buildDir`" --config Release"

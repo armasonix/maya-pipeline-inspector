@@ -13,7 +13,7 @@ if(NOT DEFINED MAYA_VERSION)
   message(FATAL_ERROR "Set -DMAYA_VERSION=2024|2025|2026")
 endif()
 
-set(PIPELINE_INSPECTOR_PLUGIN_VERSION "0.5.0" CACHE STRING "Plug-in version (sync with pyproject.toml)")
+set(PIPELINE_INSPECTOR_PLUGIN_VERSION "0.5.0" CACHE STRING "Plug-in version (sync with pyproject.toml)" FORCE)
 set(PIPELINE_INSPECTOR_PLUGIN_NAME "pipeline_inspector")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
