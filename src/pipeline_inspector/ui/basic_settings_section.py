@@ -250,6 +250,16 @@ def prepare_basic_settings_interactions(
     """Refresh Basic tab controls and ensure live theme preview wiring."""
 
     update_basic_settings_view(view, qt_widgets, user_config)
+
+    if on_preferences_changed is not None:
+        density_combo = find_child(
+            view,
+            qt_widgets.QComboBox,
+            SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
+        )
+        if density_combo is not None:
+            wire_combo_changed(density_combo, on_preferences_changed)
+
     theme_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME)
     if theme_combo is None:
         return

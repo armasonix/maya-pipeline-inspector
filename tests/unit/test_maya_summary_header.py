@@ -13,6 +13,8 @@ class FakeWidget:
         self.size_policy: Optional[tuple[Any, Any]] = None
         self.visible = True
         self.style_sheet = ""
+        self.maximum_height: int | None = None
+        self.minimum_width: int | None = None
 
     def setObjectName(self, object_name: str) -> None:
         self.object_name = object_name
@@ -25,6 +27,12 @@ class FakeWidget:
 
     def setVisible(self, visible: bool) -> None:
         self.visible = visible
+
+    def setMaximumHeight(self, height: int) -> None:
+        self.maximum_height = height
+
+    def setMinimumWidth(self, width: int) -> None:
+        self.minimum_width = width
 
     def setLayout(self, layout: Any) -> None:
         self.layout = layout
@@ -348,11 +356,15 @@ class FakeSplitter(FakeWidget):
         self.widgets: list[Any] = []
         self.stretch_factors: list[tuple[int, int]] = []
         self.orientation: Any = None
+        self.sizes: list[int] = []
         self.children_collapsible: Optional[bool] = None
         self.collapsible: dict[int, bool] = {}
 
     def setOrientation(self, orientation: Any) -> None:
         self.orientation = orientation
+
+    def setSizes(self, sizes: list[int]) -> None:
+        self.sizes = list(sizes)
 
     def addWidget(self, widget: Any) -> None:
         self.widgets.append(widget)
@@ -370,6 +382,7 @@ class FakeSplitter(FakeWidget):
 
 class FakeQt:
     Horizontal = "horizontal"
+    Vertical = "vertical"
     RichText = "rich_text"
     ScrollBarAlwaysOff = "scroll_bar_always_off"
 
@@ -570,7 +583,12 @@ def test_main_widget_contains_tabbed_shell():
 
 
 def test_validate_tab_uses_sticky_chrome_action_bar_and_splitter():
-    widget = main_window.build_main_widget(FakeQtWidgets)
+    from pipeline_inspector.user_config import UserPreferences
+
+    widget = main_window.build_main_widget(
+        FakeQtWidgets,
+        user_config=UserPreferences(ui_density="comfortable"),
+    )
     validate_tab = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME).tabs[0][1]
 
     _find(validate_tab, main_window.VALIDATE_STICKY_CHROME_OBJECT_NAME)
@@ -582,7 +600,7 @@ def test_validate_tab_uses_sticky_chrome_action_bar_and_splitter():
     assert progress.visible is False
     splitter = _find(validate_tab, main_window.VALIDATE_ISSUES_SPLITTER_OBJECT_NAME)
     assert len(splitter.widgets) == 2
-    assert splitter.stretch_factors == [(0, 3), (1, 2)]
+    assert splitter.stretch_factors[-2:] == [(0, 3), (1, 2)]
     assert splitter.children_collapsible is False
     assert splitter.collapsible == {0: False, 1: False}
 

@@ -11,18 +11,10 @@ from pipeline_inspector.runtime_preferences import (
 from pipeline_inspector.ui import main_window
 from pipeline_inspector.ui.settings_widgets import find_child
 from pipeline_inspector.ui.theme_loader import apply_panel_theme
+from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
 from pipeline_inspector.user_config import UserPreferences
 
 _PIPELINE_INSPECTOR_LOGGER = logging.getLogger("pipeline_inspector")
-
-_UI_DENSITY_MARGINS = {
-    "comfortable": (8, 8, 8, 8),
-    "compact": (4, 4, 4, 4),
-}
-_UI_DENSITY_SPACING = {
-    "comfortable": 4,
-    "compact": 2,
-}
 
 
 def summary_header_state_from_user_config(user_config: UserPreferences) -> Any:
@@ -101,31 +93,30 @@ def _widget_layout(widget: Any) -> Any | None:
 
 
 def _apply_ui_density(content: Any, qt_widgets: Any, density: str) -> None:
-    normalized = density if density in _UI_DENSITY_MARGINS else "comfortable"
-    margins = _UI_DENSITY_MARGINS[normalized]
-    spacing = _UI_DENSITY_SPACING[normalized]
+    normalized = normalize_density(density)
+    tokens = density_tokens(normalized)
 
     layout = _widget_layout(content)
     if layout is not None:
         set_margins = getattr(layout, "setContentsMargins", None)
         if set_margins is not None:
-            set_margins(*margins)
+            set_margins(*tokens.content_margins)
         set_spacing = getattr(layout, "setSpacing", None)
         if set_spacing is not None:
-            set_spacing(spacing)
+            set_spacing(tokens.content_spacing)
 
     validate_tab = _validate_tab_widget(content, qt_widgets)
-    if validate_tab is None:
-        return
-    tab_layout = _widget_layout(validate_tab)
-    if tab_layout is None:
-        return
-    set_margins = getattr(tab_layout, "setContentsMargins", None)
-    if set_margins is not None:
-        set_margins(*margins)
-    set_spacing = getattr(tab_layout, "setSpacing", None)
-    if set_spacing is not None:
-        set_spacing(spacing)
+    if validate_tab is not None:
+        tab_layout = _widget_layout(validate_tab)
+        if tab_layout is not None:
+            set_margins = getattr(tab_layout, "setContentsMargins", None)
+            if set_margins is not None:
+                set_margins(*tokens.tab_margins)
+            set_spacing = getattr(tab_layout, "setSpacing", None)
+            if set_spacing is not None:
+                set_spacing(tokens.tab_spacing)
+
+    main_window.apply_density_tokens(content, qt_widgets, tokens)
 
 
 def _validate_tab_widget(content: Any, qt_widgets: Any) -> Any | None:

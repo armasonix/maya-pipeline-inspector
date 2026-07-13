@@ -34,6 +34,11 @@ SETTINGS_GEAR_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsGearButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "pipelineInspectorDocumentationButton"
 REPORT_BUG_BUTTON_OBJECT_NAME = "pipelineInspectorReportBugButton"
 CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "pipelineInspectorCheckForUpdatesButton"
+PANEL_HEADER_OVERFLOW_BUTTON_OBJECT_NAME = "pipelineInspectorPanelHeaderOverflowButton"
+SUMMARY_CONTEXT_ROW_OBJECT_NAME = "pipelineInspectorSummaryContextRow"
+SUMMARY_PROFILE_ROW_OBJECT_NAME = "pipelineInspectorSummaryProfileRow"
+VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME = "pipelineInspectorValidateActionOverflowButton"
+VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME = "pipelineInspectorValidateActionBarSeparator"
 SETTINGS_GEAR_TOOLTIP = "Open settings"
 DOCUMENTATION_BUTTON_TOOLTIP = "Open shader health documentation in your browser."
 REPORT_BUG_BUTTON_TOOLTIP = (
@@ -47,6 +52,7 @@ PANEL_BODY_STACK_OBJECT_NAME = "pipelineInspectorPanelBodyStack"
 MAIN_VIEW_OBJECT_NAME = "pipelineInspectorMainView"
 SETTINGS_VIEW_INDEX = 1
 SUMMARY_HEADER_OBJECT_NAME = "pipelineInspectorSummaryHeader"
+SUMMARY_METRICS_ROW_OBJECT_NAME = "pipelineInspectorSummaryMetricsRow"
 VALIDATE_STICKY_CHROME_OBJECT_NAME = "pipelineInspectorValidateStickyChrome"
 VALIDATE_ACTION_BAR_OBJECT_NAME = "pipelineInspectorValidateActionBar"
 VALIDATE_PRIMARY_ACTIONS_OBJECT_NAME = "pipelineInspectorValidatePrimaryActions"
@@ -410,6 +416,13 @@ def build_panel_header(
     )
     row_layout.addWidget(updates_button)
 
+    overflow_button = _build_panel_header_overflow_button(
+        qt_widgets,
+        navigation_callbacks=navigation_callbacks,
+        secondary_buttons=(docs_button, report_bug_button, updates_button),
+    )
+    row_layout.addWidget(overflow_button)
+
     return row
 
 
@@ -480,7 +493,9 @@ def build_validation_actions(
         )
     )
     layout.addWidget(primary_group)
-    layout.addWidget(_action_bar_separator(qt_widgets))
+    layout.addWidget(
+        _action_bar_separator(qt_widgets, VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME)
+    )
 
     pipeline_group = qt_widgets.QWidget()
     pipeline_group.setObjectName(VALIDATE_PIPELINE_ACTIONS_OBJECT_NAME)
@@ -506,8 +521,23 @@ def build_validation_actions(
         )
     )
     layout.addWidget(pipeline_group)
-    layout.addWidget(_action_bar_separator(qt_widgets))
-    layout.addWidget(_build_triage_action_group(qt_widgets, issue_callbacks))
+    layout.addWidget(
+        _action_bar_separator(
+            qt_widgets,
+            f"{VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME}Pipeline",
+        )
+    )
+    triage_group = _build_triage_action_group(qt_widgets, issue_callbacks)
+    layout.addWidget(triage_group)
+    layout.addWidget(
+        _build_validate_action_overflow_button(
+            qt_widgets,
+            pipeline_group=pipeline_group,
+            triage_group=triage_group,
+            validation_callbacks=validation_callbacks,
+            issue_callbacks=issue_callbacks,
+        )
+    )
     layout.addStretch(1)
     return widget
 
@@ -531,6 +561,7 @@ def build_summary_header(
     layout.setSpacing(2)
 
     metrics_row = qt_widgets.QWidget()
+    metrics_row.setObjectName(SUMMARY_METRICS_ROW_OBJECT_NAME)
     metrics_layout = qt_widgets.QHBoxLayout(metrics_row)
     metrics_layout.setContentsMargins(0, 0, 0, 0)
     metrics_layout.setSpacing(8)
@@ -570,6 +601,7 @@ def build_summary_header(
     layout.addWidget(metrics_row)
 
     context_row = qt_widgets.QWidget()
+    context_row.setObjectName(SUMMARY_CONTEXT_ROW_OBJECT_NAME)
     context_layout = qt_widgets.QHBoxLayout(context_row)
     context_layout.setContentsMargins(0, 0, 0, 0)
     context_layout.setSpacing(8)
@@ -606,6 +638,7 @@ def build_summary_header(
     layout.addWidget(context_row)
 
     profile_row = qt_widgets.QWidget()
+    profile_row.setObjectName(SUMMARY_PROFILE_ROW_OBJECT_NAME)
     profile_layout = qt_widgets.QHBoxLayout(profile_row)
     profile_layout.setContentsMargins(0, 0, 0, 0)
     profile_layout.setSpacing(8)
@@ -1566,28 +1599,30 @@ def _details_separator(qt_widgets: Any) -> Any:
     return separator
 
 
-def _action_bar_separator(qt_widgets: Any) -> Any:
+def _action_bar_separator(
+    qt_widgets: Any,
+    object_name: str = VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME,
+) -> Any:
     separator = qt_widgets.QLabel("|")
-    separator.setObjectName("pipelineInspectorValidateActionSeparator")
+    separator.setObjectName(object_name)
     return separator
 
 
 def _find_child_widget(content: Any, qt_widgets: Any, object_name: str) -> Any:
-    if content is None:
-        return None
-    finder = getattr(content, "findChild", None)
+    from pipeline_inspector.ui.settings_widgets import find_child
+
     widget_class = getattr(qt_widgets, "QWidget", None)
-    if finder is not None and widget_class is not None:
-        found = finder(widget_class, object_name)
-        if found is not None:
-            return found
-    return _find_descendant_by_object_name(content, object_name)
+    if widget_class is None:
+        return None
+    return find_child(content, widget_class, object_name)
 
 
 def _find_descendant_by_object_name(root: Any, object_name: str) -> Any:
-    if getattr(root, "object_name", None) == object_name:
+    from pipeline_inspector.ui.settings_widgets import _widget_children, _widget_object_name
+
+    if _widget_object_name(root) == object_name:
         return root
-    for child in getattr(root, "children", []) or []:
+    for child in _widget_children(root):
         found = _find_descendant_by_object_name(child, object_name)
         if found is not None:
             return found
@@ -1805,6 +1840,342 @@ def _issues_filter_combo(
     if adjust_policy is not None and adjust_to_contents is not None:
         adjust_policy(adjust_to_contents)
     return label_widget, combo
+
+
+def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    """Apply UI density tokens to the panel shell and Validate tab chrome."""
+
+    from pipeline_inspector.ui.ui_density_tokens import UiDensityTokens
+
+    if not isinstance(tokens, UiDensityTokens):
+        return
+
+    _apply_panel_header_density(content, qt_widgets, tokens)
+    _apply_summary_header_density(content, qt_widgets, tokens)
+    _apply_validate_action_bar_density(content, qt_widgets, tokens)
+    _apply_issues_table_density(content, qt_widgets, tokens)
+    _apply_validate_sticky_chrome_spacing(content, qt_widgets, tokens)
+
+
+def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
+    if header is None:
+        return
+
+    title = _find_child_widget(header, qt_widgets, PANEL_HEADER_TITLE_OBJECT_NAME)
+    if title is not None:
+        set_style = getattr(title, "setStyleSheet", None)
+        if set_style is not None:
+            set_style(tokens.panel_title_font_css)
+
+    overflow = _find_child_widget(
+        header,
+        qt_widgets,
+        PANEL_HEADER_OVERFLOW_BUTTON_OBJECT_NAME,
+    )
+    for object_name in (
+        DOCUMENTATION_BUTTON_OBJECT_NAME,
+        REPORT_BUG_BUTTON_OBJECT_NAME,
+        CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME,
+    ):
+        button = _find_child_widget(header, qt_widgets, object_name)
+        if button is None:
+            continue
+        set_visible = getattr(button, "setVisible", None)
+        if set_visible is not None:
+            set_visible(not tokens.panel_header_overflow)
+
+    if overflow is not None:
+        set_visible = getattr(overflow, "setVisible", None)
+        if set_visible is not None:
+            set_visible(tokens.panel_header_overflow)
+
+
+def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    summary = _find_child_widget(content, qt_widgets, SUMMARY_HEADER_OBJECT_NAME)
+    if summary is None:
+        return
+
+    set_style = getattr(summary, "setStyleSheet", None)
+    if set_style is not None:
+        set_style(tokens.summary_style_sheet)
+
+    layout = _widget_layout(summary)
+    if layout is not None:
+        set_spacing = getattr(layout, "setSpacing", None)
+        if set_spacing is not None:
+            set_spacing(tokens.summary_layout_spacing)
+
+    context_row = _find_child_widget(summary, qt_widgets, SUMMARY_CONTEXT_ROW_OBJECT_NAME)
+    if context_row is not None:
+        set_visible = getattr(context_row, "setVisible", None)
+        if set_visible is not None:
+            set_visible(tokens.show_summary_context_row)
+
+    for object_name in (
+        PUBLISH_BLOCK_LABEL_OBJECT_NAME,
+        DEADLINE_BLOCK_LABEL_OBJECT_NAME,
+    ):
+        label = _find_child_widget(summary, qt_widgets, object_name)
+        if label is None:
+            continue
+        set_visible = getattr(label, "setVisible", None)
+        if set_visible is not None:
+            set_visible(tokens.show_publish_deadline_labels)
+
+
+def _apply_validate_action_bar_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    action_bar = _find_child_widget(content, qt_widgets, VALIDATE_ACTION_BAR_OBJECT_NAME)
+    if action_bar is None:
+        return
+
+    for object_name in (
+        VALIDATE_PIPELINE_ACTIONS_OBJECT_NAME,
+        VALIDATE_TRIAGE_ACTIONS_OBJECT_NAME,
+    ):
+        group = _find_child_widget(action_bar, qt_widgets, object_name)
+        if group is None:
+            continue
+        set_visible = getattr(group, "setVisible", None)
+        if set_visible is not None:
+            show_group = (
+                tokens.show_pipeline_actions
+                if object_name == VALIDATE_PIPELINE_ACTIONS_OBJECT_NAME
+                else tokens.show_triage_actions
+            )
+            set_visible(show_group)
+
+    for child in _walk_widget_tree(action_bar):
+        from pipeline_inspector.ui.settings_widgets import _widget_object_name
+
+        object_name = _widget_object_name(child)
+        if not object_name.startswith(VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME):
+            continue
+        set_visible = getattr(child, "setVisible", None)
+        if set_visible is not None:
+            set_visible(tokens.show_action_bar_separators)
+
+    overflow = _find_child_widget(
+        action_bar,
+        qt_widgets,
+        VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME,
+    )
+    if overflow is not None:
+        set_visible = getattr(overflow, "setVisible", None)
+        if set_visible is not None:
+            set_visible(tokens.validate_action_overflow)
+
+
+def _apply_issues_table_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    table = _find_child_widget(content, qt_widgets, ISSUES_TABLE_OBJECT_NAME)
+    if table is None:
+        return
+
+    column_count = getattr(table, "columnCount", None)
+    columns = int(column_count()) if callable(column_count) else 0
+    for column_index in range(columns):
+        set_hidden = getattr(table, "setColumnHidden", None)
+        if set_hidden is None:
+            continue
+        set_hidden(column_index, column_index in tokens.hidden_issue_columns)
+
+    vertical_header = getattr(table, "verticalHeader", lambda: None)()
+    if vertical_header is not None:
+        set_default_section_size = getattr(vertical_header, "setDefaultSectionSize", None)
+        if set_default_section_size is not None:
+            set_default_section_size(tokens.table_row_height)
+
+
+def _apply_validate_sticky_chrome_spacing(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    sticky = _find_child_widget(content, qt_widgets, VALIDATE_STICKY_CHROME_OBJECT_NAME)
+    if sticky is None:
+        return
+    layout = _widget_layout(sticky)
+    if layout is None:
+        return
+    set_spacing = getattr(layout, "setSpacing", None)
+    if set_spacing is not None:
+        set_spacing(tokens.sticky_chrome_spacing)
+
+
+def _widget_layout(widget: Any) -> Any | None:
+    layout_attr = getattr(widget, "layout", None)
+    if layout_attr is None:
+        return None
+    if callable(layout_attr):
+        return layout_attr()
+    return layout_attr
+
+
+_OVERFLOW_MENU_STYLE_SHEET = (
+    "QMenu { background-color: #2b2b2b; color: #e8e8e8; border: 1px solid #555555; }"
+    "QMenu::item { padding: 6px 28px; background-color: transparent; }"
+    "QMenu::item:selected { background-color: #3d6db8; color: #ffffff; }"
+    "QMenu::item:disabled { color: #777777; }"
+)
+
+
+def _configure_overflow_menu(menu: Any) -> None:
+    set_style = getattr(menu, "setStyleSheet", None)
+    if set_style is not None:
+        set_style(_OVERFLOW_MENU_STYLE_SHEET)
+
+
+def _connect_menu_action(action: Any, callback: Optional[Callable[[], None]]) -> None:
+    if callback is None:
+        set_enabled = getattr(action, "setEnabled", None)
+        if set_enabled is not None:
+            set_enabled(False)
+        return
+
+    set_enabled = getattr(action, "setEnabled", None)
+    if set_enabled is not None:
+        set_enabled(True)
+
+    def _invoke_action(*_args: Any) -> None:
+        callback()
+
+    for signal_name in ("triggered", "activated"):
+        signal = getattr(action, signal_name, None)
+        connect = getattr(signal, "connect", None)
+        if connect is not None:
+            connect(_invoke_action)
+            return
+
+
+def _build_overflow_menu_button(
+    qt_widgets: Any,
+    *,
+    label: str,
+    object_name: str,
+    tooltip: str,
+    actions: Sequence[tuple[str, Optional[Callable[[], None]]]],
+) -> Any:
+    menu_class = getattr(qt_widgets, "QMenu", None)
+    tool_button_class = getattr(qt_widgets, "QToolButton", None)
+    if menu_class is None:
+        button = qt_widgets.QPushButton(label)
+        button.setObjectName(object_name)
+        return button
+
+    button = tool_button_class() if tool_button_class is not None else qt_widgets.QPushButton(label)
+
+    button.setObjectName(object_name)
+    set_text = getattr(button, "setText", None)
+    if set_text is not None:
+        set_text(label)
+    set_tooltip = getattr(button, "setToolTip", None)
+    if set_tooltip is not None:
+        set_tooltip(tooltip)
+    set_visible = getattr(button, "setVisible", None)
+    if set_visible is not None:
+        set_visible(False)
+
+    menu = menu_class(button)
+    _configure_overflow_menu(menu)
+    for action_label, callback in actions:
+        add_action = getattr(menu, "addAction", None)
+        if add_action is None:
+            continue
+        action = add_action(action_label)
+        _connect_menu_action(action, callback)
+
+    if tool_button_class is not None:
+        instant_popup = getattr(tool_button_class, "InstantPopup", None)
+        menu_button_popup = getattr(tool_button_class, "MenuButtonPopup", None)
+        set_popup_mode = getattr(button, "setPopupMode", None)
+        if set_popup_mode is not None and instant_popup is not None:
+            set_popup_mode(instant_popup)
+        elif set_popup_mode is not None and menu_button_popup is not None:
+            set_popup_mode(menu_button_popup)
+        set_menu = getattr(button, "setMenu", None)
+        if set_menu is not None:
+            set_menu(menu)
+            button.menu = menu
+            return button
+
+    clicked = getattr(button, "clicked", None)
+    connect = getattr(clicked, "connect", None)
+    if connect is not None:
+        exec_fn = getattr(menu, "exec_", None)
+        map_to_global = getattr(button, "mapToGlobal", None)
+
+        def _show_menu() -> None:
+            if exec_fn is None or map_to_global is None:
+                return
+            try:
+                from pipeline_inspector.ui.qt import load_qt_core
+
+                qt_core = load_qt_core()
+                point = qt_core.QPoint(0, int(getattr(button, "height", lambda: 24)() or 24))
+                exec_fn(map_to_global(point))
+            except RuntimeError:
+                exec_fn()
+
+        connect(_show_menu)
+
+    button.menu = menu
+    return button
+
+
+def _build_panel_header_overflow_button(
+    qt_widgets: Any,
+    *,
+    navigation_callbacks: PanelNavigationCallbacks,
+    secondary_buttons: Sequence[Any],
+) -> Any:
+    _ = secondary_buttons
+    return _build_overflow_menu_button(
+        qt_widgets,
+        label="\u22ee",
+        object_name=PANEL_HEADER_OVERFLOW_BUTTON_OBJECT_NAME,
+        tooltip="More panel actions",
+        actions=(
+            ("Documentation", navigation_callbacks.on_open_documentation),
+            ("Report Plugin Bug", navigation_callbacks.on_report_bug),
+            ("Check for Updates", navigation_callbacks.on_check_for_updates),
+        ),
+    )
+
+
+def _build_validate_action_overflow_button(
+    qt_widgets: Any,
+    *,
+    pipeline_group: Any,
+    triage_group: Any,
+    validation_callbacks: ValidationActionCallbacks,
+    issue_callbacks: IssueDetailsActionCallbacks,
+) -> Any:
+    _ = (pipeline_group, triage_group)
+    return _build_overflow_menu_button(
+        qt_widgets,
+        label="More",
+        object_name=VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME,
+        tooltip="Pipeline and issue triage actions",
+        actions=(
+            ("Publish Preflight", validation_callbacks.on_publish_preflight),
+            ("Manifest Gate", validation_callbacks.on_manifest_gate),
+            ("Select Node", issue_callbacks.on_select_node),
+            ("Open in HyperShade", issue_callbacks.on_open_in_hypershade),
+            ("Copy Path", issue_callbacks.on_copy_path),
+            ("Reveal File", issue_callbacks.on_reveal_file),
+            ("Create Rule Draft", issue_callbacks.on_create_rule_draft),
+        ),
+    )
+
+
+def _walk_widget_tree(root: Any) -> list[Any]:
+    """Return widgets in a depth-first traversal."""
+
+    from pipeline_inspector.ui.settings_widgets import _widget_children
+
+    discovered: list[Any] = []
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        discovered.append(current)
+        stack.extend(_widget_children(current))
+    return discovered
 
 
 def _compact_button(
