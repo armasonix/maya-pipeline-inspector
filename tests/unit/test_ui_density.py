@@ -235,6 +235,27 @@ def test_apply_ui_density_compact_omits_make_waive_filter_button_and_adds_it_to_
     assert any(action.label == "Make Waive" for action in overflow.menu.actions)
 
 
+def test_apply_ui_density_comfortable_tightens_panel_header_gaps():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+    tokens = density_tokens("comfortable")
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="comfortable"),
+    )
+
+    header = _find(widget, main_window.PANEL_HEADER_OBJECT_NAME)
+    tabs = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME)
+
+    assert widget.layout.margins == (8, 2, 8, 8)
+    assert widget.layout.spacing == 2
+    assert header.maximum_height == tokens.panel_header_max_height
+    assert tokens.panel_header_chrome_stylesheet in header.style_sheet
+    assert tokens.main_tab_chrome_stylesheet in tabs.style_sheet
+    assert tabs.document_mode is True
+
+
 def test_apply_ui_density_comfortable_restores_horizontal_issues_pane():
     widget = main_window.build_main_widget(DensityFakeQtWidgets)
 

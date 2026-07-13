@@ -337,10 +337,17 @@ class FakeTabWidget(FakeWidget):
     def __init__(self) -> None:
         super().__init__()
         self.tabs: list[tuple[str, FakeWidget]] = []
+        self.document_mode = False
 
     def addTab(self, widget: FakeWidget, title: str) -> None:
         self.tabs.append((title, widget))
         self.children.append(widget)
+
+    def setDocumentMode(self, enabled: bool) -> None:
+        self.document_mode = enabled
+
+    def documentMode(self) -> bool:
+        return self.document_mode
 
 
 class FakeStackedWidget(FakeWidget):

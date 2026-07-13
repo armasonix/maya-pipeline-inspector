@@ -65,17 +65,49 @@ class UiDensityTokens:
     metrics_row_stretch: bool
     profile_row_stretch: bool
     panel_max_width: int | None
+    panel_header_max_height: int | None
+    panel_header_chrome_stylesheet: str
+    main_tab_chrome_stylesheet: str
     issues_pane_vertical: bool
     issues_pane_sizes: tuple[int, int] | None
 
 
+_COMFORTABLE_HEADER_CHROME_STYLESHEET = """
+QWidget#pipelineInspectorPanelHeader {
+    margin: 0px;
+    padding: 2px 0px;
+}
+QWidget#pipelineInspectorPanelHeader QLabel {
+    margin: 0px;
+    padding: 0px;
+}
+QWidget#pipelineInspectorPanelHeader QPushButton {
+    padding: 1px 6px;
+    min-height: 14px;
+    max-height: 20px;
+}
+""".strip()
+
+_COMFORTABLE_MAIN_TAB_CHROME_STYLESHEET = """
+QTabWidget::pane {
+    top: -1px;
+    padding: 0px;
+    margin: 0px;
+}
+QTabBar::tab {
+    padding: 2px 8px;
+    margin: 0px;
+    min-height: 0px;
+}
+""".strip()
+
 _COMFORTABLE_TOKENS = UiDensityTokens(
-    content_margins=(8, 8, 8, 8),
-    content_spacing=4,
+    content_margins=(8, 2, 8, 8),
+    content_spacing=2,
     tab_margins=(8, 8, 8, 8),
     tab_spacing=6,
     sticky_chrome_spacing=4,
-    panel_title_font_css="font-size: 14pt; font-weight: bold;",
+    panel_title_font_css="font-size: 13pt; font-weight: bold; margin: 0px; padding: 0px;",
     summary_style_sheet="",
     summary_visible_rows=3,
     summary_row_height=26,
@@ -99,6 +131,9 @@ _COMFORTABLE_TOKENS = UiDensityTokens(
     metrics_row_stretch=True,
     profile_row_stretch=True,
     panel_max_width=None,
+    panel_header_max_height=26,
+    panel_header_chrome_stylesheet=_COMFORTABLE_HEADER_CHROME_STYLESHEET,
+    main_tab_chrome_stylesheet=_COMFORTABLE_MAIN_TAB_CHROME_STYLESHEET,
     issues_pane_vertical=False,
     issues_pane_sizes=None,
 )
@@ -133,6 +168,9 @@ _COMPACT_TOKENS = UiDensityTokens(
     metrics_row_stretch=False,
     profile_row_stretch=False,
     panel_max_width=COMPACT_PANEL_MAX_WIDTH,
+    panel_header_max_height=None,
+    panel_header_chrome_stylesheet="",
+    main_tab_chrome_stylesheet="",
     issues_pane_vertical=True,
     issues_pane_sizes=(180, 120),
 )

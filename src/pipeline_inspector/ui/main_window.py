@@ -1893,6 +1893,7 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
         return
 
     _apply_panel_header_density(content, qt_widgets, tokens)
+    _apply_main_tab_chrome_density(content, qt_widgets, tokens)
     _apply_summary_header_density(content, qt_widgets, tokens)
     _apply_validate_action_bar_density(content, qt_widgets, tokens)
     _apply_issues_table_density(content, qt_widgets, tokens)
@@ -1933,6 +1934,147 @@ def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> N
         set_visible = getattr(overflow, "setVisible", None)
         if set_visible is not None:
             set_visible(tokens.panel_header_overflow)
+
+    header_layout = _widget_layout(header)
+    if header_layout is not None:
+        set_margins = getattr(header_layout, "setContentsMargins", None)
+        if set_margins is not None:
+            set_margins(0, 0, 0, 0)
+
+    if tokens.panel_header_max_height is not None:
+        set_max_height = getattr(header, "setMaximumHeight", None)
+        if set_max_height is not None:
+            set_max_height(tokens.panel_header_max_height)
+        size_policy = getattr(qt_widgets, "QSizePolicy", None)
+        set_policy = getattr(header, "setSizePolicy", None)
+        if size_policy is not None and set_policy is not None:
+            preferred = getattr(size_policy, "Preferred", None)
+            fixed = getattr(size_policy, "Fixed", None)
+            if preferred is not None and fixed is not None:
+                set_policy(preferred, fixed)
+    else:
+        set_max_height = getattr(header, "setMaximumHeight", None)
+        if set_max_height is not None:
+            set_max_height(_QT_WIDGETSIZE_MAX)
+
+    set_style = getattr(header, "setStyleSheet", None)
+    if set_style is not None:
+        set_style(tokens.panel_header_chrome_stylesheet)
+
+    gear_button = _find_child_widget(header, qt_widgets, SETTINGS_GEAR_BUTTON_OBJECT_NAME)
+    if gear_button is not None and tokens.panel_header_max_height is not None:
+        set_fixed_height = getattr(gear_button, "setFixedHeight", None)
+        if set_fixed_height is not None:
+            set_fixed_height(tokens.panel_header_max_height)
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        content_layout = _widget_layout(content)
+        content_margins = getattr(content_layout, "getContentsMargins", None)
+        margins = None
+        if callable(content_margins):
+            margins = list(content_margins())
+        elif content_layout is not None:
+            margins = getattr(content_layout, "margins", None)
+        content_spacing = None
+        if content_layout is not None:
+            spacing_fn = getattr(content_layout, "spacing", None)
+            if callable(spacing_fn):
+                content_spacing = int(spacing_fn())
+            else:
+                content_spacing = getattr(content_layout, "spacing", None)
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_panel_header_density",
+                        "message": "applied panel header density",
+                        "data": {
+                            "content_margins": margins,
+                            "content_spacing": content_spacing,
+                            "panel_header_overflow": tokens.panel_header_overflow,
+                            "panel_header_max_height": tokens.panel_header_max_height,
+                            "header_chrome_applied": bool(tokens.panel_header_chrome_stylesheet),
+                        },
+                        "hypothesisId": "comfortable-header-gap",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "comfortable-header-inset",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
+
+
+def _apply_main_tab_chrome_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    """Tighten the main tab bar against the panel header in comfortable density."""
+
+    tabs = _find_child_widget(content, qt_widgets, TAB_WIDGET_OBJECT_NAME)
+    if tabs is None:
+        return
+
+    set_document_mode = getattr(tabs, "setDocumentMode", None)
+    if tokens.main_tab_chrome_stylesheet and set_document_mode is not None:
+        set_document_mode(True)
+    elif set_document_mode is not None:
+        set_document_mode(False)
+
+    set_style = getattr(tabs, "setStyleSheet", None)
+    if set_style is not None:
+        set_style(tokens.main_tab_chrome_stylesheet)
+
+    tab_bar = getattr(tabs, "tabBar", None)
+    if tab_bar is not None and tokens.main_tab_chrome_stylesheet:
+        tab_bar_widget = tab_bar()
+        tab_bar_layout = _widget_layout(tab_bar_widget)
+        if tab_bar_layout is not None:
+            set_margins = getattr(tab_bar_layout, "setContentsMargins", None)
+            if set_margins is not None:
+                set_margins(0, 0, 0, 0)
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        document_mode = None
+        if set_document_mode is not None:
+            is_document_mode = getattr(tabs, "documentMode", None)
+            if callable(is_document_mode):
+                document_mode = bool(is_document_mode())
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_main_tab_chrome_density",
+                        "message": "applied main tab chrome density",
+                        "data": {
+                            "tab_chrome_applied": bool(tokens.main_tab_chrome_stylesheet),
+                            "document_mode": document_mode,
+                        },
+                        "hypothesisId": "tab-bar-gap",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "comfortable-header-inset",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
 
 
 def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
