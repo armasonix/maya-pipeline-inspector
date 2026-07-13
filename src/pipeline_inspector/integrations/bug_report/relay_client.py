@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pipeline_inspector.integrations.bug_report.config import BugReportRelayConfig
+from pipeline_inspector.integrations.bug_report.config import (
+    BugReportRelayConfig,
+    effective_bug_report_relay_url,
+)
 from pipeline_inspector.integrations.bug_report.payload import BugReportPayload
 from pipeline_inspector.integrations.bug_report.throttle import (
     RATE_LIMITED_SKIPPED_REASON,
@@ -81,9 +84,9 @@ class BugReportRelayClient:
     ) -> BugReportRelayResult:
         """Submit a bug report payload to the configured relay URL."""
 
-        relay_url = self._config.relay_url.strip()
+        relay_url = effective_bug_report_relay_url(self._config.relay_url)
         api_key = self._config.api_key.strip()
-        if not relay_url or not api_key:
+        if not relay_url:
             return BugReportRelayResult(
                 submitted=False,
                 skipped_reason="incomplete_config",
@@ -107,15 +110,17 @@ class BugReportRelayClient:
                 else None
             ),
         )
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": content_type,
+        }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         request = HttpRequest(
             method="POST",
             url=relay_url,
             body=body,
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": content_type,
-            },
+            headers=headers,
         )
         response = self._transport(request, self._config.timeout_seconds)
         issue_url = parse_issue_url(response)

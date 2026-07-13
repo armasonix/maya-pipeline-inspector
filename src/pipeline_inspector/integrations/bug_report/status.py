@@ -25,7 +25,7 @@ def format_bug_report_failure_status(result: BugReportRelayResult) -> str:
     if result.skipped_reason == "incomplete_config":
         return (
             "Plugin bug report relay is not configured. "
-            "Ask your TD to set relay URL and API key in Settings → Bug Report."
+            "Enable Bug Report in Settings or ask your TD to set a studio relay URL."
         )
     if result.skipped_reason == "rate_limited":
         if result.error_message:

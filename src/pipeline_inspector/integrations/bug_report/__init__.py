@@ -1,8 +1,11 @@
 """Studio bug report relay integration for Pipeline Inspector."""
 
 from pipeline_inspector.integrations.bug_report.config import (
+    DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
     DEFAULT_TIMEOUT_SECONDS,
     BugReportRelayConfig,
+    effective_bug_report_relay_url,
+    is_public_bug_report_relay_url,
 )
 from pipeline_inspector.integrations.bug_report.payload import (
     BUG_REPORT_PAYLOAD_SCHEMA_VERSION,
@@ -44,7 +47,10 @@ __all__ = [
     "BugReportRelayConfig",
     "BugReportRelayResult",
     "BugReportThrottleDecision",
+    "DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL",
     "DEFAULT_TIMEOUT_SECONDS",
+    "effective_bug_report_relay_url",
+    "is_public_bug_report_relay_url",
     "HttpRequest",
     "HttpTransport",
     "RATE_LIMITED_SKIPPED_REASON",

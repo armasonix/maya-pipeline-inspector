@@ -4,9 +4,25 @@ Pipeline Inspector ships a **client-only** bug report path for **plugin defects*
 
 This is **not** a general pipeline bug tracker for scene shading or asset issues. It is specifically: *something is wrong with Pipeline Inspector → report to the people who ship the plugin*.
 
-Each studio deploys an **HTTPS relay** that accepts submissions from Maya, creates a GitHub Issue in the plugin repository, optionally emails maintainers, and returns the issue URL to the panel.
+## Public maintainer relay (default)
 
-The open-source plugin never stores a GitHub PAT on artist workstations. Relay credentials (`relay_url`, `api_key`) live in `pipeline_inspector_studio.json` and are managed by pipeline TDs.
+The open-source plugin ships a **default public HTTPS relay** for private-repo installations:
+
+| Item | Value |
+| --- | --- |
+| Default `relay_url` | `https://maya-pipeline-inspector-bug-report.armasonix.workers.dev` |
+| `api_key` | **Optional** for the public relay (omit `Authorization` header) |
+| Enablement | Set `bug_report.enabled: true` in studio config (or enable in Settings → Bug Report) |
+
+When `relay_url` is empty in `pipeline_inspector_studio.json`, the Maya client resolves the shipped public URL automatically (`integrations/bug_report/config.py`).
+
+Studios may still override `relay_url` and `api_key` for a **private studio relay** (same HTTP contract below).
+
+## Studio private relay (override)
+
+Each studio may deploy a **private HTTPS relay** that accepts submissions from Maya, creates a GitHub Issue in the plugin repository, optionally emails maintainers, and returns the issue URL to the panel.
+
+The open-source plugin never stores a GitHub PAT on artist workstations. Private relay credentials (`relay_url`, `api_key`) live in `pipeline_inspector_studio.json` and are managed by pipeline TDs.
 
 See [ADR 0007](../adr/0007-settings-and-connectors-architecture.md) for the security checklist and Settings architecture.
 
@@ -41,12 +57,12 @@ Client-side throttling mirrors `max_reports_per_day` per `{machine_id}:{os_user}
 | Field | Purpose |
 | --- | --- |
 | `enabled` | Master toggle for bug report submissions |
-| `relay_url` | Full HTTPS URL of the studio relay `POST` endpoint |
-| `api_key` | Shared secret sent as `Authorization: Bearer` (or `X-Shader-Health-Key`) |
+| `relay_url` | Full HTTPS URL of the relay `POST` endpoint; empty uses the shipped public default |
+| `api_key` | Shared secret sent as `Authorization: Bearer` (optional for the public relay) |
 | `allow_screenshot` | When `false`, the Maya client omits the screenshot part even if captured |
 | `max_reports_per_day` | Daily cap per `{machine_id}:{os_user}`; enforced client-side and on the relay |
 
-Bug Report stays **disabled** until `relay_url` and `api_key` are set. Store secrets in the studio config file on a controlled network share — not in git. See [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md).
+Bug Report stays **disabled** until `enabled` is `true`. The public relay works with only `enabled: true`; studio private relays typically set both `relay_url` and `api_key`. Store private secrets in the studio config file on a controlled network share — not in git. See [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md).
 
 ## HTTP contract (plugin client)
 
@@ -65,11 +81,13 @@ The shipped client (`BugReportRelayClient.submit`) implements this contract toda
 
 | Header | Required | Value |
 | --- | --- | --- |
-| `Authorization` | Yes | `Bearer <api_key>` |
+| `Authorization` | No* | `Bearer <api_key>` when `api_key` is configured |
 | `Accept` | Yes | `application/json` |
 | `Content-Type` | Yes | `multipart/form-data; boundary=...` |
 
-Alternative auth accepted by relay implementers: `X-Shader-Health-Key: <api_key>` (document which header your relay uses; the plugin sends `Authorization` only).
+Alternative auth accepted by relay implementers: `X-Shader-Health-Key: <api_key>` (document which header your relay uses; the plugin sends `Authorization` only when an API key is configured).
+
+\* Public maintainer relay omits `Authorization` when no studio API key is configured.
 
 **Multipart body**
 
@@ -483,3 +501,78 @@ Plugin unit tests mock HTTP transport — no live relay or GitHub required:
 - `tests/unit/test_bug_report_throttle.py`
 
 Relay implementers should add integration tests against a staging GitHub repo and verify 401, 413, 429, and success paths independently of Maya.
+
+## Cloudflare Worker deploy guide (maintainer)
+
+The repository ships a reference public relay at `relay/bug-report-worker/` for the private `armasonix/maya-pipeline-inspector` GitHub repo.
+
+### Prerequisites
+
+- Cloudflare account with Workers and KV enabled
+- GitHub fine-grained PAT or classic token with `issues:write` on `armasonix/maya-pipeline-inspector`
+- Node.js 20+ and `npm` for Wrangler
+
+### 1. Create KV namespace
+
+```bash
+cd relay/bug-report-worker
+npm install
+npx wrangler kv namespace create BUG_REPORT_RATE_LIMIT
+```
+
+Copy the returned namespace `id` into `wrangler.toml` (`[[kv_namespaces]]` → `id`).
+
+### 2. Configure secrets
+
+```bash
+npx wrangler secret put GITHUB_TOKEN
+# Optional private relay mode (omit for public keyless relay):
+npx wrangler secret put RELAY_API_KEY
+```
+
+### 3. Deploy
+
+```bash
+npm run deploy
+```
+
+Wrangler prints the worker URL (for example `https://maya-pipeline-inspector-bug-report.<account>.workers.dev`). Update `DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL` in `src/pipeline_inspector/integrations/bug_report/config.py` when the production hostname differs.
+
+### Worker behavior
+
+| Control | Implementation |
+| --- | --- |
+| Transport | HTTPS only (Cloudflare edge) |
+| Authentication | When `RELAY_API_KEY` secret is set, requires `Authorization: Bearer` or `X-Shader-Health-Key`; otherwise public keyless mode |
+| Payload validation | `schema_version` 1.0, required fields, length caps |
+| Rate limiting | KV counter per `{machine_id}:{os_user}:{utc_day}`; returns HTTP 429 |
+| Screenshot | JPEG/PNG magic check; 2 MB cap; noted in issue body (binary upload deferred) |
+| Upstream | `POST /repos/{owner}/{repo}/issues` with labels `bug`, `user-report` |
+
+### Minimal studio config for public relay
+
+```json
+{
+  "bug_report": {
+    "enabled": true,
+    "relay_url": "",
+    "api_key": "",
+    "allow_screenshot": true,
+    "max_reports_per_day": 5
+  }
+}
+```
+
+### Private studio override example
+
+```json
+{
+  "bug_report": {
+    "enabled": true,
+    "relay_url": "https://pipeline.studio.internal/shader-health/bug-report",
+    "api_key": "rotatable-studio-secret",
+    "allow_screenshot": true,
+    "max_reports_per_day": 5
+  }
+}
+```

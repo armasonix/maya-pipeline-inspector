@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pipeline_inspector.integrations.bug_report.config import BugReportRelayConfig
+from pipeline_inspector.integrations.bug_report.config import (
+    DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
+    BugReportRelayConfig,
+    effective_bug_report_relay_url,
+    is_public_bug_report_relay_url,
+)
 from pipeline_inspector.integrations.bug_report.throttle import (
     RATE_LIMITED_SKIPPED_REASON,
     evaluate_bug_report_throttle,
@@ -19,6 +24,26 @@ def _config(*, max_reports_per_day: int = 2) -> BugReportRelayConfig:
         api_key="studio-secret",
         max_reports_per_day=max_reports_per_day,
     )
+
+
+def test_evaluate_bug_report_throttle_allows_keyless_public_relay_config(tmp_path: Path):
+    state_path = tmp_path / "bug_report_throttle.json"
+    config = BugReportRelayConfig(
+        relay_url=DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
+        api_key="",
+        max_reports_per_day=2,
+    )
+
+    decision = evaluate_bug_report_throttle(
+        config,
+        machine_id="workstation-01",
+        os_user="artist",
+        state_path=state_path,
+    )
+
+    assert decision.allowed is True
+    assert effective_bug_report_relay_url("") == DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
+    assert is_public_bug_report_relay_url(DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL) is True
 
 
 def test_evaluate_bug_report_throttle_allows_submission_under_daily_limit(tmp_path: Path):

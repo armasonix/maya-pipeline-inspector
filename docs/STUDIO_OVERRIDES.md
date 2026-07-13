@@ -321,7 +321,7 @@ Used for explicit tracker actions from the panel (not automatic validation fan-o
 | `bug_report` | HTTPS relay for **plugin** defect reports | [bug_report_relay.md](integrations/bug_report_relay.md) |
 | `updates` | Studio policy for **Check for Updates** (`allow_check`, optional `pinned_version`) | [auto_update.md](integrations/auto_update.md) |
 
-Bug report stays disabled until both `relay_url` and `api_key` are set. Updates policy is studio-controlled; per-user check-on-startup preference lives in `user.json`.
+Bug report stays enabled with the shipped public relay when `bug_report.enabled` is true; `api_key` is optional for the public endpoint. Studio private relays still use `relay_url` + `api_key`. Updates policy is studio-controlled; per-user check-on-startup preference lives in `user.json`.
 
 ## What studios typically customize
 

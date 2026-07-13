@@ -5,6 +5,28 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL = (
+    "https://maya-pipeline-inspector-bug-report.armasonix.workers.dev"
+)
+
+
+def effective_bug_report_relay_url(relay_url: str) -> str:
+    """Return the configured relay URL or the shipped public default."""
+
+    normalized = relay_url.strip()
+    if normalized:
+        return normalized
+    return DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
+
+
+def is_public_bug_report_relay_url(relay_url: str) -> bool:
+    """Return True when the relay URL targets the shipped public worker."""
+
+    return (
+        effective_bug_report_relay_url(relay_url).rstrip("/")
+        == DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL.rstrip("/")
+    )
+
 
 @dataclass(frozen=True)
 class BugReportRelayConfig:
