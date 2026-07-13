@@ -1,6 +1,7 @@
 """Maya Pipeline Inspector panel content."""
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -172,6 +173,7 @@ SEVERITY_COUNT_SPECS = (
     (WARNING_COUNT_LABEL_OBJECT_NAME, "warning", "Warning"),
     (INFO_COUNT_LABEL_OBJECT_NAME, "info", "Info"),
 )
+_SEVERITY_COUNTS_ATTR = "_pipeline_inspector_severity_counts"
 _FULL_EXPORT_BUTTON_LABELS = {
     EXPORT_JSON_BUTTON_OBJECT_NAME: "Export JSON Report",
     EXPORT_HTML_BUTTON_OBJECT_NAME: "Export HTML Report",
@@ -1038,6 +1040,7 @@ def update_severity_count_indicators(
         "warning": warning_count,
         "info": info_count,
     }
+    setattr(content, _SEVERITY_COUNTS_ATTR, dict(counts))
     for object_name, severity_key, label in SEVERITY_COUNT_SPECS:
         severity_label = _find_child_widget(content, qt_widgets, object_name)
         if severity_label is None:
@@ -2197,7 +2200,11 @@ def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) ->
             severity_label = _find_child_widget(summary, qt_widgets, object_name)
             if severity_label is None:
                 continue
-            count = _severity_count_value_from_label(severity_label)
+            count = _severity_count_for_density_apply(
+                content,
+                severity_key,
+                severity_label,
+            )
             set_text = getattr(severity_label, "setText", None)
             if set_text is not None:
                 set_text(
@@ -2209,6 +2216,51 @@ def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) ->
                     )
                 )
 
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        stored_counts = getattr(content, _SEVERITY_COUNTS_ATTR, None)
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_summary_header_density",
+                        "message": "applied severity count density",
+                        "data": {
+                            "stored_counts": stored_counts,
+                            "numbers_only": tokens.severity_counts_numbers_only,
+                        },
+                        "hypothesisId": "severity-parse",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "severity-count-fix",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
+
+
+def _severity_count_for_density_apply(
+    content: Any,
+    severity_key: str,
+    label: Any,
+) -> int:
+    stored_counts = getattr(content, _SEVERITY_COUNTS_ATTR, None)
+    if isinstance(stored_counts, dict) and severity_key in stored_counts:
+        try:
+            return max(0, int(stored_counts[severity_key]))
+        except (TypeError, ValueError):
+            pass
+    return _severity_count_value_from_label(label)
+
 
 def _severity_count_value_from_label(label: Any) -> int:
     text_fn = getattr(label, "text", None)
@@ -2218,13 +2270,20 @@ def _severity_count_value_from_label(label: Any) -> int:
         raw_text = text_fn
     else:
         return 0
-    digits = "".join(character for character in raw_text if character.isdigit())
-    if not digits:
-        return 0
-    try:
-        return int(digits)
-    except ValueError:
-        return 0
+
+    span_match = re.search(r">(\d+)</span>\s*$", raw_text)
+    if span_match is not None:
+        return int(span_match.group(1))
+
+    colon_match = re.search(r":\s*(?:<[^>]+>\s*)?(\d+)\b", raw_text)
+    if colon_match is not None:
+        return int(colon_match.group(1))
+
+    plain_text = re.sub(r"<[^>]+>", "", raw_text).strip()
+    if plain_text.isdigit():
+        return int(plain_text)
+
+    return 0
 
 
 def _apply_secondary_tabs_density(content: Any, qt_widgets: Any, tokens: Any) -> None:

@@ -199,6 +199,37 @@ def test_apply_ui_density_compact_hides_wide_issue_columns_and_shortens_rows():
     assert table.vertical_header.default_section_size == tokens.table_row_height
 
 
+def test_severity_count_value_from_label_ignores_color_hex_digits():
+    from tests.unit.test_maya_summary_header import FakeLabel
+
+    critical_label = FakeLabel('Critical: <span style="color:#e74c3c;">0</span>')
+    error_label = FakeLabel('<span style="color:#e67e22; font-weight: bold;">5</span>')
+
+    assert main_window._severity_count_value_from_label(critical_label) == 0
+    assert main_window._severity_count_value_from_label(error_label) == 5
+
+
+def test_apply_ui_density_compact_keeps_zero_severity_counts_on_preset_switch():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="comfortable"),
+    )
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    critical = _find(widget, main_window.CRITICAL_COUNT_LABEL_OBJECT_NAME)
+    error = _find(widget, main_window.ERROR_COUNT_LABEL_OBJECT_NAME)
+
+    assert critical.text == '<span style="color:#e74c3c; font-weight: bold;">0</span>'
+    assert error.text == '<span style="color:#e67e22; font-weight: bold;">0</span>'
+
+
 def test_apply_ui_density_compact_uses_colored_severity_numbers_only():
     widget = main_window.build_main_widget(DensityFakeQtWidgets)
 
