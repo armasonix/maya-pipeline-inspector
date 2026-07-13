@@ -140,6 +140,9 @@ class UpdateProgressDialog:
         set_window_title = getattr(dialog, "setWindowTitle", None)
         if set_window_title is not None:
             set_window_title(window_title)
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if set_minimum_size is not None:
+            set_minimum_size(520, 420)
 
         layout = qt_widgets.QVBoxLayout(dialog)
         layout.setContentsMargins(12, 12, 12, 12)

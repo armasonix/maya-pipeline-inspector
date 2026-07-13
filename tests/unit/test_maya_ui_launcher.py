@@ -347,39 +347,101 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
     assert calls == [("studio-config", result)]
 
 
-def test_show_check_for_updates_opens_progress_wizard(monkeypatch: Any):
+def test_show_check_for_updates_shows_info_when_up_to_date(monkeypatch: Any):
     content = SimpleNamespace(_pipeline_inspector_studio_config=None)
-    calls: list[dict[str, Any]] = []
+    wizard_calls: list[dict[str, Any]] = []
+    info_calls: list[tuple[str, str]] = []
 
-    class FakeSession:
-        result = SimpleNamespace(
-            up_to_date=True,
-            completed=True,
-            update_available=False,
-            skipped_reason="",
-            error_message="",
-            installed_version="0.5.0",
-            latest_version="0.5.0",
-            tag_name="v0.5.0",
-            staging_path="",
-        )
+    class FakeResult:
+        up_to_date = True
+        completed = True
+        update_available = False
+        skipped_reason = ""
+        error_message = ""
+        installed_version = "0.5.0"
+        latest_version = "0.5.0"
+        tag_name = "v0.5.0"
+        staging_path = ""
 
-    def _fake_show_update_modal_shell(_qt_widgets: Any, **kwargs: Any) -> FakeSession:
-        calls.append(kwargs)
-        return FakeSession()
+    def _fake_run_update_check_only(**_kwargs: Any) -> FakeResult:
+        return FakeResult()
 
+    def _fake_show_update_modal_shell(_qt_widgets: Any, **kwargs: Any) -> object:
+        wizard_calls.append(kwargs)
+        raise AssertionError("wizard should not open when up to date")
+
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.update_wizard.run_update_check_only",
+        _fake_run_update_check_only,
+    )
     monkeypatch.setattr(
         "pipeline_inspector.ui.update_modal.show_update_modal_shell",
         _fake_show_update_modal_shell,
     )
     monkeypatch.setattr(ui_launcher, "_maya_main_window_widget", lambda _qt: "main-window")
     monkeypatch.setattr(ui_launcher, "_set_label_text", lambda *_args: None)
+    monkeypatch.setattr(
+        ui_launcher,
+        "_show_information_dialog",
+        lambda _qt, title, message, **kwargs: info_calls.append((title, message)),
+    )
 
     ui_launcher._show_check_for_updates_modal_from_ui(content, object())
 
-    assert len(calls) == 1
-    assert calls[0]["parent"] == "main-window"
-    assert calls[0]["installed_version"] == "0.5.0"
+    assert wizard_calls == []
+    assert len(info_calls) == 1
+    assert info_calls[0][0] == "Check for Updates"
+    assert "already up to date" in info_calls[0][1]
+
+
+def test_show_check_for_updates_opens_wizard_when_update_available(monkeypatch: Any):
+    content = SimpleNamespace(_pipeline_inspector_studio_config=None)
+    wizard_calls: list[dict[str, Any]] = []
+    info_calls: list[tuple[str, str]] = []
+
+    class FakeResult:
+        up_to_date = False
+        completed = True
+        update_available = True
+        skipped_reason = ""
+        error_message = ""
+        installed_version = "0.4.0"
+        latest_version = "0.5.0"
+        tag_name = "v0.5.0"
+        staging_path = ""
+
+    class FakeSession:
+        result = FakeResult()
+
+    def _fake_run_update_check_only(**_kwargs: Any) -> FakeResult:
+        return FakeResult()
+
+    def _fake_show_update_modal_shell(_qt_widgets: Any, **kwargs: Any) -> FakeSession:
+        wizard_calls.append(kwargs)
+        return FakeSession()
+
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.update_wizard.run_update_check_only",
+        _fake_run_update_check_only,
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.update_modal.show_update_modal_shell",
+        _fake_show_update_modal_shell,
+    )
+    monkeypatch.setattr(ui_launcher, "_maya_main_window_widget", lambda _qt: "main-window")
+    monkeypatch.setattr(ui_launcher, "_set_label_text", lambda *_args: None)
+    monkeypatch.setattr(
+        ui_launcher,
+        "_show_information_dialog",
+        lambda _qt, title, message, **kwargs: info_calls.append((title, message)),
+    )
+
+    ui_launcher._show_check_for_updates_modal_from_ui(content, object())
+
+    assert info_calls == []
+    assert len(wizard_calls) == 1
+    assert wizard_calls[0]["parent"] == "main-window"
+    assert wizard_calls[0]["installed_version"] == "0.5.0"
 
 
 def test_maybe_run_startup_update_check_skips_when_pref_disabled(monkeypatch: Any):

@@ -247,46 +247,99 @@ def _panel_navigation_callbacks(
 
 def _show_check_for_updates_modal_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.ui.settings_widgets import try_reactivate_modal_dialog
-    from pipeline_inspector.ui.update_modal import show_update_modal_shell
     from pipeline_inspector.ui.update_progress_dialog import UPDATE_PROGRESS_DIALOG_OBJECT_NAME
 
     if try_reactivate_modal_dialog(UPDATE_PROGRESS_DIALOG_OBJECT_NAME):
         return
 
-    try:
+    def _open_update_wizard() -> None:
         from pipeline_inspector import __version__
         from pipeline_inspector.studio_config import StudioConfig
-        from pipeline_inspector.ui.update_wizard import format_update_wizard_user_message
+        from pipeline_inspector.ui.update_modal import show_update_modal_shell
+        from pipeline_inspector.ui.update_wizard import (
+            format_update_wizard_user_message,
+            run_update_check_only,
+        )
 
-        studio_config = getattr(content, "_pipeline_inspector_studio_config", None)
-        if studio_config is not None and not isinstance(studio_config, StudioConfig):
-            studio_config = None
+        try:
+            studio_config = getattr(content, "_pipeline_inspector_studio_config", None)
+            if studio_config is not None and not isinstance(studio_config, StudioConfig):
+                studio_config = None
 
-        parent = _maya_main_window_widget(qt_widgets) or content
-        session = show_update_modal_shell(
-            qt_widgets,
-            parent=parent,
-            installed_version=__version__,
-            studio_config=studio_config,
-        )
-        message = format_update_wizard_user_message(
-            session.result,
-            installed_version=__version__,
-        )
-        _set_label_text(
-            content,
-            qt_widgets,
-            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
-            message.replace("\n", " "),
-        )
-    except Exception as exc:
-        _show_information_dialog(
-            qt_widgets,
-            "Check for Updates",
-            f"Update check failed: {exc}",
-            singleton_key="pipelineInspectorCheckForUpdates",
-        )
-        raise
+            maya_parent = _maya_main_window_widget(qt_widgets)
+            check_result = run_update_check_only(
+                installed_version=__version__,
+                studio_config=studio_config,
+            )
+            message = format_update_wizard_user_message(
+                check_result,
+                installed_version=__version__,
+            )
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                message.replace("\n", " "),
+            )
+
+            if check_result.up_to_date:
+                _show_information_dialog(
+                    qt_widgets,
+                    "Check for Updates",
+                    message,
+                    singleton_key="pipelineInspectorCheckForUpdates",
+                )
+                return
+
+            if check_result.skipped_reason == "disabled" or check_result.error_message:
+                _show_information_dialog(
+                    qt_widgets,
+                    "Check for Updates",
+                    message,
+                    singleton_key="pipelineInspectorCheckForUpdates",
+                )
+                return
+
+            if not check_result.update_available:
+                _show_information_dialog(
+                    qt_widgets,
+                    "Check for Updates",
+                    message,
+                    singleton_key="pipelineInspectorCheckForUpdates",
+                )
+                return
+
+            session = show_update_modal_shell(
+                qt_widgets,
+                parent=maya_parent,
+                installed_version=__version__,
+                studio_config=studio_config,
+            )
+            final_message = format_update_wizard_user_message(
+                session.result,
+                installed_version=__version__,
+            )
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                final_message.replace("\n", " "),
+            )
+        except Exception as exc:
+            _show_information_dialog(
+                qt_widgets,
+                "Check for Updates",
+                f"Update check failed: {exc}",
+                singleton_key="pipelineInspectorCheckForUpdates",
+            )
+            raise
+
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    if single_shot is not None:
+        single_shot(0, _open_update_wizard)
+        return
+    _open_update_wizard()
 
 
 def _maybe_run_startup_update_check(

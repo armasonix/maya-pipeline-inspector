@@ -178,9 +178,11 @@ class FakeApplication:
 
 class FakeQt:
     ApplicationModal = 32
+    Window = 1
     Dialog = 2
     WindowTitleHint = 4
     WindowCloseButtonHint = 8
+    WindowStaysOnTopHint = 16
 
 
 class FakeQTimer:
@@ -421,9 +423,12 @@ def test_show_update_wizard_runs_modal_flow_with_parent_and_process_events():
     )
 
     assert session.dialog.exec_called is True
-    assert session.dialog.parent is parent
+    assert session.dialog.parent is None
     assert session.dialog.window_flags == (
-        FakeQt.Dialog | FakeQt.WindowTitleHint | FakeQt.WindowCloseButtonHint
+        FakeQt.Window
+        | FakeQt.WindowTitleHint
+        | FakeQt.WindowCloseButtonHint
+        | FakeQt.WindowStaysOnTopHint
     )
     assert session.result.up_to_date is True
     assert app.process_events_calls >= 1

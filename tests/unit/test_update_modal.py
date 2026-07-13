@@ -289,7 +289,7 @@ def test_show_update_modal_shell_uses_modal_exec_and_parent():
 
     assert dialog.exec_called is True
     assert dialog.show_called is True
-    assert dialog.parent is parent
+    assert dialog.parent is None
     assert dialog.modality == FakeQt.ApplicationModal
     assert session.result.up_to_date is True
     assert UPDATE_WIZARD_STATUS_UP_TO_DATE.format(installed_version="0.5.0") in (

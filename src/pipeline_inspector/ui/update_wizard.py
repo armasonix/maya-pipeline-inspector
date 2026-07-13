@@ -510,10 +510,8 @@ def _configure_update_dialog(
 ) -> None:
     from pipeline_inspector.ui.settings_widgets import configure_maya_modal_dialog
 
+    _ = parent
     configure_maya_modal_dialog(dialog, qt_widgets)
-    set_parent = getattr(dialog, "setParent", None)
-    if parent is not None and set_parent is not None:
-        set_parent(parent)
     _raise_update_dialog(dialog)
 
 
