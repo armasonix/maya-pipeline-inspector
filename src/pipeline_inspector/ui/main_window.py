@@ -97,6 +97,7 @@ DETAILS_REFERENCE_LABEL_OBJECT_NAME = "pipelineInspectorIssueDetailsReference"
 DETAILS_FIX_LABEL_OBJECT_NAME = "pipelineInspectorIssueDetailsFix"
 ISSUES_FILTERS_ROW_OBJECT_NAME = "pipelineInspectorIssuesFiltersRow"
 EXPORT_ACTIONS_OBJECT_NAME = "pipelineInspectorExportActions"
+EXPORT_ACTIONS_GRID_OBJECT_NAME = "pipelineInspectorExportActionsGrid"
 EXPORT_JSON_BUTTON_OBJECT_NAME = "pipelineInspectorExportJsonButton"
 EXPORT_HTML_BUTTON_OBJECT_NAME = "pipelineInspectorExportHtmlButton"
 EXPORT_MANIFEST_BUTTON_OBJECT_NAME = "pipelineInspectorExportManifestButton"
@@ -165,6 +166,39 @@ SEVERITY_ROW_NUMBER_COLORS = {
     "warning": "#f1c40f",
     "info": "#22d3ee",
 }
+SEVERITY_COUNT_SPECS = (
+    (CRITICAL_COUNT_LABEL_OBJECT_NAME, "critical", "Critical"),
+    (ERROR_COUNT_LABEL_OBJECT_NAME, "error", "Error"),
+    (WARNING_COUNT_LABEL_OBJECT_NAME, "warning", "Warning"),
+    (INFO_COUNT_LABEL_OBJECT_NAME, "info", "Info"),
+)
+_FULL_EXPORT_BUTTON_LABELS = {
+    EXPORT_JSON_BUTTON_OBJECT_NAME: "Export JSON Report",
+    EXPORT_HTML_BUTTON_OBJECT_NAME: "Export HTML Report",
+    EXPORT_MANIFEST_BUTTON_OBJECT_NAME: "Export Shader Manifest",
+    EXPORT_COMPARE_AFTER_FIXES_BUTTON_OBJECT_NAME: "Compare After Fixes",
+    EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME: "Export Manifest Diff",
+    EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME: "Compare to Approved Manifest",
+    EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME: "Send to Tracker",
+}
+_COMPACT_EXPORT_BUTTON_LABELS = {
+    EXPORT_JSON_BUTTON_OBJECT_NAME: "JSON Report",
+    EXPORT_HTML_BUTTON_OBJECT_NAME: "HTML Report",
+    EXPORT_MANIFEST_BUTTON_OBJECT_NAME: "Shader Manifest",
+    EXPORT_COMPARE_AFTER_FIXES_BUTTON_OBJECT_NAME: "After Fixes",
+    EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME: "Manifest Diff",
+    EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME: "Approved Diff",
+    EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME: "Send Tracker",
+}
+_EXPORT_BUTTON_LAYOUT_ORDER = (
+    EXPORT_JSON_BUTTON_OBJECT_NAME,
+    EXPORT_HTML_BUTTON_OBJECT_NAME,
+    EXPORT_MANIFEST_BUTTON_OBJECT_NAME,
+    EXPORT_COMPARE_AFTER_FIXES_BUTTON_OBJECT_NAME,
+    EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME,
+    EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
+    EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME,
+)
 BLOCK_LAMP_COLORS = {
     True: "#e74c3c",
     False: "#2ecc71",
@@ -908,6 +942,7 @@ def build_export_actions(
     layout.addWidget(status_label)
 
     grid_host = qt_widgets.QWidget()
+    grid_host.setObjectName(EXPORT_ACTIONS_GRID_OBJECT_NAME)
     grid = qt_widgets.QGridLayout(grid_host)
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setSpacing(4)
@@ -996,18 +1031,27 @@ def update_severity_count_indicators(
 ) -> None:
     """Update per-severity summary labels with colored count numbers."""
 
-    for object_name, severity_key, label, count in (
-        (CRITICAL_COUNT_LABEL_OBJECT_NAME, "critical", "Critical", critical_count),
-        (ERROR_COUNT_LABEL_OBJECT_NAME, "error", "Error", error_count),
-        (WARNING_COUNT_LABEL_OBJECT_NAME, "warning", "Warning", warning_count),
-        (INFO_COUNT_LABEL_OBJECT_NAME, "info", "Info", info_count),
-    ):
+    numbers_only = _severity_counts_numbers_only_for_content(content)
+    counts = {
+        "critical": critical_count,
+        "error": error_count,
+        "warning": warning_count,
+        "info": info_count,
+    }
+    for object_name, severity_key, label in SEVERITY_COUNT_SPECS:
         severity_label = _find_child_widget(content, qt_widgets, object_name)
         if severity_label is None:
             continue
         set_text = getattr(severity_label, "setText", None)
         if set_text is not None:
-            set_text(_severity_count_html(severity_key, label, count))
+            set_text(
+                _severity_count_html(
+                    severity_key,
+                    label,
+                    counts[severity_key],
+                    numbers_only=numbers_only,
+                )
+            )
 
 
 def update_block_status_indicators(
@@ -1498,8 +1542,19 @@ def _build_severity_counts_row(qt_widgets: Any, state: SummaryHeaderState) -> An
         (WARNING_COUNT_LABEL_OBJECT_NAME, "warning", "Warning", state.warning_count),
         (INFO_COUNT_LABEL_OBJECT_NAME, "info", "Info", state.info_count),
     ):
-        layout.addWidget(_severity_count_label(qt_widgets, object_name, severity_key, label, count))
+        layout.addWidget(
+            _severity_count_label(qt_widgets, object_name, severity_key, label, count)
+        )
     return row
+
+
+def _severity_counts_numbers_only_for_content(content: Any) -> bool:
+    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
+
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
+    return density_tokens(normalize_density(density)).severity_counts_numbers_only
 
 
 def _severity_count_label(
@@ -1519,8 +1574,16 @@ def _severity_count_label(
     return severity_label
 
 
-def _severity_count_html(severity_key: str, label: str, count: int) -> str:
+def _severity_count_html(
+    severity_key: str,
+    label: str,
+    count: int,
+    *,
+    numbers_only: bool = False,
+) -> str:
     color = SEVERITY_ROW_NUMBER_COLORS.get(severity_key)
+    if numbers_only and color:
+        return f'<span style="color:{color}; font-weight: bold;">{count}</span>'
     if not color:
         return f"{label}: {count}"
     return f'{label}: <span style="color:{color};">{count}</span>'
@@ -1895,6 +1958,7 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
     _apply_panel_header_density(content, qt_widgets, tokens)
     _apply_main_tab_chrome_density(content, qt_widgets, tokens)
     _apply_summary_header_density(content, qt_widgets, tokens)
+    _apply_secondary_tabs_density(content, qt_widgets, tokens)
     _apply_validate_action_bar_density(content, qt_widgets, tokens)
     _apply_issues_table_density(content, qt_widgets, tokens)
     _apply_validate_issues_pane_layout(content, qt_widgets, tokens)
@@ -2121,6 +2185,191 @@ def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) ->
             set_max_width(tokens.panel_max_width)
         elif set_max_width is not None:
             set_max_width(_QT_WIDGETSIZE_MAX)
+
+    severity_row = _find_child_widget(summary, qt_widgets, SEVERITY_COUNTS_ROW_OBJECT_NAME)
+    if severity_row is not None:
+        severity_layout = _widget_layout(severity_row)
+        if severity_layout is not None:
+            set_spacing = getattr(severity_layout, "setSpacing", None)
+            if set_spacing is not None:
+                set_spacing(4 if tokens.severity_counts_numbers_only else 12)
+        for object_name, severity_key, label in SEVERITY_COUNT_SPECS:
+            severity_label = _find_child_widget(summary, qt_widgets, object_name)
+            if severity_label is None:
+                continue
+            count = _severity_count_value_from_label(severity_label)
+            set_text = getattr(severity_label, "setText", None)
+            if set_text is not None:
+                set_text(
+                    _severity_count_html(
+                        severity_key,
+                        label,
+                        count,
+                        numbers_only=tokens.severity_counts_numbers_only,
+                    )
+                )
+
+
+def _severity_count_value_from_label(label: Any) -> int:
+    text_fn = getattr(label, "text", None)
+    if callable(text_fn):
+        raw_text = str(text_fn())
+    elif isinstance(text_fn, str):
+        raw_text = text_fn
+    else:
+        return 0
+    digits = "".join(character for character in raw_text if character.isdigit())
+    if not digits:
+        return 0
+    try:
+        return int(digits)
+    except ValueError:
+        return 0
+
+
+def _apply_secondary_tabs_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    """Relayout Reports/Farm action buttons for compact panel width."""
+
+    export_labels = (
+        _COMPACT_EXPORT_BUTTON_LABELS
+        if tokens.secondary_tab_button_columns == 1
+        else _FULL_EXPORT_BUTTON_LABELS
+    )
+    export_grid_host = _find_child_widget(content, qt_widgets, EXPORT_ACTIONS_GRID_OBJECT_NAME)
+    export_actions = _find_child_widget(content, qt_widgets, EXPORT_ACTIONS_OBJECT_NAME)
+    if export_actions is not None:
+        export_layout = _widget_layout(export_actions)
+        if export_layout is not None:
+            set_margins = getattr(export_layout, "setContentsMargins", None)
+            if set_margins is not None:
+                bottom_margin = 6 if tokens.secondary_tab_button_columns == 1 else 0
+                set_margins(0, 0, 0, bottom_margin)
+    if export_grid_host is not None:
+        _apply_button_grid_density(
+            content,
+            export_grid_host,
+            qt_widgets,
+            _EXPORT_BUTTON_LAYOUT_ORDER,
+            export_labels,
+            columns=tokens.secondary_tab_button_columns,
+            panel_max_width=tokens.panel_max_width,
+        )
+
+    from pipeline_inspector.ui.farm_tab import (
+        FARM_ACTION_BUTTONS_OBJECT_NAME,
+        FARM_BUTTON_LAYOUT_ORDER,
+        FARM_COMPACT_BUTTON_LABELS,
+        FARM_FULL_BUTTON_LABELS,
+    )
+
+    farm_labels = (
+        FARM_COMPACT_BUTTON_LABELS
+        if tokens.secondary_tab_button_columns == 1
+        else FARM_FULL_BUTTON_LABELS
+    )
+    farm_buttons_host = _find_child_widget(content, qt_widgets, FARM_ACTION_BUTTONS_OBJECT_NAME)
+    if farm_buttons_host is not None:
+        _apply_button_grid_density(
+            content,
+            farm_buttons_host,
+            qt_widgets,
+            FARM_BUTTON_LAYOUT_ORDER,
+            farm_labels,
+            columns=tokens.secondary_tab_button_columns,
+            panel_max_width=tokens.panel_max_width,
+        )
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a", encoding="utf-8"
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "main_window.py:_apply_secondary_tabs_density",
+                        "message": "applied secondary tab button density",
+                        "data": {
+                            "button_columns": tokens.secondary_tab_button_columns,
+                            "severity_numbers_only": tokens.severity_counts_numbers_only,
+                            "panel_max_width": tokens.panel_max_width,
+                        },
+                        "hypothesisId": "compact-secondary-tabs",
+                        "timestamp": int(time.time() * 1000),
+                        "runId": "compact-polish",
+                    }
+                )
+                + "\n"
+            )
+    except (OSError, TypeError, ValueError):
+        pass
+    # endregion
+
+
+def _apply_button_grid_density(
+    content: Any,
+    grid_host: Any,
+    qt_widgets: Any,
+    button_order: Sequence[str],
+    labels_by_object_name: dict[str, str],
+    *,
+    columns: int,
+    panel_max_width: int | None,
+) -> None:
+    grid_layout = _widget_layout(grid_host)
+    if grid_layout is None:
+        return
+
+    buttons: list[Any] = []
+    for object_name in button_order:
+        button = _find_child_widget(content, qt_widgets, object_name)
+        if button is not None:
+            buttons.append(button)
+
+    remove_widget = getattr(grid_layout, "removeWidget", None)
+    if callable(remove_widget):
+        for button in buttons:
+            remove_widget(button)
+
+    add_widget = getattr(grid_layout, "addWidget", None)
+    if not callable(add_widget):
+        return
+
+    normalized_columns = max(1, int(columns))
+    for index, button in enumerate(buttons):
+        from pipeline_inspector.ui.settings_widgets import _widget_object_name
+
+        object_name = _widget_object_name(button)
+        label = labels_by_object_name.get(object_name)
+        if label is not None:
+            set_text = getattr(button, "setText", None)
+            if set_text is not None:
+                set_text(label)
+        if panel_max_width is not None and normalized_columns == 1:
+            set_minimum_width = getattr(button, "setMinimumWidth", None)
+            if set_minimum_width is not None:
+                set_minimum_width(max(0, panel_max_width - 12))
+        size_policy = getattr(qt_widgets, "QSizePolicy", None)
+        set_policy = getattr(button, "setSizePolicy", None)
+        if size_policy is not None and set_policy is not None:
+            if normalized_columns == 1:
+                expanding = getattr(size_policy, "Expanding", None)
+                fixed = getattr(size_policy, "Fixed", None)
+                if expanding is not None and fixed is not None:
+                    set_policy(expanding, fixed)
+            else:
+                preferred = getattr(size_policy, "Preferred", None)
+                fixed = getattr(size_policy, "Fixed", None)
+                if preferred is not None and fixed is not None:
+                    set_policy(preferred, fixed)
+        row = index // normalized_columns
+        column = index % normalized_columns
+        add_widget(button, row, column)
 
 
 def _apply_validate_action_bar_density(content: Any, qt_widgets: Any, tokens: Any) -> None:

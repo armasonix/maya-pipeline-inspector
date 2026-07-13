@@ -161,6 +161,25 @@ def test_apply_ui_density_compact_collapses_validate_action_bar_and_summary_cont
     assert publish_label.visible is False
 
 
+def test_apply_ui_density_compact_shows_severity_and_material_columns_only():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    table = _find(widget, main_window.ISSUES_TABLE_OBJECT_NAME)
+
+    assert table.hidden_columns.get(0, False) is False
+    assert table.hidden_columns.get(ISSUES_TABLE_MATERIAL_COLUMN_INDEX, False) is False
+    assert table.hidden_columns[ISSUES_TABLE_NODE_COLUMN_INDEX] is True
+    assert table.hidden_columns[ISSUES_TABLE_ISSUE_COLUMN_INDEX] is True
+    assert table.hidden_columns[ISSUES_TABLE_OWNER_COLUMN_INDEX] is True
+    assert table.hidden_columns[ISSUES_TABLE_RULE_COLUMN_INDEX] is True
+
+
 def test_apply_ui_density_compact_hides_wide_issue_columns_and_shortens_rows():
     widget = main_window.build_main_widget(DensityFakeQtWidgets)
 
@@ -173,13 +192,54 @@ def test_apply_ui_density_compact_hides_wide_issue_columns_and_shortens_rows():
     table = _find(widget, main_window.ISSUES_TABLE_OBJECT_NAME)
     tokens = density_tokens("compact")
 
-    assert table.hidden_columns[ISSUES_TABLE_MATERIAL_COLUMN_INDEX] is True
     assert table.hidden_columns[ISSUES_TABLE_NODE_COLUMN_INDEX] is True
     assert table.hidden_columns[ISSUES_TABLE_ISSUE_COLUMN_INDEX] is True
     assert table.hidden_columns[ISSUES_TABLE_OWNER_COLUMN_INDEX] is True
     assert table.hidden_columns[ISSUES_TABLE_RULE_COLUMN_INDEX] is True
-    assert table.hidden_columns.get(0, False) is False
     assert table.vertical_header.default_section_size == tokens.table_row_height
+
+
+def test_apply_ui_density_compact_uses_colored_severity_numbers_only():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    main_window.update_severity_count_indicators(
+        widget,
+        DensityFakeQtWidgets,
+        critical_count=3,
+        error_count=5,
+        warning_count=2,
+        info_count=1,
+    )
+
+    critical = _find(widget, main_window.CRITICAL_COUNT_LABEL_OBJECT_NAME)
+    error = _find(widget, main_window.ERROR_COUNT_LABEL_OBJECT_NAME)
+
+    assert critical.text == '<span style="color:#e74c3c; font-weight: bold;">3</span>'
+    assert error.text == '<span style="color:#e67e22; font-weight: bold;">5</span>'
+    assert "Critical" not in critical.text
+    assert "Error" not in error.text
+
+
+def test_apply_ui_density_compact_uses_short_export_button_labels():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    json_button = _find(widget, main_window.EXPORT_JSON_BUTTON_OBJECT_NAME)
+    tracker_button = _find(widget, main_window.EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME)
+
+    assert json_button.text == "JSON Report"
+    assert tracker_button.text == "Send Tracker"
 
 
 def test_apply_ui_density_compact_clamps_panel_width_and_hides_extra_filters():

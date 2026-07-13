@@ -15,7 +15,6 @@ ISSUES_TABLE_LOW_PRIORITY_COLUMNS = (
     ISSUES_TABLE_RULE_COLUMN_INDEX,
 )
 ISSUES_TABLE_COMPACT_HIDDEN_COLUMNS = (
-    ISSUES_TABLE_MATERIAL_COLUMN_INDEX,
     ISSUES_TABLE_NODE_COLUMN_INDEX,
     ISSUES_TABLE_ISSUE_COLUMN_INDEX,
     ISSUES_TABLE_OWNER_COLUMN_INDEX,
@@ -68,6 +67,8 @@ class UiDensityTokens:
     panel_header_max_height: int | None
     panel_header_chrome_stylesheet: str
     main_tab_chrome_stylesheet: str
+    severity_counts_numbers_only: bool
+    secondary_tab_button_columns: int
     issues_pane_vertical: bool
     issues_pane_sizes: tuple[int, int] | None
 
@@ -134,6 +135,8 @@ _COMFORTABLE_TOKENS = UiDensityTokens(
     panel_header_max_height=26,
     panel_header_chrome_stylesheet=_COMFORTABLE_HEADER_CHROME_STYLESHEET,
     main_tab_chrome_stylesheet=_COMFORTABLE_MAIN_TAB_CHROME_STYLESHEET,
+    severity_counts_numbers_only=False,
+    secondary_tab_button_columns=3,
     issues_pane_vertical=False,
     issues_pane_sizes=None,
 )
@@ -144,7 +147,7 @@ _COMPACT_TOKENS = UiDensityTokens(
     tab_margins=(4, 4, 4, 4),
     tab_spacing=2,
     sticky_chrome_spacing=2,
-    panel_title_font_css="font-size: 11pt; font-weight: bold;",
+    panel_title_font_css="font-size: 9pt; font-weight: bold; margin: 0px; padding: 0px;",
     summary_style_sheet="QLabel { font-size: 10pt; }",
     summary_visible_rows=2,
     summary_row_height=16,
@@ -171,6 +174,8 @@ _COMPACT_TOKENS = UiDensityTokens(
     panel_header_max_height=None,
     panel_header_chrome_stylesheet="",
     main_tab_chrome_stylesheet="",
+    severity_counts_numbers_only=True,
+    secondary_tab_button_columns=1,
     issues_pane_vertical=True,
     issues_pane_sizes=(180, 120),
 )
