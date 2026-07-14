@@ -191,6 +191,30 @@ Initial check types:
 | `displacement_risk` | Displacement setup must stay within safe thresholds. |
 | `optimized_texture_freshness` | Optimized texture must exist and be newer than source. |
 | `orphan_network` | Unassigned/dead shader network detection. |
+| `duplicate_geometry` | Scene-level duplicate mesh detection by topology, bounds, and optional proxy attrs. |
+
+### `duplicate_geometry`
+
+Graph-scoped check that groups `ShapeSnapshot` entries by geometry fingerprint:
+
+- **Meshes:** `topology_fingerprint` + rounded `world_bbox` + optional `match_attributes` from `proxy_attrs`
+- **Proxy / stand-in shapes (`aiStandIn`, `VRayProxy`):** proxy source attrs such as `dso` or `fileName`
+
+Intentional Maya instance groups are ignored when every shape in a duplicate group shares the same `instancing_key`. Intermediate meshes (`proxy_attrs.intermediateObject = true`) and referenced shapes (unless `include_referenced: true`) are skipped.
+
+Example rule:
+
+```json
+"check": {
+  "type": "duplicate_geometry",
+  "max_shapes": 500,
+  "min_group_size": 2,
+  "bbox_precision": 3,
+  "match_attributes": ["displaySmoothMesh"]
+}
+```
+
+Failed results include `evidence.duplicate_groups[]` with `shape_ids`, `topology_fingerprint`, `bbox`, and `instancing_keys`. Pair with `duplicate_geometry_scan_budget` when scenes may exceed the scan cap.
 
 ## Policy Section
 

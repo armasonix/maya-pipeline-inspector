@@ -22,6 +22,8 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `common_geometry_foundation.json` | — | Common | ShapeSnapshot geometry counts, bbox, topology fingerprint, proxy attrs |
 | `geometry_polycount_pass.json` | — | Common | Prop-tier mesh within polygon budget (48k / 100k) |
 | `geometry_polycount_over_budget.json` | — | Common | Prop-tier mesh over polygon budget (150k / 100k) |
+| `duplicate_geometry_twins.json` | `duplicate_geometry_twins.expectations.json` | Common | Twin meshes with matching topology and bounds |
+| `duplicate_geometry_instances.json` | — | Common | Intentional instance group sharing one instancing key |
 
 ## Adding a renderer fixture case
 

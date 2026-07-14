@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "examples/geometry_duplicates/pipeline_inspector_demo_geo_instances.ma",
+  "maya_version": "2025",
+  "renderer": "common",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-14T14:05:00Z",
+  "nodes": [],
+  "connections": [],
+  "materials": [],
+  "shading_engines": [],
+  "file_dependencies": [],
+  "references": [],
+  "shapes": [
+    {
+      "node_id": "mesh:prop_inst_a",
+      "name": "prop_inst_a",
+      "full_name": "|world|props|prop_inst_a",
+      "type_name": "mesh",
+      "transform_id": "transform:prop_inst_a",
+      "polygon_count": 400,
+      "vertex_count": 220,
+      "face_count": 400,
+      "edge_count": 600,
+      "world_bbox": {
+        "min_x": 1.0,
+        "min_y": 0.0,
+        "min_z": 0.0,
+        "max_x": 3.0,
+        "max_y": 2.0,
+        "max_z": 1.0
+      },
+      "topology_fingerprint": "sha256:geo_inst_shared",
+      "instancing_key": "mesh:prop_shared",
+      "proxy_attrs": {},
+      "referenced": false,
+      "locked": false
+    },
+    {
+      "node_id": "mesh:prop_inst_b",
+      "name": "prop_inst_b",
+      "full_name": "|world|props|prop_inst_b",
+      "type_name": "mesh",
+      "transform_id": "transform:prop_inst_b",
+      "polygon_count": 400,
+      "vertex_count": 220,
+      "face_count": 400,
+      "edge_count": 600,
+      "world_bbox": {
+        "min_x": 5.0,
+        "min_y": 0.0,
+        "min_z": 0.0,
+        "max_x": 7.0,
+        "max_y": 2.0,
+        "max_z": 1.0
+      },
+      "topology_fingerprint": "sha256:geo_inst_shared",
+      "instancing_key": "mesh:prop_shared",
+      "proxy_attrs": {},
+      "referenced": false,
+      "locked": false
+    }
+  ]
+}

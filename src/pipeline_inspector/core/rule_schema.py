@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import (
+    BoundingBoxSnapshot,
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
@@ -430,6 +431,10 @@ class ValidationEngine:
             return self._evaluate_duplicate_file_dependencies(rule, target)
         if check_type == "duplicate_material_fingerprints":
             return self._evaluate_duplicate_material_fingerprints(rule, target)
+        if check_type == "duplicate_geometry":
+            return self._evaluate_duplicate_geometry(rule, target)
+        if check_type == "duplicate_geometry_scan_budget":
+            return self._evaluate_duplicate_geometry_scan_budget(rule, target)
         if check_type == "duplicate_scan_budget":
             return self._evaluate_duplicate_scan_budget(rule, target)
         if check_type == "list_length_max":
@@ -584,6 +589,75 @@ class ValidationEngine:
             current_value=len(groups),
             expected_value=0,
             plug="materials",
+            evidence=evidence,
+        )
+
+    def _evaluate_duplicate_geometry(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="duplicate_geometry_requires_graph_snapshot",
+            )
+
+        groups, scan_truncated, shape_count, scanned_count = _duplicate_geometry_groups(
+            target.obj,
+            rule.check.params,
+        )
+        status = "failed" if groups else "passed"
+        evidence: JsonDict = {"duplicate_groups": groups} if groups else {}
+        evidence.update(
+            {
+                "shape_count": shape_count,
+                "scanned_shape_count": scanned_count,
+            }
+        )
+        if scan_truncated:
+            evidence["geometry_scan_truncated"] = True
+            evidence["max_shapes"] = rule.check.params.get("max_shapes")
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=len(groups),
+            expected_value=0,
+            plug="shapes",
+            evidence=evidence,
+        )
+
+    def _evaluate_duplicate_geometry_scan_budget(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        if not isinstance(target.obj, GraphSnapshot):
+            return self._skipped(
+                rule,
+                target=target,
+                reason="duplicate_geometry_scan_budget_requires_graph_snapshot",
+            )
+
+        max_shapes = _as_optional_int(rule.check.params.get("max_shapes"))
+        shape_count = len(target.obj.shapes)
+        exceeded = max_shapes is not None and max_shapes > 0 and shape_count > max_shapes
+        status = "failed" if exceeded else "passed"
+        evidence = {
+            "shape_count": shape_count,
+            "max_shapes": max_shapes,
+        }
+        if exceeded:
+            evidence["geometry_scan_truncated"] = True
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=shape_count,
+            expected_value=max_shapes or 0,
+            plug="duplicate_geometry_scan_budget",
             evidence=evidence,
         )
 
@@ -1108,6 +1182,136 @@ def _duplicate_material_fingerprint_groups(
             }
         )
     return groups, scan_truncated, material_count, len(materials)
+
+_PROXY_GEOMETRY_TYPES = frozenset({"aiStandIn", "VRayProxy"})
+_PROXY_FILE_ATTRS = ("dso", "fileName", "filename", "vrmesh")
+
+
+def _duplicate_geometry_groups(
+    snapshot: GraphSnapshot,
+    params: Mapping[str, Any],
+) -> tuple[list[JsonDict], bool, int, int]:
+    max_shapes = _as_optional_int(params.get("max_shapes"))
+    min_group_size = _as_optional_int(params.get("min_group_size")) or 2
+    bbox_precision = _as_optional_int(params.get("bbox_precision")) or 3
+    match_attributes = _as_string_list(params.get("match_attributes"))
+    include_referenced = bool(params.get("include_referenced", False))
+
+    shapes = sorted(snapshot.shapes, key=lambda item: item.node_id)
+    shape_count = len(shapes)
+    scan_truncated = False
+    if max_shapes is not None and max_shapes > 0 and shape_count > max_shapes:
+        shapes = shapes[:max_shapes]
+        scan_truncated = True
+
+    grouped: dict[str, list[ShapeSnapshot]] = {}
+    for shape in shapes:
+        if not include_referenced and shape.referenced:
+            continue
+        if shape.proxy_attrs.get("intermediateObject") is True:
+            continue
+        geometry_key = _duplicate_geometry_key(
+            shape,
+            match_attributes=match_attributes,
+            bbox_precision=bbox_precision,
+        )
+        if not geometry_key:
+            continue
+        grouped.setdefault(geometry_key, []).append(shape)
+
+    groups: list[JsonDict] = []
+    for geometry_key, duplicates in sorted(grouped.items()):
+        if _is_intentional_geometry_instance_group(duplicates):
+            continue
+        shape_ids = sorted({item.node_id for item in duplicates})
+        if len(shape_ids) < min_group_size:
+            continue
+        sample = duplicates[0]
+        groups.append(
+            {
+                "geometry_key": geometry_key,
+                "topology_fingerprint": sample.topology_fingerprint,
+                "bbox": _bbox_payload(sample.world_bbox),
+                "shape_ids": shape_ids,
+                "shape_names": sorted({item.name for item in duplicates}),
+                "instancing_keys": sorted({item.instancing_key for item in duplicates}),
+                "count": len(shape_ids),
+            }
+        )
+    return groups, scan_truncated, shape_count, len(shapes)
+
+
+def _duplicate_geometry_key(
+    shape: ShapeSnapshot,
+    *,
+    match_attributes: list[str],
+    bbox_precision: int,
+) -> str:
+    if shape.type_name in _PROXY_GEOMETRY_TYPES:
+        proxy_value = _proxy_geometry_source(shape)
+        if proxy_value:
+            return f"proxy:{shape.type_name}:{proxy_value}"
+        return f"proxy:{shape.type_name}:{shape.node_id}"
+
+    topology = shape.topology_fingerprint.strip()
+    if not topology:
+        return ""
+
+    bbox_signature = _bbox_signature(shape.world_bbox, precision=bbox_precision)
+    attribute_signature = _geometry_attribute_signature(shape.proxy_attrs, match_attributes)
+    return f"mesh:{topology}|{bbox_signature}|{attribute_signature}"
+
+
+def _proxy_geometry_source(shape: ShapeSnapshot) -> str:
+    for attr_name in _PROXY_FILE_ATTRS:
+        value = shape.proxy_attrs.get(attr_name)
+        if value:
+            return str(value)
+    return ""
+
+
+def _geometry_attribute_signature(
+    proxy_attrs: Mapping[str, Any],
+    match_attributes: list[str],
+) -> str:
+    if not match_attributes:
+        return ""
+    parts: list[str] = []
+    for attr_name in sorted(match_attributes):
+        value = proxy_attrs.get(attr_name)
+        if value is not None:
+            parts.append(f"{attr_name}={value}")
+    return ";".join(parts)
+
+
+def _bbox_signature(bbox: Optional[BoundingBoxSnapshot], *, precision: int) -> str:
+    if bbox is None:
+        return "none"
+    fmt = f"{{:.{precision}f}}"
+    return "|".join(
+        [
+            fmt.format(bbox.min_x),
+            fmt.format(bbox.min_y),
+            fmt.format(bbox.min_z),
+            fmt.format(bbox.max_x),
+            fmt.format(bbox.max_y),
+            fmt.format(bbox.max_z),
+        ]
+    )
+
+
+def _bbox_payload(bbox: Optional[BoundingBoxSnapshot]) -> Optional[JsonDict]:
+    if bbox is None:
+        return None
+    return bbox.to_dict()
+
+
+def _is_intentional_geometry_instance_group(shapes: list[ShapeSnapshot]) -> bool:
+    if len(shapes) < 2:
+        return False
+    instancing_keys = {shape.instancing_key for shape in shapes if shape.instancing_key}
+    return len(instancing_keys) == 1
+
 
 def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
     path = dependency.resolved_path or dependency.raw_path

@@ -1,7 +1,7 @@
 """Semantic texture slot resolution."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from pipeline_inspector.adapters.base import RendererAdapterRegistry
@@ -84,20 +84,7 @@ class SemanticTextureSlotResolver:
             resolution = self.resolve_connection(snapshot, connection)
             resolved_connections.append(_with_connection_semantic(connection, resolution.semantic))
 
-        return GraphSnapshot(
-            schema_version=snapshot.schema_version,
-            scene_path=snapshot.scene_path,
-            maya_version=snapshot.maya_version,
-            renderer=snapshot.renderer,
-            scan_scope=snapshot.scan_scope,
-            scanned_at_utc=snapshot.scanned_at_utc,
-            nodes=snapshot.nodes,
-            connections=resolved_connections,
-            materials=snapshot.materials,
-            shading_engines=snapshot.shading_engines,
-            file_dependencies=snapshot.file_dependencies,
-            references=snapshot.references,
-        )
+        return replace(snapshot, connections=resolved_connections)
 
     def _matching_semantics(self, plug_key: str) -> list[tuple[str, str]]:
         matches: list[tuple[str, str]] = []
