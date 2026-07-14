@@ -35,9 +35,11 @@ def test_compose_profiles_merges_asset_class_resolution_rules():
 
     hero_override = composed.rule_overrides["common.texture.resolution.hero.max"]
     prop_override = composed.rule_overrides["common.texture.resolution.prop.max"]
+    hero_polycount = composed.rule_overrides["common.geometry.polycount.hero.max"]
 
     assert hero_override.enabled is True
     assert prop_override.enabled is False
+    assert hero_polycount.enabled is True
 
 
 def test_compose_profiles_without_asset_class_returns_workflow_profile():

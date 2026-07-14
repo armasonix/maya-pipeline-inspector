@@ -84,6 +84,16 @@ def test_validation_engine_geometry_scope_alias_matches_shape():
     assert geometry_targets == shape_targets
 
 
+def test_prepare_snapshot_for_validation_preserves_shapes():
+    snapshot = GraphSnapshot.from_dict(json.loads(FIXTURE_PATH.read_text(encoding="utf-8")))
+    from pipeline_inspector.maya.snapshot_enrichment import prepare_snapshot_for_validation
+
+    enriched = prepare_snapshot_for_validation(snapshot)
+
+    assert len(enriched.shapes) == len(snapshot.shapes)
+    assert enriched.shapes[0].node_id == snapshot.shapes[0].node_id
+
+
 def test_rule_definition_accepts_shape_and_geometry_scopes():
     for scope in ("shape", "geometry"):
         rule = RuleDefinition.from_dict(

@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "common.geometry.duplicate.fingerprint",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "examples/geometry_budget/pipeline_inspector_demo_polycount_pass.ma",
+  "maya_version": "2025",
+  "renderer": "common",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-14T13:00:00Z",
+  "nodes": [],
+  "connections": [],
+  "materials": [],
+  "shading_engines": [],
+  "file_dependencies": [],
+  "references": [],
+  "shapes": [
+    {
+      "node_id": "mesh:prop_chair",
+      "name": "prop_chair",
+      "full_name": "|world|prop_chair",
+      "type_name": "mesh",
+      "transform_id": "transform:prop_chair",
+      "polygon_count": 48000,
+      "vertex_count": 24000,
+      "face_count": 48000,
+      "edge_count": 72000,
+      "topology_fingerprint": "sha256:pass",
+      "instancing_key": "mesh:prop_chair",
+      "proxy_attrs": {},
+      "referenced": false,
+      "locked": false
+    }
+  ]
+}

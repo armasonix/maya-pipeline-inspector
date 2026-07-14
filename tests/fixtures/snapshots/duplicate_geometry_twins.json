@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "examples/geometry_duplicates/pipeline_inspector_demo_geo_twins.ma",
+  "maya_version": "2025",
+  "renderer": "common",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-14T14:00:00Z",
+  "nodes": [],
+  "connections": [],
+  "materials": [],
+  "shading_engines": [],
+  "file_dependencies": [],
+  "references": [],
+  "shapes": [
+    {
+      "node_id": "mesh:body_geo",
+      "name": "body_geo",
+      "full_name": "|world|body_geo",
+      "type_name": "mesh",
+      "transform_id": "transform:body_geo",
+      "polygon_count": 1200,
+      "vertex_count": 620,
+      "face_count": 1200,
+      "edge_count": 1800,
+      "world_bbox": {
+        "min_x": 0.0,
+        "min_y": 0.0,
+        "min_z": 0.0,
+        "max_x": 10.0,
+        "max_y": 5.0,
+        "max_z": 2.0
+      },
+      "topology_fingerprint": "sha256:geo_twin_a",
+      "instancing_key": "mesh:body_geo",
+      "proxy_attrs": {},
+      "referenced": false,
+      "locked": false
+    },
+    {
+      "node_id": "mesh:body_geo_copy",
+      "name": "body_geo_copy",
+      "full_name": "|world|body_geo_copy",
+      "type_name": "mesh",
+      "transform_id": "transform:body_geo_copy",
+      "polygon_count": 1200,
+      "vertex_count": 620,
+      "face_count": 1200,
+      "edge_count": 1800,
+      "world_bbox": {
+        "min_x": 0.0,
+        "min_y": 0.0,
+        "min_z": 0.0,
+        "max_x": 10.0,
+        "max_y": 5.0,
+        "max_z": 2.0
+      },
+      "topology_fingerprint": "sha256:geo_twin_a",
+      "instancing_key": "mesh:body_geo_copy",
+      "proxy_attrs": {},
+      "referenced": false,
+      "locked": false
+    }
+  ]
+}

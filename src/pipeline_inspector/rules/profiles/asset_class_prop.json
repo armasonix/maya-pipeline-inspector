@@ -15,6 +15,15 @@
     },
     "common.texture.resolution.background.max": {
       "enabled": false
+    },
+    "common.geometry.polycount.hero.max": {
+      "enabled": false
+    },
+    "common.geometry.polycount.prop.max": {
+      "enabled": true
+    },
+    "common.geometry.polycount.background.max": {
+      "enabled": false
     }
   }
 }

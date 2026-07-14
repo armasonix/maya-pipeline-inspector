@@ -1,0 +1,53 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.geometry.duplicate.fingerprint",
+      "name": "Duplicate mesh geometry should be reviewed",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "graph",
+      "severity": "warning",
+      "owner": "modeling_td",
+      "message": "Multiple meshes share the same topology, bounds, and geometry attributes.",
+      "why": "Accidental mesh copies increase scene weight, rigging cost, and export size. Reporting geometry-identical meshes helps consolidate redundant shapes while allowing intentional instance groups.",
+      "match": {},
+      "check": {
+        "type": "duplicate_geometry",
+        "max_shapes": 500,
+        "min_group_size": 2,
+        "bbox_precision": 3,
+        "match_attributes": []
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.geometry.duplicate.scan_cap",
+      "name": "Duplicate geometry scan budget exceeded for large scenes",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "graph",
+      "severity": "warning",
+      "owner": "modeling_td",
+      "message": "Scene exceeds duplicate-scan geometry budget; duplicate detection may be truncated.",
+      "why": "Large scenes can contain hundreds of shapes. Capping duplicate geometry scans keeps validation responsive while still reporting duplicates inside the scanned subset.",
+      "match": {},
+      "check": {
+        "type": "duplicate_geometry_scan_budget",
+        "max_shapes": 500
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
