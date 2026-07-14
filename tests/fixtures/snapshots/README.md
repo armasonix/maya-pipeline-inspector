@@ -19,6 +19,7 @@ JSON snapshots in this folder drive renderer policy integration tests without la
 | `texture_optimized_missing.json` | `texture_optimized_missing.expectations.json` | Arnold | Missing .tx derivative; deadline_critical farm block |
 | `duplicate_material_twins.json` | `duplicate_material_twins.expectations.json` | V-Ray | Twin material graphs + duplicate texture path detection |
 | `studio_path_substitution.json` | `studio_path_substitution.expectations.json` | Arnold | `${STUDIO_*_ROOT}` token resolution and custom alias substitution |
+| `common_geometry_foundation.json` | — | Common | ShapeSnapshot geometry counts, bbox, topology fingerprint, proxy attrs |
 
 ## Adding a renderer fixture case
 

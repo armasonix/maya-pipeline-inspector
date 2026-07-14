@@ -36,11 +36,10 @@ This keeps the following systems aligned:
   "materials": [],
   "shading_engines": [],
   "file_dependencies": [],
-  "references": []
+  "references": [],
+  "shapes": []
 }
 ```
-
-## Required Top-Level Fields
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
@@ -56,6 +55,7 @@ This keeps the following systems aligned:
 | `shading_engines` | array | Yes | Shading engine assignments and shader links. |
 | `file_dependencies` | array | Yes | Texture/file dependencies collected from file nodes. |
 | `references` | array | Yes | Referenced scene metadata for reference-safe validation. |
+| `shapes` | array | Yes | Geometry summaries for assigned or scanned shape nodes. |
 | `vray_scene_metadata` | object or null | No | V-Ray scene enrichment payload when enrichment runs. |
 | `arnold_scene_metadata` | object or null | No | Arnold scene enrichment payload when enrichment runs. |
 
@@ -432,6 +432,61 @@ Optional image metadata. This may be unavailable in fast/deadline-critical profi
   "compression": "zip"
 }
 ```
+
+## ShapeSnapshot
+
+Geometry summary for a Maya shape node (`mesh`, proxy stand-in, etc.).
+
+```json
+{
+  "node_id": "mesh:body_geo",
+  "name": "body_geo",
+  "full_name": "|world|char_demo:body_geo",
+  "type_name": "mesh",
+  "transform_id": "transform:body_geo",
+  "polygon_count": 6,
+  "vertex_count": 8,
+  "face_count": 12,
+  "edge_count": 18,
+  "world_bbox": {
+    "min_x": -1.0,
+    "min_y": -2.0,
+    "min_z": -3.0,
+    "max_x": 4.0,
+    "max_y": 5.0,
+    "max_z": 6.0
+  },
+  "topology_fingerprint": "sha256:8f14e45fceea167a",
+  "instancing_key": "mesh:body_geo",
+  "proxy_attrs": {
+    "intermediateObject": false
+  },
+  "referenced": false,
+  "namespace": "char_demo",
+  "locked": false
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `node_id` | string | Yes | Stable shape ID, typically `mesh:<short_name>`. |
+| `name` | string | Yes | Short shape name. |
+| `full_name` | string | No | Full Maya DAG path. |
+| `type_name` | string | Yes | Maya shape type (`mesh`, `aiStandIn`, `VRayProxy`, ...). |
+| `transform_id` | string | No | Parent transform ID when known. |
+| `polygon_count` | integer | Yes | Polygon count from `polyEvaluate(polygon=True)`. |
+| `vertex_count` | integer | Yes | Vertex count from `polyEvaluate(vertex=True)`. |
+| `face_count` | integer | Yes | Face count from `polyEvaluate(face=True)`. |
+| `edge_count` | integer | Yes | Edge count from `polyEvaluate(edge=True)`. |
+| `world_bbox` | object or null | No | World-space axis-aligned bounds. |
+| `topology_fingerprint` | string | Yes | Hash of topology counts and face-vertex signature. |
+| `instancing_key` | string | Yes | Shared key for instanced copies of the same shape. |
+| `proxy_attrs` | object | Yes | Proxy/custom attrs (`dso`, `fileName`, subdivision flags, ...). |
+| `referenced` | boolean | Yes | True when shape comes from a referenced file. |
+| `namespace` | string or null | No | Maya namespace if present. |
+| `locked` | boolean | Yes | True when shape node is locked. |
+
+Rule scopes `shape` and `geometry` evaluate against `GraphSnapshot.shapes`.
 
 ## ReferenceSnapshot
 

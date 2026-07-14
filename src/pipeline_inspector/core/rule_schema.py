@@ -17,6 +17,7 @@ from pipeline_inspector.core.models import (
     MaterialSnapshot,
     NodeSnapshot,
     ShadingEngineSnapshot,
+    ShapeSnapshot,
 )
 
 JsonDict = dict[str, Any]
@@ -34,6 +35,8 @@ SCOPES = frozenset(
         "file_dependency",
         "connection",
         "shading_engine",
+        "shape",
+        "geometry",
         "graph",
     }
 )
@@ -814,6 +817,11 @@ class ValidationEngine:
                 _TargetContext("shading_engine", item.node_id, item)
                 for item in snapshot.shading_engines
             ]
+        if scope in {"shape", "geometry"}:
+            return [
+                _TargetContext("shape", item.node_id, item)
+                for item in snapshot.shapes
+            ]
         if scope in {"scene", "graph"}:
             return [_TargetContext(scope, snapshot.scene_path, snapshot)]
         return []
@@ -905,7 +913,7 @@ class ValidationEngine:
         if target is None:
             return None
         obj = target.obj
-        if isinstance(obj, (NodeSnapshot, MaterialSnapshot, ShadingEngineSnapshot)):
+        if isinstance(obj, (NodeSnapshot, MaterialSnapshot, ShadingEngineSnapshot, ShapeSnapshot)):
             return obj.name
         if isinstance(obj, FileDependencySnapshot):
             return obj.node_id

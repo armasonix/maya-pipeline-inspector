@@ -591,6 +591,110 @@ class ShadingEngineSnapshot:
         )
 
 @dataclass(frozen=True)
+class BoundingBoxSnapshot:
+    """Axis-aligned world-space bounds for a shape."""
+
+    min_x: float
+    min_y: float
+    min_z: float
+    max_x: float
+    max_y: float
+    max_z: float
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "min_x": self.min_x,
+            "min_y": self.min_y,
+            "min_z": self.min_z,
+            "max_x": self.max_x,
+            "max_y": self.max_y,
+            "max_z": self.max_z,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> BoundingBoxSnapshot:
+        return cls(
+            min_x=float(data.get("min_x", 0.0)),
+            min_y=float(data.get("min_y", 0.0)),
+            min_z=float(data.get("min_z", 0.0)),
+            max_x=float(data.get("max_x", 0.0)),
+            max_y=float(data.get("max_y", 0.0)),
+            max_z=float(data.get("max_z", 0.0)),
+        )
+
+
+@dataclass(frozen=True)
+class ShapeSnapshot:
+    """Renderer-agnostic geometry summary for a Maya shape node."""
+
+    node_id: str
+    name: str
+    full_name: str = ""
+    type_name: str = "mesh"
+    transform_id: str = ""
+    polygon_count: int = 0
+    vertex_count: int = 0
+    face_count: int = 0
+    edge_count: int = 0
+    world_bbox: Optional[BoundingBoxSnapshot] = None
+    topology_fingerprint: str = ""
+    instancing_key: str = ""
+    proxy_attrs: JsonDict = field(default_factory=dict)
+    referenced: bool = False
+    namespace: Optional[str] = None
+    locked: bool = False
+
+    def to_dict(self) -> JsonDict:
+        payload: JsonDict = {
+            "node_id": self.node_id,
+            "name": self.name,
+            "full_name": self.full_name,
+            "type_name": self.type_name,
+            "transform_id": self.transform_id,
+            "polygon_count": self.polygon_count,
+            "vertex_count": self.vertex_count,
+            "face_count": self.face_count,
+            "edge_count": self.edge_count,
+            "topology_fingerprint": self.topology_fingerprint,
+            "instancing_key": self.instancing_key,
+            "proxy_attrs": dict(self.proxy_attrs),
+            "referenced": self.referenced,
+            "namespace": self.namespace,
+            "locked": self.locked,
+        }
+        if self.world_bbox is not None:
+            payload["world_bbox"] = self.world_bbox.to_dict()
+        else:
+            payload["world_bbox"] = None
+        return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ShapeSnapshot:
+        raw_bbox = data.get("world_bbox")
+        world_bbox = None
+        if isinstance(raw_bbox, Mapping):
+            world_bbox = BoundingBoxSnapshot.from_dict(raw_bbox)
+        return cls(
+            node_id=str(data.get("node_id", "")),
+            name=str(data.get("name", "")),
+            full_name=str(data.get("full_name", "")),
+            type_name=str(data.get("type_name", "mesh")),
+            transform_id=str(data.get("transform_id", "")),
+            polygon_count=int(data.get("polygon_count", 0)),
+            vertex_count=int(data.get("vertex_count", 0)),
+            face_count=int(data.get("face_count", 0)),
+            edge_count=int(data.get("edge_count", 0)),
+            world_bbox=world_bbox,
+            topology_fingerprint=str(data.get("topology_fingerprint", "")),
+            instancing_key=str(data.get("instancing_key", "")),
+            proxy_attrs=_as_dict(data.get("proxy_attrs")),
+            referenced=bool(data.get("referenced", False)),
+            namespace=data.get("namespace"),
+            locked=bool(data.get("locked", False)),
+        )
+
+
+@dataclass(frozen=True)
 class ReferenceSnapshot:
     """Referenced Maya file metadata needed for reference-safe validation."""
 
@@ -635,6 +739,7 @@ class GraphSnapshot:
     shading_engines: list[ShadingEngineSnapshot] = field(default_factory=list)
     file_dependencies: list[FileDependencySnapshot] = field(default_factory=list)
     references: list[ReferenceSnapshot] = field(default_factory=list)
+    shapes: list[ShapeSnapshot] = field(default_factory=list)
     vray_scene_metadata: Optional[VraySceneMetadata] = None
     arnold_scene_metadata: Optional[ArnoldSceneMetadata] = None
 
@@ -652,6 +757,7 @@ class GraphSnapshot:
             "shading_engines": [engine.to_dict() for engine in self.shading_engines],
             "file_dependencies": [dependency.to_dict() for dependency in self.file_dependencies],
             "references": [reference.to_dict() for reference in self.references],
+            "shapes": [shape.to_dict() for shape in self.shapes],
         }
         if self.vray_scene_metadata is not None:
             payload["vray_scene_metadata"] = self.vray_scene_metadata.to_dict()
@@ -699,6 +805,10 @@ class GraphSnapshot:
             references=[
                 ReferenceSnapshot.from_dict(_require_mapping(item, "references item"))
                 for item in data.get("references", [])
+            ],
+            shapes=[
+                ShapeSnapshot.from_dict(_require_mapping(item, "shapes item"))
+                for item in data.get("shapes", [])
             ],
             vray_scene_metadata=vray_scene_metadata,
             arnold_scene_metadata=arnold_scene_metadata,
