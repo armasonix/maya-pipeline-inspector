@@ -592,6 +592,7 @@ def test_main_widget_contains_tabbed_shell():
         "Waivers",
         "Fixes",
         "Reports",
+        "Readiness",
         "Farm",
     ]
 

@@ -11,6 +11,7 @@ from pipeline_inspector.studio_config import ConnectorSettings, StudioConfig
 from pipeline_inspector.ui.bug_report_section import read_bug_report_from_view
 from pipeline_inspector.ui.studio_environment_section import read_studio_environment_from_view
 from pipeline_inspector.ui.studio_policy_section import read_studio_policy_from_view
+from pipeline_inspector.ui.support_section import read_readiness_from_view
 from pipeline_inspector.user_config import UserPreferences
 
 SETTINGS_DIRTY_BANNER_OBJECT_NAME = "pipelineInspectorSettingsDirtyBanner"
@@ -80,6 +81,11 @@ def studio_config_from_settings_view(
             base=base.with_updates(
                 connectors=connectors,
                 studio_environment=studio_environment,
+                readiness=read_readiness_from_view(
+                    view,
+                    qt_widgets,
+                    base=base.readiness,
+                ),
             ),
         ),
     )

@@ -16,6 +16,9 @@ from pipeline_inspector.studio_config import (
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
     PipelineSettings,
+    ReadinessCheckRequirements,
+    ReadinessSettings,
+    ReadinessSupportContacts,
     SlackConnectorSettings,
     StudioConfig,
     StudioEnvironmentSettings,
@@ -239,6 +242,36 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
     assert loaded.connectors.slack.notify_on == ("block_publish",)
     assert loaded.connectors.slack.include_report_link is False
+
+
+def test_studio_config_round_trips_readiness_block(tmp_path: Path):
+    path = tmp_path / STUDIO_CONFIG_FILENAME
+    original = StudioConfig(
+        readiness=ReadinessSettings(
+            checks=ReadinessCheckRequirements(
+                maya_plugins=("mtoa",),
+                mapped_drives=("Z",),
+                env_vars=("PIPELINE_ROOT",),
+                network_paths=("\\\\farm\\textures",),
+                software_versions={"maya": "2025"},
+            ),
+            support=ReadinessSupportContacts(
+                sysadmin_telegram_chat_id="-10011",
+                support_telegram_chat_id="-10022",
+            ),
+        )
+    )
+
+    save_studio_config(path, original)
+    loaded = load_studio_config(path)
+
+    assert loaded.readiness.checks.maya_plugins == ("mtoa",)
+    assert loaded.readiness.checks.mapped_drives == ("Z",)
+    assert loaded.readiness.checks.env_vars == ("PIPELINE_ROOT",)
+    assert loaded.readiness.checks.network_paths == ("\\\\farm\\textures",)
+    assert loaded.readiness.checks.software_versions == {"maya": "2025"}
+    assert loaded.readiness.support.sysadmin_telegram_chat_id == "-10011"
+    assert loaded.readiness.support.support_telegram_chat_id == "-10022"
 
 
 def test_connector_settings_preserves_extensible_connectors():

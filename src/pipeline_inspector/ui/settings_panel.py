@@ -62,6 +62,10 @@ from pipeline_inspector.ui.studio_policy_section import (
     build_studio_policy_section,
     update_studio_policy_view,
 )
+from pipeline_inspector.ui.support_section import (
+    build_support_and_roles_section,
+    update_support_and_roles_view,
+)
 from pipeline_inspector.user_config import UserPreferences
 
 SETTINGS_VIEW_OBJECT_NAME = "pipelineInspectorSettingsView"
@@ -105,6 +109,7 @@ class SettingsActionCallbacks:
     on_cerebro_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
+    on_readiness_settings_changed: Optional[Callable[[], None]] = None
     on_bug_report_settings_changed: Optional[Callable[[], None]] = None
     on_bug_report_enabled_changed: Optional[Callable[[bool], None]] = None
     on_save_studio_settings: Optional[Callable[[], None]] = None
@@ -275,6 +280,7 @@ def update_settings_view(
     """Refresh settings controls from the active studio and user config."""
 
     update_studio_policy_view(view, qt_widgets, config)
+    update_support_and_roles_view(view, qt_widgets, config.readiness)
     update_connector_views(view, qt_widgets, config.connectors)
     update_tracker_views(view, qt_widgets, config.connectors)
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
@@ -496,6 +502,13 @@ def _build_studio_tab(
             config,
             on_require_tx_changed=callbacks.on_require_tx_changed,
             on_settings_changed=callbacks.on_studio_policy_changed,
+        )
+    )
+    layout.addWidget(
+        build_support_and_roles_section(
+            qt_widgets,
+            config,
+            on_settings_changed=callbacks.on_readiness_settings_changed,
         )
     )
     layout.addStretch(1)
