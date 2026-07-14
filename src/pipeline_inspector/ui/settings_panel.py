@@ -52,7 +52,11 @@ from pipeline_inspector.ui.settings_tabs import (
     build_placeholder_tab,
     get_settings_tab_spec,
 )
-from pipeline_inspector.ui.settings_widgets import find_child, wire_button
+from pipeline_inspector.ui.settings_widgets import (
+    build_borderless_scroll_area,
+    find_child,
+    wire_button,
+)
 from pipeline_inspector.ui.studio_environment_section import (
     build_studio_environment_section,
     update_studio_environment_view,
@@ -85,6 +89,8 @@ SETTINGS_LOAD_BUTTON_OBJECT_NAME = SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME
 SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME
 
 SETTINGS_PIPELINE_SECTION_OBJECT_NAME = "pipelineInspectorSettingsPipelineSection"
+SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollArea"
+SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollContent"
 
 
 @dataclass(frozen=True)
@@ -496,7 +502,13 @@ def _build_studio_tab(
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
-    layout.addWidget(
+
+    scroll_content = qt_widgets.QWidget()
+    scroll_content.setObjectName(SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME)
+    content_layout = qt_widgets.QVBoxLayout(scroll_content)
+    content_layout.setContentsMargins(0, 0, 0, 0)
+    content_layout.setSpacing(8)
+    content_layout.addWidget(
         build_studio_policy_section(
             qt_widgets,
             config,
@@ -504,14 +516,21 @@ def _build_studio_tab(
             on_settings_changed=callbacks.on_studio_policy_changed,
         )
     )
-    layout.addWidget(
+    content_layout.addWidget(
         build_support_and_roles_section(
             qt_widgets,
             config,
             on_settings_changed=callbacks.on_readiness_settings_changed,
         )
     )
-    layout.addStretch(1)
+    content_layout.addStretch(1)
+
+    scroll_area = build_borderless_scroll_area(
+        qt_widgets,
+        object_name=SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME,
+        content_widget=scroll_content,
+    )
+    layout.addWidget(scroll_area)
     return tab
 
 

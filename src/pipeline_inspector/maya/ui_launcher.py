@@ -1098,6 +1098,32 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
+    #region agent log
+    import json as _json
+    import time as _time
+    from pathlib import Path as _Path
+
+    _log_path = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+    try:
+        with _log_path.open("a", encoding="utf-8") as _handle:
+            _handle.write(
+                _json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "ui_launcher.py:_sync_readiness_from_ui",
+                        "message": "readiness sync triggered",
+                        "data": {"refresh_view": False},
+                        "timestamp": int(_time.time() * 1000),
+                        "hypothesisId": "B",
+                        "runId": "post-fix",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    #endregion
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
@@ -1108,8 +1134,33 @@ def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
         base=current.readiness,
     )
     updated = current.with_updates(readiness=readiness)
-    _set_studio_config(content, qt_widgets, updated)
+    setattr(content, STUDIO_CONFIG_ATTR, updated)
+    setattr(
+        content,
+        MERGED_RUNTIME_CONFIG_ATTR,
+        merge_runtime_config(updated, _user_config_for_content(content)),
+    )
     _refresh_readiness_tab(content, qt_widgets)
+    dirty_state = _settings_dirty_state(content, settings_view, qt_widgets)
+    from pipeline_inspector.ui.settings_dirty_state import dirty_indicator_text
+    from pipeline_inspector.ui.settings_panel import SETTINGS_DIRTY_BANNER_OBJECT_NAME
+
+    dirty_banner = _find_child(
+        settings_view,
+        qt_widgets.QLabel,
+        SETTINGS_DIRTY_BANNER_OBJECT_NAME,
+    )
+    if dirty_banner is not None:
+        banner_text = dirty_indicator_text(dirty_state)
+        dirty_banner.setText(banner_text)
+        set_visible = getattr(dirty_banner, "setVisible", None)
+        if set_visible is not None:
+            set_visible(bool(banner_text))
+    main_window.update_panel_header_unsaved_indicator(
+        content,
+        qt_widgets,
+        dirty=dirty_state.any_dirty,
+    )
 
 
 def _sync_bug_report_from_ui(content: Any, qt_widgets: Any) -> None:

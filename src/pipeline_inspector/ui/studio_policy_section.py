@@ -4,10 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Optional
 
-from pipeline_inspector.core.naming_conventions import (
-    format_naming_templates_text,
-    parse_naming_templates_text,
-)
+from pipeline_inspector.core.naming_conventions import NAMING_OBJECT_TYPES
 from pipeline_inspector.studio_config import (
     DEFAULT_WAIVER_EXPIRY_DAYS,
     NamingTemplatesSettings,
@@ -34,6 +31,23 @@ _LABEL_WIDTH = 84
 _FIELD_WIDTH = 240
 _PLAIN_TEXT_WIDTH = 292
 _PLAIN_TEXT_HEIGHT = 72
+_NAMING_FIELD_WIDTH = 200
+_NAMING_LABELS: dict[str, str] = {
+    "mesh": "Mesh",
+    "group": "Group",
+    "material": "Material",
+    "control": "Control",
+    "texture": "Texture",
+    "shading_engine": "Shading engine",
+}
+_NAMING_PLACEHOLDERS: dict[str, str] = {
+    "mesh": r"^geo_[A-Za-z0-9_]+$",
+    "group": r"^grp_[A-Za-z0-9_]+$",
+    "material": r"^mat_[A-Za-z0-9_]+$",
+    "control": r"^ctrl_[A-Za-z0-9_]+$",
+    "texture": r"^tex_[A-Za-z0-9_]+$",
+    "shading_engine": r"^SG_[A-Za-z0-9_]+$",
+}
 _STUDIO_TOGGLE_LABEL_WIDTH = 228
 _STUDIO_TOGGLE_GAP = 12
 
@@ -68,9 +82,22 @@ SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME = (
 SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME = (
     "pipelineInspectorSettingsExtraRulesFolderInput"
 )
-SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME = (
-    "pipelineInspectorSettingsNamingTemplatesInput"
+SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME = "pipelineInspectorSettingsNamingMeshInput"
+SETTINGS_NAMING_GROUP_INPUT_OBJECT_NAME = "pipelineInspectorSettingsNamingGroupInput"
+SETTINGS_NAMING_MATERIAL_INPUT_OBJECT_NAME = "pipelineInspectorSettingsNamingMaterialInput"
+SETTINGS_NAMING_CONTROL_INPUT_OBJECT_NAME = "pipelineInspectorSettingsNamingControlInput"
+SETTINGS_NAMING_TEXTURE_INPUT_OBJECT_NAME = "pipelineInspectorSettingsNamingTextureInput"
+SETTINGS_NAMING_SHADING_ENGINE_INPUT_OBJECT_NAME = (
+    "pipelineInspectorSettingsNamingShadingEngineInput"
 )
+SETTINGS_NAMING_TEMPLATE_INPUT_OBJECT_NAMES: dict[str, str] = {
+    "mesh": SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME,
+    "group": SETTINGS_NAMING_GROUP_INPUT_OBJECT_NAME,
+    "material": SETTINGS_NAMING_MATERIAL_INPUT_OBJECT_NAME,
+    "control": SETTINGS_NAMING_CONTROL_INPUT_OBJECT_NAME,
+    "texture": SETTINGS_NAMING_TEXTURE_INPUT_OBJECT_NAME,
+    "shading_engine": SETTINGS_NAMING_SHADING_ENGINE_INPUT_OBJECT_NAME,
+}
 
 
 def build_studio_policy_section(
@@ -231,22 +258,29 @@ def build_studio_policy_section(
     )
 
     layout.addWidget(_section_title(qt_widgets, "Naming conventions"))
-    naming_templates_input = _build_plain_text_input(
-        qt_widgets,
-        object_name=SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME,
-        text=format_naming_templates_text(config.pipeline.naming_templates.templates),
-        placeholder="mesh=^geo_[A-Za-z0-9_]+$\ngroup=^grp_[A-Za-z0-9_]+$\nmaterial=^mat_[A-Za-z0-9_]+$",
-        tooltip=(
-            "One regex template per line using object_type=pattern. "
-            "Supported types: mesh, group, material, control, texture, shading_engine."
-        ),
-        width=_PLAIN_TEXT_WIDTH,
-        height=_PLAIN_TEXT_HEIGHT,
+    naming_hint = qt_widgets.QLabel(
+        "Enter one regex per object type. Leave a field blank to skip that type."
     )
-    wire_plain_text_changed(naming_templates_input, on_settings_changed)
-    layout.addWidget(
-        _labeled_field_row(qt_widgets, "Templates", naming_templates_input)
-    )
+    naming_hint.setWordWrap(True)
+    layout.addWidget(naming_hint)
+    templates = config.pipeline.naming_templates.templates
+    for object_type in NAMING_OBJECT_TYPES:
+        pattern = str(templates.get(object_type, "") or "")
+        field = qt_widgets.QLineEdit(pattern)
+        field.setObjectName(SETTINGS_NAMING_TEMPLATE_INPUT_OBJECT_NAMES[object_type])
+        field.setPlaceholderText(_NAMING_PLACEHOLDERS.get(object_type, ""))
+        field.setToolTip(
+            f"Regex used when validating {object_type} names in the scene."
+        )
+        _configure_compact_line_edit(qt_widgets, field, _NAMING_FIELD_WIDTH)
+        wire_line_edit_finished(field, on_settings_changed)
+        layout.addWidget(
+            _labeled_field_row(
+                qt_widgets,
+                _NAMING_LABELS.get(object_type, object_type),
+                field,
+            )
+        )
 
     layout.addWidget(_section_title(qt_widgets, "Rule authoring"))
     extra_rules_input = qt_widgets.QLineEdit(config.pipeline.extra_rules_folder)
@@ -332,15 +366,7 @@ def read_pipeline_settings_from_view(
         ),
         manifest_gate_defaults=_read_manifest_gate_defaults(view, qt_widgets, current),
         naming_templates=NamingTemplatesSettings(
-            templates=parse_naming_templates_text(
-                _plain_text(
-                    find_child(
-                        view,
-                        _plain_text_widget_type(qt_widgets),
-                        SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME,
-                    )
-                )
-            )
+            templates=_read_naming_templates_from_view(view, qt_widgets)
         ),
         pinned_workflow_profile_ids=parse_profile_id_list(
             _plain_text(
@@ -452,22 +478,32 @@ def update_pipeline_settings_view(
             asset_class_input,
             format_profile_id_list(pipeline.pinned_asset_class_profile_ids),
         )
-    naming_templates_input = find_child(
-        view,
-        _plain_text_widget_type(qt_widgets),
-        SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME,
-    )
-    if naming_templates_input is not None and not widget_has_focus(naming_templates_input):
-        _set_plain_text(
-            naming_templates_input,
-            format_naming_templates_text(pipeline.naming_templates.templates),
-        )
+    for object_type, object_name in SETTINGS_NAMING_TEMPLATE_INPUT_OBJECT_NAMES.items():
+        field = find_child(view, qt_widgets.QLineEdit, object_name)
+        if field is not None and not widget_has_focus(field):
+            set_line_edit_text(
+                view,
+                qt_widgets,
+                object_name,
+                str(pipeline.naming_templates.templates.get(object_type, "") or ""),
+            )
     set_line_edit_text(
         view,
         qt_widgets,
         SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME,
         pipeline.extra_rules_folder,
     )
+
+
+def _read_naming_templates_from_view(view: Any, qt_widgets: Any) -> dict[str, str]:
+    """Read per-type naming regex fields from the Studio tab."""
+
+    templates: dict[str, str] = {}
+    for object_type, object_name in SETTINGS_NAMING_TEMPLATE_INPUT_OBJECT_NAMES.items():
+        pattern = line_edit_text(view, qt_widgets, object_name, fallback="").strip()
+        if pattern:
+            templates[object_type] = pattern
+    return templates
 
 
 def parse_profile_id_list(text: str) -> tuple[str, ...]:

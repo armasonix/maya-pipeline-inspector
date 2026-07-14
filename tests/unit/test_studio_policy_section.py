@@ -13,7 +13,10 @@ from pipeline_inspector.ui.studio_policy_section import (
     SETTINGS_MANIFEST_BLOCK_NEW_TEXTURES_TOGGLE_OBJECT_NAME,
     SETTINGS_MANIFEST_MAX_FINGERPRINT_CHANGES_INPUT_OBJECT_NAME,
     SETTINGS_MANIFEST_MAX_NEW_CHANGES_INPUT_OBJECT_NAME,
-    SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME,
+    SETTINGS_NAMING_CONTROL_INPUT_OBJECT_NAME,
+    SETTINGS_NAMING_GROUP_INPUT_OBJECT_NAME,
+    SETTINGS_NAMING_MATERIAL_INPUT_OBJECT_NAME,
+    SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME,
     SETTINGS_PINNED_ASSET_CLASS_PROFILES_INPUT_OBJECT_NAME,
     SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
     SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME,
@@ -101,6 +104,9 @@ class FakePlainTextEdit(FakeWidget):
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
+
+    def clear(self) -> None:
+        self.value = ""
 
 
 class FakePushButton(FakeWidget):
@@ -303,9 +309,8 @@ def test_build_studio_policy_section_populates_policy_fields():
     assert _find(section, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).value == (
         "artist_relaxed"
     )
-    assert _find(section, SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME).value == (
-        "mesh=^geo_.+$\nmaterial=^mat_.+$"
-    )
+    assert _find(section, SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME).value == r"^geo_.+$"
+    assert _find(section, SETTINGS_NAMING_MATERIAL_INPUT_OBJECT_NAME).value == r"^mat_.+$"
 
 
 def test_read_studio_policy_from_view_reads_policy_fields():
@@ -327,9 +332,8 @@ def test_read_studio_policy_from_view_reads_policy_fields():
     _find(section, SETTINGS_EXTRA_RULES_FOLDER_INPUT_OBJECT_NAME).setText(
         "D:/studio/extra_rules"
     )
-    _find(section, SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME).setPlainText(
-        "mesh=^geo_body$\ncontrol=^ctrl_.+$"
-    )
+    _find(section, SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME).setText(r"^geo_body$")
+    _find(section, SETTINGS_NAMING_CONTROL_INPUT_OBJECT_NAME).setText(r"^ctrl_.+$")
 
     studio = read_studio_policy_from_view(section, FakeQtWidgets, base=config)
 
@@ -370,4 +374,5 @@ def test_update_studio_policy_view_refreshes_policy_fields():
     assert _find(section, SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME).value == (
         "deadline_critical"
     )
-    assert _find(section, SETTINGS_NAMING_TEMPLATES_INPUT_OBJECT_NAME).value == "group=^grp_.+$"
+    assert _find(section, SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME).value == ""
+    assert _find(section, SETTINGS_NAMING_GROUP_INPUT_OBJECT_NAME).value == r"^grp_.+$"

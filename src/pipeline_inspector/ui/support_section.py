@@ -1,7 +1,10 @@
 """Support and Roles settings plus readiness requirements for the Studio tab."""
 from __future__ import annotations
 
+import json as _json
+import time as _time
 from collections.abc import Callable, Mapping
+from pathlib import Path as _Path
 from typing import Any, Optional
 
 from pipeline_inspector.studio_config import (
@@ -16,6 +19,7 @@ from pipeline_inspector.ui.settings_widgets import (
     qt_align_left_vcenter,
     set_fixed_horizontal_size_policy,
     set_line_edit_text,
+    widget_has_focus,
     wire_line_edit_finished,
     wire_plain_text_changed,
 )
@@ -44,7 +48,37 @@ SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME = (
     "pipelineInspectorSettingsReadinessSoftwareVersionsInput"
 )
 
-_FIELD_WIDTH = 292
+_FIELD_WIDTH = 146
+_PLAIN_TEXT_WIDTH = 146
+_PLAIN_TEXT_HEIGHT = 56
+
+_READINESS_TRACE_LOG = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+
+
+def _write_readiness_trace(
+    *,
+    location: str,
+    message: str,
+    data: dict[str, object],
+    hypothesis_id: str,
+    run_id: str = "pre-fix",
+) -> None:
+    #region agent log
+    payload = {
+        "sessionId": "618f4f",
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(_time.time() * 1000),
+        "hypothesisId": hypothesis_id,
+        "runId": run_id,
+    }
+    try:
+        with _READINESS_TRACE_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(_json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    #endregion
 
 
 def build_support_and_roles_section(
@@ -103,6 +137,7 @@ def build_support_and_roles_section(
                 "mtoa\nvrayformaya",
                 on_settings_changed,
             ),
+            hint="mtoa\nvrayformaya",
         )
     )
     layout.addWidget(
@@ -116,6 +151,7 @@ def build_support_and_roles_section(
                 "Z:\nY:",
                 on_settings_changed,
             ),
+            hint="Z:\nY:",
         )
     )
     layout.addWidget(
@@ -129,6 +165,7 @@ def build_support_and_roles_section(
                 "PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT",
                 on_settings_changed,
             ),
+            hint="PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT",
         )
     )
     layout.addWidget(
@@ -142,6 +179,7 @@ def build_support_and_roles_section(
                 "\\\\farm\\textures",
                 on_settings_changed,
             ),
+            hint="\\\\farm\\textures",
         )
     )
     layout.addWidget(
@@ -155,6 +193,7 @@ def build_support_and_roles_section(
                 "maya=2025",
                 on_settings_changed,
             ),
+            hint="maya=2025",
         )
     )
     return section
@@ -252,45 +291,50 @@ def update_support_and_roles_view(
         SETTINGS_SUPPORT_CHAT_ID_INPUT_OBJECT_NAME,
         readiness.support.support_telegram_chat_id,
     )
-    _set_plain_text(
+    _set_plain_text_if_unfocused(
         find_child(
             view,
             _plain_text_widget_type(qt_widgets),
             SETTINGS_READINESS_PLUGINS_INPUT_OBJECT_NAME,
         ),
         _lines(readiness.checks.maya_plugins),
+        field_name="maya_plugins",
     )
-    _set_plain_text(
+    _set_plain_text_if_unfocused(
         find_child(
             view,
             _plain_text_widget_type(qt_widgets),
             SETTINGS_READINESS_DRIVES_INPUT_OBJECT_NAME,
         ),
         _lines(readiness.checks.mapped_drives),
+        field_name="mapped_drives",
     )
-    _set_plain_text(
+    _set_plain_text_if_unfocused(
         find_child(
             view,
             _plain_text_widget_type(qt_widgets),
             SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME,
         ),
         _lines(readiness.checks.env_vars),
+        field_name="env_vars",
     )
-    _set_plain_text(
+    _set_plain_text_if_unfocused(
         find_child(
             view,
             _plain_text_widget_type(qt_widgets),
             SETTINGS_READINESS_NETWORK_PATHS_INPUT_OBJECT_NAME,
         ),
         _lines(readiness.checks.network_paths),
+        field_name="network_paths",
     )
-    _set_plain_text(
+    _set_plain_text_if_unfocused(
         find_child(
             view,
             _plain_text_widget_type(qt_widgets),
             SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME,
         ),
         _software_version_lines(readiness.checks.software_versions),
+        field_name="software_versions",
     )
 
 
@@ -322,9 +366,10 @@ def _software_version_lines(versions: Mapping[str, str]) -> str:
 
 def _section_title(qt_widgets: Any, text: str) -> Any:
     label = qt_widgets.QLabel(text)
-    set_bold = getattr(label, "setStyleSheet", None)
-    if set_bold is not None:
-        set_bold("font-weight: 600;")
+    set_style = getattr(label, "setStyleSheet", None)
+    if set_style is not None:
+        set_style("font-size: 11pt; font-weight: bold;")
+    set_fixed_horizontal_size_policy(qt_widgets, label)
     return label
 
 
@@ -350,13 +395,28 @@ def _labeled_field_row(qt_widgets: Any, label: str, field: Any) -> Any:
     return host
 
 
-def _labeled_plain_text_row(qt_widgets: Any, label: str, field: Any) -> Any:
+def _labeled_plain_text_row(
+    qt_widgets: Any,
+    label: str,
+    field: Any,
+    *,
+    hint: str = "",
+) -> Any:
     row = qt_widgets.QWidget()
     row_layout = qt_widgets.QVBoxLayout(row)
     row_layout.setContentsMargins(0, 0, 0, 0)
     row_layout.setSpacing(2)
     row_layout.addWidget(qt_widgets.QLabel(label))
     row_layout.addWidget(field)
+    if hint:
+        hint_label = qt_widgets.QLabel(hint)
+        set_word_wrap = getattr(hint_label, "setWordWrap", None)
+        if set_word_wrap is not None:
+            set_word_wrap(True)
+        set_style = getattr(hint_label, "setStyleSheet", None)
+        if set_style is not None:
+            set_style("color: #888888;")
+        row_layout.addWidget(hint_label)
     return row
 
 
@@ -377,11 +437,54 @@ def _build_plain_text_input(
     plain_text_class = _plain_text_widget_type(qt_widgets)
     widget = plain_text_class()
     widget.setObjectName(object_name)
-    _set_plain_text(widget, value)
+    if value:
+        _set_plain_text(widget, value)
+    else:
+        clear = getattr(widget, "clear", None)
+        if clear is not None:
+            clear()
     set_placeholder = getattr(widget, "setPlaceholderText", None)
     if set_placeholder is not None:
         set_placeholder(placeholder)
-    wire_plain_text_changed(widget, on_settings_changed)
+    #region agent log
+    _write_readiness_trace(
+        location="support_section.py:_build_plain_text_input",
+        message="readiness field built",
+        data={
+            "object_name": object_name,
+            "value_empty": not bool(value),
+            "placeholder": placeholder,
+        },
+        hypothesis_id="B",
+        run_id="post-fix",
+    )
+    #endregion
+    set_fixed_width = getattr(widget, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(_PLAIN_TEXT_WIDTH)
+    set_fixed_height = getattr(widget, "setFixedHeight", None)
+    if set_fixed_height is not None:
+        set_fixed_height(_PLAIN_TEXT_HEIGHT)
+    set_fixed_horizontal_size_policy(qt_widgets, widget)
+
+    def _on_plain_text_changed() -> None:
+        #region agent log
+        _write_readiness_trace(
+            location="support_section.py:_on_plain_text_changed",
+            message="readiness plain text changed",
+            data={
+                "object_name": object_name,
+                "text": _plain_text(widget),
+                "cursor_pos": _plain_text_cursor_position(widget),
+            },
+            hypothesis_id="B",
+            run_id="post-fix",
+        )
+        #endregion
+        if on_settings_changed is not None:
+            on_settings_changed()
+
+    wire_plain_text_changed(widget, _on_plain_text_changed)
     return widget
 
 
@@ -402,6 +505,74 @@ def _plain_text(widget: Any | None) -> str:
     if text is not None:
         return str(text() or "")
     return ""
+
+
+def _set_plain_text_if_unfocused(
+    widget: Any | None,
+    text: str,
+    *,
+    field_name: str,
+) -> None:
+    """Apply plain text only when the field is not being edited."""
+
+    has_focus = widget_has_focus(widget) if widget is not None else False
+    current_text = _plain_text(widget)
+    cursor_pos = _plain_text_cursor_position(widget)
+    layout_direction = _widget_layout_direction(widget)
+    skip_focus = has_focus
+    skip_unchanged = current_text == text
+    #region agent log
+    _write_readiness_trace(
+        location="support_section.py:_set_plain_text_if_unfocused",
+        message="update_support_and_roles_view plain text apply",
+        data={
+            "field_name": field_name,
+            "has_focus": has_focus,
+            "current_text": current_text,
+            "incoming_text": text,
+            "cursor_pos": cursor_pos,
+            "layout_direction": layout_direction,
+            "will_rewrite": not skip_unchanged,
+            "skipped": skip_focus or skip_unchanged,
+        },
+        hypothesis_id="A",
+        run_id="post-fix",
+    )
+    #endregion
+    if skip_focus or skip_unchanged:
+        return
+    _set_plain_text(widget, text)
+
+
+def _plain_text_cursor_position(widget: Any | None) -> int | None:
+    if widget is None:
+        return None
+    cursor = getattr(widget, "textCursor", None)
+    if cursor is None:
+        return None
+    try:
+        cursor_obj = cursor()
+    except TypeError:
+        return None
+    position = getattr(cursor_obj, "position", None)
+    if position is None:
+        return None
+    try:
+        return int(position())
+    except TypeError:
+        return int(position) if isinstance(position, int) else None
+
+
+def _widget_layout_direction(widget: Any | None) -> str | None:
+    if widget is None:
+        return None
+    layout_direction = getattr(widget, "layoutDirection", None)
+    if layout_direction is None:
+        return None
+    try:
+        return str(layout_direction())
+    except TypeError:
+        return str(layout_direction)
 
 
 def _set_plain_text(widget: Any | None, text: str) -> None:

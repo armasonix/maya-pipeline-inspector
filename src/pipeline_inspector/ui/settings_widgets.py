@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any, Optional
 
 _TOGGLE_STYLE_BASE = (
-    "min-width: 52px; min-height: 24px; padding: 3px 10px; border-radius: 7px; "
+    "min-width: 52px; min-height: 28px; padding: 4px 10px 5px 10px; border-radius: 7px; "
     "font-weight: bold; font-size: 11px; margin: 0px;"
 )
 _TOGGLE_OFF_STYLE = (
@@ -70,7 +70,7 @@ def _apply_toggle_size_policy(qt_widgets: Any, button: Any) -> None:
         set_min_width(52)
     set_min_height = getattr(button, "setMinimumHeight", None)
     if set_min_height is not None:
-        set_min_height(24)
+        set_min_height(28)
 
 
 def wire_button(button: Any, callback: Optional[Callable[[], None]]) -> None:
@@ -431,7 +431,7 @@ def build_labeled_toggle_row(
         set_horizontal_spacing(gap)
     set_vertical_spacing = getattr(grid, "setVerticalSpacing", None)
     if set_vertical_spacing is not None:
-        set_vertical_spacing(0)
+        set_vertical_spacing(6)
 
     caption = qt_widgets.QLabel(label_text)
     set_word_wrap = getattr(caption, "setWordWrap", None)
@@ -456,7 +456,68 @@ def build_labeled_toggle_row(
         set_column_stretch(0, 0)
         set_column_stretch(1, 0)
         set_column_stretch(2, 1)
+    set_min_height = getattr(host, "setMinimumHeight", None)
+    if set_min_height is not None:
+        set_min_height(36)
     return host
+
+
+def build_borderless_scroll_area(
+    qt_widgets: Any,
+    *,
+    object_name: str,
+    content_widget: Any,
+) -> Any:
+    """Wrap settings content in a borderless vertical scroll area when supported."""
+
+    scroll_area_class = getattr(qt_widgets, "QScrollArea", None)
+    if scroll_area_class is None:
+        return content_widget
+
+    scroll_area = scroll_area_class()
+    scroll_area.setObjectName(object_name)
+    frame_class = getattr(qt_widgets, "QFrame", None)
+    set_shape = getattr(scroll_area, "setFrameShape", None)
+    set_shadow = getattr(scroll_area, "setFrameShadow", None)
+    set_line_width = getattr(scroll_area, "setLineWidth", None)
+    set_style = getattr(scroll_area, "setStyleSheet", None)
+    if frame_class is not None and set_shape is not None:
+        no_frame = getattr(frame_class, "NoFrame", None)
+        plain = getattr(frame_class, "Plain", None)
+        if no_frame is not None:
+            set_shape(no_frame)
+        if set_shadow is not None and plain is not None:
+            set_shadow(plain)
+    if set_line_width is not None:
+        set_line_width(0)
+    if set_style is not None:
+        set_style("QScrollArea { border: none; background: transparent; }")
+
+    set_widget_resizable = getattr(scroll_area, "setWidgetResizable", None)
+    if set_widget_resizable is not None:
+        set_widget_resizable(True)
+    set_horizontal_scroll = getattr(scroll_area, "setHorizontalScrollBarPolicy", None)
+    scroll_bar_policy = getattr(qt_widgets, "Qt", None)
+    if set_horizontal_scroll is not None and scroll_bar_policy is not None:
+        scroll_always_off = getattr(scroll_bar_policy, "ScrollBarAlwaysOff", None)
+        if scroll_always_off is not None:
+            set_horizontal_scroll(scroll_always_off)
+
+    set_expanding_size_policy(qt_widgets, scroll_area)
+    set_widget = getattr(scroll_area, "setWidget", None)
+    if set_widget is not None:
+        set_widget(content_widget)
+    return scroll_area
+
+
+def set_expanding_size_policy(qt_widgets: Any, widget: Any) -> None:
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_policy = getattr(widget, "setSizePolicy", None)
+    if size_policy is None or set_policy is None:
+        return
+    expanding = getattr(size_policy, "Expanding", None)
+    if expanding is not None:
+        set_policy(expanding, expanding)
 
 
 def set_fixed_horizontal_size_policy(qt_widgets: Any, widget: Any) -> None:
