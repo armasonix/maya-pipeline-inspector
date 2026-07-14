@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "deadline_critical": {
+      "failed": [
+        {
+          "rule_id": "common.shader_complexity.farm_cost_score.max",
+          "severity": "error",
+          "block_publish": false,
+          "block_deadline": true
+        }
+      ]
+    }
+  }
+}

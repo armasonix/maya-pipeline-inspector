@@ -42,6 +42,12 @@ _COMMON_MAYA_TEXTURE_SLOTS = {
     "bump2d.normalCamera": "normal",
 }
 
+_COMMON_EXPENSIVE_NODE_TYPES = frozenset(
+    {
+        "layeredTexture",
+    }
+)
+
 _COMMON_MAYA_COMPLEXITY_WEIGHTS = {
     "shadingEngine": 0.25,
     "file": 1.0,
@@ -53,7 +59,7 @@ _COMMON_MAYA_COMPLEXITY_WEIGHTS = {
     "blendColors": 0.75,
     "condition": 0.75,
     "clamp": 0.5,
-    "layeredTexture": 2.0,
+    "layeredTexture": 2.5,
     "multiplyDivide": 0.5,
     "plusMinusAverage": 0.5,
     "remapValue": 0.75,
@@ -62,10 +68,14 @@ _COMMON_MAYA_COMPLEXITY_WEIGHTS = {
 
 _VRAY_NODE_TYPES = {
     "VRayMtl",
+    "VRayMtl2",
     "VRayBlendMtl",
     "VRayBumpMtl",
     "VRayFastSSS2",
     "VRayAlSurface",
+    "VRaySkinMtl",
+    "VRayCarPaintMtl",
+    "VRayFlakesMtl",
     "VRayBitmap",
     "VRayNormalMap",
     "VRayDisplacement",
@@ -77,6 +87,20 @@ _VRAY_NODE_TYPES = {
     "VRayMultiSubTex",
     "VRayRemap",
 }
+
+_VRAY_EXPENSIVE_NODE_TYPES = frozenset(
+    {
+        "VRayBlendMtl",
+        "VRayMtl2",
+        "VRayFastSSS2",
+        "VRayAlSurface",
+        "VRaySkinMtl",
+        "VRayCarPaintMtl",
+        "VRayFlakesMtl",
+        "VRayLayeredTex",
+        "VRayMultiSubTex",
+    }
+)
 
 _VRAY_TEXTURE_SLOTS = {
     "VRayMtl.diffuseColor": "base_color",
@@ -105,10 +129,14 @@ _VRAY_TEXTURE_SLOTS = {
 
 _VRAY_COMPLEXITY_WEIGHTS = {
     "VRayMtl": 1.25,
-    "VRayBlendMtl": 3.0,
+    "VRayMtl2": 2.5,
+    "VRayBlendMtl": 3.5,
     "VRayBumpMtl": 1.25,
-    "VRayFastSSS2": 2.0,
-    "VRayAlSurface": 2.0,
+    "VRayFastSSS2": 2.5,
+    "VRayAlSurface": 2.5,
+    "VRaySkinMtl": 2.5,
+    "VRayCarPaintMtl": 2.5,
+    "VRayFlakesMtl": 2.0,
     "VRayBitmap": 1.0,
     "VRayNormalMap": 1.0,
     "VRayDisplacement": 1.75,
@@ -116,8 +144,8 @@ _VRAY_COMPLEXITY_WEIGHTS = {
     "VRayColor": 0.25,
     "VRayDirt": 1.25,
     "VRayFresnel": 0.75,
-    "VRayLayeredTex": 2.0,
-    "VRayMultiSubTex": 2.0,
+    "VRayLayeredTex": 2.5,
+    "VRayMultiSubTex": 2.5,
     "VRayRemap": 0.75,
 }
 
@@ -128,6 +156,9 @@ _ARNOLD_NODE_TYPES = {
     "aiBump2d",
     "aiLayerShader",
     "aiMixShader",
+    "aiCarPaint",
+    "aiToon",
+    "aiOSLShader",
     "aiColorCorrect",
     "aiRange",
     "aiMultiply",
@@ -137,6 +168,16 @@ _ARNOLD_NODE_TYPES = {
     "aiUserDataFloat",
     "aiUtility",
 }
+
+_ARNOLD_EXPENSIVE_NODE_TYPES = frozenset(
+    {
+        "aiLayerShader",
+        "aiMixShader",
+        "aiCarPaint",
+        "aiToon",
+        "aiOSLShader",
+    }
+)
 
 _ARNOLD_TEXTURE_SLOTS = {
     "aiStandardSurface.baseColor": "base_color",
@@ -162,12 +203,15 @@ _ARNOLD_COMPLEXITY_WEIGHTS = {
     "aiImage": 1.0,
     "aiNormalMap": 1.0,
     "aiBump2d": 1.0,
-    "aiLayerShader": 2.5,
-    "aiMixShader": 2.0,
+    "aiLayerShader": 3.0,
+    "aiMixShader": 2.5,
+    "aiCarPaint": 2.5,
+    "aiToon": 2.0,
+    "aiOSLShader": 3.5,
     "aiColorCorrect": 0.75,
     "aiRange": 0.75,
     "aiMultiply": 0.5,
-    "aiNoise": 1.25,
+    "aiNoise": 1.5,
     "aiTriplanar": 1.5,
     "aiUserDataColor": 0.5,
     "aiUserDataFloat": 0.5,
@@ -207,6 +251,9 @@ class RendererAdapter(Protocol):
     def complexity_weights(self) -> ComplexityWeights:
         """Return per-node-type graph complexity weights."""
 
+    def expensive_node_types(self) -> frozenset[str]:
+        """Return renderer-specific node types always treated as expensive."""
+
     def default_rule_packs(self) -> list[str]:
         """Return default rule pack identifiers for this adapter."""
 
@@ -235,6 +282,9 @@ class BaseRendererAdapter:
 
     def complexity_weights(self) -> ComplexityWeights:
         return {}
+
+    def expensive_node_types(self) -> frozenset[str]:
+        return frozenset()
 
     def default_rule_packs(self) -> list[str]:
         return []
@@ -276,6 +326,9 @@ class CommonMayaAdapter(BaseRendererAdapter):
     def complexity_weights(self) -> ComplexityWeights:
         return dict(_COMMON_MAYA_COMPLEXITY_WEIGHTS)
 
+    def expensive_node_types(self) -> frozenset[str]:
+        return _COMMON_EXPENSIVE_NODE_TYPES
+
     def default_rule_packs(self) -> list[str]:
         return ["common"]
 
@@ -295,7 +348,7 @@ class VrayAdapter(BaseRendererAdapter):
             return []
         if type_name == "VRayBitmap":
             return ["texture", "file"]
-        if type_name in {"VRayMtl", "VRayBlendMtl", "VRayFastSSS2", "VRayAlSurface"}:
+        if type_name in {"VRayMtl", "VRayMtl2", "VRayBlendMtl", "VRayFastSSS2", "VRayAlSurface"}:
             return ["material"]
         if type_name in {"VRayBumpMtl", "VRayNormalMap"}:
             return ["bump", "normal", "utility"]
@@ -311,6 +364,9 @@ class VrayAdapter(BaseRendererAdapter):
 
     def complexity_weights(self) -> ComplexityWeights:
         return dict(_VRAY_COMPLEXITY_WEIGHTS)
+
+    def expensive_node_types(self) -> frozenset[str]:
+        return _VRAY_EXPENSIVE_NODE_TYPES
 
     def default_rule_packs(self) -> list[str]:
         return ["common", "vray"]
@@ -331,7 +387,13 @@ class ArnoldAdapter(BaseRendererAdapter):
             return []
         if type_name == "aiImage":
             return ["texture", "file"]
-        if type_name in {"aiStandardSurface", "aiLayerShader", "aiMixShader"}:
+        if type_name in {
+            "aiStandardSurface",
+            "aiLayerShader",
+            "aiMixShader",
+            "aiCarPaint",
+            "aiToon",
+        }:
             return ["material"]
         if type_name == "aiNormalMap":
             return ["normal", "utility"]
@@ -349,6 +411,9 @@ class ArnoldAdapter(BaseRendererAdapter):
 
     def complexity_weights(self) -> ComplexityWeights:
         return dict(_ARNOLD_COMPLEXITY_WEIGHTS)
+
+    def expensive_node_types(self) -> frozenset[str]:
+        return _ARNOLD_EXPENSIVE_NODE_TYPES
 
     def default_rule_packs(self) -> list[str]:
         return ["common", "arnold"]

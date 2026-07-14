@@ -87,7 +87,7 @@
       "check": {
         "type": "numeric_max",
         "attribute": "complexity_metadata.expensive_node_count",
-        "max": 4
+        "max": 3
       },
       "policy": {
         "block_publish": false,
@@ -111,7 +111,7 @@
       "check": {
         "type": "numeric_max",
         "attribute": "complexity_metadata.farm_cost_score",
-        "max": 18
+        "max": 16
       },
       "policy": {
         "block_publish": false,

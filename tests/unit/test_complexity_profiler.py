@@ -48,7 +48,7 @@ def test_profile_layered_common_graph_depth_histogram():
     }
     assert metadata.expensive_node_count == 1
     assert metadata.expensive_node_types == {"layeredTexture": 1}
-    assert metadata.farm_cost_score == 6.0
+    assert metadata.farm_cost_score == 6.5
     assert metadata.farm_cost_hint == "low"
 
 
@@ -73,7 +73,32 @@ def test_profile_vray_blend_graph_marks_expensive_nodes_and_medium_farm_cost():
         "VRayBlendMtl": 1,
         "VRayLayeredTex": 1,
     }
-    assert metadata.farm_cost_score == 13.5
+    assert metadata.farm_cost_score == 14.5
+    assert metadata.farm_cost_hint == "medium"
+
+
+def test_profile_arnold_layered_graph_marks_renderer_expensive_nodes():
+    snapshot = _load_fixture("shader_complexity_arnold_expensive.json")
+    material = snapshot.materials[0]
+    nodes_by_id = {node.id: node for node in snapshot.nodes}
+
+    profiled = profile_material_complexity(
+        material,
+        nodes_by_id=nodes_by_id,
+        connections=snapshot.connections,
+        adapter_registry=REGISTRY,
+    )
+
+    metadata = profiled.complexity_metadata
+    assert metadata is not None
+    assert metadata.expensive_node_count == 4
+    assert metadata.expensive_node_types == {
+        "aiLayerShader": 1,
+        "aiMixShader": 1,
+        "aiCarPaint": 1,
+        "aiOSLShader": 1,
+    }
+    assert metadata.farm_cost_score == 14.75
     assert metadata.farm_cost_hint == "medium"
 
 

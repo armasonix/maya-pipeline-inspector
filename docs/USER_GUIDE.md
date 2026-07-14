@@ -42,6 +42,21 @@ v0.3 adds manifest schema 1.1, manifest regression gates, headless apply-fixes, 
 - basic renderer compatibility;
 - Deadline preflight safety.
 
+## Shader farm cost score
+
+During validation, Pipeline Inspector profiles each material subgraph and stores complexity metadata on `MaterialSnapshot.complexity_metadata`:
+
+| Field | Meaning |
+| --- | --- |
+| `expensive_node_count` | Count of nodes flagged as high render cost. |
+| `expensive_node_types` | Per node-type totals for expensive nodes (for example `VRayBlendMtl`, `aiLayerShader`). |
+| `farm_cost_score` | Weighted sum of adapter cost weights across the material graph. |
+| `farm_cost_hint` | Cost band: `low` (<8), `medium` (<16), `high` (<28), `critical` (28+). |
+
+Expensive nodes come from renderer adapter lists in `adapters/base.py` (V-Ray blend/SSS/layered nodes, Arnold layer/mix/OSL nodes, common `layeredTexture`) plus any node whose adapter weight is **1.5 or higher**. Rules `common.shader_complexity.expensive_nodes.max` and `common.shader_complexity.farm_cost_score.max` compare these metrics against profile budgets. `deadline_critical` and `publish_strict` tighten the thresholds for farm submission and publish gates.
+
+The score is a relative complexity estimate for triage, not a measured render time. Use it to spot layered shaders worth simplifying before farm submission.
+
 ## Texture version freshness
 
 Rule `common.texture.version.latest` compares the `v###` token in a texture filename against the highest numeric sibling found in the same folder on disk (for example `albedo_v001.<UDIM>.exr` vs `albedo_v003.<UDIM>.exr` in the same directory).

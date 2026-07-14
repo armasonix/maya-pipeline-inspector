@@ -41,6 +41,7 @@ def profile_material_complexity(
     graph_node_count = len(graph_node_ids)
 
     weights = _merged_complexity_weights(material.renderer_family, adapter_registry)
+    expensive_types = _merged_expensive_node_types(material.renderer_family, adapter_registry)
     expensive_node_types: dict[str, int] = {}
     farm_cost_score = 0.0
     for node_id in sorted(graph_node_ids):
@@ -49,7 +50,7 @@ def profile_material_complexity(
             continue
         weight = weights.get(node.type_name, _DEFAULT_NODE_WEIGHT)
         farm_cost_score += weight
-        if weight >= _EXPENSIVE_NODE_WEIGHT_THRESHOLD:
+        if _is_expensive_node(node, weight=weight, expensive_types=expensive_types):
             expensive_node_types[node.type_name] = (
                 expensive_node_types.get(node.type_name, 0) + 1
             )
@@ -131,6 +132,29 @@ def _merged_complexity_weights(
         with suppress(RendererAdapterError):
             weights.update(adapter_registry.get(renderer_family).complexity_weights())
     return weights
+
+
+def _merged_expensive_node_types(
+    renderer_family: Optional[str],
+    adapter_registry: RendererAdapterRegistry,
+) -> set[str]:
+    expensive = set(adapter_registry.get("common").expensive_node_types())
+    if renderer_family:
+        with suppress(RendererAdapterError):
+            expensive.update(adapter_registry.get(renderer_family).expensive_node_types())
+    return expensive
+
+
+def _is_expensive_node(
+    node: NodeSnapshot,
+    *,
+    weight: float,
+    expensive_types: set[str],
+) -> bool:
+    if node.type_name in expensive_types:
+        return True
+    return weight >= _EXPENSIVE_NODE_WEIGHT_THRESHOLD
+
 
 def _farm_cost_hint(score: float) -> str:
     for hint, upper_bound in _FARM_COST_HINT_BANDS:
