@@ -141,8 +141,84 @@ def show_farm_check_panel() -> Any:
     if content is None:
         return panel
     qt_widgets = load_qt_widgets()
+    _set_panel_view(content, qt_widgets, settings=False)
     _select_farm_tab(content, qt_widgets)
     _run_farm_preflight_from_ui(content, qt_widgets)
+    return panel
+
+
+def show_settings_panel() -> Any:
+    """Open the panel on the settings view."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _set_panel_view(content, qt_widgets, settings=True)
+    return panel
+
+
+def show_validate_scene_panel() -> Any:
+    """Open Validate and run Validate Scene."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _set_panel_view(content, qt_widgets, settings=False)
+    _select_validate_tab(content, qt_widgets)
+    _validate_from_ui(content, qt_widgets, scan_scope="scene")
+    return panel
+
+
+def show_reports_panel() -> Any:
+    """Open the Reports tab."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _set_panel_view(content, qt_widgets, settings=False)
+    _select_reports_tab(content, qt_widgets)
+    return panel
+
+
+def show_readiness_check_panel() -> Any:
+    """Open the Readiness tab when it is available."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _set_panel_view(content, qt_widgets, settings=False)
+    if not _select_tab_by_object_name(
+        content,
+        qt_widgets,
+        main_window.READINESS_TAB_OBJECT_NAME,
+    ):
+        _show_information_dialog(
+            qt_widgets,
+            "Readiness Check",
+            "The Readiness tab is not installed yet. Machine readiness checks ship in "
+            "issue #175.",
+        )
+    return panel
+
+
+def show_check_for_updates_panel() -> Any:
+    """Open the panel and run Check for Updates."""
+
+    panel = show_panel()
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return panel
+    qt_widgets = load_qt_widgets()
+    _set_panel_view(content, qt_widgets, settings=False)
+    _show_check_for_updates_modal_from_ui(content, qt_widgets)
     return panel
 
 
@@ -217,11 +293,17 @@ def _create_dockable_panel() -> Any:
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
         _wire_validate_splitter_persistence(content, qt_widgets)
+        apply_user_preferences_to_panel(content, qt_widgets, user_config)
+        _sync_workspace_control_width(content)
         _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
         from pipeline_inspector.ui.theme_loader import apply_panel_theme
 
         apply_panel_theme(content, user_config.theme, dock=self)
+        from pipeline_inspector.maya.ui_icons import apply_panel_header_icons
+        from pipeline_inspector.ui.qt import load_qt_gui
+
+        apply_panel_header_icons(content, qt_widgets, load_qt_gui())
         _refresh_waiver_manager(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
         _maybe_run_startup_update_check(content, qt_widgets, user_config)
@@ -232,6 +314,31 @@ def _create_dockable_panel() -> Any:
         {"__init__": init_panel, "__module__": __name__},
     )
     return panel_class()
+
+
+def _sync_workspace_control_width(content: Any) -> None:
+    """Resize the Maya dock to the compact panel width token."""
+
+    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
+
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
+    tokens = density_tokens(normalize_density(density))
+    if tokens.panel_max_width is None:
+        return
+
+    cmds = _maya_cmds()
+    if not _workspace_control_exists(cmds):
+        return
+    try:
+        cmds.workspaceControl(
+            WORKSPACE_CONTROL_NAME,
+            edit=True,
+            width=tokens.panel_max_width,
+        )
+    except (RuntimeError, TypeError, ValueError):
+        return
 
 
 def _panel_navigation_callbacks(
@@ -501,6 +608,15 @@ def _resolve_maya_version_for_bug_report(content: Any) -> str:
     except RuntimeError:
         return ""
     return ""
+
+
+def open_documentation_action() -> bool:
+    """Open documentation from menu, shelf, or scripts without showing the panel."""
+
+    from pipeline_inspector.ui.documentation_actions import open_documentation_url
+    from pipeline_inspector.user_config import UserPreferences
+
+    return open_documentation_url(UserPreferences.default().docs_url)
 
 
 def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -833,6 +949,7 @@ def _set_user_config(content: Any, qt_widgets: Any, config: UserPreferences) -> 
         apply_user_preferences_to_panel(content, qt_widgets, config)
     finally:
         content._pipeline_inspector_settings_programmatic = False
+    _sync_workspace_control_width(content)
     _refresh_settings_view(content, qt_widgets)
 
 
@@ -1995,21 +2112,34 @@ def _farm_tab_widget(content: Any, qt_widgets: Any) -> Any:
     return _find_child(content, qt_widgets.QWidget, FARM_TAB_OBJECT_NAME)
 
 
-def _select_farm_tab(content: Any, qt_widgets: Any) -> None:
+def _select_tab_by_object_name(content: Any, qt_widgets: Any, object_name: str) -> bool:
     tabs = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
     if tabs is None:
-        return
+        return False
     count = getattr(tabs, "count", lambda: 0)()
     for index in range(count):
         widget = getattr(tabs, "widget", lambda _index: None)(index)
-        object_name = getattr(widget, "objectName", lambda: "")()
-        if not object_name:
-            object_name = getattr(widget, "object_name", "")
-        if widget is not None and object_name == FARM_TAB_OBJECT_NAME:
+        widget_name = getattr(widget, "objectName", lambda: "")()
+        if not widget_name:
+            widget_name = getattr(widget, "object_name", "")
+        if widget is not None and widget_name == object_name:
             set_current = getattr(tabs, "setCurrentIndex", None)
             if set_current is not None:
                 set_current(index)
-            return
+            return True
+    return False
+
+
+def _select_validate_tab(content: Any, qt_widgets: Any) -> None:
+    _select_tab_by_object_name(content, qt_widgets, main_window.VALIDATE_TAB_OBJECT_NAME)
+
+
+def _select_reports_tab(content: Any, qt_widgets: Any) -> None:
+    _select_tab_by_object_name(content, qt_widgets, main_window.REPORTS_TAB_OBJECT_NAME)
+
+
+def _select_farm_tab(content: Any, qt_widgets: Any) -> None:
+    _select_tab_by_object_name(content, qt_widgets, FARM_TAB_OBJECT_NAME)
 
 
 def _current_scene_path() -> str:
@@ -2612,12 +2742,17 @@ def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
     if splitter is None:
         return
 
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
     set_sizes = getattr(splitter, "setSizes", None)
     saved_sizes = getattr(content, VALIDATE_SPLITTER_SIZES_ATTR, None)
-    if set_sizes is not None and saved_sizes:
+    if density != "compact" and set_sizes is not None and saved_sizes:
         set_sizes([int(size) for size in saved_sizes])
 
     def _persist_splitter_sizes(*_args: Any) -> None:
+        if str(getattr(content, "_pipeline_inspector_ui_density", "comfortable")) == "compact":
+            return
         sizes_fn = getattr(splitter, "sizes", None)
         if sizes_fn is None:
             return

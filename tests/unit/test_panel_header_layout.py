@@ -27,9 +27,10 @@ def test_panel_header_layout_places_gear_title_docs_report_bug_and_updates_in_or
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
     report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
+    overflow = _find(header, main_window.PANEL_HEADER_OVERFLOW_BUTTON_OBJECT_NAME)
 
     widgets = _panel_header_widgets(header)
-    assert widgets == [gear, title, unsaved, docs, report_bug, updates]
+    assert widgets == [gear, title, unsaved, docs, report_bug, updates, overflow]
 
 
 def test_panel_header_title_receives_horizontal_stretch():

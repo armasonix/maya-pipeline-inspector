@@ -71,6 +71,30 @@ class FakeCmds:
                 self.shelf_children.remove(name)
 
 
+STANDALONE_MENU_LABELS = (
+    commands.OPEN_MENU_ITEM_LABEL,
+    commands.SETTINGS_MENU_ITEM_LABEL,
+    commands.VALIDATE_SCENE_MENU_ITEM_LABEL,
+    commands.REPORTS_MENU_ITEM_LABEL,
+    commands.READINESS_CHECK_MENU_ITEM_LABEL,
+    commands.FARM_CHECK_MENU_ITEM_LABEL,
+    commands.DOCUMENTATION_MENU_ITEM_LABEL,
+    commands.CHECK_FOR_UPDATES_MENU_ITEM_LABEL,
+    commands.CLOSE_MENU_ITEM_LABEL,
+)
+
+STANDALONE_SHELF_LABELS = (
+    commands.OPEN_MENU_ITEM_LABEL,
+    commands.SETTINGS_MENU_ITEM_LABEL,
+    commands.VALIDATE_SCENE_MENU_ITEM_LABEL,
+    commands.REPORTS_MENU_ITEM_LABEL,
+    commands.READINESS_CHECK_MENU_ITEM_LABEL,
+    commands.FARM_CHECK_MENU_ITEM_LABEL,
+    commands.DOCUMENTATION_MENU_ITEM_LABEL,
+    commands.CHECK_FOR_UPDATES_MENU_ITEM_LABEL,
+)
+
+
 def test_show_ui_delegates_to_panel_launcher(monkeypatch: Any):
     sentinel = object()
     monkeypatch.setattr(commands, "show_panel", lambda: sentinel)
@@ -96,6 +120,47 @@ def test_show_farm_check_ui_delegates_to_farm_check_launcher(monkeypatch: Any):
     monkeypatch.setattr(commands, "show_farm_check_panel", lambda: sentinel)
 
     assert commands.show_farm_check_ui() is sentinel
+
+
+def test_show_settings_ui_delegates_to_settings_launcher(monkeypatch: Any):
+    sentinel = object()
+    monkeypatch.setattr(commands, "show_settings_panel", lambda: sentinel)
+
+    assert commands.show_settings_ui() is sentinel
+
+
+def test_show_validate_scene_ui_delegates_to_validate_launcher(monkeypatch: Any):
+    sentinel = object()
+    monkeypatch.setattr(commands, "show_validate_scene_panel", lambda: sentinel)
+
+    assert commands.show_validate_scene_ui() is sentinel
+
+
+def test_show_reports_ui_delegates_to_reports_launcher(monkeypatch: Any):
+    sentinel = object()
+    monkeypatch.setattr(commands, "show_reports_panel", lambda: sentinel)
+
+    assert commands.show_reports_ui() is sentinel
+
+
+def test_show_readiness_check_ui_delegates_to_readiness_launcher(monkeypatch: Any):
+    sentinel = object()
+    monkeypatch.setattr(commands, "show_readiness_check_panel", lambda: sentinel)
+
+    assert commands.show_readiness_check_ui() is sentinel
+
+
+def test_show_check_for_updates_ui_delegates_to_updates_launcher(monkeypatch: Any):
+    sentinel = object()
+    monkeypatch.setattr(commands, "show_check_for_updates_panel", lambda: sentinel)
+
+    assert commands.show_check_for_updates_ui() is sentinel
+
+
+def test_show_documentation_ui_delegates_to_documentation_action(monkeypatch: Any):
+    monkeypatch.setattr(commands, "open_documentation_action", lambda: True)
+
+    assert commands.show_documentation_ui() is True
 
 
 def test_validate_scene_action_runs_scanner_and_validator(monkeypatch: Any):
@@ -159,13 +224,15 @@ def test_install_menu_replaces_existing_menu(monkeypatch: Any):
             "tearOff": True,
         },
     )
+    assert [item["label"] for item in cmds.created_items if "label" in item] == list(
+        STANDALONE_MENU_LABELS
+    )
+    assert all(
+        callable(item["command"]) for item in cmds.created_items if "command" in item
+    )
+    assert sum(1 for item in cmds.created_items if item.get("divider")) == 1
+    assert cmds.created_items[-1]["label"] == commands.CLOSE_MENU_ITEM_LABEL
     assert cmds.created_items[0]["label"] == commands.OPEN_MENU_ITEM_LABEL
-    assert callable(cmds.created_items[0]["command"])
-    assert cmds.created_items[1]["label"] == commands.FARM_CHECK_MENU_ITEM_LABEL
-    assert callable(cmds.created_items[1]["command"])
-    assert cmds.created_items[2] == {"divider": True, "parent": commands.MENU_NAME}
-    assert cmds.created_items[3]["label"] == commands.CLOSE_MENU_ITEM_LABEL
-    assert callable(cmds.created_items[3]["command"])
 
 
 def test_uninstall_menu_deletes_existing_menu(monkeypatch: Any):
@@ -177,7 +244,7 @@ def test_uninstall_menu_deletes_existing_menu(monkeypatch: Any):
     assert cmds.deleted == [(commands.MENU_NAME, {"menu": True})]
 
 
-def test_install_shelf_creates_shelf_and_button(monkeypatch: Any):
+def test_install_shelf_creates_shelf_and_buttons(monkeypatch: Any):
     cmds = FakeCmds(menu_exists=False, shelf_exists=False)
     monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
@@ -186,45 +253,22 @@ def test_install_shelf_creates_shelf_and_button(monkeypatch: Any):
 
     assert shelf_name == commands.SHELF_NAME
     assert cmds.created_shelf == (commands.SHELF_NAME, {"parent": "ShelfLayout"})
-    assert cmds.created_buttons == [
-        (
-            commands.SHELF_BUTTON_NAME,
-            {
-                "parent": commands.SHELF_NAME,
-                "label": commands.SHELF_BUTTON_LABEL,
-                "annotation": commands.SHELF_BUTTON_ANNOTATION,
-                "image1": "commandButton.png",
-                "sourceType": "python",
-                "command": commands.OPEN_UI_PYTHON_COMMAND,
-            },
-        ),
-        (
-            commands.FARM_CHECK_SHELF_BUTTON_NAME,
-            {
-                "parent": commands.SHELF_NAME,
-                "label": commands.FARM_CHECK_SHELF_BUTTON_LABEL,
-                "annotation": commands.FARM_CHECK_SHELF_BUTTON_ANNOTATION,
-                "image1": "commandButton.png",
-                "sourceType": "python",
-                "command": commands.FARM_CHECK_UI_PYTHON_COMMAND,
-            },
-        ),
-    ]
+    assert len(cmds.created_buttons) == 8
+    assert cmds.created_buttons[0][1]["label"] == commands.OPEN_MENU_ITEM_LABEL
+    created_labels = [fields["label"] for _, fields in cmds.created_buttons]
+    assert created_labels == list(STANDALONE_SHELF_LABELS)
+    for _, fields in cmds.created_buttons:
+        assert fields["sourceType"] == "python"
+        assert "image1" in fields
+        assert fields["parent"] == commands.SHELF_NAME
 
 
 def test_install_shelf_updates_existing_button(monkeypatch: Any):
     cmds = FakeCmds(menu_exists=False, shelf_exists=True)
-    cmds.existing_buttons.update(
-        {commands.SHELF_BUTTON_NAME, commands.FARM_CHECK_SHELF_BUTTON_NAME}
-    )
-    cmds.button_labels[commands.SHELF_BUTTON_NAME] = commands.SHELF_BUTTON_LABEL
-    cmds.button_labels[commands.FARM_CHECK_SHELF_BUTTON_NAME] = (
-        commands.FARM_CHECK_SHELF_BUTTON_LABEL
-    )
-    cmds.shelf_children = [
-        commands.SHELF_BUTTON_NAME,
-        commands.FARM_CHECK_SHELF_BUTTON_NAME,
-    ]
+    for entry in commands._standalone_shelf_entries():
+        cmds.existing_buttons.add(entry["name"])
+        cmds.button_labels[entry["name"]] = entry["label"]
+        cmds.shelf_children.append(entry["name"])
     monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
 
@@ -233,31 +277,19 @@ def test_install_shelf_updates_existing_button(monkeypatch: Any):
     assert cmds.deleted == []
     assert cmds.created_shelf is None
     assert len(cmds.created_buttons) == 0
-    assert len(cmds.edited_buttons) == 2
+    assert len(cmds.edited_buttons) == 8
 
 
 def test_install_shelf_removes_legacy_duplicate_labels(monkeypatch: Any):
     cmds = FakeCmds(menu_exists=False, shelf_exists=True)
-    cmds.existing_buttons.update(
-        {
-            commands.SHELF_BUTTON_NAME,
-            "shelfButton42",
-            commands.FARM_CHECK_SHELF_BUTTON_NAME,
-            "shelfButton99",
-        }
-    )
-    cmds.button_labels[commands.SHELF_BUTTON_NAME] = commands.SHELF_BUTTON_LABEL
-    cmds.button_labels["shelfButton42"] = commands.SHELF_BUTTON_LABEL
-    cmds.button_labels[commands.FARM_CHECK_SHELF_BUTTON_NAME] = (
-        commands.FARM_CHECK_SHELF_BUTTON_LABEL
-    )
-    cmds.button_labels["shelfButton99"] = commands.FARM_CHECK_SHELF_BUTTON_LABEL
-    cmds.shelf_children = [
-        commands.SHELF_BUTTON_NAME,
-        "shelfButton42",
-        commands.FARM_CHECK_SHELF_BUTTON_NAME,
-        "shelfButton99",
-    ]
+    legacy_names = {
+        "shelfButton42": commands.LEGACY_SHELF_BUTTON_LABEL,
+        commands.FARM_CHECK_SHELF_BUTTON_NAME: commands.FARM_CHECK_SHELF_BUTTON_LABEL,
+        "shelfButton99": commands.LEGACY_FARM_CHECK_SHELF_BUTTON_LABEL,
+    }
+    cmds.existing_buttons.update(legacy_names)
+    cmds.button_labels.update(legacy_names)
+    cmds.shelf_children = list(legacy_names)
     monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(commands, "_maya_shelf_top_level", lambda: "ShelfLayout")
 
@@ -265,29 +297,22 @@ def test_install_shelf_removes_legacy_duplicate_labels(monkeypatch: Any):
 
     assert ("shelfButton42", {"control": True}) in cmds.deleted
     assert ("shelfButton99", {"control": True}) in cmds.deleted
-    assert len(cmds.created_buttons) == 0
-    assert len(cmds.edited_buttons) == 2
+    assert len(cmds.created_buttons) == 7
+    assert len(cmds.edited_buttons) == 1
 
 
 def test_uninstall_shelf_deletes_existing_button(monkeypatch: Any):
     cmds = FakeCmds(menu_exists=False, shelf_exists=True)
-    cmds.existing_buttons.update(
-        {commands.SHELF_BUTTON_NAME, commands.FARM_CHECK_SHELF_BUTTON_NAME}
-    )
-    cmds.button_labels[commands.SHELF_BUTTON_NAME] = commands.SHELF_BUTTON_LABEL
-    cmds.button_labels[commands.FARM_CHECK_SHELF_BUTTON_NAME] = (
-        commands.FARM_CHECK_SHELF_BUTTON_LABEL
-    )
-    cmds.shelf_children = [
-        commands.SHELF_BUTTON_NAME,
-        commands.FARM_CHECK_SHELF_BUTTON_NAME,
-    ]
+    for entry in commands._standalone_shelf_entries():
+        cmds.existing_buttons.add(entry["name"])
+        cmds.button_labels[entry["name"]] = entry["label"]
+        cmds.shelf_children.append(entry["name"])
     monkeypatch.setattr(commands, "_maya_cmds", lambda: cmds)
 
     commands.uninstall_shelf()
 
-    assert (commands.SHELF_BUTTON_NAME, {"control": True}) in cmds.deleted
-    assert (commands.FARM_CHECK_SHELF_BUTTON_NAME, {"control": True}) in cmds.deleted
+    for entry in commands._standalone_shelf_entries():
+        assert (entry["name"], {"control": True}) in cmds.deleted
 
 
 def test_install_ui_refreshes_menu_and_shelf(monkeypatch: Any):

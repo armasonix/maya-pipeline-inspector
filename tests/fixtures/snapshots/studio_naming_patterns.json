@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "examples/studio_naming/pipeline_inspector_demo_naming.ma",
+  "maya_version": "2025",
+  "renderer": "common",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-14T12:00:00Z",
+  "nodes": [
+    {
+      "id": "node:grp_rig",
+      "name": "grp_rig",
+      "full_name": "|world|grp_rig",
+      "type_name": "transform",
+      "classification": ["group"]
+    },
+    {
+      "id": "node:ctrl_root",
+      "name": "ctrl_root",
+      "full_name": "|world|grp_rig|ctrl_root",
+      "type_name": "nurbsCurve",
+      "classification": ["control"]
+    },
+    {
+      "id": "node:tex_albedo",
+      "name": "tex_albedo",
+      "full_name": "tex_albedo",
+      "type_name": "file",
+      "classification": ["texture", "file"]
+    }
+  ],
+  "connections": [],
+  "materials": [
+    {
+      "node_id": "node:mat_body",
+      "name": "mat_body",
+      "type_name": "standardSurface",
+      "shading_engines": ["node:SG_body"],
+      "assigned_shapes": [],
+      "texture_nodes": [],
+      "displacement_nodes": [],
+      "graph_node_count": 1,
+      "graph_depth": 0,
+      "graph_fingerprint": ""
+    }
+  ],
+  "shading_engines": [
+    {
+      "node_id": "node:SG_body",
+      "name": "SG_body",
+      "surface_shader": "node:mat_body",
+      "members": []
+    }
+  ],
+  "file_dependencies": [],
+  "references": [],
+  "shapes": [
+    {
+      "node_id": "mesh:geo_body",
+      "name": "geo_body",
+      "full_name": "|world|geo_body",
+      "type_name": "mesh",
+      "transform_id": "transform:geo_body",
+      "polygon_count": 12,
+      "vertex_count": 8,
+      "face_count": 6,
+      "edge_count": 12,
+      "topology_fingerprint": "sha256:fixture",
+      "instancing_key": "mesh:geo_body",
+      "proxy_attrs": {},
+      "referenced": false,
+      "locked": false
+    }
+  ]
+}

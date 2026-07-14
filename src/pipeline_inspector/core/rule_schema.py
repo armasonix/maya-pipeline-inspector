@@ -6,6 +6,7 @@ production stages, and whether an optional safe fix can be planned.
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -17,7 +18,9 @@ from pipeline_inspector.core.models import (
     MaterialSnapshot,
     NodeSnapshot,
     ShadingEngineSnapshot,
+    ShapeSnapshot,
 )
+from pipeline_inspector.core.naming_conventions import resolve_object_type
 
 JsonDict = dict[str, Any]
 JsonValue = Any
@@ -34,6 +37,8 @@ SCOPES = frozenset(
         "file_dependency",
         "connection",
         "shading_engine",
+        "shape",
+        "geometry",
         "graph",
     }
 )
@@ -389,6 +394,9 @@ class _TargetContext:
 class ValidationEngine:
     """Evaluate rule definitions against a GraphSnapshot."""
 
+    def __init__(self, naming_templates: Mapping[str, str] | None = None) -> None:
+        self._naming_templates = dict(naming_templates or {})
+
     def validate(
         self,
         snapshot: GraphSnapshot,
@@ -428,6 +436,8 @@ class ValidationEngine:
             return self._evaluate_list_length_max(rule, target)
         if check_type == "list_length_min":
             return self._evaluate_list_length_min(rule, target)
+        if check_type == "name_matches":
+            return self._evaluate_name_matches(rule, target)
         if check_type == "numeric_max":
             return self._evaluate_numeric_max(rule, target)
         if check_type == "path_exists":
@@ -681,6 +691,59 @@ class ValidationEngine:
             evidence={"min": minimum_number},
         )
 
+    def _evaluate_name_matches(
+        self,
+        rule: RuleDefinition,
+        target: _TargetContext,
+    ) -> RuleResult:
+        pattern = self._resolve_naming_pattern(rule)
+        if not pattern:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="naming_template_not_configured",
+            )
+
+        try:
+            compiled = re.compile(pattern)
+        except re.error:
+            return self._skipped(
+                rule,
+                target=target,
+                reason="invalid_naming_pattern",
+            )
+
+        name_field = str(rule.check.params.get("name_field", "name"))
+        current = self._read_value(target, name_field)
+        if not isinstance(current, str) or not current.strip():
+            return self._skipped(
+                rule,
+                target=target,
+                reason="missing_name",
+            )
+
+        status = "passed" if compiled.fullmatch(current) else "failed"
+        return self._result(
+            rule,
+            status=status,
+            target=target,
+            current_value=current,
+            expected_value=pattern,
+            plug=name_field,
+        )
+
+    def _resolve_naming_pattern(self, rule: RuleDefinition) -> Optional[str]:
+        params = rule.check.params
+        inline_pattern = params.get("pattern")
+        if inline_pattern is not None:
+            normalized = str(inline_pattern).strip()
+            return normalized or None
+
+        object_type = params.get("object_type") or params.get("template_key")
+        if object_type is None:
+            return None
+        return self._naming_templates.get(str(object_type))
+
     def _evaluate_numeric_max(
         self,
         rule: RuleDefinition,
@@ -814,6 +877,11 @@ class ValidationEngine:
                 _TargetContext("shading_engine", item.node_id, item)
                 for item in snapshot.shading_engines
             ]
+        if scope in {"shape", "geometry"}:
+            return [
+                _TargetContext("shape", item.node_id, item)
+                for item in snapshot.shapes
+            ]
         if scope in {"scene", "graph"}:
             return [_TargetContext(scope, snapshot.scene_path, snapshot)]
         return []
@@ -837,6 +905,8 @@ class ValidationEngine:
     def _read_match_value(self, target: _TargetContext, key: str) -> Any:
         if key == "node_type":
             return self._read_value(target, "type_name")
+        if key == "object_type":
+            return resolve_object_type(target.obj)
         if key == "semantic_slot":
             return target.semantic or self._read_value(target, "semantic_slot")
         if key == "dependency_kind" and isinstance(target.obj, FileDependencySnapshot):
@@ -905,7 +975,7 @@ class ValidationEngine:
         if target is None:
             return None
         obj = target.obj
-        if isinstance(obj, (NodeSnapshot, MaterialSnapshot, ShadingEngineSnapshot)):
+        if isinstance(obj, (NodeSnapshot, MaterialSnapshot, ShadingEngineSnapshot, ShapeSnapshot)):
             return obj.name
         if isinstance(obj, FileDependencySnapshot):
             return obj.node_id

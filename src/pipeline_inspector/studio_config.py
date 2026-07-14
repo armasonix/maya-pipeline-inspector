@@ -10,6 +10,7 @@ from typing import Any, Optional
 from urllib.parse import urlparse
 
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
+from pipeline_inspector.core.naming_conventions import normalize_naming_templates
 from pipeline_inspector.core.rule_loader import RuleOverride
 
 STUDIO_CONFIG_SCHEMA_VERSION = "2.0"
@@ -67,12 +68,27 @@ class WaiverDefaultsSettings:
 
 
 @dataclass(frozen=True)
+class NamingTemplatesSettings:
+    """Per-object-type regex naming templates configured by the studio."""
+
+    templates: dict[str, str] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.templates)
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> NamingTemplatesSettings:
+        return cls(templates=normalize_naming_templates(data))
+
+
+@dataclass(frozen=True)
 class PipelineSettings:
     """Pipeline policy toggles controlled by studio configuration."""
 
     require_tx_derivatives: bool = True
     waiver_defaults: WaiverDefaultsSettings = WaiverDefaultsSettings()
     manifest_gate_defaults: ManifestGatePolicy = ManifestGatePolicy()
+    naming_templates: NamingTemplatesSettings = field(default_factory=NamingTemplatesSettings)
     pinned_workflow_profile_ids: tuple[str, ...] = ()
     pinned_asset_class_profile_ids: tuple[str, ...] = ()
     extra_rules_folder: str = ""
@@ -91,10 +107,17 @@ class PipelineSettings:
         manifest_gate_defaults = ManifestGatePolicy.from_mapping(
             manifest_raw if isinstance(manifest_raw, Mapping) else None
         )
+        naming_raw = data.get("naming_templates")
+        naming_templates = (
+            NamingTemplatesSettings.from_mapping(naming_raw)
+            if isinstance(naming_raw, Mapping)
+            else NamingTemplatesSettings()
+        )
         return cls(
             require_tx_derivatives=bool(data.get("require_tx_derivatives", True)),
             waiver_defaults=waiver_defaults,
             manifest_gate_defaults=manifest_gate_defaults,
+            naming_templates=naming_templates,
             pinned_workflow_profile_ids=_profile_ids_from_value(
                 data.get("pinned_workflow_profile_ids")
             ),
@@ -117,6 +140,7 @@ class PipelineSettings:
                     self.manifest_gate_defaults.block_on_new_textures
                 ),
             },
+            "naming_templates": self.naming_templates.to_dict(),
             "pinned_workflow_profile_ids": list(self.pinned_workflow_profile_ids),
             "pinned_asset_class_profile_ids": list(self.pinned_asset_class_profile_ids),
             "extra_rules_folder": self.extra_rules_folder,

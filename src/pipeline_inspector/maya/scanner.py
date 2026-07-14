@@ -6,6 +6,7 @@ loaded lazily only when scan functions run without an injected ``cmds_module``.
 from __future__ import annotations
 
 import glob
+import hashlib
 import logging
 import os
 import re
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core import (
+    BoundingBoxSnapshot,
     ConnectionSnapshot,
     FileDependencySnapshot,
     GraphSnapshot,
@@ -22,6 +24,7 @@ from pipeline_inspector.core import (
     NodeSnapshot,
     ReferenceSnapshot,
     ShadingEngineSnapshot,
+    ShapeSnapshot,
 )
 
 log = logging.getLogger(__name__)
@@ -77,6 +80,14 @@ _ATTRS_BY_TYPE = {
         "shift",
     ),
 }
+
+_PROXY_ATTRS_BY_TYPE = {
+    "mesh": ("intermediateObject", "displaySmoothMesh"),
+    "aiStandIn": ("dso", "mode", "useFrameExtension", "abcFormat", "radius"),
+    "VRayProxy": ("fileName", "previewType", "flipAxis"),
+}
+
+_GEOMETRY_NODE_TYPES = frozenset({"mesh", "nurbsSurface", "subdiv", "aiStandIn", "VRayProxy"})
 
 _TEXTURE_PATH_ATTRS = {
     "file": "fileTextureName",
@@ -160,6 +171,7 @@ def _scan_snapshot(
         shading_engines=graph.shading_engines,
         file_dependencies=graph.file_dependencies,
         references=graph.references,
+        shapes=graph.shapes,
     )
 
 @dataclass
@@ -170,6 +182,7 @@ class _GraphBuildResult:
     shading_engines: list[ShadingEngineSnapshot]
     file_dependencies: list[FileDependencySnapshot]
     references: list[ReferenceSnapshot]
+    shapes: list[ShapeSnapshot]
 
 def _collect_shader_graph(
     cmds: Any,
@@ -181,6 +194,7 @@ def _collect_shader_graph(
     connections: list[ConnectionSnapshot] = []
     materials: list[MaterialSnapshot] = []
     shading_engines: list[ShadingEngineSnapshot] = []
+    shapes_by_id: dict[str, ShapeSnapshot] = {}
 
     for selected in selected_nodes or []:
         _add_node_snapshot(cmds, nodes, selected)
@@ -193,6 +207,7 @@ def _collect_shader_graph(
         displacement_shader = _connected_node(cmds, f"{engine_name}.displacementShader")
         volume_shader = _connected_node(cmds, f"{engine_name}.volumeShader")
         members = _set_members(cmds, engine_name)
+        _collect_shape_snapshots(cmds, members, shapes_by_id)
 
         shading_engines.append(
             ShadingEngineSnapshot(
@@ -262,6 +277,7 @@ def _collect_shader_graph(
         shading_engines=shading_engines,
         file_dependencies=file_dependencies,
         references=references,
+        shapes=sorted(shapes_by_id.values(), key=lambda item: item.node_id),
     )
 
 def _shading_engine_names(cmds: Any, selected_nodes: Optional[list[str]]) -> list[str]:
@@ -752,6 +768,176 @@ def _dedupe_connections(connections: list[ConnectionSnapshot]) -> list[Connectio
         seen.add(key)
         result.append(connection)
     return result
+
+def _collect_shape_snapshots(
+    cmds: Any,
+    member_names: list[str],
+    shapes_by_id: dict[str, ShapeSnapshot],
+) -> None:
+    for member_name in member_names:
+        for shape_name in _resolve_member_shapes(cmds, member_name):
+            shape_id = _shape_id(shape_name)
+            if shape_id in shapes_by_id:
+                continue
+            shapes_by_id[shape_id] = _shape_snapshot(cmds, shape_name)
+
+
+def _resolve_member_shapes(cmds: Any, member_name: str) -> list[str]:
+    type_name = _node_type(cmds, member_name)
+    if type_name in _GEOMETRY_NODE_TYPES:
+        return [member_name]
+    if type_name == "transform":
+        shapes = _call_cmds(
+            cmds,
+            "listRelatives",
+            [],
+            member_name,
+            shapes=True,
+            fullPath=True,
+            noIntermediate=True,
+        ) or []
+        return [str(shape) for shape in shapes]
+    return []
+
+
+def _shape_snapshot(cmds: Any, shape_name: str) -> ShapeSnapshot:
+    type_name = _node_type(cmds, shape_name)
+    transform_name = _shape_transform_name(cmds, shape_name)
+    vertex_count = _poly_count(cmds, shape_name, vertex=True)
+    face_count = _poly_count(cmds, shape_name, face=True)
+    edge_count = _poly_count(cmds, shape_name, edge=True)
+    polygon_count = _poly_count(cmds, shape_name, polygon=True)
+    face_vertex_signature = _poly_face_vertex_signature(cmds, shape_name)
+    topology_fingerprint = _topology_fingerprint(
+        vertex_count=vertex_count,
+        edge_count=edge_count,
+        face_count=face_count,
+        polygon_count=polygon_count,
+        face_vertex_signature=face_vertex_signature,
+    )
+    return ShapeSnapshot(
+        node_id=_shape_id(shape_name),
+        name=_short_name(shape_name),
+        full_name=shape_name,
+        type_name=type_name or "mesh",
+        transform_id=_transform_id(transform_name) if transform_name else "",
+        polygon_count=polygon_count,
+        vertex_count=vertex_count,
+        face_count=face_count,
+        edge_count=edge_count,
+        world_bbox=_world_bbox(cmds, shape_name),
+        topology_fingerprint=topology_fingerprint,
+        instancing_key=_shape_id(shape_name),
+        proxy_attrs=_collect_proxy_attrs(cmds, shape_name, type_name),
+        referenced=_is_referenced(cmds, shape_name),
+        namespace=_namespace(shape_name),
+        locked=_is_locked(cmds, shape_name),
+    )
+
+
+def _shape_transform_name(cmds: Any, shape_name: str) -> Optional[str]:
+    parents = _call_cmds(
+        cmds,
+        "listRelatives",
+        [],
+        shape_name,
+        parent=True,
+        fullPath=True,
+    ) or []
+    if not parents:
+        return None
+    return str(parents[0])
+
+
+def _poly_count(cmds: Any, shape_name: str, **query_flags: Any) -> int:
+    value = _call_cmds(cmds, "polyEvaluate", 0, shape_name, **query_flags)
+    if isinstance(value, (list, tuple)):
+        return int(value[0]) if value else 0
+    return int(value or 0)
+
+
+def _poly_face_vertex_signature(cmds: Any, shape_name: str) -> str:
+    raw_counts = _call_cmds(cmds, "polyInfo", [], shape_name, faceVertexCount=True) or []
+    tokens: list[str] = []
+    for item in raw_counts:
+        text = str(item).strip()
+        if not text:
+            continue
+        if ":" in text:
+            text = text.split(":", 1)[1].strip()
+        tokens.append(text)
+    return ",".join(tokens)
+
+
+def _topology_fingerprint(
+    *,
+    vertex_count: int,
+    edge_count: int,
+    face_count: int,
+    polygon_count: int,
+    face_vertex_signature: str,
+) -> str:
+    payload = (
+        f"v{vertex_count}|e{edge_count}|f{face_count}|p{polygon_count}|"
+        f"{face_vertex_signature}"
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"sha256:{digest[:16]}"
+
+
+def _world_bbox(cmds: Any, shape_name: str) -> Optional[BoundingBoxSnapshot]:
+    bounds = _call_cmds(cmds, "exactWorldBoundingBox", None, shape_name)
+    if isinstance(bounds, (list, tuple)) and len(bounds) == 6:
+        return BoundingBoxSnapshot(
+            min_x=float(bounds[0]),
+            min_y=float(bounds[1]),
+            min_z=float(bounds[2]),
+            max_x=float(bounds[3]),
+            max_y=float(bounds[4]),
+            max_z=float(bounds[5]),
+        )
+
+    evaluated = _call_cmds(
+        cmds,
+        "polyEvaluate",
+        None,
+        shape_name,
+        boundingBox=True,
+        worldSpace=True,
+    )
+    if not isinstance(evaluated, (list, tuple)) or len(evaluated) != 2:
+        return None
+    min_corner, max_corner = evaluated
+    if not isinstance(min_corner, (list, tuple)) or not isinstance(max_corner, (list, tuple)):
+        return None
+    if len(min_corner) < 3 or len(max_corner) < 3:
+        return None
+    return BoundingBoxSnapshot(
+        min_x=float(min_corner[0]),
+        min_y=float(min_corner[1]),
+        min_z=float(min_corner[2]),
+        max_x=float(max_corner[0]),
+        max_y=float(max_corner[1]),
+        max_z=float(max_corner[2]),
+    )
+
+
+def _collect_proxy_attrs(cmds: Any, shape_name: str, type_name: str) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    for attr_name in _PROXY_ATTRS_BY_TYPE.get(type_name, ()):
+        value = _safe_get_attr(cmds, shape_name, attr_name)
+        if value is not None:
+            attrs[attr_name] = value
+    return attrs
+
+
+def _shape_id(shape_name: str) -> str:
+    return f"mesh:{_short_name(shape_name)}"
+
+
+def _transform_id(transform_name: str) -> str:
+    return f"transform:{_short_name(transform_name)}"
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")

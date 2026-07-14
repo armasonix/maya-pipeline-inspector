@@ -29,6 +29,13 @@ maya_module/plug-ins/2024/*.bundle
 maya_module/plug-ins/2025/*.bundle
 maya_module/plug-ins/2026/*.bundle
 
+# Raster assets: ignore stray PNGs; keep shipped module icons and doc screenshots
+*.png
+!maya_module/icons/
+!maya_module/icons/**
+!docs/assets/
+!docs/assets/**
+
 # Virtual environments
 .venv/
 venv/

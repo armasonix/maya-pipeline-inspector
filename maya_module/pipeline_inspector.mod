@@ -2,4 +2,5 @@
 PYTHONPATH +:= ../src
 scripts: scripts
 shelves: shelves
+icons: icons
 plug-ins: plug-ins

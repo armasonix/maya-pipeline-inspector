@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "examples/broken_scene/pipeline_inspector_demo_broken.ma",
+  "maya_version": "2025",
+  "renderer": "common",
+  "scan_scope": "scene",
+  "scanned_at_utc": "2026-07-14T08:00:00Z",
+  "nodes": [],
+  "connections": [],
+  "materials": [],
+  "shading_engines": [],
+  "file_dependencies": [],
+  "references": [],
+  "shapes": [
+    {
+      "node_id": "mesh:body_geo",
+      "name": "body_geo",
+      "full_name": "|world|char_demo:body_geo",
+      "type_name": "mesh",
+      "transform_id": "transform:body_geo",
+      "polygon_count": 6,
+      "vertex_count": 8,
+      "face_count": 12,
+      "edge_count": 18,
+      "world_bbox": {
+        "min_x": -1.0,
+        "min_y": -2.0,
+        "min_z": -3.0,
+        "max_x": 4.0,
+        "max_y": 5.0,
+        "max_z": 6.0
+      },
+      "topology_fingerprint": "sha256:8f14e45fceea167a5a36dedd4bea2543",
+      "instancing_key": "mesh:body_geo",
+      "proxy_attrs": {
+        "intermediateObject": false
+      },
+      "referenced": false,
+      "namespace": "char_demo",
+      "locked": false
+    }
+  ]
+}

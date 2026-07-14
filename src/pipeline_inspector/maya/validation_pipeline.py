@@ -59,6 +59,14 @@ def _studio_environment_for_validation(
     return studio_config.studio_environment
 
 
+def _naming_templates_for_validation(
+    studio_config: Optional[StudioConfig],
+) -> dict[str, str]:
+    if studio_config is None:
+        return {}
+    return dict(studio_config.pipeline.naming_templates.templates)
+
+
 @dataclass(frozen=True)
 class ProfileOption:
     """One selectable profile entry for Maya UI dropdowns."""
@@ -338,7 +346,11 @@ def run_validation(
         profile=profile,
         extra_rule_paths=extra_rule_paths,
     )
-    results = list(ValidationEngine().validate(enriched, rules))
+    results = list(
+        ValidationEngine(
+            naming_templates=_naming_templates_for_validation(studio_config),
+        ).validate(enriched, rules)
+    )
     sidecar_path = waiver_sidecar_path or resolve_waiver_sidecar_path(enriched.scene_path)
     if sidecar_path is not None and sidecar_path.is_file():
         results = list(apply_waivers(results, load_waiver_sidecar(sidecar_path)))

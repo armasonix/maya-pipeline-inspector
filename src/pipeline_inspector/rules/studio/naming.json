@@ -1,0 +1,154 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.mesh.pattern",
+      "name": "Mesh name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "shape",
+      "severity": "warning",
+      "owner": "pipeline_td",
+      "message": "Mesh name does not match the studio naming template.",
+      "why": "Consistent mesh naming helps rigging, lighting, and farm automation find geometry reliably across shots and departments.",
+      "match": {
+        "object_type": "mesh"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "mesh"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.group.pattern",
+      "name": "Group name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "node",
+      "severity": "warning",
+      "owner": "pipeline_td",
+      "message": "Group transform name does not match the studio naming template.",
+      "why": "Predictable group naming keeps hierarchy exports, selectors, and publish manifests stable for downstream tools.",
+      "match": {
+        "object_type": "group"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "group"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.material.pattern",
+      "name": "Material name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "material",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Material name does not match the studio naming template.",
+      "why": "Material naming conventions prevent accidental reuse of the wrong shader network during lookdev handoff and farm renders.",
+      "match": {
+        "object_type": "material"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "material"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.control.pattern",
+      "name": "Control name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "node",
+      "severity": "warning",
+      "owner": "rigging_td",
+      "message": "Control name does not match the studio naming template.",
+      "why": "Rig controls with consistent prefixes are easier to filter, mirror, and validate before animation publish.",
+      "match": {
+        "object_type": "control"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "control"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.texture.pattern",
+      "name": "Texture node name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "node",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Texture node name does not match the studio naming template.",
+      "why": "Texture node naming keeps shader graphs readable and helps automated cleanup scripts target the right file nodes.",
+      "match": {
+        "object_type": "texture"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "texture"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.shading_engine.pattern",
+      "name": "Shading engine name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "shading_engine",
+      "severity": "warning",
+      "owner": "shader_td",
+      "message": "Shading engine name does not match the studio naming template.",
+      "why": "Shading engine naming keeps assignment exports aligned with lighting templates and material manifests.",
+      "match": {
+        "object_type": "shading_engine"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "shading_engine"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}

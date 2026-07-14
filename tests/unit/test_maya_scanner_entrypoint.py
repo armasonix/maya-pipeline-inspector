@@ -28,6 +28,34 @@ class FakeCmds:
         }
         self.referenced_nodes = {"char_demo:file_albedo"}
         self.locked_nodes = {"char_demo:file_roughness"}
+        self.attrs["|world|char_demo:body_geo.intermediateObject"] = False
+
+    def polyEvaluate(self, shape, **kwargs):
+        if shape != "|world|char_demo:body_geo":
+            return 0
+        if kwargs.get("vertex"):
+            return 8
+        if kwargs.get("face"):
+            return 12
+        if kwargs.get("edge"):
+            return 18
+        if kwargs.get("polygon"):
+            return 6
+        if kwargs.get("boundingBox"):
+            return [(-1.0, -2.0, -3.0), (4.0, 5.0, 6.0)]
+        return 0
+
+    def exactWorldBoundingBox(self, *shapes):
+        shape = shapes[0] if shapes else ""
+        if shape != "|world|char_demo:body_geo":
+            return None
+        return [-1.0, -2.0, -3.0, 4.0, 5.0, 6.0]
+
+    def polyInfo(self, shape, **kwargs):
+        del shape
+        if kwargs.get("faceVertexCount"):
+            return ["4", "4", "4", "4", "4", "4"]
+        return []
 
     def file(self, *args, **kwargs):
         del args
@@ -138,6 +166,27 @@ def test_scan_scene_collects_shading_engine_and_material_network():
     assert material.graph_depth == 2
 
 
+def test_scan_scene_collects_shape_geometry_snapshot():
+    snapshot = scan_scene(cmds_module=FakeCmds())
+
+    assert len(snapshot.shapes) == 1
+    shape = snapshot.shapes[0]
+    assert shape.node_id == "mesh:body_geo"
+    assert shape.name == "body_geo"
+    assert shape.full_name == "|world|char_demo:body_geo"
+    assert shape.type_name == "mesh"
+    assert shape.vertex_count == 8
+    assert shape.face_count == 12
+    assert shape.edge_count == 18
+    assert shape.polygon_count == 6
+    assert shape.world_bbox is not None
+    assert shape.world_bbox.min_x == -1.0
+    assert shape.world_bbox.max_z == 6.0
+    assert shape.topology_fingerprint.startswith("sha256:")
+    assert shape.instancing_key == "mesh:body_geo"
+    assert shape.proxy_attrs["intermediateObject"] is False
+
+
 def test_scan_scene_collects_upstream_nodes_and_connections():
     snapshot = scan_scene(cmds_module=FakeCmds())
     nodes = {node.id: node for node in snapshot.nodes}
@@ -219,6 +268,7 @@ def test_scan_scene_handles_missing_optional_cmds_safely():
     assert snapshot.connections == []
     assert snapshot.materials == []
     assert snapshot.shading_engines == []
+    assert snapshot.shapes == []
 
 
 def test_scan_options_are_available_for_future_scanner_expansion():

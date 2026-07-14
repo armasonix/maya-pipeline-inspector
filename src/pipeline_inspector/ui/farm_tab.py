@@ -20,6 +20,22 @@ FARM_CONNECTION_STATUS_VALUE_LABEL_OBJECT_NAME = (
 FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME = "pipelineInspectorFarmRefreshConnectionButton"
 FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME = "pipelineInspectorFarmPreflightButton"
 FARM_SUBMIT_BUTTON_OBJECT_NAME = "pipelineInspectorFarmSubmitButton"
+FARM_ACTION_BUTTONS_OBJECT_NAME = "pipelineInspectorFarmActionButtons"
+FARM_FULL_BUTTON_LABELS = {
+    FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME: "Refresh Connection",
+    FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME: "Run Farm Preflight",
+    FARM_SUBMIT_BUTTON_OBJECT_NAME: "Submit to Farm",
+}
+FARM_COMPACT_BUTTON_LABELS = {
+    FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME: "Refresh",
+    FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME: "Preflight",
+    FARM_SUBMIT_BUTTON_OBJECT_NAME: "Submit",
+}
+FARM_BUTTON_LAYOUT_ORDER = (
+    FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME,
+    FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME,
+    FARM_SUBMIT_BUTTON_OBJECT_NAME,
+)
 
 @dataclass(frozen=True)
 class FarmTabState:
@@ -99,40 +115,38 @@ def build_farm_tab(
         add_status(status_group)
 
     buttons_row = qt_widgets.QWidget()
-    buttons_layout = qt_widgets.QHBoxLayout(buttons_row)
+    buttons_row.setObjectName(FARM_ACTION_BUTTONS_OBJECT_NAME)
+    buttons_layout = qt_widgets.QGridLayout(buttons_row)
     buttons_layout.setContentsMargins(0, 0, 0, 0)
     buttons_layout.setSpacing(4)
-    buttons_layout.addWidget(
+    farm_buttons = (
         _farm_button(
             qt_widgets,
-            "Refresh Connection",
+            FARM_FULL_BUTTON_LABELS[FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME],
             FARM_REFRESH_CONNECTION_BUTTON_OBJECT_NAME,
             "Ping the configured Deadline Web Service.",
             farm_callbacks.on_refresh_connection,
-        )
-    )
-    buttons_layout.addWidget(
+        ),
         _farm_button(
             qt_widgets,
-            "Run Farm Preflight",
+            FARM_FULL_BUTTON_LABELS[FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME],
             FARM_RUN_PREFLIGHT_BUTTON_OBJECT_NAME,
             "Validate the scene with deadline_critical and evaluate farm eligibility.",
             farm_callbacks.on_run_farm_preflight,
-        )
-    )
-    buttons_layout.addWidget(
+        ),
         _farm_button(
             qt_widgets,
-            "Submit to Farm",
+            FARM_FULL_BUTTON_LABELS[FARM_SUBMIT_BUTTON_OBJECT_NAME],
             FARM_SUBMIT_BUTTON_OBJECT_NAME,
             (
                 "Submit a CommandScript utility job that runs Pipeline Inspector "
                 "validation on a worker."
             ),
             farm_callbacks.on_submit_to_farm,
-        )
+        ),
     )
-    buttons_layout.addStretch(1)
+    for index, button in enumerate(farm_buttons):
+        buttons_layout.addWidget(button, 0, index)
     actions_section_layout.addWidget(buttons_row)
     layout.addWidget(actions_section)
 
