@@ -1128,32 +1128,6 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _sync_governance_from_ui(content: Any, qt_widgets: Any) -> None:
-    # region agent log
-    import json
-    import time
-
-    try:
-        with open(
-            r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "hypothesisId": "H1",
-                        "location": "ui_launcher.py:_sync_governance_from_ui",
-                        "message": "sync governance triggered",
-                        "data": {},
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
@@ -1525,6 +1499,10 @@ def _waiver_manager_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_report_supervisor=lambda: _report_supervisor_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_revoke_selected=lambda: _revoke_selected_waiver_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -1856,11 +1834,6 @@ def _readiness_action_callbacks(
             qt_widgets,
             recipient="support",
         ),
-        on_send_report_to_supervisor=lambda: _send_readiness_report_from_ui(
-            _panel_content(panel_state),
-            qt_widgets,
-            recipient="supervisor",
-        ),
     )
 
 
@@ -1984,26 +1957,164 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
         )
 
         studio_config = _studio_config_for_content(content)
-        resolver = _permission_resolver_for_content(content)
-        supervisor_route = resolve_supervisor_route(
-            studio_config.governance,
-            resolver.effective_role,
-        )
         dispatch_result = dispatch_validation_notifications(
             studio_config,
             result,
-            supervisor_route=supervisor_route,
+            force_notify=False,
         )
+        # region agent log
+        try:
+            import json
+            import time
+
+            with open(
+                r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
+                "a",
+                encoding="utf-8",
+            ) as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "sessionId": "618f4f",
+                            "hypothesisId": "H8",
+                            "location": "ui_launcher.py:_maybe_notify_validation",
+                            "message": "auto validation notify dispatch",
+                            "data": {"force_notify": False},
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
+                    + "\n"
+                )
+        except OSError:
+            pass
+        # endregion
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(content, qt_widgets, dispatch_result)
     except Exception as exc:  # noqa: BLE001
         print(f"Validation notification dispatch failed: {exc}")
 
 
+def _report_supervisor_from_ui(content: Any, qt_widgets: Any) -> None:
+    """Send the latest validation summary to the configured supervisor route."""
+
+    result = getattr(content, "_pipeline_inspector_last_validation_result", None)
+    if result is None:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            "Report Supervisor: run Validate first.",
+        )
+        return
+
+    try:
+        from pipeline_inspector.integrations.notify.dispatcher import (
+            dispatch_validation_notifications,
+            report_validation_notification_outcomes,
+        )
+
+        studio_config = _studio_config_for_content(content)
+        resolver = _permission_resolver_for_content(content)
+        supervisor_route = resolve_supervisor_route(
+            studio_config.governance,
+            resolver.effective_role,
+        )
+        if supervisor_route is None:
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                "Report Supervisor: no route configured for your pipeline role.",
+            )
+            return
+
+        # region agent log
+        try:
+            import json
+            import time
+
+            with open(
+                r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
+                "a",
+                encoding="utf-8",
+            ) as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "sessionId": "618f4f",
+                            "hypothesisId": "H5",
+                            "location": "ui_launcher.py:_report_supervisor_from_ui",
+                            "message": "manual supervisor validation report",
+                            "data": {
+                                "reporter_role": resolver.effective_role,
+                                "has_slack": bool(
+                                    supervisor_route.route.slack_webhook_url.strip()
+                                ),
+                            },
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
+                    + "\n"
+                )
+        except OSError:
+            pass
+        # endregion
+
+        dispatch_result = dispatch_validation_notifications(
+            studio_config,
+            result,
+            supervisor_route=supervisor_route,
+            force_notify=True,
+        )
+        # region agent log
+        try:
+            import json
+            import time
+
+            slack_sent = next(
+                (outcome.sent for outcome in dispatch_result.outcomes if outcome.connector_id == "slack"),
+                False,
+            )
+            with open(
+                r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
+                "a",
+                encoding="utf-8",
+            ) as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "sessionId": "618f4f",
+                            "hypothesisId": "H7",
+                            "location": "ui_launcher.py:_report_supervisor_from_ui",
+                            "message": "supervisor dispatch complete",
+                            "data": {"slack_sent": slack_sent},
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
+                    + "\n"
+                )
+        except OSError:
+            pass
+        # endregion
+        report_validation_notification_outcomes(dispatch_result)
+        _append_validation_notification_status(
+            content,
+            qt_widgets,
+            dispatch_result,
+            prefix="Report Supervisor:",
+        )
+    except Exception as exc:  # noqa: BLE001
+        message = f"Report Supervisor failed: {exc}"
+        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
+        print(message)
+
+
 def _append_validation_notification_status(
     content: Any,
     qt_widgets: Any,
     dispatch_result: Any,
+    *,
+    prefix: str = "",
 ) -> None:
     """Mirror connector notification outcomes on the Validate status label."""
 
@@ -2038,7 +2149,10 @@ def _append_validation_notification_status(
         return
     current = str(text_fn()).strip()
     suffix = " ".join(lines)
-    set_text(f"{current} {suffix}".strip() if current else suffix)
+    message = f"{current} {suffix}".strip() if current else suffix
+    if prefix:
+        message = f"{prefix} {message}".strip()
+    set_text(message)
 
 
 def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:

@@ -120,6 +120,7 @@ def send_discord_validation_notification(
     *,
     client_factory: DiscordClientFactory | None = None,
     webhook_url_override: str | None = None,
+    force_notify: bool = False,
 ) -> DiscordNotificationResult:
     """Send a Discord validation embed when connector settings match block events."""
 
@@ -148,6 +149,10 @@ def send_discord_validation_notification(
         block_publish=context.block_publish,
         block_deadline=context.block_deadline,
     )
+    if force_notify and override_webhook and not matched_events:
+        from pipeline_inspector.studio_config import DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH
+
+        matched_events = tuple(settings.notify_on) or (DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH,)
     if not matched_events:
         return DiscordNotificationResult(sent=False, skipped_reason="no_matching_events")
 
@@ -173,6 +178,7 @@ def maybe_send_discord_validation_notification(
     *,
     client_factory: DiscordClientFactory | None = None,
     webhook_url_override: str | None = None,
+    force_notify: bool = False,
 ) -> DiscordNotificationResult:
     """Send a Discord validation embed for a validation run result."""
 
@@ -182,4 +188,5 @@ def maybe_send_discord_validation_notification(
         context,
         client_factory=client_factory,
         webhook_url_override=webhook_url_override,
+        force_notify=force_notify,
     )

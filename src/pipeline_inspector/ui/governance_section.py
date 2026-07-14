@@ -1,8 +1,6 @@
 """Governance and supervisor routing fields for the Studio settings tab."""
 from __future__ import annotations
 
-import json
-import time
 from collections.abc import Callable
 from typing import Any, Optional
 
@@ -22,36 +20,6 @@ SETTINGS_GOVERNANCE_SECTION_OBJECT_NAME = "pipelineInspectorSettingsGovernanceSe
 SETTINGS_TRACKER_ROLE_MAP_INPUT_OBJECT_NAME = "pipelineInspectorSettingsTrackerRoleMapInput"
 SETTINGS_SUPERVISOR_ROUTES_INPUT_OBJECT_NAME = "pipelineInspectorSettingsSupervisorRoutesInput"
 
-_DEBUG_LOG_PATH = r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log"
-
-
-def _agent_debug_log(
-    location: str,
-    message: str,
-    data: dict[str, Any],
-    *,
-    hypothesis_id: str,
-) -> None:
-    # region agent log
-    try:
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "hypothesisId": hypothesis_id,
-                        "location": location,
-                        "message": message,
-                        "data": data,
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
-
 
 def build_governance_section(
     qt_widgets: Any,
@@ -68,7 +36,7 @@ def build_governance_section(
     layout.setSpacing(8)
 
     intro = qt_widgets.QLabel(
-        "Map tracker roles to pipeline roles and route validation/readiness reports "
+        "Map tracker roles to pipeline roles and route validation reports "
         "to supervisor notification targets by reporter role."
     )
     intro.setWordWrap(True)
@@ -85,10 +53,7 @@ def build_governance_section(
         "Used with Ftrack security roles and Cerebro groups."
     )
     _set_plain_text_height(tracker_map_input, 72)
-    wire_plain_text_changed(
-        tracker_map_input,
-        _wrap_governance_changed(on_settings_changed, "tracker_map", tracker_map_input),
-    )
+    wire_plain_text_changed(tracker_map_input, on_settings_changed)
     layout.addWidget(tracker_map_input)
 
     layout.addWidget(_section_title(qt_widgets, "Supervisor routes"))
@@ -103,10 +68,7 @@ def build_governance_section(
         "discord_webhook_url|slack_webhook_url"
     )
     _set_plain_text_height(routes_input, 96)
-    wire_plain_text_changed(
-        routes_input,
-        _wrap_governance_changed(on_settings_changed, "supervisor_routes", routes_input),
-    )
+    wire_plain_text_changed(routes_input, on_settings_changed)
     layout.addWidget(routes_input)
 
     role_hint = qt_widgets.QLabel(
@@ -137,27 +99,8 @@ def read_governance_from_view(
         qt_widgets.QPlainTextEdit,
         SETTINGS_SUPERVISOR_ROUTES_INPUT_OBJECT_NAME,
     )
-    raw_tracker_text = _plain_text(tracker_map_input)
-    raw_routes_text = _plain_text(routes_input)
-    tracker_role_map = _parse_tracker_role_map(raw_tracker_text)
-    supervisor_routes = _parse_supervisor_routes(raw_routes_text)
-    used_tracker_fallback = not tracker_role_map
-    used_routes_fallback = not supervisor_routes
-    # region agent log
-    _agent_debug_log(
-        "governance_section.py:read_governance_from_view",
-        "parsed governance fields",
-        {
-            "raw_tracker_len": len(raw_tracker_text),
-            "raw_routes_len": len(raw_routes_text),
-            "parsed_tracker_count": len(tracker_role_map),
-            "parsed_routes_count": len(supervisor_routes),
-            "used_tracker_fallback": used_tracker_fallback,
-            "used_routes_fallback": used_routes_fallback,
-        },
-        hypothesis_id="H2",
-    )
-    # endregion
+    tracker_role_map = _parse_tracker_role_map(_plain_text(tracker_map_input))
+    supervisor_routes = _parse_supervisor_routes(_plain_text(routes_input))
     return GovernanceSettings(
         enforced_role=current.enforced_role,
         tracker_role_map=tracker_role_map,
@@ -179,31 +122,10 @@ def update_governance_view(view: Any, qt_widgets: Any, config: StudioConfig) -> 
         qt_widgets.QPlainTextEdit,
         SETTINGS_SUPERVISOR_ROUTES_INPUT_OBJECT_NAME,
     )
-    tracker_has_focus = widget_has_focus(tracker_map_input)
-    routes_has_focus = widget_has_focus(routes_input)
-    tracker_before = _plain_text(tracker_map_input)
-    routes_before = _plain_text(routes_input)
-    if tracker_map_input is not None and not tracker_has_focus:
+    if tracker_map_input is not None and not widget_has_focus(tracker_map_input):
         _set_plain_text(tracker_map_input, _format_tracker_role_map(config.governance))
-    if routes_input is not None and not routes_has_focus:
+    if routes_input is not None and not widget_has_focus(routes_input):
         _set_plain_text(routes_input, _format_supervisor_routes(config.governance))
-    # region agent log
-    _agent_debug_log(
-        "governance_section.py:update_governance_view",
-        "refreshed governance plain-text fields",
-        {
-            "tracker_has_focus": tracker_has_focus,
-            "routes_has_focus": routes_has_focus,
-            "tracker_before_len": len(tracker_before),
-            "routes_before_len": len(routes_before),
-            "tracker_after_len": len(_plain_text(tracker_map_input)),
-            "routes_after_len": len(_plain_text(routes_input)),
-            "tracker_text_wiped": tracker_before != _plain_text(tracker_map_input),
-            "routes_text_wiped": routes_before != _plain_text(routes_input),
-        },
-        hypothesis_id="H1",
-    )
-    # endregion
 
 
 def _format_tracker_role_map(governance: GovernanceSettings) -> str:
@@ -319,33 +241,3 @@ def _set_plain_text_height(widget: Any, height: int) -> None:
     set_fixed_height = getattr(widget, "setFixedHeight", None)
     if set_fixed_height is not None:
         set_fixed_height(height)
-
-
-def _wrap_governance_changed(
-    callback: Optional[Callable[[], None]],
-    field_name: str,
-    widget: Any,
-) -> Optional[Callable[[], None]]:
-    if callback is None:
-        return None
-
-    def _wrapped() -> None:
-        is_read_only = getattr(widget, "isReadOnly", lambda: False)()
-        is_enabled = getattr(widget, "isEnabled", lambda: True)()
-        # region agent log
-        _agent_debug_log(
-            "governance_section.py:_wrap_governance_changed",
-            "governance field text changed",
-            {
-                "field": field_name,
-                "text_len": len(_plain_text(widget)),
-                "has_focus": widget_has_focus(widget),
-                "is_read_only": bool(is_read_only),
-                "is_enabled": bool(is_enabled),
-            },
-            hypothesis_id="H3",
-        )
-        # endregion
-        callback()
-
-    return _wrapped

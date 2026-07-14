@@ -505,6 +505,8 @@ def build_validation_actions(
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
     *,
     on_make_waive: Optional[Callable[[], None]] = None,
+    on_report_supervisor: Optional[Callable[[], None]] = None,
+    show_make_waive_in_overflow: bool = False,
 ) -> Any:
     """Build grouped validate controls: primary, pipeline, and issue triage actions."""
 
@@ -586,10 +588,10 @@ def build_validation_actions(
         ("Reveal File", issue_callbacks.on_reveal_file),
         ("Create Rule Draft", issue_callbacks.on_create_rule_draft),
     ]
-    if on_make_waive is not None:
+    if on_make_waive is not None and show_make_waive_in_overflow:
         overflow_actions.append(("Make Waive", on_make_waive))
-    else:
-        overflow_actions.append(("Make Waive", None))
+    if on_report_supervisor is not None and show_make_waive_in_overflow:
+        overflow_actions.append(("Report Supervisor", on_report_supervisor))
     layout.addWidget(
         _build_validate_action_overflow_button(
             qt_widgets,
@@ -746,7 +748,9 @@ def build_issues_table(
     rows: Sequence[IssueTableRow] = (),
     *,
     on_make_waive: Optional[Callable[[], None]] = None,
+    on_report_supervisor: Optional[Callable[[], None]] = None,
     show_make_waive_in_filters: bool = True,
+    show_report_supervisor_in_filters: bool = True,
     filters_row_stretch: bool = True,
 ) -> Any:
     """Build the filterable/sortable issues table widget."""
@@ -805,10 +809,10 @@ def build_issues_table(
 
     if on_make_waive is not None and show_make_waive_in_filters:
         from pipeline_inspector.ui.settings_widgets import wire_button
-        from pipeline_inspector.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
+        from pipeline_inspector.ui.waiver_manager import VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME
 
         make_waive_button = qt_widgets.QPushButton("Make Waive")
-        make_waive_button.setObjectName(WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME)
+        make_waive_button.setObjectName(VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME)
         set_tooltip = getattr(make_waive_button, "setToolTip", None)
         if set_tooltip is not None:
             set_tooltip(
@@ -816,6 +820,23 @@ def build_issues_table(
             )
         wire_button(make_waive_button, on_make_waive)
         filters_layout.addWidget(make_waive_button, 0)
+
+    if on_report_supervisor is not None and show_report_supervisor_in_filters:
+        from pipeline_inspector.ui.settings_widgets import wire_button
+        from pipeline_inspector.ui.waiver_manager import (
+            VALIDATE_REPORT_SUPERVISOR_BUTTON_OBJECT_NAME,
+        )
+
+        report_supervisor_button = qt_widgets.QPushButton("Report Supervisor")
+        report_supervisor_button.setObjectName(VALIDATE_REPORT_SUPERVISOR_BUTTON_OBJECT_NAME)
+        set_tooltip = getattr(report_supervisor_button, "setToolTip", None)
+        if set_tooltip is not None:
+            set_tooltip(
+                "Send the latest validation summary to your supervisor route "
+                "(Telegram, Discord, or Slack)."
+            )
+        wire_button(report_supervisor_button, on_report_supervisor)
+        filters_layout.addWidget(report_supervisor_button, 0)
 
     if filters_row_stretch:
         filters_layout.addStretch(1)
@@ -1156,6 +1177,8 @@ def build_validate_sticky_chrome(
     *,
     user_config: Optional[UserPreferences] = None,
     on_make_waive: Optional[Callable[[], None]] = None,
+    on_report_supervisor: Optional[Callable[[], None]] = None,
+    show_make_waive_in_overflow: bool = False,
 ) -> Any:
     """Build pinned summary + action bar chrome for the Validate tab."""
 
@@ -1185,6 +1208,8 @@ def build_validate_sticky_chrome(
             callbacks=validation_callbacks,
             issue_details_callbacks=issue_details_callbacks,
             on_make_waive=on_make_waive,
+            on_report_supervisor=on_report_supervisor,
+            show_make_waive_in_overflow=show_make_waive_in_overflow,
         )
     )
     return widget
@@ -1350,6 +1375,12 @@ def _build_validate_tab(
 
     waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
 
+    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
+
+    pane_tokens = density_tokens(
+        normalize_density(user_config.ui_density if user_config is not None else "comfortable")
+    )
+
     layout.addWidget(
         build_validate_sticky_chrome(
             qt_widgets,
@@ -1357,19 +1388,17 @@ def _build_validate_tab(
             issue_details_callbacks,
             user_config=user_config,
             on_make_waive=waiver_callbacks.on_make_waive,
+            on_report_supervisor=waiver_callbacks.on_report_supervisor,
+            show_make_waive_in_overflow=not pane_tokens.show_make_waive_in_filters,
         )
-    )
-
-    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
-
-    pane_tokens = density_tokens(
-        normalize_density(user_config.ui_density if user_config is not None else "comfortable")
     )
 
     issues_table = build_issues_table(
         qt_widgets,
         on_make_waive=waiver_callbacks.on_make_waive,
+        on_report_supervisor=waiver_callbacks.on_report_supervisor,
         show_make_waive_in_filters=pane_tokens.show_make_waive_in_filters,
+        show_report_supervisor_in_filters=pane_tokens.show_make_waive_in_filters,
         filters_row_stretch=pane_tokens.filters_row_stretch,
     )
     details_panel = build_issue_details_panel(qt_widgets, callbacks=issue_details_callbacks)
@@ -2506,18 +2535,34 @@ def _apply_issues_table_density(content: Any, qt_widgets: Any, tokens: Any) -> N
         if set_default_section_size is not None:
             set_default_section_size(tokens.table_row_height)
 
-    from pipeline_inspector.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
+    from pipeline_inspector.ui.waiver_manager import (
+        VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+        VALIDATE_REPORT_SUPERVISOR_BUTTON_OBJECT_NAME,
+    )
 
     make_waive_button = _find_child_widget(
         content,
         qt_widgets,
-        WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+        VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME,
     )
     if make_waive_button is not None:
         _set_filter_row_widget_visible(
             content,
             qt_widgets,
             make_waive_button,
+            visible=tokens.show_make_waive_in_filters,
+        )
+
+    report_supervisor_button = _find_child_widget(
+        content,
+        qt_widgets,
+        VALIDATE_REPORT_SUPERVISOR_BUTTON_OBJECT_NAME,
+    )
+    if report_supervisor_button is not None:
+        _set_filter_row_widget_visible(
+            content,
+            qt_widgets,
+            report_supervisor_button,
             visible=tokens.show_make_waive_in_filters,
         )
 

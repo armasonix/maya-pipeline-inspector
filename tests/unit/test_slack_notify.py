@@ -266,3 +266,91 @@ def test_matched_notify_events_returns_publish_and_deadline_flags():
         block_publish=True,
         block_deadline=True,
     ) == ("block_publish", "block_deadline")
+
+
+def test_send_slack_validation_notification_force_notify_uses_supervisor_override():
+    captured: list[HttpRequest] = []
+
+    def transport(request: HttpRequest, timeout: float) -> SlackResponse:
+        captured.append(request)
+        _ = timeout
+        return SlackResponse(status_code=200, body="ok", json_data=None)
+
+    studio = _studio_config(
+        _slack_settings(
+            publish_webhook_url="",
+            deadline_webhook_url="",
+            notify_on=(),
+        )
+    )
+    context = _context(block_publish=False, block_deadline=False)
+
+    result = send_slack_validation_notification(
+        studio,
+        context,
+        client_factory=lambda: SlackClient(transport=transport),
+        webhook_url_override="https://hooks.slack.com/services/supervisor",
+        force_notify=True,
+    )
+
+    assert result.sent is True
+    assert captured[0].url == "https://hooks.slack.com/services/supervisor"
+
+
+def test_send_slack_validation_notification_override_sends_single_post_for_multiple_events():
+    captured: list[HttpRequest] = []
+
+    def transport(request: HttpRequest, timeout: float) -> SlackResponse:
+        captured.append(request)
+        _ = timeout
+        return SlackResponse(status_code=200, body="ok", json_data=None)
+
+    studio = _studio_config(
+        _slack_settings(
+            publish_webhook_url="",
+            deadline_webhook_url="",
+            notify_on=("block_publish", "block_deadline"),
+        )
+    )
+    context = _context(block_publish=True, block_deadline=True)
+
+    result = send_slack_validation_notification(
+        studio,
+        context,
+        client_factory=lambda: SlackClient(transport=transport),
+        webhook_url_override="https://hooks.slack.com/services/supervisor",
+        force_notify=True,
+    )
+
+    assert result.sent is True
+    assert len(captured) == 1
+    assert captured[0].url == "https://hooks.slack.com/services/supervisor"
+
+
+def test_send_slack_validation_notification_dedupes_same_webhook_for_publish_and_deadline():
+    captured: list[HttpRequest] = []
+
+    def transport(request: HttpRequest, timeout: float) -> SlackResponse:
+        captured.append(request)
+        _ = timeout
+        return SlackResponse(status_code=200, body="ok", json_data=None)
+
+    shared_webhook = "https://hooks.slack.com/services/shared"
+    studio = _studio_config(
+        _slack_settings(
+            publish_webhook_url=shared_webhook,
+            deadline_webhook_url=shared_webhook,
+            notify_on=("block_publish", "block_deadline"),
+        )
+    )
+    context = _context(block_publish=True, block_deadline=True)
+
+    result = send_slack_validation_notification(
+        studio,
+        context,
+        client_factory=lambda: SlackClient(transport=transport),
+    )
+
+    assert result.sent is True
+    assert len(captured) == 1
+    assert captured[0].url == shared_webhook

@@ -143,6 +143,7 @@ def send_telegram_validation_notification(
     *,
     client_factory: TelegramClientFactory | None = None,
     chat_id_override: str | None = None,
+    force_notify: bool = False,
 ) -> TelegramNotificationResult:
     """Send a Telegram validation summary when connector settings match block events."""
 
@@ -167,6 +168,10 @@ def send_telegram_validation_notification(
         block_publish=context.block_publish,
         block_deadline=context.block_deadline,
     )
+    if force_notify and override_chat_id and not matched_events:
+        from pipeline_inspector.studio_config import TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH
+
+        matched_events = tuple(settings.notify_on) or (TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH,)
     if not matched_events:
         return TelegramNotificationResult(sent=False, skipped_reason="no_matching_events")
 
@@ -194,6 +199,7 @@ def maybe_send_telegram_validation_notification(
     *,
     client_factory: TelegramClientFactory | None = None,
     chat_id_override: str | None = None,
+    force_notify: bool = False,
 ) -> TelegramNotificationResult:
     """Send a Telegram validation summary for a validation run result."""
 
@@ -203,4 +209,5 @@ def maybe_send_telegram_validation_notification(
         context,
         client_factory=client_factory,
         chat_id_override=chat_id_override,
+        force_notify=force_notify,
     )

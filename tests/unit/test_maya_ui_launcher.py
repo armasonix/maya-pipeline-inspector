@@ -409,6 +409,8 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
     assert len(calls) == 1
     assert calls[0][0].__class__.__name__ == "StudioConfig"
     assert calls[0][1] is result
+    assert calls[0][2].get("supervisor_route") is None
+    assert calls[0][2].get("force_notify") is False
 
 
 def test_show_check_for_updates_shows_info_when_up_to_date(monkeypatch: Any):
