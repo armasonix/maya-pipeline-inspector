@@ -1,7 +1,9 @@
 """Maya dockable panel launcher."""
 from __future__ import annotations
 
+import json
 import os
+import time
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
@@ -36,7 +38,6 @@ from pipeline_inspector.ui.farm_tab import (
     update_farm_tab,
 )
 from pipeline_inspector.ui.fix_queue import (
-    FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
     FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
     FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueActionCallbacks,
@@ -93,6 +94,35 @@ from pipeline_inspector.user_config import (
     merge_runtime_config,
     save_user_config,
 )
+
+_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+
+
+def _debug_session_log(
+    *,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict[str, Any] | None = None,
+    run_id: str = "pre-fix",
+) -> None:
+    # region agent log
+    try:
+        payload = {
+            "sessionId": "618f4f",
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # endregion
+
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 OBSOLETE_WORKSPACE_CONTROL_NAMES = (
@@ -291,7 +321,6 @@ def _create_dockable_panel() -> Any:
             remember_user_config_path(user_config.config_path)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
-        _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
@@ -768,6 +797,17 @@ def _guard_panel_capability(
     decision = _permission_resolver_for_content(content).require(capability)
     if decision.allowed:
         return True
+    _debug_session_log(
+        hypothesis_id="H1-H3",
+        location="ui_launcher.py:_guard_panel_capability",
+        message="permission denied dialog shown",
+        data={
+            "capability": capability,
+            "effective_role": decision.effective_role,
+            "role_source": decision.role_source,
+            "reason": decision.reason,
+        },
+    )
     _show_information_dialog(qt_widgets, title, decision.reason)
     _set_label_text(content, qt_widgets, status_object_name, decision.reason)
     return False
@@ -3061,39 +3101,6 @@ def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
             connect(lambda *_: _on_waiver_row_selected(content, qt_widgets))
 
 
-def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
-    apply_selected = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        "pipelineInspectorApplySelectedFixesButton",
-    )
-    apply_safe = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        "pipelineInspectorApplySafeFixesButton",
-    )
-    export_fix_plan = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
-    )
-    if apply_selected is not None:
-        clicked = getattr(apply_selected, "clicked", None)
-        connect = getattr(clicked, "connect", None)
-        if connect is not None:
-            connect(lambda *_: _apply_selected_fixes_from_ui(content, qt_widgets))
-    if apply_safe is not None:
-        clicked = getattr(apply_safe, "clicked", None)
-        connect = getattr(clicked, "connect", None)
-        if connect is not None:
-            connect(lambda *_: _apply_safe_fixes_from_ui(content, qt_widgets))
-    if export_fix_plan is not None:
-        clicked = getattr(export_fix_plan, "clicked", None)
-        connect = getattr(clicked, "connect", None)
-        if connect is not None:
-            connect(lambda *_: _export_fix_plan_from_ui())
-
-
 def _fix_queue_table(content: Any, qt_widgets: Any) -> Any:
     return _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
 
@@ -3117,6 +3124,18 @@ def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
 def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.maya.fix_applier import apply_fix_actions
 
+    _debug_session_log(
+        hypothesis_id="H1-H2",
+        location="ui_launcher.py:_apply_selected_fixes_from_ui",
+        message="apply selected fixes handler invoked",
+        data={
+            "assigned_role": getattr(
+                _user_config_for_content(content),
+                "assigned_role",
+                "",
+            ),
+        },
+    )
     fix_plan = getattr(content, "_pipeline_inspector_fix_plan", None)
     table = _fix_queue_table(content, qt_widgets)
     stored_rows = getattr(content, "_pipeline_inspector_fix_rows", ())
