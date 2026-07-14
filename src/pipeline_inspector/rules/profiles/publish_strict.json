@@ -95,6 +95,30 @@
     },
     "arnold.material.texture_budget.warning": {
       "block_publish": true
+    },
+    "studio.naming.mesh.pattern": {
+      "severity": "error",
+      "block_publish": true
+    },
+    "studio.naming.group.pattern": {
+      "severity": "error",
+      "block_publish": true
+    },
+    "studio.naming.material.pattern": {
+      "severity": "error",
+      "block_publish": true
+    },
+    "studio.naming.control.pattern": {
+      "severity": "error",
+      "block_publish": true
+    },
+    "studio.naming.texture.pattern": {
+      "severity": "error",
+      "block_publish": true
+    },
+    "studio.naming.shading_engine.pattern": {
+      "severity": "error",
+      "block_publish": true
     }
   }
 }

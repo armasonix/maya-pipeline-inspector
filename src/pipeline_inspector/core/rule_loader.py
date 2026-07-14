@@ -193,6 +193,10 @@ def build_rule_search_paths(
     if common_path.exists():
         paths.append(common_path)
 
+    studio_path = rule_root / "studio"
+    if studio_path.exists():
+        paths.append(studio_path)
+
     seen_renderers = {"common"}
     for renderer_id in renderer_ids:
         renderer = renderer_id.strip().lower()

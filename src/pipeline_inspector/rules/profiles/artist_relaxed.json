@@ -22,6 +22,24 @@
     },
     "common.texture.path.project_root": {
       "block_deadline": false
+    },
+    "studio.naming.mesh.pattern": {
+      "enabled": false
+    },
+    "studio.naming.group.pattern": {
+      "enabled": false
+    },
+    "studio.naming.material.pattern": {
+      "enabled": false
+    },
+    "studio.naming.control.pattern": {
+      "enabled": false
+    },
+    "studio.naming.texture.pattern": {
+      "enabled": false
+    },
+    "studio.naming.shading_engine.pattern": {
+      "enabled": false
     }
   }
 }
