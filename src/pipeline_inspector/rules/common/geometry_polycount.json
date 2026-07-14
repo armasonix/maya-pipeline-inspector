@@ -1,0 +1,85 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "common.geometry.polycount.hero.max",
+      "name": "Hero mesh polycount budget",
+      "enabled": false,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "geometry",
+      "severity": "warning",
+      "owner": "modeling_td",
+      "message": "Hero mesh polygon count exceeds the configured budget.",
+      "why": "Hero assets need higher detail, but uncontrolled polygon growth still increases rig, deformation, and farm cost. Per-shape budgets keep hero geometry reviewable before publish.",
+      "match": {
+        "type_name": "mesh",
+        "referenced": false
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "polygon_count",
+        "max": 500000
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.geometry.polycount.prop.max",
+      "name": "Prop mesh polycount budget",
+      "enabled": false,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "geometry",
+      "severity": "warning",
+      "owner": "modeling_td",
+      "message": "Prop mesh polygon count exceeds the configured budget.",
+      "why": "Prop assets should stay within tiered geometry budgets so publish gates remain predictable across asset classes.",
+      "match": {
+        "type_name": "mesh",
+        "referenced": false
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "polygon_count",
+        "max": 100000
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "common.geometry.polycount.background.max",
+      "name": "Background mesh polycount budget",
+      "enabled": false,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "geometry",
+      "severity": "warning",
+      "owner": "modeling_td",
+      "message": "Background mesh polygon count exceeds the configured budget.",
+      "why": "Background assets can use lower geometry tiers to keep scene complexity and farm cost manageable.",
+      "match": {
+        "type_name": "mesh",
+        "referenced": false
+      },
+      "check": {
+        "type": "numeric_max",
+        "attribute": "polygon_count",
+        "max": 25000
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    }
+  ]
+}
