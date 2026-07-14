@@ -149,6 +149,31 @@
         "waiver_allowed": true,
         "auto_fix_allowed": false
       }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.light_source.pattern",
+      "name": "Light source name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "node",
+      "severity": "warning",
+      "owner": "lighting_td",
+      "message": "Light source name does not match the studio naming template.",
+      "why": "Consistent light naming helps lighting templates, farm exports, and automated scene cleanup target the right sources.",
+      "match": {
+        "object_type": "light_source"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "light_source"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
     }
   ]
 }

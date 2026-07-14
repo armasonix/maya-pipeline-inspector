@@ -321,6 +321,151 @@ def wire_plain_text_changed(field: Any, callback: Optional[Callable[[], None]]) 
             return
 
 
+_PLAIN_TEXT_FIELD_STYLE = (
+    "QPlainTextEdit { background-color: #1f1f1f; border: 1px solid #555555; "
+    "border-radius: 3px; selection-background-color: #3d6ea8; "
+    "selection-color: #ffffff; }"
+)
+
+
+def configure_plain_text_placeholder_field(
+    qt_widgets: Any,
+    widget: Any,
+    *,
+    value: str,
+    placeholder: str,
+    text_color: str = "#f0f0f0",
+    placeholder_color: str = "#888888",
+) -> None:
+    """Apply plain-text state and keep placeholder visible under themed QSS."""
+
+    set_placeholder = getattr(widget, "setPlaceholderText", None)
+    if set_placeholder is not None:
+        set_placeholder(placeholder)
+
+    if value:
+        set_plain = getattr(widget, "setPlainText", None)
+        if set_plain is not None:
+            set_plain(value)
+        else:
+            set_text = getattr(widget, "setText", None)
+            if set_text is not None:
+                set_text(value)
+    else:
+        clear = getattr(widget, "clear", None)
+        if clear is not None:
+            clear()
+
+    _apply_plain_text_palette(
+        widget,
+        text_color=text_color,
+        placeholder_color=placeholder_color,
+    )
+    set_style = getattr(widget, "setStyleSheet", None)
+    if set_style is not None:
+        set_style(_PLAIN_TEXT_FIELD_STYLE)
+
+    document_fn = getattr(widget, "document", None)
+    if document_fn is not None:
+        with contextlib.suppress(TypeError):
+            document = document_fn()
+            set_modified = getattr(document, "setModified", None)
+            if set_modified is not None:
+                set_modified(False)
+
+    _refresh_plain_text_viewport(widget)
+    _schedule_plain_text_placeholder_refresh(qt_widgets, widget, placeholder)
+
+
+def refresh_plain_text_placeholder(qt_widgets: Any, widget: Any | None) -> None:
+    """Re-apply placeholder styling after the document becomes empty."""
+
+    if widget is None:
+        return
+    placeholder_fn = getattr(widget, "placeholderText", None)
+    if placeholder_fn is None:
+        return
+    placeholder = str(placeholder_fn() or "")
+    if not placeholder:
+        return
+    plain_text_fn = getattr(widget, "toPlainText", None)
+    value = str(plain_text_fn() or "") if plain_text_fn is not None else ""
+    configure_plain_text_placeholder_field(
+        qt_widgets,
+        widget,
+        value=value,
+        placeholder=placeholder,
+    )
+
+
+def _apply_plain_text_palette(
+    widget: Any,
+    *,
+    text_color: str,
+    placeholder_color: str,
+) -> None:
+    try:
+        from pipeline_inspector.ui.qt import load_qt_gui
+
+        qt_gui = load_qt_gui()
+    except RuntimeError:
+        return
+
+    QColor = getattr(qt_gui, "QColor", None)
+    QPalette = getattr(qt_gui, "QPalette", None)
+    palette_fn = getattr(widget, "palette", None)
+    set_palette = getattr(widget, "setPalette", None)
+    if QColor is None or QPalette is None or palette_fn is None or set_palette is None:
+        return
+
+    palette = palette_fn()
+    palette.setColor(QPalette.Text, QColor(text_color))
+    placeholder_role = getattr(QPalette, "PlaceholderText", None)
+    if placeholder_role is not None:
+        palette.setColor(placeholder_role, QColor(placeholder_color))
+    set_palette(palette)
+
+
+def _refresh_plain_text_viewport(widget: Any) -> None:
+    update = getattr(widget, "update", None)
+    if update is not None:
+        update()
+    viewport_fn = getattr(widget, "viewport", None)
+    if viewport_fn is None:
+        return
+    with contextlib.suppress(TypeError):
+        viewport = viewport_fn()
+        viewport_update = getattr(viewport, "update", None)
+        if viewport_update is not None:
+            viewport_update()
+
+
+def _schedule_plain_text_placeholder_refresh(
+    qt_widgets: Any,
+    widget: Any,
+    placeholder: str,
+) -> None:
+    timer_class = getattr(qt_widgets, "QTimer", None)
+    if timer_class is None:
+        with contextlib.suppress(RuntimeError):
+            from pipeline_inspector.ui.qt import load_qt_core
+
+            timer_class = getattr(load_qt_core(), "QTimer", None)
+    if timer_class is None:
+        return
+    single_shot = getattr(timer_class, "singleShot", None)
+    if single_shot is None:
+        return
+
+    def _refresh() -> None:
+        set_placeholder = getattr(widget, "setPlaceholderText", None)
+        if set_placeholder is not None:
+            set_placeholder(placeholder)
+        _refresh_plain_text_viewport(widget)
+
+    single_shot(0, _refresh)
+
+
 def _widget_object_name(widget: Any) -> str:
     object_name_fn = getattr(widget, "objectName", None)
     if callable(object_name_fn):
@@ -467,6 +612,7 @@ def build_borderless_scroll_area(
     *,
     object_name: str,
     content_widget: Any,
+    allow_horizontal_scroll: bool = False,
 ) -> Any:
     """Wrap settings content in a borderless vertical scroll area when supported."""
 
@@ -499,9 +645,14 @@ def build_borderless_scroll_area(
     set_horizontal_scroll = getattr(scroll_area, "setHorizontalScrollBarPolicy", None)
     scroll_bar_policy = getattr(qt_widgets, "Qt", None)
     if set_horizontal_scroll is not None and scroll_bar_policy is not None:
-        scroll_always_off = getattr(scroll_bar_policy, "ScrollBarAlwaysOff", None)
-        if scroll_always_off is not None:
-            set_horizontal_scroll(scroll_always_off)
+        if allow_horizontal_scroll:
+            scroll_as_needed = getattr(scroll_bar_policy, "ScrollBarAsNeeded", None)
+            if scroll_as_needed is not None:
+                set_horizontal_scroll(scroll_as_needed)
+        else:
+            scroll_always_off = getattr(scroll_bar_policy, "ScrollBarAlwaysOff", None)
+            if scroll_always_off is not None:
+                set_horizontal_scroll(scroll_always_off)
 
     set_expanding_size_policy(qt_widgets, scroll_area)
     set_widget = getattr(scroll_area, "setWidget", None)

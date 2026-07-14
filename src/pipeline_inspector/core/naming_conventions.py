@@ -19,6 +19,7 @@ NAMING_OBJECT_TYPES: tuple[str, ...] = (
     "control",
     "texture",
     "shading_engine",
+    "light_source",
 )
 
 
@@ -90,6 +91,8 @@ def resolve_object_type(target_obj: object) -> Optional[str]:
             return "material"
         if "texture" in target_obj.classification or "file" in target_obj.classification:
             return "texture"
+        if "light" in target_obj.classification or _is_light_type(target_obj.type_name):
+            return "light_source"
         type_name = target_obj.type_name.lower()
         if type_name == "transform":
             return "group"
@@ -110,3 +113,15 @@ def name_matches_pattern(name: str, pattern: str) -> bool:
     """Return whether the full node name matches the naming regex."""
 
     return bool(compile_naming_pattern(pattern).fullmatch(name))
+
+
+def _is_light_type(type_name: str) -> bool:
+    """Return whether a Maya node type should be treated as a light source."""
+
+    return is_light_type(type_name)
+
+
+def is_light_type(type_name: str) -> bool:
+    """Return whether a Maya node type should be treated as a light source."""
+
+    return str(type_name or "").lower().endswith("light")

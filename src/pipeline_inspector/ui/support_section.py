@@ -14,9 +14,11 @@ from pipeline_inspector.studio_config import (
     StudioConfig,
 )
 from pipeline_inspector.ui.settings_widgets import (
+    configure_plain_text_placeholder_field,
     find_child,
     line_edit_text,
     qt_align_left_vcenter,
+    refresh_plain_text_placeholder,
     set_fixed_horizontal_size_policy,
     set_line_edit_text,
     widget_has_focus,
@@ -47,9 +49,12 @@ SETTINGS_READINESS_NETWORK_PATHS_INPUT_OBJECT_NAME = (
 SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME = (
     "pipelineInspectorSettingsReadinessSoftwareVersionsInput"
 )
+SETTINGS_READINESS_CHECKS_ROW_OBJECT_NAME = "pipelineInspectorSettingsReadinessChecksRow"
 
 _FIELD_WIDTH = 146
+_READINESS_FIELD_WIDTH = 120
 _PLAIN_TEXT_WIDTH = 146
+_READINESS_PLAIN_TEXT_WIDTH = _READINESS_FIELD_WIDTH
 _PLAIN_TEXT_HEIGHT = 56
 
 _READINESS_TRACE_LOG = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
@@ -127,73 +132,10 @@ def build_support_and_roles_section(
     layout.addWidget(checks_intro)
 
     layout.addWidget(
-        _labeled_plain_text_row(
+        _build_readiness_checks_row(
             qt_widgets,
-            "Maya plugins",
-            _build_plain_text_input(
-                qt_widgets,
-                SETTINGS_READINESS_PLUGINS_INPUT_OBJECT_NAME,
-                _lines(readiness.checks.maya_plugins),
-                "mtoa\nvrayformaya",
-                on_settings_changed,
-            ),
-            hint="mtoa\nvrayformaya",
-        )
-    )
-    layout.addWidget(
-        _labeled_plain_text_row(
-            qt_widgets,
-            "Mapped drives",
-            _build_plain_text_input(
-                qt_widgets,
-                SETTINGS_READINESS_DRIVES_INPUT_OBJECT_NAME,
-                _lines(readiness.checks.mapped_drives),
-                "Z:\nY:",
-                on_settings_changed,
-            ),
-            hint="Z:\nY:",
-        )
-    )
-    layout.addWidget(
-        _labeled_plain_text_row(
-            qt_widgets,
-            "Env vars",
-            _build_plain_text_input(
-                qt_widgets,
-                SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME,
-                _lines(readiness.checks.env_vars),
-                "PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT",
-                on_settings_changed,
-            ),
-            hint="PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT",
-        )
-    )
-    layout.addWidget(
-        _labeled_plain_text_row(
-            qt_widgets,
-            "Network paths",
-            _build_plain_text_input(
-                qt_widgets,
-                SETTINGS_READINESS_NETWORK_PATHS_INPUT_OBJECT_NAME,
-                _lines(readiness.checks.network_paths),
-                "\\\\farm\\textures",
-                on_settings_changed,
-            ),
-            hint="\\\\farm\\textures",
-        )
-    )
-    layout.addWidget(
-        _labeled_plain_text_row(
-            qt_widgets,
-            "Software versions",
-            _build_plain_text_input(
-                qt_widgets,
-                SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME,
-                _software_version_lines(readiness.checks.software_versions),
-                "maya=2025",
-                on_settings_changed,
-            ),
-            hint="maya=2025",
+            readiness.checks,
+            on_settings_changed=on_settings_changed,
         )
     )
     return section
@@ -299,6 +241,7 @@ def update_support_and_roles_view(
         ),
         _lines(readiness.checks.maya_plugins),
         field_name="maya_plugins",
+        qt_widgets=qt_widgets,
     )
     _set_plain_text_if_unfocused(
         find_child(
@@ -308,6 +251,7 @@ def update_support_and_roles_view(
         ),
         _lines(readiness.checks.mapped_drives),
         field_name="mapped_drives",
+        qt_widgets=qt_widgets,
     )
     _set_plain_text_if_unfocused(
         find_child(
@@ -317,6 +261,7 @@ def update_support_and_roles_view(
         ),
         _lines(readiness.checks.env_vars),
         field_name="env_vars",
+        qt_widgets=qt_widgets,
     )
     _set_plain_text_if_unfocused(
         find_child(
@@ -326,6 +271,7 @@ def update_support_and_roles_view(
         ),
         _lines(readiness.checks.network_paths),
         field_name="network_paths",
+        qt_widgets=qt_widgets,
     )
     _set_plain_text_if_unfocused(
         find_child(
@@ -335,6 +281,7 @@ def update_support_and_roles_view(
         ),
         _software_version_lines(readiness.checks.software_versions),
         field_name="software_versions",
+        qt_widgets=qt_widgets,
     )
 
 
@@ -373,6 +320,77 @@ def _section_title(qt_widgets: Any, text: str) -> Any:
     return label
 
 
+def _build_readiness_checks_row(
+    qt_widgets: Any,
+    checks: ReadinessCheckRequirements,
+    *,
+    on_settings_changed: Optional[Callable[[], None]] = None,
+) -> Any:
+    """Lay out readiness requirement editors left-to-right in one row."""
+
+    row_host = qt_widgets.QWidget()
+    row_host.setObjectName(SETTINGS_READINESS_CHECKS_ROW_OBJECT_NAME)
+    row_layout = qt_widgets.QHBoxLayout(row_host)
+    set_margins = getattr(row_layout, "setContentsMargins", None)
+    if set_margins is not None:
+        set_margins(0, 0, 0, 0)
+    set_spacing = getattr(row_layout, "setSpacing", None)
+    if set_spacing is not None:
+        set_spacing(8)
+
+    field_specs = (
+        ("Maya plugins", SETTINGS_READINESS_PLUGINS_INPUT_OBJECT_NAME, _lines(checks.maya_plugins), "mtoa\nvrayformaya"),
+        ("Mapped drives", SETTINGS_READINESS_DRIVES_INPUT_OBJECT_NAME, _lines(checks.mapped_drives), "Z:\nY:"),
+        ("Env vars", SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME, _lines(checks.env_vars), "PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT"),
+        ("Network paths", SETTINGS_READINESS_NETWORK_PATHS_INPUT_OBJECT_NAME, _lines(checks.network_paths), "\\\\farm\\textures"),
+        (
+            "Software versions",
+            SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME,
+            _software_version_lines(checks.software_versions),
+            "maya=2025",
+        ),
+    )
+    for label, object_name, value, placeholder in field_specs:
+        field = _build_plain_text_input(
+            qt_widgets,
+            object_name,
+            value,
+            placeholder,
+            on_settings_changed,
+            width=_READINESS_PLAIN_TEXT_WIDTH,
+        )
+        row_layout.addWidget(_labeled_plain_text_column(qt_widgets, label, field))
+
+    add_stretch = getattr(row_layout, "addStretch", None)
+    if add_stretch is not None:
+        add_stretch(1)
+
+    #region agent log
+    _write_readiness_trace(
+        location="support_section.py:_build_readiness_checks_row",
+        message="readiness checks row built",
+        data={"column_count": len(field_specs), "layout": "horizontal"},
+        hypothesis_id="C",
+        run_id="post-fix",
+    )
+    #endregion
+    return row_host
+
+
+def _labeled_plain_text_column(qt_widgets: Any, label: str, field: Any) -> Any:
+    column = qt_widgets.QWidget()
+    column_layout = qt_widgets.QVBoxLayout(column)
+    set_margins = getattr(column_layout, "setContentsMargins", None)
+    if set_margins is not None:
+        set_margins(0, 0, 0, 0)
+    set_spacing = getattr(column_layout, "setSpacing", None)
+    if set_spacing is not None:
+        set_spacing(2)
+    column_layout.addWidget(qt_widgets.QLabel(label))
+    column_layout.addWidget(field)
+    return column
+
+
 def _labeled_field_row(qt_widgets: Any, label: str, field: Any) -> Any:
     row = qt_widgets.QHBoxLayout()
     set_margins = getattr(row, "setContentsMargins", None)
@@ -395,31 +413,6 @@ def _labeled_field_row(qt_widgets: Any, label: str, field: Any) -> Any:
     return host
 
 
-def _labeled_plain_text_row(
-    qt_widgets: Any,
-    label: str,
-    field: Any,
-    *,
-    hint: str = "",
-) -> Any:
-    row = qt_widgets.QWidget()
-    row_layout = qt_widgets.QVBoxLayout(row)
-    row_layout.setContentsMargins(0, 0, 0, 0)
-    row_layout.setSpacing(2)
-    row_layout.addWidget(qt_widgets.QLabel(label))
-    row_layout.addWidget(field)
-    if hint:
-        hint_label = qt_widgets.QLabel(hint)
-        set_word_wrap = getattr(hint_label, "setWordWrap", None)
-        if set_word_wrap is not None:
-            set_word_wrap(True)
-        set_style = getattr(hint_label, "setStyleSheet", None)
-        if set_style is not None:
-            set_style("color: #888888;")
-        row_layout.addWidget(hint_label)
-    return row
-
-
 def _configure_line_edit(qt_widgets: Any, field: Any) -> None:
     set_fixed_width = getattr(field, "setFixedWidth", None)
     if set_fixed_width is not None:
@@ -433,19 +426,22 @@ def _build_plain_text_input(
     value: str,
     placeholder: str,
     on_settings_changed: Optional[Callable[[], None]],
+    *,
+    width: int = _PLAIN_TEXT_WIDTH,
 ) -> Any:
     plain_text_class = _plain_text_widget_type(qt_widgets)
     widget = plain_text_class()
     widget.setObjectName(object_name)
-    if value:
-        _set_plain_text(widget, value)
-    else:
-        clear = getattr(widget, "clear", None)
-        if clear is not None:
-            clear()
-    set_placeholder = getattr(widget, "setPlaceholderText", None)
-    if set_placeholder is not None:
-        set_placeholder(placeholder)
+    configure_plain_text_placeholder_field(
+        qt_widgets,
+        widget,
+        value=value,
+        placeholder=placeholder,
+    )
+    placeholder_text_fn = getattr(widget, "placeholderText", None)
+    applied_placeholder = (
+        str(placeholder_text_fn() or "") if placeholder_text_fn is not None else ""
+    )
     #region agent log
     _write_readiness_trace(
         location="support_section.py:_build_plain_text_input",
@@ -454,14 +450,16 @@ def _build_plain_text_input(
             "object_name": object_name,
             "value_empty": not bool(value),
             "placeholder": placeholder,
+            "applied_placeholder": applied_placeholder,
+            "uses_local_plain_text_style": True,
         },
         hypothesis_id="B",
-        run_id="post-fix",
+        run_id="placeholder-fix",
     )
     #endregion
     set_fixed_width = getattr(widget, "setFixedWidth", None)
     if set_fixed_width is not None:
-        set_fixed_width(_PLAIN_TEXT_WIDTH)
+        set_fixed_width(width)
     set_fixed_height = getattr(widget, "setFixedHeight", None)
     if set_fixed_height is not None:
         set_fixed_height(_PLAIN_TEXT_HEIGHT)
@@ -512,6 +510,7 @@ def _set_plain_text_if_unfocused(
     text: str,
     *,
     field_name: str,
+    qt_widgets: Any | None = None,
 ) -> None:
     """Apply plain text only when the field is not being edited."""
 
@@ -536,12 +535,14 @@ def _set_plain_text_if_unfocused(
             "skipped": skip_focus or skip_unchanged,
         },
         hypothesis_id="A",
-        run_id="post-fix",
+        run_id="placeholder-fix",
     )
     #endregion
     if skip_focus or skip_unchanged:
         return
     _set_plain_text(widget, text)
+    if not text and qt_widgets is not None:
+        refresh_plain_text_placeholder(qt_widgets, widget)
 
 
 def _plain_text_cursor_position(widget: Any | None) -> int | None:
@@ -578,6 +579,11 @@ def _widget_layout_direction(widget: Any | None) -> str | None:
 def _set_plain_text(widget: Any | None, text: str) -> None:
     if widget is None:
         return
+    if not text:
+        clear = getattr(widget, "clear", None)
+        if clear is not None:
+            clear()
+            return
     set_plain = getattr(widget, "setPlainText", None)
     if set_plain is not None:
         set_plain(text)

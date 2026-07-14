@@ -102,6 +102,12 @@ class FakePlainTextEdit(FakeWidget):
     def setPlaceholderText(self, text: str) -> None:
         self.placeholder = text
 
+    def placeholderText(self) -> str:
+        return self.placeholder
+
+    def setStyleSheet(self, style: str) -> None:
+        self.style_sheet = style
+
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
 
@@ -185,29 +191,6 @@ class FakeQt:
     AlignVCenter = 2
 
 
-class FakeHBoxLayout:
-    def __init__(self, parent: FakeWidget | None = None) -> None:
-        self.parent = parent
-        self.widgets: list[object] = []
-        if parent is not None:
-            parent.layout = self
-
-    def setContentsMargins(self, *_args: object) -> None:
-        return
-
-    def setSpacing(self, _spacing: int) -> None:
-        return
-
-    def addWidget(self, widget: object, *_args: object) -> None:
-        self.widgets.append(widget)
-
-    def addSpacing(self, _spacing: int) -> None:
-        return
-
-    def addStretch(self, _stretch: int = 0) -> None:
-        return
-
-
 class FakeVBoxLayout:
     def __init__(self, parent: FakeWidget | None = None) -> None:
         self.parent = parent
@@ -222,9 +205,13 @@ class FakeVBoxLayout:
     def setSpacing(self, _spacing: int) -> None:
         return
 
-    def addWidget(self, widget: object) -> None:
+    def addWidget(self, widget: object, *_args: object) -> None:
         self.widgets.append(widget)
         self._attach_widget(widget)
+        self._attach_nested(widget)
+
+    def addStretch(self, _stretch: int = 0) -> None:
+        return
 
     def addLayout(self, layout: object) -> None:
         self.layouts.append(layout)
@@ -244,6 +231,18 @@ class FakeVBoxLayout:
             and widget not in self.parent.children
         ):
             self.parent.children.append(widget)
+
+    def _attach_nested(self, widget: object) -> None:
+        layout = getattr(widget, "layout", None)
+        if layout is None:
+            return
+        for child in getattr(layout, "widgets", []):
+            self._attach_widget(child)
+            self._attach_nested(child)
+
+
+class FakeHBoxLayout(FakeVBoxLayout):
+    pass
 
 
 class FakeQtWidgets:

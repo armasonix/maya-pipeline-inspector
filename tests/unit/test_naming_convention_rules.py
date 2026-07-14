@@ -38,6 +38,7 @@ STUDIO_TEMPLATES = {
     "control": r"^ctrl_[A-Za-z0-9_]+$",
     "texture": r"^tex_[A-Za-z0-9_]+$",
     "shading_engine": r"^SG_[A-Za-z0-9_]+$",
+    "light_source": r"^lgt_[A-Za-z0-9_]+$",
 }
 
 
@@ -92,6 +93,19 @@ def test_resolve_object_type_maps_snapshot_targets():
             )
         )
         == "material"
+    )
+
+
+    assert (
+        resolve_object_type(
+            NodeSnapshot(
+                id="node:lgt_key",
+                name="lgt_key",
+                type_name="directionalLight",
+                classification=["light"],
+            )
+        )
+        == "light_source"
     )
 
 

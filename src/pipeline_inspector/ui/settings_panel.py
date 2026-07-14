@@ -529,6 +529,7 @@ def _build_studio_tab(
         qt_widgets,
         object_name=SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME,
         content_widget=scroll_content,
+        allow_horizontal_scroll=True,
     )
     layout.addWidget(scroll_area)
     return tab

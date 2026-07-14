@@ -444,6 +444,7 @@ class FakeQt:
     AlignRight = 2
     AlignVCenter = 4
     ScrollBarAlwaysOff = 0
+    ScrollBarAsNeeded = 1
 
 
 class FakeTabWidget(FakeWidget):
