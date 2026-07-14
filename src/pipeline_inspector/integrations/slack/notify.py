@@ -107,6 +107,7 @@ def send_slack_validation_notification(
     *,
     thread_ts: str | None = None,
     client_factory: SlackClientFactory | None = None,
+    webhook_url_override: str | None = None,
 ) -> SlackNotificationResult:
     """Send Slack validation blocks to routed webhooks when settings match block events."""
 
@@ -119,7 +120,7 @@ def send_slack_validation_notification(
         return SlackNotificationResult(sent=False, skipped_reason="disabled")
 
     config = resolve_slack_config(studio_config)
-    if config is None:
+    if config is None and not str(webhook_url_override or "").strip():
         return SlackNotificationResult(sent=False, skipped_reason="incomplete_config")
 
     matched_events = matched_notify_events(
@@ -130,7 +131,13 @@ def send_slack_validation_notification(
     if not matched_events:
         return SlackNotificationResult(sent=False, skipped_reason="no_matching_events")
 
-    routes = route_matched_events(settings, matched_events)
+    override_webhook = str(webhook_url_override or "").strip()
+    if override_webhook:
+        routes = tuple((event_id, override_webhook) for event_id in matched_events)
+    else:
+        if config is None:
+            return SlackNotificationResult(sent=False, skipped_reason="incomplete_config")
+        routes = route_matched_events(settings, matched_events)
     if not routes:
         return SlackNotificationResult(sent=False, skipped_reason="no_routed_webhooks")
 
@@ -183,6 +190,7 @@ def maybe_send_slack_validation_notification(
     result: Any,
     *,
     client_factory: SlackClientFactory | None = None,
+    webhook_url_override: str | None = None,
 ) -> SlackNotificationResult:
     """Send Slack validation blocks for a validation run result."""
 
@@ -193,4 +201,5 @@ def maybe_send_slack_validation_notification(
         context,
         thread_ts=thread_ts,
         client_factory=client_factory,
+        webhook_url_override=webhook_url_override,
     )

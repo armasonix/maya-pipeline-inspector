@@ -15,6 +15,7 @@ READINESS_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorReadinessStatusLabel"
 READINESS_RUN_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessRunButton"
 READINESS_SEND_SYSADMIN_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSysadminButton"
 READINESS_SEND_SUPPORT_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSupportButton"
+READINESS_SEND_SUPERVISOR_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSupervisorButton"
 READINESS_ACTION_BUTTONS_OBJECT_NAME = "pipelineInspectorReadinessActionButtons"
 
 
@@ -28,6 +29,7 @@ class ReadinessTabState:
     checks_configured: bool = False
     all_passed: bool = False
     can_send_report: bool = False
+    can_send_supervisor_report: bool = False
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,7 @@ class ReadinessActionCallbacks:
     on_run_readiness_check: Optional[Callable[[], None]] = None
     on_send_report_to_sysadmin: Optional[Callable[[], None]] = None
     on_send_report_to_support: Optional[Callable[[], None]] = None
+    on_send_report_to_supervisor: Optional[Callable[[], None]] = None
 
 
 def build_readiness_tab(
@@ -99,9 +102,17 @@ def build_readiness_tab(
         "Send the latest readiness failure report to the configured support Telegram chat.",
         readiness_callbacks.on_send_report_to_support,
     )
+    supervisor_button = _readiness_button(
+        qt_widgets,
+        "Send report to Supervisor",
+        READINESS_SEND_SUPERVISOR_BUTTON_OBJECT_NAME,
+        "Route the latest readiness failure report to your supervisor based on pipeline role.",
+        readiness_callbacks.on_send_report_to_supervisor,
+    )
     buttons_layout.addWidget(run_button, 0, 0)
     buttons_layout.addWidget(sysadmin_button, 0, 1)
     buttons_layout.addWidget(support_button, 0, 2)
+    buttons_layout.addWidget(supervisor_button, 1, 0, 1, 3)
     layout.addWidget(buttons_row)
 
     status_label = qt_widgets.QLabel(readiness_state.status_message)
@@ -134,6 +145,7 @@ def readiness_tab_state_from_report(
     results: tuple[ReadinessCheckResult, ...],
     checks_configured: bool,
     can_send_report: bool,
+    can_send_supervisor_report: bool = False,
 ) -> ReadinessTabState:
     """Build tab state from a readiness engine report."""
 
@@ -145,6 +157,7 @@ def readiness_tab_state_from_report(
         checks_configured=checks_configured,
         all_passed=all_passed,
         can_send_report=can_send_report,
+        can_send_supervisor_report=can_send_supervisor_report,
     )
 
 
@@ -178,11 +191,20 @@ def _update_action_buttons(tab_root: Any, qt_widgets: Any, state: ReadinessTabSt
         qt_widgets.QPushButton,
         READINESS_SEND_SUPPORT_BUTTON_OBJECT_NAME,
     )
+    supervisor_button = _find_child(
+        tab_root,
+        qt_widgets.QPushButton,
+        READINESS_SEND_SUPERVISOR_BUTTON_OBJECT_NAME,
+    )
     send_enabled = state.can_send_report and not state.all_passed and bool(state.results)
+    supervisor_enabled = (
+        state.can_send_supervisor_report and not state.all_passed and bool(state.results)
+    )
     for button, enabled in (
         (run_button, True),
         (sysadmin_button, send_enabled),
         (support_button, send_enabled),
+        (supervisor_button, supervisor_enabled),
     ):
         if button is None:
             continue

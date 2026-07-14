@@ -18,3 +18,6 @@ class CerebroDatabasePort(Protocol):
 
     def add_note(self, task_id: int, parent_message_id: int, html_text: str) -> int | None:
         """Create a Note-type message on a task."""
+
+    def list_role_names(self, *, username: str = "") -> tuple[str, ...]:
+        """Return role or group names visible to the connected API session."""

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from pipeline_inspector.core.supervisor_routing import SupervisorRoutingDecision
 from pipeline_inspector.integrations.discord.notify import (
     DiscordClientFactory,
     DiscordNotificationResult,
@@ -79,26 +80,35 @@ def dispatch_validation_notifications(
     studio_config: StudioConfig | None,
     result: Any,
     *,
+    supervisor_route: SupervisorRoutingDecision | None = None,
     telegram_client_factory: TelegramClientFactory | None = None,
     discord_client_factory: DiscordClientFactory | None = None,
     slack_client_factory: SlackClientFactory | None = None,
 ) -> ValidationNotificationDispatchResult:
     """Fan out validation notifications to all enabled notification connectors."""
 
+    route = supervisor_route.route if supervisor_route is not None else None
+    telegram_chat_id = route.telegram_chat_id.strip() if route is not None else ""
+    discord_webhook = route.discord_webhook_url.strip() if route is not None else ""
+    slack_webhook = route.slack_webhook_url.strip() if route is not None else ""
+
     telegram_result = maybe_send_telegram_validation_notification(
         studio_config,
         result,
         client_factory=telegram_client_factory,
+        chat_id_override=telegram_chat_id or None,
     )
     discord_result = maybe_send_discord_validation_notification(
         studio_config,
         result,
         client_factory=discord_client_factory,
+        webhook_url_override=discord_webhook or None,
     )
     slack_result = maybe_send_slack_validation_notification(
         studio_config,
         result,
         client_factory=slack_client_factory,
+        webhook_url_override=slack_webhook or None,
     )
     return ValidationNotificationDispatchResult(
         outcomes=(

@@ -119,6 +119,7 @@ def send_discord_validation_notification(
     context: ValidationEmbedContext,
     *,
     client_factory: DiscordClientFactory | None = None,
+    webhook_url_override: str | None = None,
 ) -> DiscordNotificationResult:
     """Send a Discord validation embed when connector settings match block events."""
 
@@ -131,7 +132,15 @@ def send_discord_validation_notification(
         return DiscordNotificationResult(sent=False, skipped_reason="disabled")
 
     config = resolve_discord_config(studio_config)
-    if config is None:
+    if config is None and not str(webhook_url_override or "").strip():
+        return DiscordNotificationResult(sent=False, skipped_reason="incomplete_config")
+
+    override_webhook = str(webhook_url_override or "").strip()
+    if override_webhook:
+        from pipeline_inspector.integrations.discord.config import DiscordConfig
+
+        config = DiscordConfig(webhook_url=override_webhook)
+    elif config is None:
         return DiscordNotificationResult(sent=False, skipped_reason="incomplete_config")
 
     matched_events = matched_notify_events(
@@ -163,6 +172,7 @@ def maybe_send_discord_validation_notification(
     result: Any,
     *,
     client_factory: DiscordClientFactory | None = None,
+    webhook_url_override: str | None = None,
 ) -> DiscordNotificationResult:
     """Send a Discord validation embed for a validation run result."""
 
@@ -171,4 +181,5 @@ def maybe_send_discord_validation_notification(
         studio_config,
         context,
         client_factory=client_factory,
+        webhook_url_override=webhook_url_override,
     )

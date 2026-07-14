@@ -142,6 +142,7 @@ def send_telegram_validation_notification(
     context: ValidationNotificationContext,
     *,
     client_factory: TelegramClientFactory | None = None,
+    chat_id_override: str | None = None,
 ) -> TelegramNotificationResult:
     """Send a Telegram validation summary when connector settings match block events."""
 
@@ -156,6 +157,10 @@ def send_telegram_validation_notification(
     config = resolve_telegram_config(studio_config)
     if config is None:
         return TelegramNotificationResult(sent=False, skipped_reason="incomplete_config")
+
+    override_chat_id = str(chat_id_override or "").strip()
+    if override_chat_id:
+        config = config.with_overrides(chat_id=override_chat_id)
 
     matched_events = matched_notify_events(
         settings,
@@ -188,6 +193,7 @@ def maybe_send_telegram_validation_notification(
     result: Any,
     *,
     client_factory: TelegramClientFactory | None = None,
+    chat_id_override: str | None = None,
 ) -> TelegramNotificationResult:
     """Send a Telegram validation summary for a validation run result."""
 
@@ -196,4 +202,5 @@ def maybe_send_telegram_validation_notification(
         studio_config,
         context,
         client_factory=client_factory,
+        chat_id_override=chat_id_override,
     )

@@ -377,8 +377,8 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
     result = SimpleNamespace()
     calls: list[tuple[Any, Any]] = []
 
-    def _fake_dispatch(studio_config: Any, validation_result: Any) -> Any:
-        calls.append((studio_config, validation_result))
+    def _fake_dispatch(studio_config: Any, validation_result: Any, **kwargs: Any) -> Any:
+        calls.append((studio_config, validation_result, kwargs))
         from pipeline_inspector.integrations.notify.dispatcher import (
             ValidationNotificationDispatchResult,
         )
@@ -396,12 +396,19 @@ def test_maybe_notify_validation_delegates_to_dispatcher(monkeypatch: Any):
     monkeypatch.setattr(
         ui_launcher,
         "_studio_config_for_content",
-        lambda _content: "studio-config",
+        lambda _content: ui_launcher.StudioConfig(),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_permission_resolver_for_content",
+        lambda _content: SimpleNamespace(effective_role="technical_artist"),
     )
 
     ui_launcher._maybe_notify_validation(content, object(), result)
 
-    assert calls == [("studio-config", result)]
+    assert len(calls) == 1
+    assert calls[0][0].__class__.__name__ == "StudioConfig"
+    assert calls[0][1] is result
 
 
 def test_show_check_for_updates_shows_info_when_up_to_date(monkeypatch: Any):

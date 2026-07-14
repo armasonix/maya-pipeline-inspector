@@ -21,7 +21,6 @@ PipelineRole = Literal[
     "technical_artist",
     "technical_support",
     "pipeline_td",
-    "producer",
     "admin",
 ]
 
@@ -33,7 +32,6 @@ ROLE_LABELS: dict[PipelineRole, str] = {
     "technical_artist": "Technical Artist",
     "technical_support": "Technical Support",
     "pipeline_td": "Pipeline TD",
-    "producer": "Producer",
     "admin": "Admin",
 }
 
@@ -67,12 +65,6 @@ ROLE_CAPABILITY_MATRIX: dict[PipelineRole, frozenset[Capability]] = {
             "edit_studio_settings",
         }
     ),
-    "producer": frozenset(
-        {
-            "apply_safe_fixes",
-            "submit_farm",
-        }
-    ),
     "admin": frozenset(
         {
             "apply_safe_fixes",
@@ -95,7 +87,6 @@ _ROLE_ALIASES: dict[str, PipelineRole] = {
     "pipeline_td": "pipeline_td",
     "pipeline td": "pipeline_td",
     "td": "pipeline_td",
-    "producer": "producer",
     "admin": "admin",
     "administrator": "admin",
 }
@@ -147,6 +138,8 @@ class PermissionResolver:
 def normalize_pipeline_role(value: str | None) -> Optional[PipelineRole]:
     normalized = str(value or "").strip().casefold().replace("-", "_")
     if not normalized:
+        return None
+    if normalized == "producer":
         return None
     return _ROLE_ALIASES.get(normalized.replace(" ", "_")) or _ROLE_ALIASES.get(
         normalized.replace("_", " ")
@@ -217,16 +210,41 @@ def tracker_role_from_environment() -> str | None:
     return value or None
 
 
+def resolve_runtime_tracker_role(
+    *,
+    studio: StudioConfig | None = None,
+    user: UserPreferences | None = None,
+) -> str | None:
+    """Resolve tracker role from env, Ftrack, or Cerebro before governance mapping."""
+
+    env_role = tracker_role_from_environment()
+    if env_role:
+        return env_role
+
+    from pipeline_inspector.integrations.trackers.role_resolver import (
+        resolve_tracker_role_for_runtime,
+    )
+
+    return resolve_tracker_role_for_runtime(studio, user=user)
+
+
 def build_permission_resolver_from_runtime(
     *,
     studio: StudioConfig | None = None,
     user: UserPreferences | None = None,
     tracker_role: str | None = None,
 ) -> PermissionResolver:
+    resolved_studio = studio or StudioConfig.default()
+    resolved_user = user or UserPreferences.default()
+    resolved_tracker_role = (
+        tracker_role
+        if tracker_role is not None
+        else resolve_runtime_tracker_role(studio=resolved_studio, user=resolved_user)
+    )
     return build_permission_resolver(
-        studio=studio or StudioConfig.default(),
-        user=user or UserPreferences.default(),
-        tracker_role=tracker_role if tracker_role is not None else tracker_role_from_environment(),
+        studio=resolved_studio,
+        user=resolved_user,
+        tracker_role=resolved_tracker_role,
     )
 
 

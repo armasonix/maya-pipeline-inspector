@@ -1,9 +1,7 @@
 """Maya dockable panel launcher."""
 from __future__ import annotations
 
-import json
 import os
-import time
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
@@ -12,9 +10,9 @@ from typing import Any, Optional
 from pipeline_inspector import __version__
 from pipeline_inspector.core.governance import (
     Capability,
-    build_permission_resolver,
-    tracker_role_from_environment,
+    build_permission_resolver_from_runtime,
 )
+from pipeline_inspector.core.supervisor_routing import resolve_supervisor_route
 from pipeline_inspector.maya.panel_session import (
     load_runtime_configs_from_session,
     remember_panel_visible,
@@ -52,6 +50,7 @@ from pipeline_inspector.ui.fix_queue import (
     selected_fix_rows,
     update_risky_confirmation_label,
 )
+from pipeline_inspector.ui.governance_section import read_governance_from_view
 from pipeline_inspector.ui.issues_triage import (
     apply_combo_preference,
     read_issue_filter_prefs,
@@ -94,35 +93,6 @@ from pipeline_inspector.user_config import (
     merge_runtime_config,
     save_user_config,
 )
-
-_DEBUG_LOG_PATH = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-
-
-def _debug_session_log(
-    *,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict[str, Any] | None = None,
-    run_id: str = "pre-fix",
-) -> None:
-    # region agent log
-    try:
-        payload = {
-            "sessionId": "618f4f",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
-
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
 OBSOLETE_WORKSPACE_CONTROL_NAMES = (
@@ -710,6 +680,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_governance_changed=lambda: _sync_governance_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_readiness_settings_changed=lambda: _sync_readiness_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -779,10 +753,9 @@ def _user_config_for_content(content: Any) -> UserPreferences:
 
 
 def _permission_resolver_for_content(content: Any):
-    return build_permission_resolver(
+    return build_permission_resolver_from_runtime(
         studio=_studio_config_for_content(content),
         user=_user_config_for_content(content),
-        tracker_role=tracker_role_from_environment(),
     )
 
 
@@ -797,17 +770,6 @@ def _guard_panel_capability(
     decision = _permission_resolver_for_content(content).require(capability)
     if decision.allowed:
         return True
-    _debug_session_log(
-        hypothesis_id="H1-H3",
-        location="ui_launcher.py:_guard_panel_capability",
-        message="permission denied dialog shown",
-        data={
-            "capability": capability,
-            "effective_role": decision.effective_role,
-            "role_source": decision.role_source,
-            "reason": decision.reason,
-        },
-    )
     _show_information_dialog(qt_widgets, title, decision.reason)
     _set_label_text(content, qt_widgets, status_object_name, decision.reason)
     return False
@@ -1165,33 +1127,42 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_studio_config(content, qt_widgets, updated)
 
 
-def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
-    #region agent log
-    import json as _json
-    import time as _time
-    from pathlib import Path as _Path
+def _sync_governance_from_ui(content: Any, qt_widgets: Any) -> None:
+    # region agent log
+    import json
+    import time
 
-    _log_path = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
     try:
-        with _log_path.open("a", encoding="utf-8") as _handle:
-            _handle.write(
-                _json.dumps(
+        with open(
+            r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
+            "a",
+            encoding="utf-8",
+        ) as handle:
+            handle.write(
+                json.dumps(
                     {
                         "sessionId": "618f4f",
-                        "location": "ui_launcher.py:_sync_readiness_from_ui",
-                        "message": "readiness sync triggered",
-                        "data": {"refresh_view": False},
-                        "timestamp": int(_time.time() * 1000),
-                        "hypothesisId": "B",
-                        "runId": "post-fix",
-                    },
-                    ensure_ascii=False,
+                        "hypothesisId": "H1",
+                        "location": "ui_launcher.py:_sync_governance_from_ui",
+                        "message": "sync governance triggered",
+                        "data": {},
+                        "timestamp": int(time.time() * 1000),
+                    }
                 )
                 + "\n"
             )
     except OSError:
         pass
-    #endregion
+    # endregion
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    governance = read_governance_from_view(settings_view, qt_widgets, base=current)
+    _set_studio_config(content, qt_widgets, current.with_updates(governance=governance))
+
+
+def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
@@ -1375,6 +1346,7 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_deadline_connector_from_ui(content, qt_widgets)
     _sync_studio_environment_from_ui(content, qt_widgets)
     _sync_studio_policy_from_ui(content, qt_widgets)
+    _sync_governance_from_ui(content, qt_widgets)
     _sync_bug_report_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
     path = _pick_settings_save_path(qt_widgets, config.config_path)
@@ -1884,6 +1856,11 @@ def _readiness_action_callbacks(
             qt_widgets,
             recipient="support",
         ),
+        on_send_report_to_supervisor=lambda: _send_readiness_report_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            recipient="supervisor",
+        ),
     )
 
 
@@ -2007,9 +1984,15 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
         )
 
         studio_config = _studio_config_for_content(content)
+        resolver = _permission_resolver_for_content(content)
+        supervisor_route = resolve_supervisor_route(
+            studio_config.governance,
+            resolver.effective_role,
+        )
         dispatch_result = dispatch_validation_notifications(
             studio_config,
             result,
+            supervisor_route=supervisor_route,
         )
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(content, qt_widgets, dispatch_result)
@@ -2384,7 +2367,12 @@ def _send_readiness_report_from_ui(
     if report is None:
         _set_readiness_status(content, qt_widgets, "Run Machine Readiness before sending a report.")
         return
-    result = send_readiness_report_action(config, report, recipient=recipient)
+    result = send_readiness_report_action(
+        config,
+        report,
+        recipient=recipient,
+        permission_resolver=_permission_resolver_for_content(content),
+    )
     content._pipeline_inspector_readiness_tab_state = result.tab_state
     _apply_readiness_tab_state(content, qt_widgets, result.tab_state)
 
@@ -3124,18 +3112,6 @@ def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
 def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.maya.fix_applier import apply_fix_actions
 
-    _debug_session_log(
-        hypothesis_id="H1-H2",
-        location="ui_launcher.py:_apply_selected_fixes_from_ui",
-        message="apply selected fixes handler invoked",
-        data={
-            "assigned_role": getattr(
-                _user_config_for_content(content),
-                "assigned_role",
-                "",
-            ),
-        },
-    )
     fix_plan = getattr(content, "_pipeline_inspector_fix_plan", None)
     table = _fix_queue_table(content, qt_widgets)
     stored_rows = getattr(content, "_pipeline_inspector_fix_rows", ())

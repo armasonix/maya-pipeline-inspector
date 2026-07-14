@@ -1034,12 +1034,42 @@ class ConnectorSettings:
 
 
 @dataclass(frozen=True)
+class SupervisorRoute:
+    """Notification targets for reports escalated from a reporter pipeline role."""
+
+    supervisor_label: str = ""
+    telegram_chat_id: str = ""
+    discord_webhook_url: str = ""
+    slack_webhook_url: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "supervisor_label": self.supervisor_label,
+            "telegram_chat_id": self.telegram_chat_id,
+            "discord_webhook_url": self.discord_webhook_url,
+            "slack_webhook_url": self.slack_webhook_url,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> SupervisorRoute:
+        if not data:
+            return cls()
+        return cls(
+            supervisor_label=str(data.get("supervisor_label", "") or ""),
+            telegram_chat_id=str(data.get("telegram_chat_id", "") or ""),
+            discord_webhook_url=str(data.get("discord_webhook_url", "") or ""),
+            slack_webhook_url=str(data.get("slack_webhook_url", "") or ""),
+        )
+
+
+@dataclass(frozen=True)
 class GovernanceSettings:
     """Studio role policy overrides for permission resolution."""
 
     enforced_role: str = ""
     tracker_role_map: dict[str, str] = field(default_factory=dict)
     capability_denials: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    supervisor_routes: dict[str, SupervisorRoute] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1048,6 +1078,9 @@ class GovernanceSettings:
             "capability_denials": {
                 role: list(capabilities)
                 for role, capabilities in self.capability_denials.items()
+            },
+            "supervisor_routes": {
+                role: route.to_dict() for role, route in self.supervisor_routes.items()
             },
         }
 
@@ -1074,10 +1107,27 @@ class GovernanceSettings:
                 )
                 if normalized:
                     capability_denials[str(role)] = normalized
+        routes_raw = data.get("supervisor_routes")
+        supervisor_routes: dict[str, SupervisorRoute] = {}
+        if isinstance(routes_raw, Mapping):
+            for role, route_data in routes_raw.items():
+                if not isinstance(route_data, Mapping):
+                    continue
+                route = SupervisorRoute.from_mapping(route_data)
+                if any(
+                    (
+                        route.supervisor_label.strip(),
+                        route.telegram_chat_id.strip(),
+                        route.discord_webhook_url.strip(),
+                        route.slack_webhook_url.strip(),
+                    )
+                ):
+                    supervisor_routes[str(role)] = route
         return cls(
             enforced_role=str(data.get("enforced_role", "") or ""),
             tracker_role_map=tracker_role_map,
             capability_denials=capability_denials,
+            supervisor_routes=supervisor_routes,
         )
 
 

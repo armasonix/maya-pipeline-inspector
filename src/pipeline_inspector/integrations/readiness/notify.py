@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Literal
 
+from pipeline_inspector.core.supervisor_routing import resolve_supervisor_route
 from pipeline_inspector.integrations.readiness.engine import (
     ReadinessReport,
     format_readiness_report_text,
@@ -32,6 +33,7 @@ def send_readiness_report_to_telegram(
     *,
     recipient: ReadinessRecipient,
     client_factory: TelegramClientFactory | None = None,
+    chat_id_override: str | None = None,
 ) -> ReadinessNotifyResult:
     """Send a readiness failure report to the configured support Telegram chat."""
 
@@ -42,7 +44,8 @@ def send_readiness_report_to_telegram(
             error_message="studio_config_missing",
         )
 
-    chat_id = _resolve_support_chat_id(studio_config, recipient)
+    override_chat_id = str(chat_id_override or "").strip()
+    chat_id = override_chat_id or _resolve_support_chat_id(studio_config, recipient)
     if not chat_id:
         return ReadinessNotifyResult(
             sent=False,
@@ -87,6 +90,50 @@ def send_readiness_report_to_telegram(
         sent=True,
         recipient=recipient,
         chat_id=chat_id,
+    )
+
+
+def send_readiness_report_to_supervisor(
+    studio_config: StudioConfig | None,
+    report: ReadinessReport,
+    *,
+    reporter_role: str,
+    client_factory: TelegramClientFactory | None = None,
+) -> ReadinessNotifyResult:
+    """Send a readiness report to the supervisor route for the reporter role."""
+
+    if studio_config is None:
+        return ReadinessNotifyResult(
+            sent=False,
+            recipient="support",
+            error_message="studio_config_missing",
+        )
+
+    from pipeline_inspector.core.governance import normalize_pipeline_role
+
+    normalized_role = normalize_pipeline_role(reporter_role) or "technical_artist"
+    routing = resolve_supervisor_route(studio_config.governance, normalized_role)
+    if routing is None:
+        return ReadinessNotifyResult(
+            sent=False,
+            recipient="support",
+            error_message="supervisor_route_missing",
+        )
+
+    chat_id = routing.route.telegram_chat_id.strip()
+    if not chat_id:
+        return ReadinessNotifyResult(
+            sent=False,
+            recipient="support",
+            error_message="supervisor_telegram_chat_missing",
+        )
+
+    return send_readiness_report_to_telegram(
+        studio_config,
+        report,
+        recipient="support",
+        client_factory=client_factory,
+        chat_id_override=chat_id,
     )
 
 

@@ -624,7 +624,7 @@ def test_studio_config_round_trips_governance_section(tmp_path: Path):
         governance=GovernanceSettings(
             enforced_role="pipeline_td",
             tracker_role_map={"Pipeline Supervisor": "pipeline_td"},
-            capability_denials={"producer": ("submit_farm",)},
+            capability_denials={"animator": ("submit_farm",)},
         ),
     )
     path = tmp_path / "pipeline_inspector_studio.json"
@@ -633,4 +633,4 @@ def test_studio_config_round_trips_governance_section(tmp_path: Path):
 
     assert payload["governance"]["enforced_role"] == "pipeline_td"
     assert payload["governance"]["tracker_role_map"]["Pipeline Supervisor"] == "pipeline_td"
-    assert payload["governance"]["capability_denials"]["producer"] == ["submit_farm"]
+    assert payload["governance"]["capability_denials"]["animator"] == ["submit_farm"]

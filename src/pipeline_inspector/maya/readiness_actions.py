@@ -6,14 +6,18 @@ import socket
 from dataclasses import dataclass, replace
 from typing import Any, Callable
 
+from pipeline_inspector.core.governance import PermissionResolver
 from pipeline_inspector.integrations.readiness import (
     OsReadinessProbes,
     ReadinessNotifyResult,
     ReadinessReport,
     run_readiness_checks,
+)
+from pipeline_inspector.integrations.readiness.notify import (
+    ReadinessRecipient,
+    send_readiness_report_to_supervisor,
     send_readiness_report_to_telegram,
 )
-from pipeline_inspector.integrations.readiness.notify import ReadinessRecipient
 from pipeline_inspector.integrations.readiness.probes import (
     ReadinessProbes,
     normalize_plugin_name,
@@ -83,8 +87,39 @@ def send_readiness_report_action(
     *,
     recipient: str,
     client_factory: TelegramClientFactory | None = None,
+    permission_resolver: PermissionResolver | None = None,
 ) -> ReadinessNotifyActionResult:
-    """Send a readiness failure report to sysadmin or support."""
+    """Send a readiness failure report to sysadmin, support, or supervisor."""
+
+    if recipient == "supervisor":
+        resolver = permission_resolver
+        reporter_role = resolver.effective_role if resolver is not None else "technical_artist"
+        notify_result = send_readiness_report_to_supervisor(
+            studio_config,
+            report,
+            reporter_role=reporter_role,
+            client_factory=client_factory,
+        )
+        tab_state = _tab_state_from_report(studio_config, report)
+        if notify_result.sent:
+            routing = studio_config.governance.supervisor_routes.get(reporter_role)
+            label = (
+                routing.supervisor_label.strip()
+                if routing is not None and routing.supervisor_label.strip()
+                else "Supervisor"
+            )
+            message = f"Readiness report sent to {label} via Telegram."
+            succeeded = True
+        else:
+            message = _supervisor_notify_failure_message(notify_result)
+            succeeded = False
+        tab_state = replace(tab_state, status_message=message)
+        return ReadinessNotifyActionResult(
+            succeeded=succeeded,
+            message=message,
+            tab_state=tab_state,
+            notify_result=notify_result,
+        )
 
     normalized_recipient: ReadinessRecipient = (
         "sysadmin" if recipient == "sysadmin" else "support"
@@ -127,6 +162,7 @@ def initial_readiness_tab_state(studio_config: StudioConfig) -> ReadinessTabStat
         status_message="No readiness check has been run yet.",
         checks_configured=configured,
         can_send_report=_can_send_report(studio_config),
+        can_send_supervisor_report=_can_send_supervisor_report(studio_config),
     )
 
 
@@ -208,6 +244,7 @@ def _tab_state_from_report(
         results=report.results,
         checks_configured=_checks_configured(studio_config.readiness),
         can_send_report=_can_send_report(studio_config),
+        can_send_supervisor_report=_can_send_supervisor_report(studio_config),
     )
 
 
@@ -227,8 +264,23 @@ def _can_send_report(studio_config: StudioConfig) -> bool:
     support = studio_config.readiness.support
     if not telegram.enabled or not telegram.bot_token.strip():
         return False
+    if any(
+        route.telegram_chat_id.strip()
+        for route in studio_config.governance.supervisor_routes.values()
+    ):
+        return True
     return bool(
         support.sysadmin_telegram_chat_id.strip() or support.support_telegram_chat_id.strip()
+    )
+
+
+def _can_send_supervisor_report(studio_config: StudioConfig) -> bool:
+    telegram = studio_config.connectors.telegram
+    if not telegram.enabled or not telegram.bot_token.strip():
+        return False
+    return any(
+        route.telegram_chat_id.strip()
+        for route in studio_config.governance.supervisor_routes.values()
     )
 
 
@@ -251,6 +303,21 @@ def _notify_failure_message(result: ReadinessNotifyResult) -> str:
         "telegram_api_error": "Telegram API rejected the readiness report.",
     }
     return errors.get(result.error_message, "Failed to send readiness report.")
+
+
+def _supervisor_notify_failure_message(result: ReadinessNotifyResult) -> str:
+    errors = {
+        "studio_config_missing": "Studio config is unavailable.",
+        "supervisor_route_missing": "No supervisor route is configured for your pipeline role.",
+        "supervisor_telegram_chat_missing": (
+            "Supervisor route exists but Telegram chat ID is missing."
+        ),
+        "telegram_connector_disabled": (
+            "Telegram connector is disabled or incomplete. Configure bot token under Connectors."
+        ),
+        "telegram_api_error": "Telegram API rejected the readiness report.",
+    }
+    return errors.get(result.error_message, "Failed to send readiness report to supervisor.")
 
 
 def _maya_cmds() -> Any:

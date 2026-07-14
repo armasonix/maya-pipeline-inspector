@@ -17,6 +17,7 @@ def test_normalize_pipeline_role_accepts_labels_and_ids():
     assert normalize_pipeline_role("technical_artist") == "technical_artist"
     assert normalize_pipeline_role("Administrator") == "admin"
     assert normalize_pipeline_role("unknown role") is None
+    assert normalize_pipeline_role("producer") is None
 
 
 def test_resolve_effective_role_priority_studio_tracker_user_default():
@@ -25,7 +26,7 @@ def test_resolve_effective_role_priority_studio_tracker_user_default():
         tracker_role_map={"Pipeline Supervisor": "pipeline_td"},
     )
     studio = StudioConfig(governance=governance)
-    user = UserPreferences(assigned_role="producer")
+    user = UserPreferences(assigned_role="technical_support")
 
     role, source = resolve_effective_role(
         governance=studio.governance,
@@ -49,7 +50,7 @@ def test_resolve_effective_role_priority_studio_tracker_user_default():
         user=user,
         tracker_role=None,
     )
-    assert role == "producer"
+    assert role == "technical_support"
     assert source == "user_preference"
 
     role, source = resolve_effective_role(
@@ -68,8 +69,6 @@ def test_resolve_effective_role_priority_studio_tracker_user_default():
         ("technical_artist", "apply_safe_fixes", True),
         ("technical_support", "apply_risky_fixes", True),
         ("pipeline_td", "manage_rules", True),
-        ("producer", "submit_farm", True),
-        ("producer", "apply_risky_fixes", False),
         ("admin", "edit_connectors", True),
     ],
 )
@@ -84,12 +83,12 @@ def test_capability_matrix(role, capability, expected):
 def test_studio_capability_denials_remove_granted_capabilities():
     studio = StudioConfig(
         governance=GovernanceSettings(
-            capability_denials={"producer": ("submit_farm",)},
+            capability_denials={"technical_artist": ("submit_farm",)},
         )
     )
     resolver = build_permission_resolver(
         studio=studio,
-        user=UserPreferences(assigned_role="producer"),
+        user=UserPreferences(assigned_role="technical_artist"),
     )
 
     assert resolver.allows("apply_safe_fixes") is True

@@ -126,6 +126,10 @@ class PycerebroHttpDatabaseAdapter:
         database = _require_database(self._database)
         return tuple(entry[0] for entry in _list_visible_projects(database))
 
+    def list_role_names(self, *, username: str = "") -> tuple[str, ...]:
+        database = _require_database(self._database)
+        return _list_role_names(database, username=username)
+
 
 class PyCerebroDatabaseAdapter:
     """Wrap py_cerebro.database.Database when the server package is installed."""
@@ -222,6 +226,34 @@ class PyCerebroDatabaseAdapter:
     def list_visible_project_names(self) -> tuple[str, ...]:
         database = _require_database(self._database)
         return tuple(entry[0] for entry in _list_visible_projects(database))
+
+    def list_role_names(self, *, username: str = "") -> tuple[str, ...]:
+        database = _require_database(self._database)
+        return _list_role_names(database, username=username)
+
+
+def _list_role_names(database: Any, *, username: str = "") -> tuple[str, ...]:
+    normalized = normalize_cerebro_field(username).lower()
+    queries: tuple[tuple[str, tuple[Any, ...]], ...] = (
+        ("select name from groups where del = 0 limit 25", ()),
+        ('select name from groups where del = 0 and lower(name) = lower(?) limit 5', (normalized,)),
+    ) if normalized else (("select name from groups where del = 0 limit 25", ()),)
+    names: list[str] = []
+    for query, params in queries:
+        try:
+            rows = _database_query(database, True, query, *params)
+        except Exception:
+            continue
+        for row in rows or ():
+            try:
+                name = str(row[0] or "").strip()
+            except (IndexError, TypeError, ValueError):
+                continue
+            if name and name not in names:
+                names.append(name)
+        if names:
+            break
+    return tuple(names)
 
 
 def _task_id_from_row(task_row: Any) -> int | None:
