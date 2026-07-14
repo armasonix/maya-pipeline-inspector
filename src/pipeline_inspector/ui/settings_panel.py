@@ -52,7 +52,11 @@ from pipeline_inspector.ui.settings_tabs import (
     build_placeholder_tab,
     get_settings_tab_spec,
 )
-from pipeline_inspector.ui.settings_widgets import find_child, wire_button
+from pipeline_inspector.ui.settings_widgets import (
+    build_borderless_scroll_area,
+    find_child,
+    wire_button,
+)
 from pipeline_inspector.ui.studio_environment_section import (
     build_studio_environment_section,
     update_studio_environment_view,
@@ -61,6 +65,10 @@ from pipeline_inspector.ui.studio_policy_section import (
     SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME,
     build_studio_policy_section,
     update_studio_policy_view,
+)
+from pipeline_inspector.ui.support_section import (
+    build_support_and_roles_section,
+    update_support_and_roles_view,
 )
 from pipeline_inspector.user_config import UserPreferences
 
@@ -81,6 +89,8 @@ SETTINGS_LOAD_BUTTON_OBJECT_NAME = SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME
 SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME
 
 SETTINGS_PIPELINE_SECTION_OBJECT_NAME = "pipelineInspectorSettingsPipelineSection"
+SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollArea"
+SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollContent"
 
 
 @dataclass(frozen=True)
@@ -105,6 +115,7 @@ class SettingsActionCallbacks:
     on_cerebro_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
+    on_readiness_settings_changed: Optional[Callable[[], None]] = None
     on_bug_report_settings_changed: Optional[Callable[[], None]] = None
     on_bug_report_enabled_changed: Optional[Callable[[bool], None]] = None
     on_save_studio_settings: Optional[Callable[[], None]] = None
@@ -275,6 +286,7 @@ def update_settings_view(
     """Refresh settings controls from the active studio and user config."""
 
     update_studio_policy_view(view, qt_widgets, config)
+    update_support_and_roles_view(view, qt_widgets, config.readiness)
     update_connector_views(view, qt_widgets, config.connectors)
     update_tracker_views(view, qt_widgets, config.connectors)
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
@@ -490,7 +502,13 @@ def _build_studio_tab(
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
-    layout.addWidget(
+
+    scroll_content = qt_widgets.QWidget()
+    scroll_content.setObjectName(SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME)
+    content_layout = qt_widgets.QVBoxLayout(scroll_content)
+    content_layout.setContentsMargins(0, 0, 0, 0)
+    content_layout.setSpacing(8)
+    content_layout.addWidget(
         build_studio_policy_section(
             qt_widgets,
             config,
@@ -498,7 +516,22 @@ def _build_studio_tab(
             on_settings_changed=callbacks.on_studio_policy_changed,
         )
     )
-    layout.addStretch(1)
+    content_layout.addWidget(
+        build_support_and_roles_section(
+            qt_widgets,
+            config,
+            on_settings_changed=callbacks.on_readiness_settings_changed,
+        )
+    )
+    content_layout.addStretch(1)
+
+    scroll_area = build_borderless_scroll_area(
+        qt_widgets,
+        object_name=SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME,
+        content_widget=scroll_content,
+        allow_horizontal_scroll=True,
+    )
+    layout.addWidget(scroll_area)
     return tab
 
 

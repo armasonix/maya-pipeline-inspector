@@ -1,18 +1,31 @@
 """Maya-side execution for planned safe actions."""
 from __future__ import annotations
 
+import glob
 import importlib
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from pipeline_inspector.core.fix_plan import FixAction
 
 from pipeline_inspector.core.fix_plan import HIGH_RISK_BLOCK_REASON, resolve_normalize_path_value
+from pipeline_inspector.core.naming_fix import texture_tile_filename_from_paths
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
-SUPPORTED_FIX_TYPES = frozenset({"set_attr", "relink_path", "normalize_path", "disable_feature"})
+SUPPORTED_FIX_TYPES = frozenset(
+    {
+        "set_attr",
+        "relink_path",
+        "normalize_path",
+        "disable_feature",
+        "rename_node",
+        "rename_texture_file",
+    }
+)
 DEFAULT_UNDO_CHUNK_NAME = "Pipeline Inspector Apply Fixes"
 DEFAULT_TEXTURE_PATH_ATTR = "fileTextureName"
 REFERENCED_BLOCK_REASON = "target_referenced"
@@ -22,6 +35,9 @@ MISSING_TARGET_REASON = "target_node_missing"
 MISSING_ATTR_REASON = "target_attr_missing"
 INVALID_RELINK_PATH_REASON = "invalid_relink_path"
 INVALID_NORMALIZE_PATH_REASON = "invalid_normalize_path"
+INVALID_RENAME_NAME_REASON = "invalid_rename_name"
+INVALID_TEXTURE_FILE_RENAME_REASON = "invalid_texture_file_rename"
+TEXTURE_FILE_MISSING_REASON = "texture_file_missing"
 METADATA_PLUG_NAMES = frozenset({"version"})
 
 @dataclass(frozen=True)
@@ -138,7 +154,166 @@ def _apply_one(
         return _apply_normalize_path(action, cmds)
     if action.fix_type == "disable_feature":
         return _apply_disable_feature(action, cmds)
+    if action.fix_type == "rename_node":
+        return _apply_rename_node(action, cmds)
+    if action.fix_type == "rename_texture_file":
+        return _apply_rename_texture_file(action, cmds)
     return _blocked(action, [UNSUPPORTED_FIX_REASON])
+
+def _apply_rename_texture_file(action: FixAction, cmds: Any) -> AppliedFixRecord:
+    raw_before = action.before_value
+    raw_after = action.after_value
+    if not _is_path_string_value(raw_before) or not _is_path_string_value(raw_after):
+        return _blocked(action, [INVALID_TEXTURE_FILE_RENAME_REASON])
+
+    target_attr = _path_target_attr(action)
+    if not target_attr:
+        return _blocked(action, [MISSING_ATTR_REASON])
+
+    resolved_before = str(action.params.get("resolved_before") or raw_before)
+    is_udim = bool(action.params.get("is_udim"))
+    rename_error = _rename_texture_files_on_disk(
+        resolved_before,
+        str(raw_before),
+        str(raw_after),
+        is_udim=is_udim,
+    )
+    if rename_error:
+        return _blocked(action, [rename_error])
+
+    path_record = _apply_path_value(
+        action,
+        cmds,
+        target_attr,
+        str(raw_after).strip(),
+        str(raw_before),
+    )
+    if path_record.blocked:
+        return path_record
+
+    node_after = action.params.get("node_name_after")
+    if isinstance(node_after, str) and node_after.strip() and cmds.objExists(action.target_node):
+        cmds.rename(action.target_node, node_after.strip())
+
+    # region agent log
+    try:
+        import json
+        import time
+
+        payload = {
+            "sessionId": "618f4f",
+            "runId": "texture-file-fix-apply",
+            "hypothesisId": "H2",
+            "location": "fix_applier.py:_apply_rename_texture_file",
+            "message": "texture file rename applied",
+            "data": {
+                "target_node": action.target_node,
+                "file_before": raw_before,
+                "file_after": raw_after,
+                "node_after": node_after,
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # endregion
+
+    return path_record
+
+
+def _rename_texture_files_on_disk(
+    resolved_before: str,
+    raw_before: str,
+    raw_after: str,
+    *,
+    is_udim: bool,
+) -> Optional[str]:
+    if is_udim or "<UDIM>" in resolved_before or "<udim>" in resolved_before:
+        return _rename_udim_texture_files(resolved_before, raw_before, raw_after)
+
+    source = Path(os.path.expandvars(os.path.expanduser(resolved_before.replace("/", os.sep))))
+    if not source.is_file():
+        return TEXTURE_FILE_MISSING_REASON
+
+    destination = _resolved_destination_path(source, raw_before, raw_after)
+    if destination is None:
+        return INVALID_TEXTURE_FILE_RENAME_REASON
+    if destination.exists():
+        return INVALID_TEXTURE_FILE_RENAME_REASON
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    os.rename(source, destination)
+    return None
+
+
+def _rename_udim_texture_files(
+    resolved_before: str,
+    raw_before: str,
+    raw_after: str,
+) -> Optional[str]:
+    glob_pattern = (
+        resolved_before.replace("<UDIM>", "[0-9][0-9][0-9][0-9]")
+        .replace("<udim>", "[0-9][0-9][0-9][0-9]")
+    )
+    matched_files = sorted(glob.glob(glob_pattern))
+    if not matched_files:
+        return TEXTURE_FILE_MISSING_REASON
+
+    for old_file in matched_files:
+        old_path = Path(old_file)
+        new_name = texture_tile_filename_from_paths(
+            old_path.name,
+            raw_before=raw_before,
+            raw_after=raw_after,
+        )
+        if not new_name:
+            return INVALID_TEXTURE_FILE_RENAME_REASON
+        new_path = old_path.with_name(new_name)
+        if new_path.exists():
+            return INVALID_TEXTURE_FILE_RENAME_REASON
+        os.rename(old_path, new_path)
+    return None
+
+
+def _resolved_destination_path(
+    source: Path,
+    raw_before: str,
+    raw_after: str,
+) -> Optional[Path]:
+    before_name = Path(str(raw_before).replace("\\", "/")).name
+    after_name = Path(str(raw_after).replace("\\", "/")).name
+    if not before_name or not after_name:
+        return None
+    if source.name != before_name:
+        return source.with_name(after_name)
+    return source.with_name(after_name)
+
+
+def _apply_rename_node(action: FixAction, cmds: Any) -> AppliedFixRecord:
+    proposed_name = action.after_value
+    if not isinstance(proposed_name, str) or not proposed_name.strip():
+        return _blocked(action, [INVALID_RENAME_NAME_REASON])
+
+    before_name = _node_short_name(cmds, action.target_node)
+    if before_name is None:
+        return _blocked(action, [MISSING_TARGET_REASON])
+
+    renamed_node = cmds.rename(action.target_node, proposed_name.strip())
+    after_name = _node_short_name(cmds, renamed_node) or str(proposed_name).strip()
+    return _applied(action, None, before_name, after_name)
+
+
+def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
+    if not cmds.objExists(node_name):
+        return None
+    short_names = cmds.ls(node_name, shortNames=True) or []
+    if not short_names:
+        return None
+    return str(short_names[0]).split("|")[-1].split(":")[-1]
+
 
 def _apply_disable_feature(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if action.after_value is None:

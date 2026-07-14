@@ -11,6 +11,7 @@ from pipeline_inspector.core import (
     RuleLoadError,
     RuleResult,
     ValidationEngine,
+    apply_fix_availability,
     apply_waivers,
     build_fix_plan,
     compute_health_score,
@@ -361,6 +362,7 @@ def run_validation(
         enriched,
         studio_environment=_studio_environment_for_validation(studio_config),
     )
+    results = apply_fix_availability(results, fix_plan)
     summary = summarize_results(results)
     health_score = compute_health_score(results)
     failed_count = sum(1 for item in results if item.status == "failed")

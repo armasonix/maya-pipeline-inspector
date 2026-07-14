@@ -52,6 +52,11 @@ from pipeline_inspector.ui.issues_triage import (
     read_issue_filter_prefs_from_widgets,
 )
 from pipeline_inspector.ui.qt import load_qt_widgets
+from pipeline_inspector.ui.readiness_tab import (
+    READINESS_TAB_OBJECT_NAME,
+    ReadinessTabState,
+    update_readiness_tab,
+)
 from pipeline_inspector.ui.settings_dirty_state import (
     evaluate_settings_dirty_state_from_view,
 )
@@ -64,6 +69,7 @@ from pipeline_inspector.ui.settings_panel import (
 )
 from pipeline_inspector.ui.studio_environment_section import read_studio_environment_from_view
 from pipeline_inspector.ui.studio_policy_section import read_studio_policy_from_view
+from pipeline_inspector.ui.support_section import read_readiness_from_view
 from pipeline_inspector.ui.user_preferences_ui import (
     apply_user_preferences_to_panel,
 )
@@ -187,7 +193,7 @@ def show_reports_panel() -> Any:
 
 
 def show_readiness_check_panel() -> Any:
-    """Open the Readiness tab when it is available."""
+    """Open the Readiness tab and run machine readiness checks."""
 
     panel = show_panel()
     content = _panel_content_from_panel(panel)
@@ -195,17 +201,8 @@ def show_readiness_check_panel() -> Any:
         return panel
     qt_widgets = load_qt_widgets()
     _set_panel_view(content, qt_widgets, settings=False)
-    if not _select_tab_by_object_name(
-        content,
-        qt_widgets,
-        main_window.READINESS_TAB_OBJECT_NAME,
-    ):
-        _show_information_dialog(
-            qt_widgets,
-            "Readiness Check",
-            "The Readiness tab is not installed yet. Machine readiness checks ship in "
-            "issue #175.",
-        )
+    _select_readiness_tab(content, qt_widgets)
+    _run_readiness_check_from_ui(content, qt_widgets)
     return panel
 
 
@@ -270,6 +267,7 @@ def _create_dockable_panel() -> Any:
             issue_details_callbacks=_issue_details_action_callbacks(panel_state, qt_widgets),
             waiver_callbacks=_waiver_manager_callbacks(panel_state, qt_widgets),
             farm_callbacks=_farm_action_callbacks(panel_state, qt_widgets),
+            readiness_callbacks=_readiness_action_callbacks(panel_state, qt_widgets),
             settings_callbacks=_settings_action_callbacks(panel_state, qt_widgets),
             navigation_callbacks=_panel_navigation_callbacks(panel_state, qt_widgets),
             studio_config=studio_config,
@@ -305,6 +303,7 @@ def _create_dockable_panel() -> Any:
 
         apply_panel_header_icons(content, qt_widgets, load_qt_gui())
         _refresh_waiver_manager(content, qt_widgets)
+        _refresh_readiness_tab(content, qt_widgets)
         _refresh_farm_tab(content, qt_widgets)
         _maybe_run_startup_update_check(content, qt_widgets, user_config)
 
@@ -674,6 +673,10 @@ def _settings_action_callbacks(
             qt_widgets,
         ),
         on_studio_policy_changed=lambda: _sync_studio_policy_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_readiness_settings_changed=lambda: _sync_readiness_from_ui(
             _panel_content(panel_state),
             qt_widgets,
         ),
@@ -1091,6 +1094,72 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
         return
     updated = read_studio_policy_from_view(settings_view, qt_widgets, base=current)
     _set_studio_config(content, qt_widgets, updated)
+
+
+def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
+    #region agent log
+    import json as _json
+    import time as _time
+    from pathlib import Path as _Path
+
+    _log_path = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+    try:
+        with _log_path.open("a", encoding="utf-8") as _handle:
+            _handle.write(
+                _json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "location": "ui_launcher.py:_sync_readiness_from_ui",
+                        "message": "readiness sync triggered",
+                        "data": {"refresh_view": False},
+                        "timestamp": int(_time.time() * 1000),
+                        "hypothesisId": "B",
+                        "runId": "post-fix",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    #endregion
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    readiness = read_readiness_from_view(
+        settings_view,
+        qt_widgets,
+        base=current.readiness,
+    )
+    updated = current.with_updates(readiness=readiness)
+    setattr(content, STUDIO_CONFIG_ATTR, updated)
+    setattr(
+        content,
+        MERGED_RUNTIME_CONFIG_ATTR,
+        merge_runtime_config(updated, _user_config_for_content(content)),
+    )
+    _refresh_readiness_tab(content, qt_widgets)
+    dirty_state = _settings_dirty_state(content, settings_view, qt_widgets)
+    from pipeline_inspector.ui.settings_dirty_state import dirty_indicator_text
+    from pipeline_inspector.ui.settings_panel import SETTINGS_DIRTY_BANNER_OBJECT_NAME
+
+    dirty_banner = _find_child(
+        settings_view,
+        qt_widgets.QLabel,
+        SETTINGS_DIRTY_BANNER_OBJECT_NAME,
+    )
+    if dirty_banner is not None:
+        banner_text = dirty_indicator_text(dirty_state)
+        dirty_banner.setText(banner_text)
+        set_visible = getattr(dirty_banner, "setVisible", None)
+        if set_visible is not None:
+            set_visible(bool(banner_text))
+    main_window.update_panel_header_unsaved_indicator(
+        content,
+        qt_widgets,
+        dirty=dirty_state.any_dirty,
+    )
 
 
 def _sync_bug_report_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -1701,6 +1770,30 @@ def _farm_action_callbacks(
     )
 
 
+def _readiness_action_callbacks(
+    panel_state: dict[str, Any],
+    qt_widgets: Any,
+) -> Any:
+    from pipeline_inspector.ui.readiness_tab import ReadinessActionCallbacks
+
+    return ReadinessActionCallbacks(
+        on_run_readiness_check=lambda: _run_readiness_check_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_send_report_to_sysadmin=lambda: _send_readiness_report_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            recipient="sysadmin",
+        ),
+        on_send_report_to_support=lambda: _send_readiness_report_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            recipient="support",
+        ),
+    )
+
+
 def _validate_from_ui(content: Any, qt_widgets: Any, *, scan_scope: str) -> None:
     _schedule_ui_validation(content, qt_widgets, scan_scope=scan_scope)
 
@@ -2140,6 +2233,99 @@ def _select_reports_tab(content: Any, qt_widgets: Any) -> None:
 
 def _select_farm_tab(content: Any, qt_widgets: Any) -> None:
     _select_tab_by_object_name(content, qt_widgets, FARM_TAB_OBJECT_NAME)
+
+
+def _select_readiness_tab(content: Any, qt_widgets: Any) -> None:
+    _select_tab_by_object_name(content, qt_widgets, READINESS_TAB_OBJECT_NAME)
+
+
+def _refresh_readiness_tab(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.maya.readiness_actions import initial_readiness_tab_state
+
+    stored_state = getattr(content, "_pipeline_inspector_readiness_tab_state", None)
+    if stored_state is not None:
+        config = _studio_config_for_content(content)
+        tab_state = replace(
+            stored_state,
+            checks_configured=initial_readiness_tab_state(config).checks_configured,
+            can_send_report=initial_readiness_tab_state(config).can_send_report,
+        )
+    else:
+        tab_state = initial_readiness_tab_state(_studio_config_for_content(content))
+    _apply_readiness_tab_state(content, qt_widgets, tab_state)
+
+
+def _run_readiness_check_from_ui(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.maya.readiness_actions import (
+        collect_maya_readiness_probes,
+        run_readiness_check_action,
+    )
+
+    config = _studio_config_for_content(content)
+    probes = collect_maya_readiness_probes()
+    content._pipeline_inspector_readiness_probes = probes
+    result = run_readiness_check_action(config, probes=probes)
+    content._pipeline_inspector_readiness_report = result.report
+    content._pipeline_inspector_readiness_tab_state = result.tab_state
+    _apply_readiness_tab_state(content, qt_widgets, result.tab_state)
+
+
+def _send_readiness_report_from_ui(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    recipient: str,
+) -> None:
+    from pipeline_inspector.maya.readiness_actions import send_readiness_report_action
+
+    config = _studio_config_for_content(content)
+    report = getattr(content, "_pipeline_inspector_readiness_report", None)
+    if report is None:
+        _set_readiness_status(content, qt_widgets, "Run Machine Readiness before sending a report.")
+        return
+    result = send_readiness_report_action(config, report, recipient=recipient)
+    content._pipeline_inspector_readiness_tab_state = result.tab_state
+    _apply_readiness_tab_state(content, qt_widgets, result.tab_state)
+
+
+def _apply_readiness_tab_state(
+    content: Any,
+    qt_widgets: Any,
+    tab_state: ReadinessTabState,
+) -> None:
+    readiness_tab = _readiness_tab_widget(content, qt_widgets)
+    if readiness_tab is not None:
+        update_readiness_tab(readiness_tab, qt_widgets, tab_state)
+
+
+def _set_readiness_status(content: Any, qt_widgets: Any, message: str) -> None:
+    stored_state = getattr(content, "_pipeline_inspector_readiness_tab_state", None)
+    if stored_state is not None:
+        tab_state = replace(stored_state, status_message=message)
+    else:
+        from pipeline_inspector.maya.readiness_actions import initial_readiness_tab_state
+
+        tab_state = replace(
+            initial_readiness_tab_state(_studio_config_for_content(content)),
+            status_message=message,
+        )
+    content._pipeline_inspector_readiness_tab_state = tab_state
+    _apply_readiness_tab_state(content, qt_widgets, tab_state)
+
+
+def _readiness_tab_widget(content: Any, qt_widgets: Any) -> Any:
+    tabs = _find_child(content, qt_widgets.QTabWidget, main_window.TAB_WIDGET_OBJECT_NAME)
+    if tabs is None:
+        return None
+    count = getattr(tabs, "count", lambda: 0)()
+    for index in range(count):
+        widget = getattr(tabs, "widget", lambda _index: None)(index)
+        object_name = getattr(widget, "objectName", lambda: "")()
+        if not object_name:
+            object_name = getattr(widget, "object_name", "")
+        if widget is not None and object_name == READINESS_TAB_OBJECT_NAME:
+            return widget
+    return _find_child(content, qt_widgets.QWidget, READINESS_TAB_OBJECT_NAME)
 
 
 def _current_scene_path() -> str:

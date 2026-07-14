@@ -1,0 +1,167 @@
+{
+  "connections": [
+    {
+      "dst_attr": "input1",
+      "dst_node": "node:layer_shader",
+      "src_attr": "outColor",
+      "src_node": "node:mix_shader"
+    },
+    {
+      "dst_attr": "input2",
+      "dst_node": "node:layer_shader",
+      "src_attr": "outColor",
+      "src_node": "node:car_paint"
+    },
+    {
+      "dst_attr": "input3",
+      "dst_node": "node:layer_shader",
+      "src_attr": "outColor",
+      "src_node": "node:osl_shader"
+    },
+    {
+      "dst_attr": "baseColor",
+      "dst_node": "node:hero_mtl",
+      "semantic": "base_color",
+      "src_attr": "outColor",
+      "src_node": "node:layer_shader"
+    },
+    {
+      "dst_attr": "color1",
+      "dst_node": "node:mix_shader",
+      "src_attr": "outColor",
+      "src_node": "node:file_a"
+    },
+    {
+      "dst_attr": "color2",
+      "dst_node": "node:mix_shader",
+      "src_attr": "outColor",
+      "src_node": "node:file_b"
+    }
+  ],
+  "file_dependencies": [],
+  "materials": [
+    {
+      "assigned_shapes": ["mesh:hero_body"],
+      "displacement_nodes": [],
+      "graph_depth": 0,
+      "graph_fingerprint": "",
+      "graph_node_count": 0,
+      "name": "hero_mtl",
+      "node_id": "node:hero_mtl",
+      "renderer_family": "arnold",
+      "shading_engines": ["node:hero_sg"],
+      "texture_nodes": ["node:file_a", "node:file_b"],
+      "type_name": "aiStandardSurface"
+    }
+  ],
+  "maya_version": "2025",
+  "nodes": [
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "hero_mtl",
+      "id": "node:hero_mtl",
+      "locked": false,
+      "name": "hero_mtl",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiStandardSurface"
+    },
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "layer_shader",
+      "id": "node:layer_shader",
+      "locked": false,
+      "name": "layer_shader",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiLayerShader"
+    },
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "mix_shader",
+      "id": "node:mix_shader",
+      "locked": false,
+      "name": "mix_shader",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiMixShader"
+    },
+    {
+      "attrs": {},
+      "classification": ["material"],
+      "full_name": "car_paint",
+      "id": "node:car_paint",
+      "locked": false,
+      "name": "car_paint",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiCarPaint"
+    },
+    {
+      "attrs": {},
+      "classification": ["utility"],
+      "full_name": "osl_shader",
+      "id": "node:osl_shader",
+      "locked": false,
+      "name": "osl_shader",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiOSLShader"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_a",
+      "id": "node:file_a",
+      "locked": false,
+      "name": "file_a",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiImage"
+    },
+    {
+      "attrs": {},
+      "classification": ["texture", "file"],
+      "full_name": "file_b",
+      "id": "node:file_b",
+      "locked": false,
+      "name": "file_b",
+      "namespace": null,
+      "reference_path": null,
+      "referenced": false,
+      "renderer_family": "arnold",
+      "type_name": "aiImage"
+    }
+  ],
+  "references": [],
+  "renderer": "arnold",
+  "scan_scope": "scene",
+  "scene_path": "examples/broken_scene/pipeline_inspector_demo_arnold_expensive.ma",
+  "scanned_at_utc": "2026-07-14T15:00:00Z",
+  "schema_version": "1.0",
+  "shading_engines": [
+    {
+      "displacement_shader": null,
+      "members": ["mesh:hero_body"],
+      "name": "hero_sg",
+      "node_id": "node:hero_sg",
+      "surface_shader": "node:hero_mtl",
+      "volume_shader": null
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "supervisor_full": {
+      "failed": [
+        {
+          "rule_id": "common.shader_complexity.expensive_nodes.max",
+          "severity": "warning",
+          "block_publish": false,
+          "block_deadline": false
+        }
+      ]
+    }
+  }
+}

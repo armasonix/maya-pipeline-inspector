@@ -22,7 +22,7 @@
         "block_publish": false,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
       }
     },
     {
@@ -47,7 +47,7 @@
         "block_publish": false,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
       }
     },
     {
@@ -72,7 +72,7 @@
         "block_publish": false,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
       }
     },
     {
@@ -97,7 +97,7 @@
         "block_publish": false,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
       }
     },
     {
@@ -109,8 +109,8 @@
       "scope": "node",
       "severity": "warning",
       "owner": "shader_td",
-      "message": "Texture node name does not match the studio naming template.",
-      "why": "Texture node naming keeps shader graphs readable and helps automated cleanup scripts target the right file nodes.",
+      "message": "Texture file name does not match the studio naming template.",
+      "why": "Texture file naming keeps published assets searchable on disk and aligned with the Maya file node path and studio manifests.",
       "match": {
         "object_type": "texture"
       },
@@ -122,7 +122,7 @@
         "block_publish": false,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
       }
     },
     {
@@ -147,7 +147,32 @@
         "block_publish": false,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.light_source.pattern",
+      "name": "Light source name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "node",
+      "severity": "warning",
+      "owner": "lighting_td",
+      "message": "Light source name does not match the studio naming template.",
+      "why": "Consistent light naming helps lighting templates, farm exports, and automated scene cleanup target the right sources.",
+      "match": {
+        "object_type": "light_source"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "light_source"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
       }
     }
   ]

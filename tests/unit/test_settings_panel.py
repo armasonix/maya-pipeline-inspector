@@ -62,6 +62,7 @@ from pipeline_inspector.ui.studio_environment_section import (
 from pipeline_inspector.ui.studio_policy_section import (
     SETTINGS_PINNED_WORKFLOW_PROFILES_INPUT_OBJECT_NAME,
     SETTINGS_STUDIO_NAME_INPUT_OBJECT_NAME,
+    SETTINGS_STUDIO_POLICY_SECTION_OBJECT_NAME,
     SETTINGS_WAIVER_APPROVED_BY_INPUT_OBJECT_NAME,
 )
 from pipeline_inspector.user_config import UserPreferences
@@ -219,6 +220,9 @@ class FakePlainTextEdit(FakeWidget):
 
     def setToolTip(self, text: str) -> None:
         self.tooltip = text
+
+    def clear(self) -> None:
+        self.value = ""
 
 
 class FakeComboBox(FakeWidget):
@@ -398,12 +402,49 @@ class FakeGridLayout(FakeVBoxLayout):
 class FakeSizePolicy:
     Fixed = "fixed"
     Preferred = "preferred"
+    Expanding = "expanding"
+
+
+class FakeScrollArea(FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.widget: Any | None = None
+
+    def setWidgetResizable(self, _enabled: bool) -> None:
+        return
+
+    def setWidget(self, widget: Any) -> None:
+        self.widget = widget
+        if widget not in self.children:
+            self.children.append(widget)
+
+    def setFrameShape(self, *_args: Any) -> None:
+        return
+
+    def setFrameShadow(self, *_args: Any) -> None:
+        return
+
+    def setLineWidth(self, *_args: Any) -> None:
+        return
+
+    def setHorizontalScrollBarPolicy(self, *_args: Any) -> None:
+        return
+
+    def setSizePolicy(self, *_args: Any) -> None:
+        return
+
+
+class FakeFrame:
+    NoFrame = 0
+    Plain = 0
 
 
 class FakeQt:
     AlignLeft = 1
     AlignRight = 2
     AlignVCenter = 4
+    ScrollBarAlwaysOff = 0
+    ScrollBarAsNeeded = 1
 
 
 class FakeTabWidget(FakeWidget):
@@ -432,6 +473,8 @@ class FakeQtWidgets:
     QHBoxLayout = FakeHBoxLayout
     QFormLayout = FakeFormLayout
     QGridLayout = FakeGridLayout
+    QScrollArea = FakeScrollArea
+    QFrame = FakeFrame
     QSizePolicy = FakeSizePolicy
     Qt = FakeQt
     QTabWidget = FakeTabWidget
@@ -954,7 +997,11 @@ def test_studio_tab_clarifies_pipeline_policy_scope():
     view = settings_panel.build_settings_view(FakeQtWidgets)
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
     studio_tab = tabs.tabs[3][1]
-    policy_section = studio_tab.layout.widgets[0]
+    scroll_area = _find(studio_tab, settings_panel.SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME)
+    policy_section = _find(
+        scroll_area.widget,
+        SETTINGS_STUDIO_POLICY_SECTION_OBJECT_NAME,
+    )
     intro = policy_section.layout.widgets[0]
 
     assert "pipeline_inspector_studio.json" in intro.text

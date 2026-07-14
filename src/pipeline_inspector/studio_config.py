@@ -200,6 +200,171 @@ class StudioUiSettings:
 
 
 @dataclass(frozen=True)
+class ReadinessSupportContacts:
+    """Telegram chat IDs used for machine readiness escalation."""
+
+    sysadmin_telegram_chat_id: str = ""
+    support_telegram_chat_id: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sysadmin_telegram_chat_id": self.sysadmin_telegram_chat_id,
+            "support_telegram_chat_id": self.support_telegram_chat_id,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> ReadinessSupportContacts:
+        if not data:
+            return cls()
+        return cls(
+            sysadmin_telegram_chat_id=str(data.get("sysadmin_telegram_chat_id", "") or ""),
+            support_telegram_chat_id=str(data.get("support_telegram_chat_id", "") or ""),
+        )
+
+
+@dataclass(frozen=True)
+class SoftwareVersionRequirement:
+    """One installed-software version requirement for machine readiness."""
+
+    product: str
+    version: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"product": self.product, "version": self.version}
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> SoftwareVersionRequirement:
+        return cls(
+            product=str(data.get("product", "") or "").strip(),
+            version=str(data.get("version", "") or "").strip(),
+        )
+
+
+def parse_software_version_requirements(
+    raw: object,
+) -> tuple[SoftwareVersionRequirement, ...]:
+    """Parse readiness software requirements from JSON or UI text."""
+
+    if raw is None:
+        return ()
+    if isinstance(raw, str):
+        return _parse_software_version_text(raw)
+    if isinstance(raw, list):
+        requirements: list[SoftwareVersionRequirement] = []
+        for item in raw:
+            if isinstance(item, Mapping):
+                requirement = SoftwareVersionRequirement.from_mapping(item)
+                if requirement.product and requirement.version:
+                    requirements.append(requirement)
+            elif isinstance(item, str):
+                requirements.extend(_parse_software_version_text(item))
+        return tuple(requirements)
+    if isinstance(raw, Mapping):
+        requirements = []
+        for product, version in raw.items():
+            product_text = str(product or "").strip()
+            if not product_text:
+                continue
+            if isinstance(version, list):
+                for entry in version:
+                    version_text = str(entry or "").strip()
+                    if version_text:
+                        requirements.append(
+                            SoftwareVersionRequirement(product_text, version_text)
+                        )
+            else:
+                version_text = str(version or "").strip()
+                if version_text:
+                    requirements.append(
+                        SoftwareVersionRequirement(product_text, version_text)
+                    )
+        return tuple(requirements)
+    return ()
+
+
+def _parse_software_version_text(text: str) -> tuple[SoftwareVersionRequirement, ...]:
+    requirements: list[SoftwareVersionRequirement] = []
+    for line in str(text or "").replace("\r\n", "\n").split("\n"):
+        entry = line.strip()
+        if not entry or "=" not in entry:
+            continue
+        product, version = entry.split("=", 1)
+        product_text = product.strip()
+        version_text = version.strip()
+        if product_text and version_text:
+            requirements.append(SoftwareVersionRequirement(product_text, version_text))
+    return tuple(requirements)
+
+
+@dataclass(frozen=True)
+class ReadinessCheckRequirements:
+    """Studio-configured machine readiness requirements."""
+
+    maya_plugins: tuple[str, ...] = ()
+    mapped_drives: tuple[str, ...] = ()
+    env_vars: tuple[str, ...] = ()
+    network_paths: tuple[str, ...] = ()
+    software_version_requirements: tuple[SoftwareVersionRequirement, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "maya_plugins": list(self.maya_plugins),
+            "mapped_drives": list(self.mapped_drives),
+            "env_vars": list(self.env_vars),
+            "network_paths": list(self.network_paths),
+            "software_versions": [
+                requirement.to_dict() for requirement in self.software_version_requirements
+            ],
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> ReadinessCheckRequirements:
+        if not data:
+            return cls()
+        return cls(
+            maya_plugins=_as_str_tuple(data.get("maya_plugins")),
+            mapped_drives=_as_str_tuple(data.get("mapped_drives")),
+            env_vars=_as_str_tuple(data.get("env_vars")),
+            network_paths=_as_str_tuple(data.get("network_paths")),
+            software_version_requirements=parse_software_version_requirements(
+                data.get("software_versions")
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ReadinessSettings:
+    """Machine readiness policy and support escalation contacts."""
+
+    checks: ReadinessCheckRequirements = field(default_factory=ReadinessCheckRequirements)
+    support: ReadinessSupportContacts = field(default_factory=ReadinessSupportContacts)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "checks": self.checks.to_dict(),
+            "support": self.support.to_dict(),
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> ReadinessSettings:
+        if not data:
+            return cls()
+        checks_raw = data.get("checks")
+        support_raw = data.get("support")
+        checks = (
+            ReadinessCheckRequirements.from_mapping(checks_raw)
+            if isinstance(checks_raw, Mapping)
+            else ReadinessCheckRequirements()
+        )
+        support = (
+            ReadinessSupportContacts.from_mapping(support_raw)
+            if isinstance(support_raw, Mapping)
+            else ReadinessSupportContacts()
+        )
+        return cls(checks=checks, support=support)
+
+
+@dataclass(frozen=True)
 class BugReportSettings:
     """Bug report relay settings controlled by the studio."""
 
@@ -878,6 +1043,7 @@ class StudioConfig:
     studio_environment: StudioEnvironmentSettings = StudioEnvironmentSettings()
     ui: StudioUiSettings = StudioUiSettings()
     bug_report: BugReportSettings = BugReportSettings()
+    readiness: ReadinessSettings = ReadinessSettings()
     updates: StudioUpdatesSettings = StudioUpdatesSettings()
     connectors: ConnectorSettings = ConnectorSettings()
     config_path: Optional[Path] = None
@@ -891,6 +1057,7 @@ class StudioConfig:
         studio_environment: Optional[StudioEnvironmentSettings] = None,
         ui: Optional[StudioUiSettings] = None,
         bug_report: Optional[BugReportSettings] = None,
+        readiness: Optional[ReadinessSettings] = None,
         updates: Optional[StudioUpdatesSettings] = None,
         connectors: Optional[ConnectorSettings] = None,
         config_path: Optional[Path] = None,
@@ -905,6 +1072,7 @@ class StudioConfig:
             ),
             ui=self.ui if ui is None else ui,
             bug_report=self.bug_report if bug_report is None else bug_report,
+            readiness=self.readiness if readiness is None else readiness,
             updates=self.updates if updates is None else updates,
             connectors=self.connectors if connectors is None else connectors,
             config_path=self.config_path if config_path is None else config_path,
@@ -935,6 +1103,7 @@ class StudioConfig:
             "studio_environment": self.studio_environment.to_dict(),
             "ui": self.ui.to_dict(),
             "bug_report": self.bug_report.to_dict(),
+            "readiness": self.readiness.to_dict(),
             "updates": self.updates.to_dict(),
             "connectors": self.connectors.to_dict(),
         }
@@ -967,6 +1136,12 @@ class StudioConfig:
             if isinstance(bug_report_raw, Mapping)
             else BugReportSettings()
         )
+        readiness_raw = data.get("readiness")
+        readiness = (
+            ReadinessSettings.from_mapping(readiness_raw)
+            if isinstance(readiness_raw, Mapping)
+            else ReadinessSettings()
+        )
         updates_raw = data.get("updates")
         updates = (
             StudioUpdatesSettings.from_mapping(updates_raw)
@@ -986,6 +1161,7 @@ class StudioConfig:
             studio_environment=studio_environment,
             ui=ui,
             bug_report=bug_report,
+            readiness=readiness,
             updates=updates,
             connectors=connectors,
             config_path=config_path,
@@ -1120,6 +1296,14 @@ def _profile_ids_from_value(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(str(item).strip() for item in value if str(item).strip())
+
+
+def _as_str_tuple(value: Any) -> tuple[str, ...]:
+    if isinstance(value, tuple):
+        return tuple(str(item).strip() for item in value if str(item).strip())
+    if isinstance(value, list):
+        return tuple(str(item).strip() for item in value if str(item).strip())
+    return ()
 
 
 def discover_studio_config_path() -> Path | None:

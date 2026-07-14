@@ -9,15 +9,35 @@ from pipeline_inspector.maya.fix_applier import apply_fix_actions
 class FakeCmds:
     def __init__(self, attrs: Optional[dict[str, Any]] = None) -> None:
         self.attrs = attrs or {}
+        self.nodes: dict[str, str] = {}
         self.undo_calls: list[dict[str, Any]] = []
         self.set_calls: list[tuple[str, Any, dict[str, Any]]] = []
+        self.rename_calls: list[tuple[str, str]] = []
 
     def undoInfo(self, **kwargs: Any) -> None:
         self.undo_calls.append(dict(kwargs))
 
     def objExists(self, node_name: str) -> bool:
+        if node_name in self.nodes:
+            return True
         prefix = f"{node_name}."
         return any(plug.startswith(prefix) for plug in self.attrs)
+
+    def ls(self, node_name: str, shortNames: bool = False) -> list[str]:
+        if node_name in self.nodes:
+            return [self.nodes[node_name]]
+        if self.objExists(node_name):
+            return [node_name]
+        return []
+
+    def rename(self, node_name: str, new_name: str) -> str:
+        self.rename_calls.append((node_name, new_name))
+        current = self.nodes.get(node_name, node_name)
+        parent = "|".join(current.split("|")[:-1])
+        renamed = f"{parent}|{new_name}" if parent else new_name
+        self.nodes[node_name] = renamed
+        self.nodes[renamed] = renamed
+        return renamed
 
     def getAttr(self, plug: str) -> Any:
         return self.attrs[plug]
@@ -25,6 +45,64 @@ class FakeCmds:
     def setAttr(self, plug: str, value: Any, **kwargs: Any) -> None:
         self.set_calls.append((plug, value, dict(kwargs)))
         self.attrs[plug] = value
+
+
+def test_apply_rename_texture_file_renames_disk_file_and_updates_path(tmp_path):
+    texture_file = tmp_path / "albedo_wrong.exr"
+    texture_file.write_bytes(b"fixture")
+    cmds = FakeCmds({"file1.fileTextureName": str(texture_file)})
+    cmds.nodes["file1"] = "file1"
+    action = FixAction(
+        fix_id="studio.naming.texture.pattern:node:file1:rename_texture_file",
+        rule_id="studio.naming.texture.pattern",
+        title="Texture file name must match studio naming template: rename texture file",
+        fix_type="rename_texture_file",
+        risk="medium",
+        target_kind="node",
+        target_id="node:file1",
+        target_node="file1",
+        target_attr="fileTextureName",
+        before_value=str(texture_file),
+        after_value=str(tmp_path / "tex_albedo_wrong.exr"),
+        params={
+            "resolved_before": str(texture_file),
+            "is_udim": False,
+            "node_name_after": "tex_albedo_wrong",
+        },
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert report.applied_count == 1
+    assert not texture_file.exists()
+    assert (tmp_path / "tex_albedo_wrong.exr").is_file()
+    assert cmds.attrs["file1.fileTextureName"] == str(tmp_path / "tex_albedo_wrong.exr")
+    assert cmds.rename_calls == [("file1", "tex_albedo_wrong")]
+
+
+def test_apply_rename_node_updates_short_name_inside_undo_chunk():
+    cmds = FakeCmds()
+    cmds.nodes["|world|body_bad"] = "|world|body_bad"
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:body_bad:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:body_bad",
+        target_node="|world|body_bad",
+        before_value="body_bad",
+        after_value="geo_body_bad",
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == [("|world|body_bad", "geo_body_bad")]
+    assert report.applied_count == 1
+    record = report.records[0]
+    assert record.before_value == "body_bad"
+    assert record.after_value == "geo_body_bad"
 
 
 def test_apply_fix_actions_uses_undo_chunk_and_records_before_after_values():

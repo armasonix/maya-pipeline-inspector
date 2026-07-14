@@ -19,6 +19,7 @@ from pipeline_inspector.studio_config import StudioConfig
 from pipeline_inspector.ui.farm_tab import FarmActionCallbacks, build_farm_tab
 from pipeline_inspector.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
 from pipeline_inspector.ui.qt import load_qt_core
+from pipeline_inspector.ui.readiness_tab import ReadinessActionCallbacks, build_readiness_tab
 from pipeline_inspector.ui.settings_panel import SettingsActionCallbacks, build_settings_view
 from pipeline_inspector.ui.table_widgets import configure_read_only_table, make_read_only_item
 from pipeline_inspector.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager
@@ -309,6 +310,7 @@ def build_main_widget(
     issue_details_callbacks: Optional[IssueDetailsActionCallbacks] = None,
     waiver_callbacks: Optional[WaiverManagerCallbacks] = None,
     farm_callbacks: Optional[FarmActionCallbacks] = None,
+    readiness_callbacks: Optional[ReadinessActionCallbacks] = None,
     settings_callbacks: Optional[SettingsActionCallbacks] = None,
     navigation_callbacks: Optional[PanelNavigationCallbacks] = None,
     studio_config: Optional[StudioConfig] = None,
@@ -321,6 +323,7 @@ def build_main_widget(
     issue_details_callbacks = issue_details_callbacks or IssueDetailsActionCallbacks()
     waiver_callbacks = waiver_callbacks or WaiverManagerCallbacks()
     farm_callbacks = farm_callbacks or FarmActionCallbacks()
+    readiness_callbacks = readiness_callbacks or ReadinessActionCallbacks()
     settings_callbacks = settings_callbacks or SettingsActionCallbacks()
     navigation_callbacks = navigation_callbacks or PanelNavigationCallbacks()
     active_studio_config = studio_config or StudioConfig.default()
@@ -359,6 +362,10 @@ def build_main_widget(
     tabs.addTab(_build_waivers_tab(qt_widgets, waiver_callbacks), "Waivers")
     tabs.addTab(_build_fixes_tab(qt_widgets, fix_queue_callbacks), "Fixes")
     tabs.addTab(_build_reports_tab(qt_widgets, export_callbacks), "Reports")
+    tabs.addTab(
+        build_readiness_tab(qt_widgets, callbacks=readiness_callbacks),
+        "Readiness",
+    )
     tabs.addTab(build_farm_tab(qt_widgets, callbacks=farm_callbacks), "Farm")
     main_layout.addWidget(tabs)
     stack.addWidget(main_view)

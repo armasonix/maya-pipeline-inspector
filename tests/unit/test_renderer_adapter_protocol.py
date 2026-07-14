@@ -194,7 +194,8 @@ def test_common_maya_adapter_exposes_displacement_and_complexity_contract():
     assert weights["file"] == 1.0
     assert weights["standardSurface"] == 1.0
     assert weights["displacementShader"] == 1.25
-    assert weights["layeredTexture"] == 2.0
+    assert weights["layeredTexture"] == 2.5
+    assert adapter.expensive_node_types() == frozenset({"layeredTexture"})
 
 
 def test_registry_classifies_common_maya_nodes():
@@ -265,10 +266,12 @@ def test_vray_adapter_exposes_displacement_and_complexity_contract():
 
     weights = adapter.complexity_weights()
     assert weights["VRayMtl"] == 1.25
-    assert weights["VRayBlendMtl"] == 3.0
+    assert weights["VRayBlendMtl"] == 3.5
     assert weights["VRayBitmap"] == 1.0
     assert weights["VRayDisplacement"] == 1.75
-    assert weights["VRayLayeredTex"] == 2.0
+    assert weights["VRayLayeredTex"] == 2.5
+    assert "VRayBlendMtl" in adapter.expensive_node_types()
+    assert "VRayLayeredTex" in adapter.expensive_node_types()
 
 
 def test_registry_classifies_vray_nodes():
@@ -302,6 +305,8 @@ def test_arnold_adapter_supports_initial_arnold_node_types():
     assert "aiLayerShader" in supported
     assert "aiMixShader" in supported
     assert "aiTriplanar" in supported
+    assert "aiCarPaint" in supported
+    assert "aiOSLShader" in supported
 
 
 def test_arnold_adapter_classifies_arnold_nodes():
@@ -350,9 +355,11 @@ def test_arnold_adapter_exposes_displacement_and_complexity_contract():
     weights = adapter.complexity_weights()
     assert weights["aiStandardSurface"] == 1.25
     assert weights["aiImage"] == 1.0
-    assert weights["aiLayerShader"] == 2.5
-    assert weights["aiMixShader"] == 2.0
+    assert weights["aiLayerShader"] == 3.0
+    assert weights["aiMixShader"] == 2.5
     assert weights["aiTriplanar"] == 1.5
+    assert "aiLayerShader" in adapter.expensive_node_types()
+    assert "aiOSLShader" in adapter.expensive_node_types()
 
 
 def test_registry_classifies_arnold_nodes():

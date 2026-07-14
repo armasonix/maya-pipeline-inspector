@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any, Optional
 
 _TOGGLE_STYLE_BASE = (
-    "min-width: 52px; min-height: 24px; padding: 3px 10px; border-radius: 7px; "
+    "min-width: 52px; min-height: 28px; padding: 4px 10px 5px 10px; border-radius: 7px; "
     "font-weight: bold; font-size: 11px; margin: 0px;"
 )
 _TOGGLE_OFF_STYLE = (
@@ -70,7 +70,7 @@ def _apply_toggle_size_policy(qt_widgets: Any, button: Any) -> None:
         set_min_width(52)
     set_min_height = getattr(button, "setMinimumHeight", None)
     if set_min_height is not None:
-        set_min_height(24)
+        set_min_height(28)
 
 
 def wire_button(button: Any, callback: Optional[Callable[[], None]]) -> None:
@@ -321,6 +321,151 @@ def wire_plain_text_changed(field: Any, callback: Optional[Callable[[], None]]) 
             return
 
 
+_PLAIN_TEXT_FIELD_STYLE = (
+    "QPlainTextEdit { background-color: #1f1f1f; border: 1px solid #555555; "
+    "border-radius: 3px; selection-background-color: #3d6ea8; "
+    "selection-color: #ffffff; }"
+)
+
+
+def configure_plain_text_placeholder_field(
+    qt_widgets: Any,
+    widget: Any,
+    *,
+    value: str,
+    placeholder: str,
+    text_color: str = "#f0f0f0",
+    placeholder_color: str = "#888888",
+) -> None:
+    """Apply plain-text state and keep placeholder visible under themed QSS."""
+
+    set_placeholder = getattr(widget, "setPlaceholderText", None)
+    if set_placeholder is not None:
+        set_placeholder(placeholder)
+
+    if value:
+        set_plain = getattr(widget, "setPlainText", None)
+        if set_plain is not None:
+            set_plain(value)
+        else:
+            set_text = getattr(widget, "setText", None)
+            if set_text is not None:
+                set_text(value)
+    else:
+        clear = getattr(widget, "clear", None)
+        if clear is not None:
+            clear()
+
+    _apply_plain_text_palette(
+        widget,
+        text_color=text_color,
+        placeholder_color=placeholder_color,
+    )
+    set_style = getattr(widget, "setStyleSheet", None)
+    if set_style is not None:
+        set_style(_PLAIN_TEXT_FIELD_STYLE)
+
+    document_fn = getattr(widget, "document", None)
+    if document_fn is not None:
+        with contextlib.suppress(TypeError):
+            document = document_fn()
+            set_modified = getattr(document, "setModified", None)
+            if set_modified is not None:
+                set_modified(False)
+
+    _refresh_plain_text_viewport(widget)
+    _schedule_plain_text_placeholder_refresh(qt_widgets, widget, placeholder)
+
+
+def refresh_plain_text_placeholder(qt_widgets: Any, widget: Any | None) -> None:
+    """Re-apply placeholder styling after the document becomes empty."""
+
+    if widget is None:
+        return
+    placeholder_fn = getattr(widget, "placeholderText", None)
+    if placeholder_fn is None:
+        return
+    placeholder = str(placeholder_fn() or "")
+    if not placeholder:
+        return
+    plain_text_fn = getattr(widget, "toPlainText", None)
+    value = str(plain_text_fn() or "") if plain_text_fn is not None else ""
+    configure_plain_text_placeholder_field(
+        qt_widgets,
+        widget,
+        value=value,
+        placeholder=placeholder,
+    )
+
+
+def _apply_plain_text_palette(
+    widget: Any,
+    *,
+    text_color: str,
+    placeholder_color: str,
+) -> None:
+    try:
+        from pipeline_inspector.ui.qt import load_qt_gui
+
+        qt_gui = load_qt_gui()
+    except RuntimeError:
+        return
+
+    QColor = getattr(qt_gui, "QColor", None)
+    QPalette = getattr(qt_gui, "QPalette", None)
+    palette_fn = getattr(widget, "palette", None)
+    set_palette = getattr(widget, "setPalette", None)
+    if QColor is None or QPalette is None or palette_fn is None or set_palette is None:
+        return
+
+    palette = palette_fn()
+    palette.setColor(QPalette.Text, QColor(text_color))
+    placeholder_role = getattr(QPalette, "PlaceholderText", None)
+    if placeholder_role is not None:
+        palette.setColor(placeholder_role, QColor(placeholder_color))
+    set_palette(palette)
+
+
+def _refresh_plain_text_viewport(widget: Any) -> None:
+    update = getattr(widget, "update", None)
+    if update is not None:
+        update()
+    viewport_fn = getattr(widget, "viewport", None)
+    if viewport_fn is None:
+        return
+    with contextlib.suppress(TypeError):
+        viewport = viewport_fn()
+        viewport_update = getattr(viewport, "update", None)
+        if viewport_update is not None:
+            viewport_update()
+
+
+def _schedule_plain_text_placeholder_refresh(
+    qt_widgets: Any,
+    widget: Any,
+    placeholder: str,
+) -> None:
+    timer_class = getattr(qt_widgets, "QTimer", None)
+    if timer_class is None:
+        with contextlib.suppress(RuntimeError):
+            from pipeline_inspector.ui.qt import load_qt_core
+
+            timer_class = getattr(load_qt_core(), "QTimer", None)
+    if timer_class is None:
+        return
+    single_shot = getattr(timer_class, "singleShot", None)
+    if single_shot is None:
+        return
+
+    def _refresh() -> None:
+        set_placeholder = getattr(widget, "setPlaceholderText", None)
+        if set_placeholder is not None:
+            set_placeholder(placeholder)
+        _refresh_plain_text_viewport(widget)
+
+    single_shot(0, _refresh)
+
+
 def _widget_object_name(widget: Any) -> str:
     object_name_fn = getattr(widget, "objectName", None)
     if callable(object_name_fn):
@@ -431,7 +576,7 @@ def build_labeled_toggle_row(
         set_horizontal_spacing(gap)
     set_vertical_spacing = getattr(grid, "setVerticalSpacing", None)
     if set_vertical_spacing is not None:
-        set_vertical_spacing(0)
+        set_vertical_spacing(6)
 
     caption = qt_widgets.QLabel(label_text)
     set_word_wrap = getattr(caption, "setWordWrap", None)
@@ -456,7 +601,74 @@ def build_labeled_toggle_row(
         set_column_stretch(0, 0)
         set_column_stretch(1, 0)
         set_column_stretch(2, 1)
+    set_min_height = getattr(host, "setMinimumHeight", None)
+    if set_min_height is not None:
+        set_min_height(36)
     return host
+
+
+def build_borderless_scroll_area(
+    qt_widgets: Any,
+    *,
+    object_name: str,
+    content_widget: Any,
+    allow_horizontal_scroll: bool = False,
+) -> Any:
+    """Wrap settings content in a borderless vertical scroll area when supported."""
+
+    scroll_area_class = getattr(qt_widgets, "QScrollArea", None)
+    if scroll_area_class is None:
+        return content_widget
+
+    scroll_area = scroll_area_class()
+    scroll_area.setObjectName(object_name)
+    frame_class = getattr(qt_widgets, "QFrame", None)
+    set_shape = getattr(scroll_area, "setFrameShape", None)
+    set_shadow = getattr(scroll_area, "setFrameShadow", None)
+    set_line_width = getattr(scroll_area, "setLineWidth", None)
+    set_style = getattr(scroll_area, "setStyleSheet", None)
+    if frame_class is not None and set_shape is not None:
+        no_frame = getattr(frame_class, "NoFrame", None)
+        plain = getattr(frame_class, "Plain", None)
+        if no_frame is not None:
+            set_shape(no_frame)
+        if set_shadow is not None and plain is not None:
+            set_shadow(plain)
+    if set_line_width is not None:
+        set_line_width(0)
+    if set_style is not None:
+        set_style("QScrollArea { border: none; background: transparent; }")
+
+    set_widget_resizable = getattr(scroll_area, "setWidgetResizable", None)
+    if set_widget_resizable is not None:
+        set_widget_resizable(True)
+    set_horizontal_scroll = getattr(scroll_area, "setHorizontalScrollBarPolicy", None)
+    scroll_bar_policy = getattr(qt_widgets, "Qt", None)
+    if set_horizontal_scroll is not None and scroll_bar_policy is not None:
+        if allow_horizontal_scroll:
+            scroll_as_needed = getattr(scroll_bar_policy, "ScrollBarAsNeeded", None)
+            if scroll_as_needed is not None:
+                set_horizontal_scroll(scroll_as_needed)
+        else:
+            scroll_always_off = getattr(scroll_bar_policy, "ScrollBarAlwaysOff", None)
+            if scroll_always_off is not None:
+                set_horizontal_scroll(scroll_always_off)
+
+    set_expanding_size_policy(qt_widgets, scroll_area)
+    set_widget = getattr(scroll_area, "setWidget", None)
+    if set_widget is not None:
+        set_widget(content_widget)
+    return scroll_area
+
+
+def set_expanding_size_policy(qt_widgets: Any, widget: Any) -> None:
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    set_policy = getattr(widget, "setSizePolicy", None)
+    if size_policy is None or set_policy is None:
+        return
+    expanding = getattr(size_policy, "Expanding", None)
+    if expanding is not None:
+        set_policy(expanding, expanding)
 
 
 def set_fixed_horizontal_size_policy(qt_widgets: Any, widget: Any) -> None:

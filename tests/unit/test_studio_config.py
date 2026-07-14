@@ -16,7 +16,11 @@ from pipeline_inspector.studio_config import (
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
     PipelineSettings,
+    ReadinessCheckRequirements,
+    ReadinessSettings,
+    ReadinessSupportContacts,
     SlackConnectorSettings,
+    SoftwareVersionRequirement,
     StudioConfig,
     StudioEnvironmentSettings,
     StudioUiSettings,
@@ -25,6 +29,7 @@ from pipeline_inspector.studio_config import (
     WaiverDefaultsSettings,
     load_studio_config,
     merge_studio_rule_overrides,
+    parse_software_version_requirements,
     resolve_bug_report_config,
     resolve_deadline_config,
     resolve_discord_config,
@@ -239,6 +244,63 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.connectors.slack.deadline_webhook_url == "https://hooks.slack.com/deadline"
     assert loaded.connectors.slack.notify_on == ("block_publish",)
     assert loaded.connectors.slack.include_report_link is False
+
+
+def test_studio_config_round_trips_readiness_block(tmp_path: Path):
+    path = tmp_path / STUDIO_CONFIG_FILENAME
+    original = StudioConfig(
+        readiness=ReadinessSettings(
+            checks=ReadinessCheckRequirements(
+                maya_plugins=("mtoa",),
+                mapped_drives=("Z",),
+                env_vars=("PIPELINE_ROOT",),
+                network_paths=("\\\\farm\\textures",),
+                software_version_requirements=(
+                    SoftwareVersionRequirement("maya", "2025"),
+                ),
+            ),
+            support=ReadinessSupportContacts(
+                sysadmin_telegram_chat_id="-10011",
+                support_telegram_chat_id="-10022",
+            ),
+        )
+    )
+
+    save_studio_config(path, original)
+    loaded = load_studio_config(path)
+
+    assert loaded.readiness.checks.maya_plugins == ("mtoa",)
+    assert loaded.readiness.checks.mapped_drives == ("Z",)
+    assert loaded.readiness.checks.env_vars == ("PIPELINE_ROOT",)
+    assert loaded.readiness.checks.network_paths == ("\\\\farm\\textures",)
+    assert loaded.readiness.checks.software_version_requirements == (
+        SoftwareVersionRequirement("maya", "2025"),
+    )
+    assert loaded.readiness.support.sysadmin_telegram_chat_id == "-10011"
+    assert loaded.readiness.support.support_telegram_chat_id == "-10022"
+
+
+def test_parse_software_version_requirements_preserves_duplicate_products():
+    requirements = parse_software_version_requirements(
+        "maya=2024\nmaya=2025\nmtoa=5.4.0"
+    )
+
+    assert requirements == (
+        SoftwareVersionRequirement("maya", "2024"),
+        SoftwareVersionRequirement("maya", "2025"),
+        SoftwareVersionRequirement("mtoa", "5.4.0"),
+    )
+
+
+def test_parse_software_version_requirements_reads_legacy_dict_and_list_values():
+    from_mapping = parse_software_version_requirements({"maya": ["2024", "2025"]})
+    legacy = parse_software_version_requirements({"maya": "2025"})
+
+    assert from_mapping == (
+        SoftwareVersionRequirement("maya", "2024"),
+        SoftwareVersionRequirement("maya", "2025"),
+    )
+    assert legacy == (SoftwareVersionRequirement("maya", "2025"),)
 
 
 def test_connector_settings_preserves_extensible_connectors():

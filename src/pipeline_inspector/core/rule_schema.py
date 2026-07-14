@@ -22,11 +22,18 @@ from pipeline_inspector.core.models import (
     ShapeSnapshot,
 )
 from pipeline_inspector.core.naming_conventions import resolve_object_type
+from pipeline_inspector.core.naming_fix import texture_filename_stem
 
 JsonDict = dict[str, Any]
 JsonValue = Any
 
 RULE_SCHEMA_VERSION = "1.0"
+
+_TEXTURE_PATH_ATTRS = {
+    "file": "fileTextureName",
+    "VRayBitmap": "file",
+    "aiImage": "filename",
+}
 
 SEVERITIES = frozenset({"info", "warning", "error", "critical"})
 SCOPES = frozenset(
@@ -788,7 +795,19 @@ class ValidationEngine:
             )
 
         name_field = str(rule.check.params.get("name_field", "name"))
-        current = self._read_value(target, name_field)
+        object_type = rule.check.params.get("object_type") or rule.match.criteria.get(
+            "object_type"
+        )
+        plug = name_field
+        if object_type == "texture":
+            texture_path = self._texture_file_path(target)
+            if texture_path:
+                current = texture_filename_stem(texture_path)
+                plug = self._texture_path_attr(target) or "fileTextureName"
+            else:
+                current = self._read_value(target, name_field)
+        else:
+            current = self._read_value(target, name_field)
         if not isinstance(current, str) or not current.strip():
             return self._skipped(
                 rule,
@@ -803,7 +822,7 @@ class ValidationEngine:
             target=target,
             current_value=current,
             expected_value=pattern,
-            plug=name_field,
+            plug=plug,
         )
 
     def _resolve_naming_pattern(self, rule: RuleDefinition) -> Optional[str]:
@@ -817,6 +836,23 @@ class ValidationEngine:
         if object_type is None:
             return None
         return self._naming_templates.get(str(object_type))
+
+    def _texture_file_path(self, target: _TargetContext) -> Optional[str]:
+        if not isinstance(target.obj, NodeSnapshot):
+            return None
+        attr = self._texture_path_attr(target)
+        if not attr:
+            return None
+        value = target.obj.attrs.get(attr)
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
+
+    def _texture_path_attr(self, target: _TargetContext) -> Optional[str]:
+        if not isinstance(target.obj, NodeSnapshot):
+            return None
+        return _TEXTURE_PATH_ATTRS.get(target.obj.type_name, "fileTextureName")
 
     def _evaluate_numeric_max(
         self,

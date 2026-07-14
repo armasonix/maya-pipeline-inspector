@@ -82,9 +82,9 @@ def test_shader_complexity_rule_pack_has_production_defaults():
     assert depth.check.params["max"] == 10
 
     assert expensive.check.params["attribute"] == "complexity_metadata.expensive_node_count"
-    assert expensive.check.params["max"] == 4
+    assert expensive.check.params["max"] == 3
     assert farm_cost.check.params["attribute"] == "complexity_metadata.farm_cost_score"
-    assert farm_cost.check.params["max"] == 18
+    assert farm_cost.check.params["max"] == 16
 
     for rule in (graph_nodes, textures, depth, expensive, farm_cost):
         assert rule.severity == "warning"
@@ -176,26 +176,26 @@ def test_graph_depth_budget_rule_passes_at_threshold():
 
 def test_expensive_node_budget_rule_fails_above_threshold():
     rule = load_complexity_rule("common.shader_complexity.expensive_nodes.max")
-    snapshot = snapshot_for_material_complexity(expensive_node_count=5)
+    snapshot = snapshot_for_material_complexity(expensive_node_count=4)
 
     result = ValidationEngine().validate(snapshot, [rule])[0]
 
     assert result.status == "failed"
     assert result.plug == "complexity_metadata.expensive_node_count"
-    assert result.current_value == 5
-    assert result.expected_value == 4
+    assert result.current_value == 4
+    assert result.expected_value == 3
 
 
 def test_farm_cost_score_budget_rule_fails_above_threshold():
     rule = load_complexity_rule("common.shader_complexity.farm_cost_score.max")
-    snapshot = snapshot_for_material_complexity(farm_cost_score=18.5)
+    snapshot = snapshot_for_material_complexity(farm_cost_score=16.5)
 
     result = ValidationEngine().validate(snapshot, [rule])[0]
 
     assert result.status == "failed"
     assert result.plug == "complexity_metadata.farm_cost_score"
-    assert result.current_value == 18.5
-    assert result.expected_value == 18
+    assert result.current_value == 16.5
+    assert result.expected_value == 16
 
 
 def test_graph_node_budget_rule_skips_missing_numeric_metadata():

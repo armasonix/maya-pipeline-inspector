@@ -26,6 +26,7 @@ from pipeline_inspector.core import (
     ShadingEngineSnapshot,
     ShapeSnapshot,
 )
+from pipeline_inspector.core.naming_conventions import is_light_type
 
 log = logging.getLogger(__name__)
 
@@ -710,6 +711,8 @@ def _classify_node(type_name: str) -> list[str]:
         return ["shading_engine"]
     if type_name in {"file", "VRayBitmap", "aiImage"}:
         return ["texture", "file"]
+    if is_light_type(type_name):
+        return ["light"]
     if "displacement" in lowered:
         return ["displacement"]
     if type_name.startswith("VRay") or type_name in {"aiStandardSurface", "lambert"}:
