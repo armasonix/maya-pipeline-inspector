@@ -151,6 +151,7 @@ def test_show_farm_check_panel_selects_farm_tab_and_runs_preflight(monkeypatch: 
     calls: list[str] = []
     monkeypatch.setattr(ui_launcher, "show_panel", lambda: panel)
     monkeypatch.setattr(ui_launcher, "load_qt_widgets", lambda: object())
+    monkeypatch.setattr(ui_launcher, "_set_panel_view", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         ui_launcher,
         "_select_farm_tab",

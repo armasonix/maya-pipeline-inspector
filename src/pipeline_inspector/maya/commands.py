@@ -23,7 +23,30 @@ from pipeline_inspector.maya.navigation import (
     reveal_file,
     select_node,
 )
-from pipeline_inspector.maya.ui_launcher import close_panel, show_farm_check_panel, show_panel
+from pipeline_inspector.maya.ui_icons import (
+    ICON_CHECK_FOR_UPDATES,
+    ICON_CLOSE,
+    ICON_DOCUMENTATION,
+    ICON_FARM_CHECK,
+    ICON_MAIN,
+    ICON_READINESS_CHECK,
+    ICON_REPORTS,
+    ICON_SETTINGS,
+    ICON_VALIDATE_SCENE,
+    menu_item_image_kwargs,
+    shelf_button_image_kwargs,
+)
+from pipeline_inspector.maya.ui_launcher import (
+    close_panel,
+    open_documentation_action,
+    show_check_for_updates_panel,
+    show_farm_check_panel,
+    show_panel,
+    show_readiness_check_panel,
+    show_reports_panel,
+    show_settings_panel,
+    show_validate_scene_panel,
+)
 from pipeline_inspector.maya.validation_pipeline import (
     DEFAULT_PROFILE_ID,
     ValidationRunResult,
@@ -36,21 +59,67 @@ from pipeline_inspector.user_config import UserPreferences
 MENU_NAME = "pipelineInspectorMenu"
 MENU_LABEL = "Pipeline Inspector"
 OPEN_MENU_ITEM_LABEL = "Open Pipeline Inspector"
-FARM_CHECK_MENU_ITEM_LABEL = "Pipeline Inspector Farm Check"
+SETTINGS_MENU_ITEM_LABEL = "Settings"
+VALIDATE_SCENE_MENU_ITEM_LABEL = "Validate Scene"
+REPORTS_MENU_ITEM_LABEL = "Reports"
+READINESS_CHECK_MENU_ITEM_LABEL = "Readiness Check"
+FARM_CHECK_MENU_ITEM_LABEL = "Farm Check"
+DOCUMENTATION_MENU_ITEM_LABEL = "Documentation"
+CHECK_FOR_UPDATES_MENU_ITEM_LABEL = "Check for Updates"
 CLOSE_MENU_ITEM_LABEL = "Close Pipeline Inspector"
 SHELF_NAME = "PipelineInspector"
-SHELF_BUTTON_NAME = "pipelineInspectorShelfButton"
+OPEN_SHELF_BUTTON_NAME = "pipelineInspectorShelfButton"
+SETTINGS_SHELF_BUTTON_NAME = "pipelineInspectorSettingsShelfButton"
+VALIDATE_SCENE_SHELF_BUTTON_NAME = "pipelineInspectorValidateSceneShelfButton"
+REPORTS_SHELF_BUTTON_NAME = "pipelineInspectorReportsShelfButton"
+READINESS_CHECK_SHELF_BUTTON_NAME = "pipelineInspectorReadinessCheckShelfButton"
 FARM_CHECK_SHELF_BUTTON_NAME = "pipelineInspectorFarmCheckShelfButton"
-SHELF_BUTTON_LABEL = "Pipeline Inspector"
-FARM_CHECK_SHELF_BUTTON_LABEL = "Pipeline Inspector Farm Check"
-SHELF_BUTTON_ANNOTATION = "Open Maya Pipeline Inspector"
-FARM_CHECK_SHELF_BUTTON_ANNOTATION = (
-    "Open the Farm tab and run deadline_critical preflight."
-)
+DOCUMENTATION_SHELF_BUTTON_NAME = "pipelineInspectorDocumentationShelfButton"
+CHECK_FOR_UPDATES_SHELF_BUTTON_NAME = "pipelineInspectorCheckForUpdatesShelfButton"
+OPEN_SHELF_BUTTON_LABEL = OPEN_MENU_ITEM_LABEL
+SETTINGS_SHELF_BUTTON_LABEL = SETTINGS_MENU_ITEM_LABEL
+VALIDATE_SCENE_SHELF_BUTTON_LABEL = VALIDATE_SCENE_MENU_ITEM_LABEL
+REPORTS_SHELF_BUTTON_LABEL = REPORTS_MENU_ITEM_LABEL
+READINESS_CHECK_SHELF_BUTTON_LABEL = READINESS_CHECK_MENU_ITEM_LABEL
+FARM_CHECK_SHELF_BUTTON_LABEL = FARM_CHECK_MENU_ITEM_LABEL
+DOCUMENTATION_SHELF_BUTTON_LABEL = DOCUMENTATION_MENU_ITEM_LABEL
+CHECK_FOR_UPDATES_SHELF_BUTTON_LABEL = CHECK_FOR_UPDATES_MENU_ITEM_LABEL
+LEGACY_SHELF_BUTTON_LABEL = "Pipeline Inspector"
+LEGACY_FARM_CHECK_SHELF_BUTTON_LABEL = "Pipeline Inspector Farm Check"
+OPEN_SHELF_BUTTON_ANNOTATION = "Open Maya Pipeline Inspector"
+SETTINGS_SHELF_BUTTON_ANNOTATION = "Open Pipeline Inspector settings."
+VALIDATE_SCENE_SHELF_BUTTON_ANNOTATION = "Run Validate Scene."
+REPORTS_SHELF_BUTTON_ANNOTATION = "Open the Reports tab."
+READINESS_CHECK_SHELF_BUTTON_ANNOTATION = "Open the Readiness tab."
+FARM_CHECK_SHELF_BUTTON_ANNOTATION = "Open the Farm tab."
+DOCUMENTATION_SHELF_BUTTON_ANNOTATION = "Open Pipeline Inspector documentation in your browser."
+CHECK_FOR_UPDATES_SHELF_BUTTON_ANNOTATION = "Check for Pipeline Inspector updates."
 MAYA_MAIN_WINDOW = "MayaWindow"
 OPEN_UI_PYTHON_COMMAND = "from pipeline_inspector.maya.commands import show_ui\nshow_ui()"
+SETTINGS_UI_PYTHON_COMMAND = (
+    "from pipeline_inspector.maya.commands import show_settings_ui\nshow_settings_ui()"
+)
+VALIDATE_SCENE_UI_PYTHON_COMMAND = (
+    "from pipeline_inspector.maya.commands import show_validate_scene_ui\n"
+    "show_validate_scene_ui()"
+)
+REPORTS_UI_PYTHON_COMMAND = (
+    "from pipeline_inspector.maya.commands import show_reports_ui\nshow_reports_ui()"
+)
+READINESS_CHECK_UI_PYTHON_COMMAND = (
+    "from pipeline_inspector.maya.commands import show_readiness_check_ui\n"
+    "show_readiness_check_ui()"
+)
 FARM_CHECK_UI_PYTHON_COMMAND = (
     "from pipeline_inspector.maya.commands import show_farm_check_ui\nshow_farm_check_ui()"
+)
+DOCUMENTATION_UI_PYTHON_COMMAND = (
+    "from pipeline_inspector.maya.commands import show_documentation_ui\n"
+    "show_documentation_ui()"
+)
+CHECK_FOR_UPDATES_UI_PYTHON_COMMAND = (
+    "from pipeline_inspector.maya.commands import show_check_for_updates_ui\n"
+    "show_check_for_updates_ui()"
 )
 
 
@@ -64,6 +133,42 @@ def show_farm_check_ui() -> Any:
     """Open the Farm tab and run deadline_critical preflight from menu/shelf."""
 
     return show_farm_check_panel()
+
+
+def show_settings_ui() -> Any:
+    """Open Pipeline Inspector settings from menu/shelf."""
+
+    return show_settings_panel()
+
+
+def show_validate_scene_ui() -> Any:
+    """Open Validate and run Validate Scene from menu/shelf."""
+
+    return show_validate_scene_panel()
+
+
+def show_reports_ui() -> Any:
+    """Open the Reports tab from menu/shelf."""
+
+    return show_reports_panel()
+
+
+def show_readiness_check_ui() -> Any:
+    """Open the Readiness tab from menu/shelf."""
+
+    return show_readiness_check_panel()
+
+
+def show_check_for_updates_ui() -> Any:
+    """Open Check for Updates from menu/shelf."""
+
+    return show_check_for_updates_panel()
+
+
+def show_documentation_ui() -> bool:
+    """Open documentation from menu/shelf."""
+
+    return open_documentation_action()
 
 
 def close_ui(*, delete: bool = True) -> None:
@@ -286,21 +391,109 @@ def export_manifest_diff_action(
 
 
 def install_menu(parent: Optional[str] = None) -> str:
-    """Install Maya menu entries that open and close the dockable panel."""
+    """Install standalone Maya menu entries for Pipeline Inspector actions."""
 
     cmds = _maya_cmds()
     menu_parent = parent or MAYA_MAIN_WINDOW
     if cmds.menu(MENU_NAME, query=True, exists=True):
         cmds.deleteUI(MENU_NAME, menu=True)
     menu_name = cmds.menu(MENU_NAME, label=MENU_LABEL, parent=menu_parent, tearOff=True)
-    cmds.menuItem(label=OPEN_MENU_ITEM_LABEL, parent=menu_name, command=lambda *_: show_ui())
-    cmds.menuItem(
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=OPEN_MENU_ITEM_LABEL,
+        command=lambda *_: show_ui(),
+        icon_id=ICON_MAIN,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=SETTINGS_MENU_ITEM_LABEL,
+        command=lambda *_: show_settings_ui(),
+        icon_id=ICON_SETTINGS,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=VALIDATE_SCENE_MENU_ITEM_LABEL,
+        command=lambda *_: show_validate_scene_ui(),
+        icon_id=ICON_VALIDATE_SCENE,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=REPORTS_MENU_ITEM_LABEL,
+        command=lambda *_: show_reports_ui(),
+        icon_id=ICON_REPORTS,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=READINESS_CHECK_MENU_ITEM_LABEL,
+        command=lambda *_: show_readiness_check_ui(),
+        icon_id=ICON_READINESS_CHECK,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
         label=FARM_CHECK_MENU_ITEM_LABEL,
-        parent=menu_name,
         command=lambda *_: show_farm_check_ui(),
+        icon_id=ICON_FARM_CHECK,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=DOCUMENTATION_MENU_ITEM_LABEL,
+        command=lambda *_: show_documentation_ui(),
+        icon_id=ICON_DOCUMENTATION,
+    )
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=CHECK_FOR_UPDATES_MENU_ITEM_LABEL,
+        command=lambda *_: show_check_for_updates_ui(),
+        icon_id=ICON_CHECK_FOR_UPDATES,
     )
     cmds.menuItem(divider=True, parent=menu_name)
-    cmds.menuItem(label=CLOSE_MENU_ITEM_LABEL, parent=menu_name, command=lambda *_: close_ui())
+    _install_standalone_menu_item(
+        cmds,
+        menu_name,
+        label=CLOSE_MENU_ITEM_LABEL,
+        command=lambda *_: close_ui(),
+        icon_id=ICON_CLOSE,
+    )
+    # region agent log
+    try:
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a",
+            encoding="utf-8",
+        ) as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "runId": "pre-fix",
+                        "hypothesisId": "F",
+                        "location": "commands.install_menu",
+                        "message": "menu installed",
+                        "data": {
+                            "first_item": OPEN_MENU_ITEM_LABEL,
+                            "last_item": CLOSE_MENU_ITEM_LABEL,
+                            "close_icon_exists": (
+                                Path(__file__).resolve().parents[3]
+                                / "maya_module"
+                                / "icons"
+                                / "pipeline_inspector_close.png"
+                            ).is_file(),
+                        },
+                        "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # endregion
     return str(menu_name)
 
 
@@ -321,22 +514,9 @@ def install_shelf(parent: Optional[str] = None) -> str:
     if not cmds.shelfLayout(SHELF_NAME, query=True, exists=True):
         cmds.shelfLayout(SHELF_NAME, parent=shelf_parent)
 
-    _ensure_shelf_button(
-        cmds,
-        name=SHELF_BUTTON_NAME,
-        parent=SHELF_NAME,
-        label=SHELF_BUTTON_LABEL,
-        annotation=SHELF_BUTTON_ANNOTATION,
-        command=OPEN_UI_PYTHON_COMMAND,
-    )
-    _ensure_shelf_button(
-        cmds,
-        name=FARM_CHECK_SHELF_BUTTON_NAME,
-        parent=SHELF_NAME,
-        label=FARM_CHECK_SHELF_BUTTON_LABEL,
-        annotation=FARM_CHECK_SHELF_BUTTON_ANNOTATION,
-        command=FARM_CHECK_UI_PYTHON_COMMAND,
-    )
+    _remove_legacy_shelf_buttons(cmds)
+    for entry in _standalone_shelf_entries():
+        _ensure_shelf_button(cmds, **entry)
     return SHELF_NAME
 
 
@@ -346,7 +526,9 @@ def uninstall_shelf() -> None:
     cmds = _maya_cmds()
     if not cmds.shelfLayout(SHELF_NAME, query=True, exists=True):
         return
-    for label in (SHELF_BUTTON_LABEL, FARM_CHECK_SHELF_BUTTON_LABEL):
+    labels = tuple(entry["label"] for entry in _standalone_shelf_entries())
+    labels += (LEGACY_SHELF_BUTTON_LABEL, LEGACY_FARM_CHECK_SHELF_BUTTON_LABEL)
+    for label in labels:
         for child in _shelf_layout_children(cmds, SHELF_NAME):
             if not cmds.shelfButton(child, query=True, exists=True):
                 continue
@@ -695,6 +877,104 @@ def _remove_extra_shelf_buttons(
         cmds.deleteUI(child, control=True)
 
 
+def _install_standalone_menu_item(
+    cmds: Any,
+    menu_name: str,
+    *,
+    label: str,
+    command: Any,
+    icon_id: str,
+) -> None:
+    fields = {
+        "label": label,
+        "parent": menu_name,
+        "command": command,
+        **menu_item_image_kwargs(icon_id),
+    }
+    cmds.menuItem(**fields)
+
+
+def _standalone_shelf_entries() -> tuple[dict[str, Any], ...]:
+    return (
+        {
+            "name": OPEN_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": OPEN_SHELF_BUTTON_LABEL,
+            "annotation": OPEN_SHELF_BUTTON_ANNOTATION,
+            "command": OPEN_UI_PYTHON_COMMAND,
+            "icon_id": ICON_MAIN,
+        },
+        {
+            "name": SETTINGS_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": SETTINGS_SHELF_BUTTON_LABEL,
+            "annotation": SETTINGS_SHELF_BUTTON_ANNOTATION,
+            "command": SETTINGS_UI_PYTHON_COMMAND,
+            "icon_id": ICON_SETTINGS,
+        },
+        {
+            "name": VALIDATE_SCENE_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": VALIDATE_SCENE_SHELF_BUTTON_LABEL,
+            "annotation": VALIDATE_SCENE_SHELF_BUTTON_ANNOTATION,
+            "command": VALIDATE_SCENE_UI_PYTHON_COMMAND,
+            "icon_id": ICON_VALIDATE_SCENE,
+        },
+        {
+            "name": REPORTS_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": REPORTS_SHELF_BUTTON_LABEL,
+            "annotation": REPORTS_SHELF_BUTTON_ANNOTATION,
+            "command": REPORTS_UI_PYTHON_COMMAND,
+            "icon_id": ICON_REPORTS,
+        },
+        {
+            "name": READINESS_CHECK_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": READINESS_CHECK_SHELF_BUTTON_LABEL,
+            "annotation": READINESS_CHECK_SHELF_BUTTON_ANNOTATION,
+            "command": READINESS_CHECK_UI_PYTHON_COMMAND,
+            "icon_id": ICON_READINESS_CHECK,
+        },
+        {
+            "name": FARM_CHECK_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": FARM_CHECK_SHELF_BUTTON_LABEL,
+            "annotation": FARM_CHECK_SHELF_BUTTON_ANNOTATION,
+            "command": FARM_CHECK_UI_PYTHON_COMMAND,
+            "icon_id": ICON_FARM_CHECK,
+        },
+        {
+            "name": DOCUMENTATION_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": DOCUMENTATION_SHELF_BUTTON_LABEL,
+            "annotation": DOCUMENTATION_SHELF_BUTTON_ANNOTATION,
+            "command": DOCUMENTATION_UI_PYTHON_COMMAND,
+            "icon_id": ICON_DOCUMENTATION,
+        },
+        {
+            "name": CHECK_FOR_UPDATES_SHELF_BUTTON_NAME,
+            "parent": SHELF_NAME,
+            "label": CHECK_FOR_UPDATES_SHELF_BUTTON_LABEL,
+            "annotation": CHECK_FOR_UPDATES_SHELF_BUTTON_ANNOTATION,
+            "command": CHECK_FOR_UPDATES_UI_PYTHON_COMMAND,
+            "icon_id": ICON_CHECK_FOR_UPDATES,
+        },
+    )
+
+
+def _remove_legacy_shelf_buttons(cmds: Any) -> None:
+    for child in _shelf_layout_children(cmds, SHELF_NAME):
+        if not cmds.shelfButton(child, query=True, exists=True):
+            continue
+        label = _shelf_button_label(cmds, child)
+        if label == LEGACY_FARM_CHECK_SHELF_BUTTON_LABEL:
+            cmds.deleteUI(child, control=True)
+            continue
+        if label == LEGACY_SHELF_BUTTON_LABEL and child != OPEN_SHELF_BUTTON_NAME:
+            cmds.deleteUI(child, control=True)
+
+
 def _ensure_shelf_button(
     cmds: Any,
     *,
@@ -703,14 +983,15 @@ def _ensure_shelf_button(
     label: str,
     annotation: str,
     command: str,
+    icon_id: str,
 ) -> None:
     _remove_extra_shelf_buttons(cmds, shelf_name=parent, label=label, keep_name=name)
     button_fields = {
         "label": label,
         "annotation": annotation,
-        "image1": "commandButton.png",
         "sourceType": "python",
         "command": command,
+        **shelf_button_image_kwargs(icon_id),
     }
     if cmds.shelfButton(name, query=True, exists=True):
         cmds.shelfButton(name, edit=True, **button_fields)

@@ -2,7 +2,13 @@ global proc shelf_PipelineInspector()
 {
     string $shelfName = "PipelineInspector";
     string $openButton = "pipelineInspectorShelfButton";
+    string $settingsButton = "pipelineInspectorSettingsShelfButton";
+    string $validateButton = "pipelineInspectorValidateSceneShelfButton";
+    string $reportsButton = "pipelineInspectorReportsShelfButton";
+    string $readinessButton = "pipelineInspectorReadinessCheckShelfButton";
     string $farmButton = "pipelineInspectorFarmCheckShelfButton";
+    string $documentationButton = "pipelineInspectorDocumentationShelfButton";
+    string $updatesButton = "pipelineInspectorCheckForUpdatesShelfButton";
 
     if (!`shelfLayout -q -exists $shelfName`) {
         return;
@@ -12,21 +18,87 @@ global proc shelf_PipelineInspector()
         shelfButton
             -parent $shelfName
             -name $openButton
-            -label "Pipeline Inspector"
+            -label "Open Pipeline Inspector"
             -annotation "Open Maya Pipeline Inspector"
-            -image1 "commandButton.png"
-            -sourceType "mel"
-            -command "python(\"import pipeline_inspector_bootstrap; pipeline_inspector_bootstrap.show()\")";
+            -image1 "pipeline_inspector_main.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_ui; show_ui()\")";
+    }
+
+    if (!`shelfButton -q -exists $settingsButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $settingsButton
+            -label "Settings"
+            -annotation "Open Pipeline Inspector settings."
+            -image1 "pipeline_inspector_settings.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_settings_ui; show_settings_ui()\")";
+    }
+
+    if (!`shelfButton -q -exists $validateButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $validateButton
+            -label "Validate Scene"
+            -annotation "Open Validate and run Validate Scene."
+            -image1 "pipeline_inspector_validate_scene.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_validate_scene_ui; show_validate_scene_ui()\")";
+    }
+
+    if (!`shelfButton -q -exists $reportsButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $reportsButton
+            -label "Reports"
+            -annotation "Open the Reports tab."
+            -image1 "pipeline_inspector_reports.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_reports_ui; show_reports_ui()\")";
+    }
+
+    if (!`shelfButton -q -exists $readinessButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $readinessButton
+            -label "Readiness Check"
+            -annotation "Open the Readiness tab."
+            -image1 "pipeline_inspector_readiness_check.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_readiness_check_ui; show_readiness_check_ui()\")";
     }
 
     if (!`shelfButton -q -exists $farmButton`) {
         shelfButton
             -parent $shelfName
             -name $farmButton
-            -label "Pipeline Inspector Farm Check"
+            -label "Farm Check"
             -annotation "Open the Farm tab and run deadline_critical preflight"
-            -image1 "commandButton.png"
-            -sourceType "mel"
+            -image1 "pipeline_inspector_farm_check.png"
+            -sourceType "python"
             -command "python(\"from pipeline_inspector.maya.commands import show_farm_check_ui; show_farm_check_ui()\")";
+    }
+
+    if (!`shelfButton -q -exists $documentationButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $documentationButton
+            -label "Documentation"
+            -annotation "Open shader health documentation in your browser."
+            -image1 "pipeline_inspector_wiki.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_documentation_ui; show_documentation_ui()\")";
+    }
+
+    if (!`shelfButton -q -exists $updatesButton`) {
+        shelfButton
+            -parent $shelfName
+            -name $updatesButton
+            -label "Check for Updates"
+            -annotation "Check for Pipeline Inspector updates."
+            -image1 "pipeline_inspector_check_for_updates.png"
+            -sourceType "python"
+            -command "python(\"from pipeline_inspector.maya.commands import show_check_for_updates_ui; show_check_for_updates_ui()\")";
     }
 }

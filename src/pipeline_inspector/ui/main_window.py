@@ -28,6 +28,9 @@ PANEL_OBJECT_NAME = "pipelineInspectorPanel"
 PANEL_TITLE = "Maya Pipeline Inspector"
 PANEL_CONTENT_OBJECT_NAME = "pipelineInspectorPanelContent"
 TAB_WIDGET_OBJECT_NAME = "pipelineInspectorTabWidget"
+VALIDATE_TAB_OBJECT_NAME = "pipelineInspectorValidateTab"
+REPORTS_TAB_OBJECT_NAME = "pipelineInspectorReportsTab"
+READINESS_TAB_OBJECT_NAME = "pipelineInspectorReadinessTab"
 PANEL_HEADER_OBJECT_NAME = "pipelineInspectorPanelHeader"
 PANEL_HEADER_TITLE_OBJECT_NAME = "pipelineInspectorPanelHeaderTitle"
 PANEL_HEADER_UNSAVED_OBJECT_NAME = "pipelineInspectorPanelHeaderUnsaved"
@@ -41,10 +44,9 @@ SUMMARY_PROFILE_ROW_OBJECT_NAME = "pipelineInspectorSummaryProfileRow"
 VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME = "pipelineInspectorValidateActionOverflowButton"
 VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME = "pipelineInspectorValidateActionBarSeparator"
 SETTINGS_GEAR_TOOLTIP = "Open settings"
-DOCUMENTATION_BUTTON_TOOLTIP = "Open shader health documentation in your browser."
+DOCUMENTATION_BUTTON_TOOLTIP = "Open Pipeline Inspector documentation in your browser."
 REPORT_BUG_BUTTON_TOOLTIP = (
     "Report a bug in Pipeline Inspector to the plugin maintainers. "
-    "Creates a GitHub issue via your studio relay."
 )
 CHECK_FOR_UPDATES_BUTTON_TOOLTIP = (
     "Open the update wizard shell and preview staged progress steps."
@@ -1334,6 +1336,7 @@ def _build_validate_tab(
     user_config: Optional[UserPreferences] = None,
 ) -> Any:
     tab = qt_widgets.QWidget()
+    tab.setObjectName(VALIDATE_TAB_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(6)
@@ -1471,6 +1474,7 @@ def _build_reports_tab(
     export_callbacks: ExportActionCallbacks,
 ) -> Any:
     tab = qt_widgets.QWidget()
+    tab.setObjectName(REPORTS_TAB_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(6)
