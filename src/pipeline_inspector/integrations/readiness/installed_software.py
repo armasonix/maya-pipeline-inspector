@@ -184,10 +184,7 @@ def _filesystem_maya_version_installed(
             candidates.append(root / f"Maya{version_year}")
             candidates.append(root / f"maya{version_year}")
 
-    for candidate in candidates:
-        if _maya_install_root_has_mayapy(candidate):
-            return True
-    return False
+    return any(_maya_install_root_has_mayapy(candidate) for candidate in candidates)
 
 
 def _maya_install_root_has_mayapy(install_root: Path) -> bool:
@@ -200,10 +197,10 @@ def _autodesk_install_roots() -> tuple[Path, ...]:
     system = platform.system().casefold()
     if system == "windows":
         roots = [Path(r"C:\Program Files\Autodesk")]
-        program_files = os.environ.get("ProgramFiles", "").strip()
+        program_files = os.environ.get("PROGRAMFILES", "").strip()
         if program_files:
             roots.append(Path(program_files) / "Autodesk")
-        program_files_x86 = os.environ.get("ProgramFiles(x86)", "").strip()
+        program_files_x86 = os.environ.get("PROGRAMFILES(X86)", "").strip()
         if program_files_x86:
             roots.append(Path(program_files_x86) / "Autodesk")
         return tuple(dict.fromkeys(roots))

@@ -3,6 +3,7 @@
 from pipeline_inspector.core.fix_plan import (
     FixAction,
     FixPlan,
+    apply_fix_availability,
     build_fix_plan,
 )
 from pipeline_inspector.core.models import (
@@ -108,6 +109,7 @@ __all__ = [
     "WaiverSidecar",
     "apply_profile_overrides",
     "apply_waivers",
+    "apply_fix_availability",
     "build_fix_plan",
     "build_rule_search_paths",
     "compute_health_score",

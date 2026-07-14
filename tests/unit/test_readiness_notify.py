@@ -5,7 +5,7 @@ from typing import Any
 
 from pipeline_inspector.integrations.readiness.engine import ReadinessCheckResult, ReadinessReport
 from pipeline_inspector.integrations.readiness.notify import send_readiness_report_to_telegram
-from pipeline_inspector.integrations.telegram.client import HttpRequest, TelegramResponse
+from pipeline_inspector.integrations.telegram.client import TelegramResponse
 from pipeline_inspector.studio_config import (
     ConnectorSettings,
     ReadinessSettings,

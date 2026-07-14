@@ -17,9 +17,9 @@ from pipeline_inspector.maya.validation_pipeline import (
 )
 from pipeline_inspector.studio_config import StudioConfig
 from pipeline_inspector.ui.farm_tab import FarmActionCallbacks, build_farm_tab
-from pipeline_inspector.ui.readiness_tab import ReadinessActionCallbacks, build_readiness_tab
 from pipeline_inspector.ui.fix_queue import FixQueueActionCallbacks, build_fix_queue
 from pipeline_inspector.ui.qt import load_qt_core
+from pipeline_inspector.ui.readiness_tab import ReadinessActionCallbacks, build_readiness_tab
 from pipeline_inspector.ui.settings_panel import SettingsActionCallbacks, build_settings_view
 from pipeline_inspector.ui.table_widgets import configure_read_only_table, make_read_only_item
 from pipeline_inspector.ui.waiver_manager import WaiverManagerCallbacks, build_waiver_manager

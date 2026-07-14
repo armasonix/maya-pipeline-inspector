@@ -13,6 +13,7 @@ from pipeline_inspector.integrations.readiness import (
     run_readiness_checks,
     send_readiness_report_to_telegram,
 )
+from pipeline_inspector.integrations.readiness.notify import ReadinessRecipient
 from pipeline_inspector.integrations.readiness.probes import (
     ReadinessProbes,
     normalize_plugin_name,
@@ -85,7 +86,9 @@ def send_readiness_report_action(
 ) -> ReadinessNotifyActionResult:
     """Send a readiness failure report to sysadmin or support."""
 
-    normalized_recipient = "sysadmin" if recipient == "sysadmin" else "support"
+    normalized_recipient: ReadinessRecipient = (
+        "sysadmin" if recipient == "sysadmin" else "support"
+    )
     notify_result = send_readiness_report_to_telegram(
         studio_config,
         report,

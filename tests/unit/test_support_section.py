@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.unit.test_studio_policy_section import FakeQtWidgets, _find
+
 from pipeline_inspector.studio_config import (
     ReadinessCheckRequirements,
     ReadinessSettings,
@@ -18,7 +20,6 @@ from pipeline_inspector.ui.support_section import (
     read_readiness_from_view,
     update_support_and_roles_view,
 )
-from tests.unit.test_studio_policy_section import FakeQtWidgets, _find
 
 
 def test_build_support_and_roles_section_exposes_contact_and_requirement_fields():
@@ -79,4 +80,5 @@ def test_update_support_and_roles_view_refreshes_fields():
     )
 
     assert _find(section, SETTINGS_SUPPORT_CHAT_ID_INPUT_OBJECT_NAME).value == "-10088"
-    assert "PIPELINE_ROOT" in _find(section, SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME).toPlainText()
+    env_field = _find(section, SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME)
+    assert "PIPELINE_ROOT" in env_field.toPlainText()

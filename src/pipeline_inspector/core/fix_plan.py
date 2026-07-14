@@ -3,11 +3,16 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
+from pipeline_inspector.core.naming_fix import (
+    propose_naming_fix,
+    propose_texture_file_path_fix,
+    texture_filename_stem,
+)
 from pipeline_inspector.core.rule_schema import RuleDefinition, RuleResult
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 from pipeline_inspector.util.paths import (
@@ -25,6 +30,7 @@ _REFERENCE_BLOCK_REASON = "target_referenced"
 _LOCKED_BLOCK_REASON = "target_locked"
 HIGH_RISK_BLOCK_REASON = "high_risk_requires_explicit_confirmation"
 INVALID_NORMALIZE_PATH_REASON = "invalid_normalize_path"
+TEXTURE_FILE_MISSING_BLOCK_REASON = "texture_file_missing"
 UNPLANNABLE_EXPECTED_VALUES = frozenset(
     {
         "path policy compliant",
@@ -38,8 +44,11 @@ UNDO_SUPPORTED_FIX_TYPES = frozenset(
         "relink_path",
         "normalize_path",
         "disable_feature",
+        "rename_node",
     }
 )
+NAMING_FIX_TYPE = "rename_node"
+TEXTURE_FILE_FIX_TYPE = "rename_texture_file"
 
 @dataclass(frozen=True)
 class FixAction:
@@ -178,11 +187,225 @@ def build_fix_plan(
         if result.status != "failed":
             continue
         rule = rules_by_id.get(result.rule_id)
-        if rule is None or rule.fix is None:
+        if rule is None:
             continue
-        actions.append(_build_action(result, rule, node_index))
+        if rule.fix is not None:
+            actions.append(_build_action(result, rule, node_index))
+            continue
+        naming_action = _build_naming_action(result, rule, node_index)
+        if naming_action is not None:
+            actions.append(naming_action)
 
     return FixPlan(actions=tuple(actions))
+
+
+def apply_fix_availability(
+    results: Iterable[RuleResult],
+    fix_plan: FixPlan,
+) -> list[RuleResult]:
+    """Mark validation results auto-fixable when the fix planner produced an action."""
+
+    available_keys = {
+        (action.rule_id, action.target_id)
+        for action in fix_plan.actions
+        if not action.blocked
+    }
+    enriched: list[RuleResult] = []
+    for result in results:
+        key = (result.rule_id, result.target_id)
+        if key not in available_keys:
+            enriched.append(result)
+            continue
+        fix_id = next(
+            (
+                action.fix_id
+                for action in fix_plan.actions
+                if action.rule_id == result.rule_id
+                and action.target_id == result.target_id
+                and not action.blocked
+            ),
+            None,
+        )
+        enriched.append(
+            replace(
+                result,
+                auto_fix_available=True,
+                fix_id=fix_id or result.fix_id,
+            )
+        )
+    return enriched
+
+def _build_naming_action(
+    result: RuleResult,
+    rule: RuleDefinition,
+    node_index: _NodeIndex,
+) -> Optional[FixAction]:
+    if rule.check.type != "name_matches" or not rule.policy.auto_fix_allowed:
+        return None
+    pattern = result.expected_value
+    current_name = result.current_value
+    if not isinstance(pattern, str) or not pattern.strip():
+        return None
+    if not isinstance(current_name, str) or not current_name.strip():
+        return None
+
+    object_type = rule.check.params.get("object_type") or rule.match.criteria.get(
+        "object_type"
+    )
+    if object_type == "texture":
+        return _build_texture_file_naming_action(result, rule, node_index, pattern)
+
+    proposed_name = propose_naming_fix(current_name, pattern)
+    if not proposed_name or proposed_name == current_name:
+        return None
+
+    node = node_index.find(result)
+    target_node = _target_node_name(result, node)
+    block_reasons = _block_reasons(node, "low")
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path as LogPath
+
+        payload = {
+            "sessionId": "618f4f",
+            "runId": "naming-fix-plan",
+            "hypothesisId": "H1",
+            "location": "fix_plan.py:_build_naming_action",
+            "message": "naming fix action planned",
+            "data": {
+                "rule_id": rule.id,
+                "target_id": result.target_id,
+                "before": current_name,
+                "after": proposed_name,
+                "target_node": target_node,
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        log_path = LogPath(__file__).resolve().parents[3] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # endregion
+
+    return FixAction(
+        fix_id=_fix_id(result, NAMING_FIX_TYPE),
+        rule_id=rule.id,
+        title=f"{rule.name}: rename",
+        fix_type=NAMING_FIX_TYPE,
+        risk="low",
+        target_kind=result.target_kind,
+        target_id=result.target_id,
+        target_node=target_node,
+        before_value=current_name,
+        after_value=proposed_name,
+        explanation=result.why or rule.why,
+        referenced=bool(node.referenced) if node else False,
+        locked=bool(node.locked) if node else False,
+        reference_path=node.reference_path if node else None,
+        requires_reference_edit=bool(node.referenced) if node else False,
+        requires_supervisor=False,
+        undo_supported=True,
+        blocked=bool(hard_block_reasons(block_reasons)),
+        block_reasons=block_reasons,
+        params={"pattern": pattern},
+    )
+
+
+def _build_texture_file_naming_action(
+    result: RuleResult,
+    rule: RuleDefinition,
+    node_index: _NodeIndex,
+    pattern: str,
+) -> Optional[FixAction]:
+    dependency = node_index.file_dependency(result.target_id)
+    raw_path = dependency.raw_path if dependency is not None else None
+    if not raw_path:
+        return None
+
+    proposed_path = propose_texture_file_path_fix(raw_path, pattern)
+    if not proposed_path or proposed_path == raw_path:
+        return None
+
+    proposed_node = propose_naming_fix(texture_filename_stem(raw_path), pattern)
+    if not proposed_node:
+        proposed_node = propose_naming_fix(str(result.node or ""), pattern)
+    if not proposed_node:
+        return None
+
+    node = node_index.find(result)
+    target_node = _target_node_name(result, node)
+    block_reasons = _block_reasons(node, "low")
+    if dependency is not None and not dependency.exists:
+        block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+    if dependency is not None and dependency.is_udim and not dependency.exists:
+        block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+
+    # region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path as LogPath
+
+        payload = {
+            "sessionId": "618f4f",
+            "runId": "texture-file-fix-plan",
+            "hypothesisId": "H2",
+            "location": "fix_plan.py:_build_texture_file_naming_action",
+            "message": "texture file naming fix planned",
+            "data": {
+                "rule_id": rule.id,
+                "target_id": result.target_id,
+                "file_before": raw_path,
+                "file_after": proposed_path,
+                "node_after": proposed_node,
+                "exists": dependency.exists if dependency else False,
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        log_path = LogPath(__file__).resolve().parents[3] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # endregion
+
+    return FixAction(
+        fix_id=_fix_id(result, TEXTURE_FILE_FIX_TYPE),
+        rule_id=rule.id,
+        title=f"{rule.name}: rename texture file",
+        fix_type=TEXTURE_FILE_FIX_TYPE,
+        risk="medium",
+        target_kind=result.target_kind,
+        target_id=result.target_id,
+        target_node=target_node,
+        target_attr=dependency.attr if dependency else "fileTextureName",
+        before_value=raw_path,
+        after_value=proposed_path,
+        explanation=(
+            "Renames the texture file on disk, updates the file node path, "
+            "and aligns the Maya file node name with the studio template."
+        ),
+        referenced=bool(node.referenced) if node else False,
+        locked=bool(node.locked) if node else False,
+        reference_path=node.reference_path if node else None,
+        requires_reference_edit=bool(node.referenced) if node else False,
+        requires_supervisor=False,
+        undo_supported=False,
+        blocked=bool(hard_block_reasons(block_reasons)),
+        block_reasons=block_reasons,
+        params={
+            "pattern": pattern,
+            "node_name_before": result.node or texture_filename_stem(raw_path),
+            "node_name_after": proposed_node,
+            "resolved_before": dependency.resolved_path if dependency else raw_path,
+            "is_udim": bool(dependency.is_udim) if dependency else False,
+        },
+    )
+
 
 def _build_action(
     result: RuleResult,
@@ -445,6 +668,16 @@ def _is_plannable_normalize(before_value: JsonValue, after_value: JsonValue) -> 
         return False
     return str(before_value or "").strip() != str(after_value or "").strip()
 
+
+@dataclass(frozen=True)
+class _FileDependencyRef:
+    raw_path: str
+    resolved_path: str
+    attr: str
+    is_udim: bool
+    exists: bool
+
+
 class _NodeIndex:
     def __init__(
         self,
@@ -455,20 +688,62 @@ class _NodeIndex:
         self.scene_path = snapshot.scene_path or ""
         self.studio_environment = studio_environment
         self._by_key: dict[str, NodeSnapshot] = {}
-        self._dependency_paths: dict[str, str] = {}
+        self._file_dependencies: dict[str, _FileDependencyRef] = {}
         for node in snapshot.nodes:
             self._add(node.id, node)
             self._add(node.name, node)
             self._add(node.full_name, node)
         for material in snapshot.materials:
             self._add_material(material)
+            self._add(
+                material.node_id,
+                NodeSnapshot(id=material.node_id, name=material.name, full_name=material.name),
+            )
+            self._add(material.name, NodeSnapshot(id=material.node_id, name=material.name))
+        for shading_engine in snapshot.shading_engines:
+            self._add(
+                shading_engine.node_id,
+                NodeSnapshot(
+                    id=shading_engine.node_id,
+                    name=shading_engine.name,
+                    full_name=shading_engine.name,
+                ),
+            )
+            self._add(
+                shading_engine.name,
+                NodeSnapshot(id=shading_engine.node_id, name=shading_engine.name),
+            )
+        for shape in snapshot.shapes:
+            shape_node = NodeSnapshot(
+                id=shape.node_id,
+                name=shape.name,
+                full_name=shape.full_name or shape.name,
+                referenced=shape.referenced,
+                locked=shape.locked,
+            )
+            self._add(shape.node_id, shape_node)
+            self._add(shape.name, shape_node)
+            if shape.full_name:
+                self._add(shape.full_name, shape_node)
         for dependency in snapshot.file_dependencies:
-            self._dependency_paths[dependency.node_id] = (
-                dependency.raw_path or dependency.resolved_path or ""
+            raw_path = dependency.raw_path or dependency.resolved_path or ""
+            resolved_path = dependency.resolved_path or dependency.raw_path or ""
+            self._file_dependencies[dependency.node_id] = _FileDependencyRef(
+                raw_path=raw_path,
+                resolved_path=resolved_path,
+                attr=dependency.attr,
+                is_udim=dependency.is_udim,
+                exists=dependency.exists,
             )
 
+    def file_dependency(self, target_id: str) -> Optional[_FileDependencyRef]:
+        return self._file_dependencies.get(str(target_id or ""))
+
     def file_dependency_path(self, target_id: str) -> Optional[str]:
-        path = self._dependency_paths.get(str(target_id or ""), "").strip()
+        dependency = self.file_dependency(target_id)
+        if dependency is None:
+            return None
+        path = dependency.raw_path.strip()
         return path or None
 
     def find(self, result: RuleResult) -> Optional[NodeSnapshot]:

@@ -5,13 +5,21 @@ from typing import Optional
 
 from pipeline_inspector.core.fix_plan import (
     FixAction,
+    FixPlan,
+    apply_fix_availability,
     build_fix_plan,
     fix_plan_from_export,
     project_root_from_scene,
     replace_path_prefix,
     resolve_normalize_path_value,
 )
-from pipeline_inspector.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
+from pipeline_inspector.core.models import (
+    FileDependencySnapshot,
+    GraphSnapshot,
+    MaterialSnapshot,
+    NodeSnapshot,
+    ShapeSnapshot,
+)
 from pipeline_inspector.core.rule_schema import (
     RuleCheck,
     RuleDefinition,
@@ -52,6 +60,139 @@ def test_fix_planner_builds_action_for_failed_result_with_rule_fix():
     assert action.referenced is False
     assert action.locked is False
     assert action.blocked is False
+
+
+def test_fix_planner_builds_texture_file_rename_action_for_failed_texture_rule():
+    rule = RuleDefinition(
+        id="studio.naming.texture.pattern",
+        name="Texture file name must match studio naming template",
+        enabled=True,
+        renderer=["common"],
+        scope="node",
+        severity="warning",
+        owner="shader_td",
+        message="Texture file name does not match the studio naming template.",
+        why="Texture file naming keeps published assets searchable on disk.",
+        match=RuleMatch(criteria={"object_type": "texture"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "texture"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="node",
+        target_id="node:tex_bad",
+        node="tex_bad",
+        plug="fileTextureName",
+        current_value="albedo_wrong",
+        expected_value=r"^tex_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        nodes=(
+            NodeSnapshot(
+                id="node:tex_bad",
+                name="tex_bad",
+                type_name="file",
+                classification=["texture", "file"],
+                attrs={"fileTextureName": "D:/show/tex/albedo_wrong.exr"},
+            ),
+        ),
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id="node:tex_bad",
+                attr="fileTextureName",
+                raw_path="D:/show/tex/albedo_wrong.exr",
+                resolved_path="D:/show/tex/albedo_wrong.exr",
+                exists=True,
+            ),
+        ),
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.fix_type == "rename_texture_file"
+    assert action.before_value == "D:/show/tex/albedo_wrong.exr"
+    assert action.after_value == "D:/show/tex/tex_albedo_wrong.exr"
+    assert action.params["node_name_after"] == "tex_albedo_wrong"
+    assert action.undo_supported is False
+
+
+def test_fix_planner_builds_rename_action_for_failed_name_matches_rule():
+    rule = RuleDefinition(
+        id="studio.naming.mesh.pattern",
+        name="Mesh name must match studio naming template",
+        enabled=True,
+        renderer=["common"],
+        scope="shape",
+        severity="warning",
+        owner="pipeline_td",
+        message="Mesh name does not match the studio naming template.",
+        why="Consistent mesh naming helps rigging and lighting.",
+        match=RuleMatch(criteria={"object_type": "mesh"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "mesh"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="shape",
+        target_id="mesh:body_bad",
+        node="body_bad",
+        current_value="body_bad",
+        expected_value=r"^geo_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        shapes=(
+            ShapeSnapshot(
+                node_id="mesh:body_bad",
+                name="body_bad",
+                full_name="|world|body_bad",
+                type_name="mesh",
+            ),
+        )
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.fix_type == "rename_node"
+    assert action.before_value == "body_bad"
+    assert action.after_value == "geo_body_bad"
+    assert action.target_node == "|world|body_bad"
+    assert action.blocked is False
+
+
+def test_apply_fix_availability_marks_matching_results():
+    result = _failed_result(auto_fix_available=False)
+    action = FixAction(
+        fix_id="rule:node:set_attr",
+        rule_id=result.rule_id,
+        title="title",
+        fix_type="set_attr",
+        risk="low",
+        target_kind=result.target_kind,
+        target_id=result.target_id,
+        target_node="file1",
+    )
+    plan = FixPlan(actions=(action,))
+
+    enriched = apply_fix_availability([result], plan)
+
+    assert enriched[0].auto_fix_available is True
+    assert enriched[0].fix_id == "rule:node:set_attr"
 
 
 def test_fix_planner_skips_non_failed_results_and_rules_without_fix():
@@ -546,6 +687,7 @@ def _failed_result(
     node: str = "file1",
     plug: str = "colorSpace",
     current_value: str = "ACEScg",
+    auto_fix_available: bool = True,
 ) -> RuleResult:
     return RuleResult(
         rule_id="common.texture.colorspace.data_raw",
@@ -561,7 +703,7 @@ def _failed_result(
         plug=plug,
         current_value=current_value,
         expected_value="Raw",
-        auto_fix_available=True,
+        auto_fix_available=auto_fix_available,
         fix_id="set_attr",
     )
 

@@ -30,12 +30,6 @@ from pipeline_inspector.ui.farm_tab import (
     FarmTabState,
     update_farm_tab,
 )
-from pipeline_inspector.ui.readiness_tab import (
-    READINESS_STATUS_LABEL_OBJECT_NAME,
-    READINESS_TAB_OBJECT_NAME,
-    ReadinessTabState,
-    update_readiness_tab,
-)
 from pipeline_inspector.ui.fix_queue import (
     FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
     FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
@@ -58,6 +52,11 @@ from pipeline_inspector.ui.issues_triage import (
     read_issue_filter_prefs_from_widgets,
 )
 from pipeline_inspector.ui.qt import load_qt_widgets
+from pipeline_inspector.ui.readiness_tab import (
+    READINESS_TAB_OBJECT_NAME,
+    ReadinessTabState,
+    update_readiness_tab,
+)
 from pipeline_inspector.ui.settings_dirty_state import (
     evaluate_settings_dirty_state_from_view,
 )
@@ -2264,10 +2263,10 @@ def _run_readiness_check_from_ui(content: Any, qt_widgets: Any) -> None:
 
     config = _studio_config_for_content(content)
     probes = collect_maya_readiness_probes()
-    setattr(content, "_pipeline_inspector_readiness_probes", probes)
+    content._pipeline_inspector_readiness_probes = probes
     result = run_readiness_check_action(config, probes=probes)
-    setattr(content, "_pipeline_inspector_readiness_report", result.report)
-    setattr(content, "_pipeline_inspector_readiness_tab_state", result.tab_state)
+    content._pipeline_inspector_readiness_report = result.report
+    content._pipeline_inspector_readiness_tab_state = result.tab_state
     _apply_readiness_tab_state(content, qt_widgets, result.tab_state)
 
 
@@ -2285,7 +2284,7 @@ def _send_readiness_report_from_ui(
         _set_readiness_status(content, qt_widgets, "Run Machine Readiness before sending a report.")
         return
     result = send_readiness_report_action(config, report, recipient=recipient)
-    setattr(content, "_pipeline_inspector_readiness_tab_state", result.tab_state)
+    content._pipeline_inspector_readiness_tab_state = result.tab_state
     _apply_readiness_tab_state(content, qt_widgets, result.tab_state)
 
 
@@ -2310,7 +2309,7 @@ def _set_readiness_status(content: Any, qt_widgets: Any, message: str) -> None:
             initial_readiness_tab_state(_studio_config_for_content(content)),
             status_message=message,
         )
-    setattr(content, "_pipeline_inspector_readiness_tab_state", tab_state)
+    content._pipeline_inspector_readiness_tab_state = tab_state
     _apply_readiness_tab_state(content, qt_widgets, tab_state)
 
 

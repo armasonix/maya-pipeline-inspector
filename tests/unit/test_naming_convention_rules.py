@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from pipeline_inspector.core import (
+    FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
@@ -164,8 +165,69 @@ def test_group_and_control_naming_rules_use_node_scope():
     assert control_result.status == "passed"
 
 
+def test_texture_naming_rule_validates_texture_file_stem():
+    snapshot = load_naming_fixture()
+    node = snapshot.nodes[2]
+    snapshot = GraphSnapshot(
+        scene_path=snapshot.scene_path,
+        renderer=snapshot.renderer,
+        nodes=(
+            NodeSnapshot(
+                id=node.id,
+                name=node.name,
+                full_name=node.full_name,
+                type_name=node.type_name,
+                classification=node.classification,
+                attrs={"fileTextureName": "D:/show/tex/albedo_wrong.exr"},
+            ),
+        ),
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id=node.id,
+                attr="fileTextureName",
+                raw_path="D:/show/tex/albedo_wrong.exr",
+                resolved_path="D:/show/tex/albedo_wrong.exr",
+                exists=True,
+            ),
+        ),
+    )
+    result = evaluate_rule("studio.naming.texture.pattern", snapshot)[0]
+
+    assert result.status == "failed"
+    assert result.current_value == "albedo_wrong"
+
+
 def test_texture_and_shading_engine_naming_rules_pass_from_fixture():
     snapshot = load_naming_fixture()
+    texture_node = snapshot.nodes[2]
+    snapshot = GraphSnapshot(
+        scene_path=snapshot.scene_path,
+        renderer=snapshot.renderer,
+        nodes=(
+            NodeSnapshot(
+                id=texture_node.id,
+                name=texture_node.name,
+                full_name=texture_node.full_name,
+                type_name=texture_node.type_name,
+                classification=texture_node.classification,
+                attrs={"fileTextureName": "D:/show/tex/tex_albedo.exr"},
+            ),
+            *snapshot.nodes[:2],
+            *snapshot.nodes[3:],
+        ),
+        materials=snapshot.materials,
+        shading_engines=snapshot.shading_engines,
+        shapes=snapshot.shapes,
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id=texture_node.id,
+                attr="fileTextureName",
+                raw_path="D:/show/tex/tex_albedo.exr",
+                resolved_path="D:/show/tex/tex_albedo.exr",
+                exists=True,
+            ),
+        ),
+    )
 
     texture_result = evaluate_rule("studio.naming.texture.pattern", snapshot)[0]
     shading_result = evaluate_rule("studio.naming.shading_engine.pattern", snapshot)[0]

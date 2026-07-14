@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from tests.unit.test_maya_summary_header import FakePushButton, FakeQtWidgets, FakeWidget, _find
+
 from pipeline_inspector.integrations.readiness.engine import ReadinessCheckResult
 from pipeline_inspector.ui import main_window
 from pipeline_inspector.ui.readiness_tab import (
@@ -12,7 +14,6 @@ from pipeline_inspector.ui.readiness_tab import (
     build_readiness_tab,
     update_readiness_tab,
 )
-from tests.unit.test_maya_summary_header import FakePushButton, FakeQtWidgets, FakeWidget, _find
 
 
 class FakeSignal:

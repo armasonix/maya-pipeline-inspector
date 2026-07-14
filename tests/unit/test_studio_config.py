@@ -29,13 +29,13 @@ from pipeline_inspector.studio_config import (
     WaiverDefaultsSettings,
     load_studio_config,
     merge_studio_rule_overrides,
+    parse_software_version_requirements,
     resolve_bug_report_config,
     resolve_deadline_config,
     resolve_discord_config,
     resolve_slack_config,
     resolve_studio_config_for_headless,
     resolve_telegram_config,
-    parse_software_version_requirements,
     save_studio_config,
 )
 

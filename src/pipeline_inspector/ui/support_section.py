@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json as _json
 import time as _time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path as _Path
 from typing import Any, Optional
 
@@ -336,10 +336,30 @@ def _build_readiness_checks_row(
         set_spacing(8)
 
     field_specs = (
-        ("Maya plugins", SETTINGS_READINESS_PLUGINS_INPUT_OBJECT_NAME, _lines(checks.maya_plugins), "mtoa\nvrayformaya"),
-        ("Mapped drives", SETTINGS_READINESS_DRIVES_INPUT_OBJECT_NAME, _lines(checks.mapped_drives), "Z:\nY:"),
-        ("Env vars", SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME, _lines(checks.env_vars), "PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT"),
-        ("Network paths", SETTINGS_READINESS_NETWORK_PATHS_INPUT_OBJECT_NAME, _lines(checks.network_paths), "\\\\farm\\textures"),
+        (
+            "Maya plugins",
+            SETTINGS_READINESS_PLUGINS_INPUT_OBJECT_NAME,
+            _lines(checks.maya_plugins),
+            "mtoa\nvrayformaya",
+        ),
+        (
+            "Mapped drives",
+            SETTINGS_READINESS_DRIVES_INPUT_OBJECT_NAME,
+            _lines(checks.mapped_drives),
+            "Z:\nY:",
+        ),
+        (
+            "Env vars",
+            SETTINGS_READINESS_ENV_VARS_INPUT_OBJECT_NAME,
+            _lines(checks.env_vars),
+            "PIPELINE_ROOT\nSTUDIO_TEXTURE_ROOT",
+        ),
+        (
+            "Network paths",
+            SETTINGS_READINESS_NETWORK_PATHS_INPUT_OBJECT_NAME,
+            _lines(checks.network_paths),
+            r"\\farm\textures",
+        ),
         (
             "Software versions",
             SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME,
