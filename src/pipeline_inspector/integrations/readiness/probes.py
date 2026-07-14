@@ -6,6 +6,10 @@ import platform
 from pathlib import Path
 from typing import Protocol
 
+from pipeline_inspector.integrations.readiness.installed_software import (
+    find_installed_product_versions,
+)
+
 
 class ReadinessProbes(Protocol):
     """Injectable probes used by the readiness engine."""
@@ -27,6 +31,9 @@ class ReadinessProbes(Protocol):
 
     def software_version(self, product: str) -> str | None:
         """Return a detected version string for a named product."""
+
+    def installed_versions(self, product: str) -> frozenset[str]:
+        """Return version tokens detected as installed on the machine."""
 
 
 def normalize_drive_letter(drive: str) -> str:
@@ -78,4 +85,10 @@ class OsReadinessProbes:
         return self.path_exists(f"{letter}:\\")
 
     def software_version(self, product: str) -> str | None:
-        return None
+        installed = self.installed_versions(product)
+        if not installed:
+            return None
+        return sorted(installed)[0]
+
+    def installed_versions(self, product: str) -> frozenset[str]:
+        return find_installed_product_versions(product)

@@ -5,6 +5,10 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from pipeline_inspector.integrations.readiness.installed_software import (
+    format_installed_versions,
+    installed_version_matches,
+)
 from pipeline_inspector.integrations.readiness.probes import (
     ReadinessProbes,
     normalize_drive_letter,
@@ -118,24 +122,28 @@ def run_readiness_checks(
             )
         )
 
-    for product, required_version in checks.software_versions.items():
-        detected = _detect_software_version(product, probes, detected_maya_version)
-        ok = _version_requirement_met(required_version, detected)
+    for index, requirement in enumerate(checks.software_version_requirements):
+        product = requirement.product
+        required_version = requirement.version
+        installed = probes.installed_versions(product)
+        if not installed and str(product or "").strip().casefold() != "maya":
+            session_version = probes.software_version(product)
+            if session_version:
+                installed = frozenset({session_version})
+        ok = _installed_requirement_met(required_version, installed)
+        installed_text = format_installed_versions(installed)
         results.append(
             ReadinessCheckResult(
-                check_id=f"software_version:{product}",
+                check_id=f"software_version:{product}:{required_version}:{index}",
                 category="software_version",
-                label=f"{product} version",
+                label=f"{product} {required_version} installed",
                 ok=ok,
                 message=(
-                    (
-                        f"{product} version {detected or 'unknown'} meets "
-                        f"requirement {required_version}."
-                    )
+                    f"{product} {required_version} is installed on this machine."
                     if ok
                     else (
-                        f"{product} version {detected or 'unknown'} does not meet "
-                        f"required {required_version}."
+                        f"{product} {required_version} is not installed. "
+                        f"Detected installs: {installed_text}."
                     )
                 ),
             )
@@ -174,19 +182,13 @@ def format_readiness_report_text(report: ReadinessReport) -> str:
     return "\n".join(lines)
 
 
-def _detect_software_version(
-    product: str,
-    probes: ReadinessProbes,
-    maya_version: str,
-) -> str | None:
-    product_key = str(product or "").strip().casefold()
-    if product_key == "maya":
-        return maya_version or probes.maya_version() or None
-    detected = probes.software_version(product)
-    if detected:
-        return detected
-    plugin_version = probes.software_version(product_key)
-    return plugin_version or None
+def _installed_requirement_met(required: str, installed: frozenset[str]) -> bool:
+    required_text = str(required or "").strip()
+    if not required_text:
+        return True
+    if not installed:
+        return False
+    return any(installed_version_matches(required_text, item) for item in installed)
 
 
 def _version_requirement_met(required: str, detected: str | None) -> bool:

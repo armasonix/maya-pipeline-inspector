@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pipeline_inspector.integrations.readiness.engine import run_readiness_checks
-from pipeline_inspector.studio_config import ReadinessCheckRequirements, ReadinessSettings
+from pipeline_inspector.studio_config import (
+    ReadinessCheckRequirements,
+    ReadinessSettings,
+    SoftwareVersionRequirement,
+)
 
 
 @dataclass(frozen=True)
@@ -14,6 +18,7 @@ class FakeProbes:
     paths: frozenset[str] = frozenset()
     drives: frozenset[str] = frozenset()
     versions: dict[str, str] | None = None
+    installed: dict[str, frozenset[str]] | None = None
 
     def loaded_maya_plugins(self) -> frozenset[str]:
         return self.plugins
@@ -36,8 +41,20 @@ class FakeProbes:
         return drive.upper() in self.drives or drive in self.drives
 
     def software_version(self, product: str) -> str | None:
+        installed_versions = self.installed_versions(product)
+        if not installed_versions:
+            return None
+        return sorted(installed_versions)[0]
+
+    def installed_versions(self, product: str) -> frozenset[str]:
+        installed = self.installed or {}
+        if product in installed:
+            return installed[product]
         versions = self.versions or {}
-        return versions.get(product)
+        value = versions.get(product)
+        if value:
+            return frozenset({value})
+        return frozenset()
 
 
 def test_run_readiness_checks_reports_all_categories():
@@ -47,7 +64,9 @@ def test_run_readiness_checks_reports_all_categories():
             mapped_drives=("Z",),
             env_vars=("PIPELINE_ROOT",),
             network_paths=("\\\\farm\\textures",),
-            software_versions={"maya": "2025"},
+            software_version_requirements=(
+                SoftwareVersionRequirement("maya", "2025"),
+            ),
         )
     )
     probes = FakeProbes(
@@ -56,6 +75,7 @@ def test_run_readiness_checks_reports_all_categories():
         env={"PIPELINE_ROOT": "D:/pipeline"},
         paths=frozenset({"\\\\farm\\textures"}),
         drives=frozenset({"Z"}),
+        installed={"maya": frozenset({"2025"})},
     )
 
     report = run_readiness_checks(
@@ -87,6 +107,28 @@ def test_run_readiness_checks_marks_missing_plugin_env_and_path_failures():
     assert any(result.category == "maya_plugin" for result in report.results)
     assert any(result.category == "env_var" for result in report.results)
     assert any(result.category == "network_path" for result in report.results)
+
+
+def test_run_readiness_checks_evaluates_each_software_requirement_separately():
+    readiness = ReadinessSettings(
+        checks=ReadinessCheckRequirements(
+            software_version_requirements=(
+                SoftwareVersionRequirement("maya", "2024"),
+                SoftwareVersionRequirement("maya", "2025"),
+            )
+        )
+    )
+    probes = FakeProbes(installed={"maya": frozenset({"2025"})})
+
+    report = run_readiness_checks(readiness, probes=probes)
+
+    assert report.ok is False
+    software_results = [
+        result for result in report.results if result.category == "software_version"
+    ]
+    assert len(software_results) == 2
+    assert software_results[0].ok is False
+    assert software_results[1].ok is True
 
 
 def test_run_readiness_checks_with_no_configuration_is_passing_idle_state():

@@ -223,6 +223,80 @@ class ReadinessSupportContacts:
 
 
 @dataclass(frozen=True)
+class SoftwareVersionRequirement:
+    """One installed-software version requirement for machine readiness."""
+
+    product: str
+    version: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"product": self.product, "version": self.version}
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> SoftwareVersionRequirement:
+        return cls(
+            product=str(data.get("product", "") or "").strip(),
+            version=str(data.get("version", "") or "").strip(),
+        )
+
+
+def parse_software_version_requirements(
+    raw: object,
+) -> tuple[SoftwareVersionRequirement, ...]:
+    """Parse readiness software requirements from JSON or UI text."""
+
+    if raw is None:
+        return ()
+    if isinstance(raw, str):
+        return _parse_software_version_text(raw)
+    if isinstance(raw, list):
+        requirements: list[SoftwareVersionRequirement] = []
+        for item in raw:
+            if isinstance(item, Mapping):
+                requirement = SoftwareVersionRequirement.from_mapping(item)
+                if requirement.product and requirement.version:
+                    requirements.append(requirement)
+            elif isinstance(item, str):
+                requirements.extend(_parse_software_version_text(item))
+        return tuple(requirements)
+    if isinstance(raw, Mapping):
+        requirements = []
+        for product, version in raw.items():
+            product_text = str(product or "").strip()
+            if not product_text:
+                continue
+            if isinstance(version, list):
+                for entry in version:
+                    version_text = str(entry or "").strip()
+                    if version_text:
+                        requirements.append(
+                            SoftwareVersionRequirement(product_text, version_text)
+                        )
+            else:
+                version_text = str(version or "").strip()
+                if version_text:
+                    requirements.append(
+                        SoftwareVersionRequirement(product_text, version_text)
+                    )
+        return tuple(requirements)
+    return ()
+
+
+def _parse_software_version_text(text: str) -> tuple[SoftwareVersionRequirement, ...]:
+    requirements: list[SoftwareVersionRequirement] = []
+    for line in str(text or "").replace("\r\n", "\n").split("\n"):
+        entry = line.strip()
+        if not entry or "=" not in entry:
+            continue
+        product, version = entry.split("=", 1)
+        product_text = product.strip()
+        version_text = version.strip()
+        if product_text and version_text:
+            requirements.append(SoftwareVersionRequirement(product_text, version_text))
+    return tuple(requirements)
+
+
+@dataclass(frozen=True)
 class ReadinessCheckRequirements:
     """Studio-configured machine readiness requirements."""
 
@@ -230,7 +304,7 @@ class ReadinessCheckRequirements:
     mapped_drives: tuple[str, ...] = ()
     env_vars: tuple[str, ...] = ()
     network_paths: tuple[str, ...] = ()
-    software_versions: Mapping[str, str] = field(default_factory=dict)
+    software_version_requirements: tuple[SoftwareVersionRequirement, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -238,23 +312,23 @@ class ReadinessCheckRequirements:
             "mapped_drives": list(self.mapped_drives),
             "env_vars": list(self.env_vars),
             "network_paths": list(self.network_paths),
-            "software_versions": dict(self.software_versions),
+            "software_versions": [
+                requirement.to_dict() for requirement in self.software_version_requirements
+            ],
         }
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> ReadinessCheckRequirements:
         if not data:
             return cls()
-        versions_raw = data.get("software_versions")
-        versions: dict[str, str] = {}
-        if isinstance(versions_raw, Mapping):
-            versions = {str(key): str(value) for key, value in versions_raw.items()}
         return cls(
             maya_plugins=_as_str_tuple(data.get("maya_plugins")),
             mapped_drives=_as_str_tuple(data.get("mapped_drives")),
             env_vars=_as_str_tuple(data.get("env_vars")),
             network_paths=_as_str_tuple(data.get("network_paths")),
-            software_versions=versions,
+            software_version_requirements=parse_software_version_requirements(
+                data.get("software_versions")
+            ),
         )
 
 

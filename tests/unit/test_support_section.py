@@ -4,6 +4,7 @@ from pipeline_inspector.studio_config import (
     ReadinessCheckRequirements,
     ReadinessSettings,
     ReadinessSupportContacts,
+    SoftwareVersionRequirement,
     StudioConfig,
 )
 from pipeline_inspector.ui.support_section import (
@@ -57,9 +58,13 @@ def test_read_readiness_from_view_round_trips_settings():
 
 
 def test_parse_software_version_lines_reads_product_version_pairs():
-    versions = parse_software_version_lines("maya=2025\nmtoa=5.4.0\ninvalid-line")
+    versions = parse_software_version_lines("maya=2024\nmaya=2025\nmtoa=5.4.0\ninvalid-line")
 
-    assert versions == {"maya": "2025", "mtoa": "5.4.0"}
+    assert versions == (
+        SoftwareVersionRequirement("maya", "2024"),
+        SoftwareVersionRequirement("maya", "2025"),
+        SoftwareVersionRequirement("mtoa", "5.4.0"),
+    )
 
 
 def test_update_support_and_roles_view_refreshes_fields():

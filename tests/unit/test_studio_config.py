@@ -20,6 +20,7 @@ from pipeline_inspector.studio_config import (
     ReadinessSettings,
     ReadinessSupportContacts,
     SlackConnectorSettings,
+    SoftwareVersionRequirement,
     StudioConfig,
     StudioEnvironmentSettings,
     StudioUiSettings,
@@ -34,6 +35,7 @@ from pipeline_inspector.studio_config import (
     resolve_slack_config,
     resolve_studio_config_for_headless,
     resolve_telegram_config,
+    parse_software_version_requirements,
     save_studio_config,
 )
 
@@ -253,7 +255,9 @@ def test_studio_config_round_trips_readiness_block(tmp_path: Path):
                 mapped_drives=("Z",),
                 env_vars=("PIPELINE_ROOT",),
                 network_paths=("\\\\farm\\textures",),
-                software_versions={"maya": "2025"},
+                software_version_requirements=(
+                    SoftwareVersionRequirement("maya", "2025"),
+                ),
             ),
             support=ReadinessSupportContacts(
                 sysadmin_telegram_chat_id="-10011",
@@ -269,9 +273,34 @@ def test_studio_config_round_trips_readiness_block(tmp_path: Path):
     assert loaded.readiness.checks.mapped_drives == ("Z",)
     assert loaded.readiness.checks.env_vars == ("PIPELINE_ROOT",)
     assert loaded.readiness.checks.network_paths == ("\\\\farm\\textures",)
-    assert loaded.readiness.checks.software_versions == {"maya": "2025"}
+    assert loaded.readiness.checks.software_version_requirements == (
+        SoftwareVersionRequirement("maya", "2025"),
+    )
     assert loaded.readiness.support.sysadmin_telegram_chat_id == "-10011"
     assert loaded.readiness.support.support_telegram_chat_id == "-10022"
+
+
+def test_parse_software_version_requirements_preserves_duplicate_products():
+    requirements = parse_software_version_requirements(
+        "maya=2024\nmaya=2025\nmtoa=5.4.0"
+    )
+
+    assert requirements == (
+        SoftwareVersionRequirement("maya", "2024"),
+        SoftwareVersionRequirement("maya", "2025"),
+        SoftwareVersionRequirement("mtoa", "5.4.0"),
+    )
+
+
+def test_parse_software_version_requirements_reads_legacy_dict_and_list_values():
+    from_mapping = parse_software_version_requirements({"maya": ["2024", "2025"]})
+    legacy = parse_software_version_requirements({"maya": "2025"})
+
+    assert from_mapping == (
+        SoftwareVersionRequirement("maya", "2024"),
+        SoftwareVersionRequirement("maya", "2025"),
+    )
+    assert legacy == (SoftwareVersionRequirement("maya", "2025"),)
 
 
 def test_connector_settings_preserves_extensible_connectors():

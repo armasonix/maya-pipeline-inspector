@@ -11,7 +11,9 @@ from pipeline_inspector.studio_config import (
     ReadinessCheckRequirements,
     ReadinessSettings,
     ReadinessSupportContacts,
+    SoftwareVersionRequirement,
     StudioConfig,
+    parse_software_version_requirements,
 )
 from pipeline_inspector.ui.settings_widgets import (
     configure_plain_text_placeholder_field,
@@ -125,8 +127,9 @@ def build_support_and_roles_section(
 
     layout.addWidget(_section_title(qt_widgets, "Readiness checks"))
     checks_intro = qt_widgets.QLabel(
-        "One requirement per line. Software versions use PRODUCT=VERSION "
-        "(for example maya=2025 or mtoa=5.4.0)."
+        "One requirement per line. Repeat a product to require multiple installed "
+        "versions (for example maya=2024 and maya=2025). Software versions use "
+        "PRODUCT=VERSION (for example maya=2025 or mtoa=5.4.0)."
     )
     checks_intro.setWordWrap(True)
     layout.addWidget(checks_intro)
@@ -187,7 +190,7 @@ def read_readiness_from_view(
                     )
                 )
             ),
-            software_versions=parse_software_version_lines(
+            software_version_requirements=parse_software_version_requirements(
                 _plain_text(
                     find_child(
                         view,
@@ -279,36 +282,30 @@ def update_support_and_roles_view(
             _plain_text_widget_type(qt_widgets),
             SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME,
         ),
-        _software_version_lines(readiness.checks.software_versions),
+        _software_version_lines(readiness.checks.software_version_requirements),
         field_name="software_versions",
         qt_widgets=qt_widgets,
     )
 
 
-def parse_software_version_lines(text: str) -> dict[str, str]:
+def parse_software_version_lines(text: str) -> tuple[SoftwareVersionRequirement, ...]:
     """Parse PRODUCT=VERSION lines from the settings UI."""
 
-    versions: dict[str, str] = {}
-    for line in text.replace("\r\n", "\n").split("\n"):
-        entry = line.strip()
-        if not entry or "=" not in entry:
-            continue
-        product, version = entry.split("=", 1)
-        product_text = product.strip()
-        version_text = version.strip()
-        if product_text and version_text:
-            versions[product_text] = version_text
-    return versions
+    return parse_software_version_requirements(text)
 
 
-def _lines(values: Mapping[str, str] | tuple[str, ...]) -> str:
-    if isinstance(values, Mapping):
-        return _software_version_lines(values)
-    return "\n".join(values)
+def _lines(values: tuple[str, ...] | tuple[SoftwareVersionRequirement, ...]) -> str:
+    if values and isinstance(values[0], SoftwareVersionRequirement):
+        return _software_version_lines(values)  # type: ignore[arg-type]
+    return "\n".join(values)  # type: ignore[arg-type]
 
 
-def _software_version_lines(versions: Mapping[str, str]) -> str:
-    return "\n".join(f"{product}={version}" for product, version in versions.items())
+def _software_version_lines(
+    requirements: tuple[SoftwareVersionRequirement, ...],
+) -> str:
+    return "\n".join(
+        f"{requirement.product}={requirement.version}" for requirement in requirements
+    )
 
 
 def _section_title(qt_widgets: Any, text: str) -> Any:
@@ -346,7 +343,7 @@ def _build_readiness_checks_row(
         (
             "Software versions",
             SETTINGS_READINESS_SOFTWARE_VERSIONS_INPUT_OBJECT_NAME,
-            _software_version_lines(checks.software_versions),
+            _software_version_lines(checks.software_version_requirements),
             "maya=2025",
         ),
     )

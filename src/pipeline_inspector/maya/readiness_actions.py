@@ -165,17 +165,34 @@ class MayaReadinessProbes:
         return self._base.drive_mapped(drive)
 
     def software_version(self, product: str) -> str | None:
+        installed = self.installed_versions(product)
+        if not installed:
+            return None
+        return sorted(installed)[0]
+
+    def installed_versions(self, product: str) -> frozenset[str]:
         product_key = str(product or "").strip().casefold()
         if product_key == "maya":
-            return self.maya_version() or None
+            return self._base.installed_versions(product)
+        versions: set[str] = set()
         try:
-            if self._cmds.pluginInfo(product_key, query=True, loaded=True):
-                version = self._cmds.pluginInfo(product_key, query=True, version=True)
-                text = str(version or "").strip()
-                return text or None
+            plugin_names = self._cmds.pluginInfo(query=True, listPlugins=True) or []
         except Exception:
-            return None
-        return None
+            return frozenset()
+        for plugin_name in plugin_names:
+            text_name = str(plugin_name)
+            if normalize_plugin_name(text_name) != product_key:
+                continue
+            try:
+                version = self._cmds.pluginInfo(text_name, query=True, version=True)
+            except Exception:
+                continue
+            version_text = str(version or "").strip()
+            if version_text:
+                versions.add(version_text)
+            else:
+                versions.add("installed")
+        return frozenset(versions)
 
 
 def _tab_state_from_report(
@@ -198,7 +215,7 @@ def _checks_configured(readiness: ReadinessSettings) -> bool:
         or checks.mapped_drives
         or checks.env_vars
         or checks.network_paths
-        or checks.software_versions
+        or checks.software_version_requirements
     )
 
 
