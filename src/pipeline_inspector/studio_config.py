@@ -1034,6 +1034,54 @@ class ConnectorSettings:
 
 
 @dataclass(frozen=True)
+class GovernanceSettings:
+    """Studio role policy overrides for permission resolution."""
+
+    enforced_role: str = ""
+    tracker_role_map: dict[str, str] = field(default_factory=dict)
+    capability_denials: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enforced_role": self.enforced_role,
+            "tracker_role_map": dict(self.tracker_role_map),
+            "capability_denials": {
+                role: list(capabilities)
+                for role, capabilities in self.capability_denials.items()
+            },
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> GovernanceSettings:
+        if not data:
+            return cls()
+        tracker_raw = data.get("tracker_role_map")
+        tracker_role_map: dict[str, str] = {}
+        if isinstance(tracker_raw, Mapping):
+            tracker_role_map = {
+                str(key): str(value)
+                for key, value in tracker_raw.items()
+                if str(key).strip() and str(value).strip()
+            }
+        denials_raw = data.get("capability_denials")
+        capability_denials: dict[str, tuple[str, ...]] = {}
+        if isinstance(denials_raw, Mapping):
+            for role, capabilities in denials_raw.items():
+                if not isinstance(capabilities, list):
+                    continue
+                normalized = tuple(
+                    str(item).strip() for item in capabilities if str(item).strip()
+                )
+                if normalized:
+                    capability_denials[str(role)] = normalized
+        return cls(
+            enforced_role=str(data.get("enforced_role", "") or ""),
+            tracker_role_map=tracker_role_map,
+            capability_denials=capability_denials,
+        )
+
+
+@dataclass(frozen=True)
 class StudioConfig:
     """Persistent studio settings for Pipeline Inspector."""
 
@@ -1046,6 +1094,7 @@ class StudioConfig:
     readiness: ReadinessSettings = ReadinessSettings()
     updates: StudioUpdatesSettings = StudioUpdatesSettings()
     connectors: ConnectorSettings = ConnectorSettings()
+    governance: GovernanceSettings = GovernanceSettings()
     config_path: Optional[Path] = None
 
     def with_updates(
@@ -1060,6 +1109,7 @@ class StudioConfig:
         readiness: Optional[ReadinessSettings] = None,
         updates: Optional[StudioUpdatesSettings] = None,
         connectors: Optional[ConnectorSettings] = None,
+        governance: Optional[GovernanceSettings] = None,
         config_path: Optional[Path] = None,
     ) -> StudioConfig:
         return replace(
@@ -1075,6 +1125,7 @@ class StudioConfig:
             readiness=self.readiness if readiness is None else readiness,
             updates=self.updates if updates is None else updates,
             connectors=self.connectors if connectors is None else connectors,
+            governance=self.governance if governance is None else governance,
             config_path=self.config_path if config_path is None else config_path,
         )
 
@@ -1106,6 +1157,7 @@ class StudioConfig:
             "readiness": self.readiness.to_dict(),
             "updates": self.updates.to_dict(),
             "connectors": self.connectors.to_dict(),
+            "governance": self.governance.to_dict(),
         }
 
     @classmethod
@@ -1154,6 +1206,12 @@ class StudioConfig:
             if isinstance(connectors_raw, Mapping)
             else ConnectorSettings()
         )
+        governance_raw = data.get("governance")
+        governance = (
+            GovernanceSettings.from_mapping(governance_raw)
+            if isinstance(governance_raw, Mapping)
+            else GovernanceSettings()
+        )
         return cls(
             schema_version=schema_version,
             studio_name=studio_name,
@@ -1164,6 +1222,7 @@ class StudioConfig:
             readiness=readiness,
             updates=updates,
             connectors=connectors,
+            governance=governance,
             config_path=config_path,
         )
 

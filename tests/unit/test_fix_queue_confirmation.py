@@ -197,6 +197,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
 
     from pipeline_inspector.maya import ui_launcher
     from pipeline_inspector.ui.fix_queue import FIX_QUEUE_TABLE_OBJECT_NAME
+    from pipeline_inspector.user_config import UserPreferences
 
     apply_calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
 
@@ -242,6 +243,7 @@ def test_apply_selected_fixes_cancel_skips_apply(monkeypatch):
             _high_risk_row(),
         ),
         _pipeline_inspector_profile_id="artist_relaxed",
+        _pipeline_inspector_user_config=UserPreferences(assigned_role="technical_support"),
     )
 
     def fake_find_child(_content, _widget_type, object_name: str):

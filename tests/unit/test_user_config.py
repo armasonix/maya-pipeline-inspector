@@ -34,6 +34,7 @@ def test_user_preferences_round_trips_through_json_file(tmp_path: Path, monkeypa
         mayapy_path="C:/mayapy.exe",
         docs_url="https://example.test/docs",
         updates=UserUpdatesSettings(check_on_startup=True),
+        assigned_role="pipeline_td",
     )
 
     save_user_config(path, original)
@@ -43,6 +44,7 @@ def test_user_preferences_round_trips_through_json_file(tmp_path: Path, monkeypa
     assert loaded.theme == "dark"
     assert loaded.extra_rule_paths == ("/studio/rules",)
     assert loaded.updates.check_on_startup is True
+    assert loaded.assigned_role == "pipeline_td"
     assert loaded.config_path == path.resolve()
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "1.0"

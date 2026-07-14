@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector import __version__
+from pipeline_inspector.core.governance import (
+    Capability,
+    build_permission_resolver,
+    tracker_role_from_environment,
+)
 from pipeline_inspector.maya.panel_session import (
     load_runtime_configs_from_session,
     remember_panel_visible,
@@ -744,6 +749,30 @@ def _user_config_for_content(content: Any) -> UserPreferences:
     return UserPreferences.default()
 
 
+def _permission_resolver_for_content(content: Any):
+    return build_permission_resolver(
+        studio=_studio_config_for_content(content),
+        user=_user_config_for_content(content),
+        tracker_role=tracker_role_from_environment(),
+    )
+
+
+def _guard_panel_capability(
+    content: Any,
+    qt_widgets: Any,
+    capability: Capability,
+    *,
+    title: str = "Permission denied",
+    status_object_name: str = main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+) -> bool:
+    decision = _permission_resolver_for_content(content).require(capability)
+    if decision.allowed:
+        return True
+    _show_information_dialog(qt_widgets, title, decision.reason)
+    _set_label_text(content, qt_widgets, status_object_name, decision.reason)
+    return False
+
+
 def _session_rule_overrides_for_content(content: Any) -> dict[str, Any]:
     overrides = getattr(content, SESSION_RULE_OVERRIDES_ATTR, None)
     if isinstance(overrides, dict):
@@ -1289,6 +1318,20 @@ def _commit_saved_settings_baselines(content: Any) -> None:
 
 
 def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    if not _guard_panel_capability(
+        content,
+        qt_widgets,
+        "edit_studio_settings",
+        title="Save Studio Config",
+    ):
+        return
+    if not _guard_panel_capability(
+        content,
+        qt_widgets,
+        "edit_connectors",
+        title="Save Studio Config",
+    ):
+        return
     _sync_deadline_connector_from_ui(content, qt_widgets)
     _sync_studio_environment_from_ui(content, qt_widgets)
     _sync_studio_policy_from_ui(content, qt_widgets)
@@ -1321,6 +1364,16 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
 def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_user_preferences_from_ui(content, qt_widgets)
     config = _user_config_for_content(content)
+    if config.extra_rule_paths and not _permission_resolver_for_content(content).allows(
+        "manage_rules"
+    ):
+        _guard_panel_capability(
+            content,
+            qt_widgets,
+            "manage_rules",
+            title="Save User Preferences",
+        )
+        return
     path = config.config_path or default_user_config_path()
     try:
         saved_path = save_user_config(path, config.with_updates(config_path=path))
@@ -2124,6 +2177,14 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
             "Submit to Farm",
             _disabled_farm_tab_state().status_message,
         )
+        return
+
+    if not _guard_panel_capability(
+        content,
+        qt_widgets,
+        "submit_farm",
+        title="Submit to Farm",
+    ):
         return
 
     scene_path = getattr(content, "_pipeline_inspector_scene_path", "") or _current_scene_path()
@@ -3098,6 +3159,8 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
     if risky_fix_rows(selected):
+        if not _guard_panel_capability(content, qt_widgets, "apply_risky_fixes"):
+            return
         profile_id = getattr(content, "_pipeline_inspector_profile_id", "") or ""
         if not confirm_risky_fixes(qt_widgets, selected, profile_id=profile_id):
             _set_label_text(

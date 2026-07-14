@@ -316,6 +316,13 @@ def test_apply_fixes_cli_forwards_policy_flags_to_applier(tmp_path: Path, monkey
 
     monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
     monkeypatch.setattr(cli, "_apply_fixes_in_scene", capture_apply)
+    monkeypatch.setattr(
+        cli,
+        "_permission_resolver_from_args",
+        lambda _args: cli.build_permission_resolver_from_runtime(
+            user=cli.UserPreferences(assigned_role="pipeline_td"),
+        ),
+    )
 
     exit_code = cli.main(
         [

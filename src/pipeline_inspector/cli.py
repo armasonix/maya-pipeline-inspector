@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from pipeline_inspector.core import GraphSnapshot, RuleLoadError
 from pipeline_inspector.core.fix_plan import FixPlan, fix_plan_from_export
+from pipeline_inspector.core.governance import build_permission_resolver_from_runtime
 from pipeline_inspector.core.manifest_gate import evaluate_manifest_gate
 from pipeline_inspector.core.rule_loader import DEFAULT_RULE_ROOT, load_profile
 from pipeline_inspector.maya.validation_pipeline import (
@@ -30,7 +31,8 @@ from pipeline_inspector.reports.manifest_diff_cli import (
     load_manifest_json,
 )
 from pipeline_inspector.rules_cli import validate_rule_paths
-from pipeline_inspector.studio_config import resolve_studio_config_for_headless
+from pipeline_inspector.studio_config import StudioConfig, resolve_studio_config_for_headless
+from pipeline_inspector.user_config import UserPreferences
 from pipeline_inspector.util.paths import normalize_cli_path
 
 _MAYA_STANDALONE_INITIALIZED = False
@@ -244,6 +246,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def validate_command(args: argparse.Namespace) -> int:
     try:
+        if args.extra_rules:
+            resolver = _permission_resolver_from_args(args)
+            decision = resolver.require("manage_rules")
+            if not decision.allowed:
+                print(decision.reason, file=sys.stderr)
+                return EXIT_CONFIG_ERROR
         input_path = _cli_path(args.input_path)
         report_path = _cli_path(args.report)
         snapshot = _load_snapshot(input_path, args.input_kind)
@@ -337,6 +345,12 @@ def manifest_command(args: argparse.Namespace) -> int:
 
 def apply_fixes_command(args: argparse.Namespace) -> int:
     try:
+        if args.allow_high_risk:
+            resolver = _permission_resolver_from_args(args)
+            decision = resolver.require("apply_risky_fixes")
+            if not decision.allowed:
+                print(decision.reason, file=sys.stderr)
+                return EXIT_CONFIG_ERROR
         scene_path = _cli_path(args.input_path)
         fix_plan = _load_fix_plan_for_scene(
             scene_path,
@@ -564,6 +578,12 @@ def _studio_config_from_args(args: argparse.Namespace) -> Optional[Any]:
         )
     except ValueError as exc:
         raise RuleLoadError(str(exc)) from exc
+
+
+def _permission_resolver_from_args(args: argparse.Namespace):
+    studio = _studio_config_from_args(args) or StudioConfig.default()
+    user = UserPreferences.default()
+    return build_permission_resolver_from_runtime(studio=studio, user=user)
 
 
 def _ensure_maya_standalone() -> None:

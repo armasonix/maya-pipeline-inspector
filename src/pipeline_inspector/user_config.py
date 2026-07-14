@@ -54,6 +54,7 @@ class UserPreferences:
     max_issues_displayed: int = DEFAULT_MAX_ISSUES_DISPLAYED
     mayapy_path: str = ""
     docs_url: str = DEFAULT_USER_DOCS_URL
+    assigned_role: str = "technical_artist"
     updates: UserUpdatesSettings = UserUpdatesSettings()
     config_path: Optional[Path] = None
 
@@ -71,6 +72,7 @@ class UserPreferences:
         max_issues_displayed: Optional[int] = None,
         mayapy_path: Optional[str] = None,
         docs_url: Optional[str] = None,
+        assigned_role: Optional[str] = None,
         updates: Optional[UserUpdatesSettings] = None,
         config_path: Optional[Path] = None,
     ) -> UserPreferences:
@@ -103,6 +105,7 @@ class UserPreferences:
             ),
             mayapy_path=self.mayapy_path if mayapy_path is None else mayapy_path,
             docs_url=self.docs_url if docs_url is None else docs_url,
+            assigned_role=self.assigned_role if assigned_role is None else assigned_role,
             updates=self.updates if updates is None else updates,
             config_path=self.config_path if config_path is None else config_path,
         )
@@ -125,6 +128,7 @@ class UserPreferences:
             "max_issues_displayed": int(self.max_issues_displayed),
             "mayapy_path": self.mayapy_path,
             "docs_url": self.docs_url,
+            "assigned_role": self.assigned_role,
             "updates": self.updates.to_dict(),
         }
 
@@ -169,6 +173,7 @@ class UserPreferences:
             ),
             mayapy_path=str(data.get("mayapy_path", "") or ""),
             docs_url=str(data.get("docs_url", DEFAULT_USER_DOCS_URL) or DEFAULT_USER_DOCS_URL),
+            assigned_role=str(data.get("assigned_role", "technical_artist") or "technical_artist"),
             updates=updates,
             config_path=config_path,
         )
