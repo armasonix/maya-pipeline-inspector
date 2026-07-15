@@ -157,11 +157,20 @@ def test_fix_planner_builds_rename_action_for_failed_name_matches_rule():
         shapes=(
             ShapeSnapshot(
                 node_id="mesh:body_bad",
+                name="body_badShape",
+                full_name="|world|body_bad|body_badShape",
+                type_name="mesh",
+                transform_id="transform:body_bad",
+            ),
+        ),
+        nodes=(
+            NodeSnapshot(
+                id="node:|world|body_bad",
                 name="body_bad",
                 full_name="|world|body_bad",
-                type_name="mesh",
+                type_name="transform",
             ),
-        )
+        ),
     )
 
     plan = build_fix_plan([result], [rule], snapshot)
@@ -173,6 +182,105 @@ def test_fix_planner_builds_rename_action_for_failed_name_matches_rule():
     assert action.after_value == "geo_body_bad"
     assert action.target_node == "|world|body_bad"
     assert action.blocked is False
+
+
+def test_fix_planner_resolves_mesh_transform_from_shape_name_suffix():
+    rule = RuleDefinition(
+        id="studio.naming.mesh.pattern",
+        name="Mesh name must match studio naming template",
+        enabled=True,
+        renderer=["common"],
+        scope="shape",
+        severity="warning",
+        owner="pipeline_td",
+        message="Mesh name does not match the studio naming template.",
+        why="Consistent mesh naming helps rigging and lighting.",
+        match=RuleMatch(criteria={"object_type": "mesh"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "mesh"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="shape",
+        target_id="mesh:mesh_displacement_risk_GEOShape",
+        node="mesh_displacement_risk_GEOShape",
+        current_value="mesh_displacement_risk_GEOShape",
+        expected_value=r"^geo_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        shapes=(
+            ShapeSnapshot(
+                node_id="mesh:mesh_displacement_risk_GEOShape",
+                name="mesh_displacement_risk_GEOShape",
+                full_name="mesh_displacement_risk_GEOShape",
+                type_name="mesh",
+            ),
+        )
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.before_value == "mesh_displacement_risk_GEO"
+    assert action.after_value == "geo_mesh_displacement_risk_GEO"
+    assert action.target_node == "mesh_displacement_risk_GEO"
+
+
+def test_fix_planner_resolves_mesh_transform_from_transform_id_when_node_missing():
+    rule = RuleDefinition(
+        id="studio.naming.mesh.pattern",
+        name="Mesh name must match studio naming template",
+        enabled=True,
+        renderer=["common"],
+        scope="shape",
+        severity="warning",
+        owner="pipeline_td",
+        message="Mesh name does not match the studio naming template.",
+        why="Consistent mesh naming helps rigging and lighting.",
+        match=RuleMatch(criteria={"object_type": "mesh"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "mesh"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        node="pHelixShape1",
+        current_value="pHelixShape1",
+        expected_value=r"^geo_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        shapes=(
+            ShapeSnapshot(
+                node_id="mesh:pHelixShape1",
+                name="pHelixShape1",
+                full_name="pHelixShape1",
+                type_name="mesh",
+                transform_id="transform:pHelix1",
+            ),
+        )
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.before_value == "pHelix1"
+    assert action.after_value == "geo_pHelix1"
+    assert action.target_node == "pHelix1"
 
 
 def test_apply_fix_availability_marks_matching_results():

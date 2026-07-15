@@ -16,6 +16,7 @@ class FakeCmds:
         self.undo_calls: list[dict[str, Any]] = []
         self.set_calls: list[tuple[str, Any, dict[str, Any]]] = []
         self.rename_calls: list[tuple[str, str]] = []
+        self.node_types: dict[str, str] = {}
 
     def undoInfo(self, **kwargs: Any) -> None:
         self.undo_calls.append(dict(kwargs))
@@ -44,9 +45,9 @@ class FakeCmds:
         self.nodes[renamed] = renamed
         return renamed
 
-    def lockNode(self, node_name: str, **kwargs: Any) -> bool:
+    def lockNode(self, node_name: str, **kwargs: Any) -> Any:
         if kwargs.get("q") and kwargs.get("lock"):
-            return node_name in self.locked_nodes
+            return [node_name in self.locked_nodes]
         return False
 
     def referenceQuery(self, node_name: str, **kwargs: Any) -> bool:
@@ -62,6 +63,19 @@ class FakeCmds:
     def setAttr(self, plug: str, value: Any, **kwargs: Any) -> None:
         self.set_calls.append((plug, value, dict(kwargs)))
         self.attrs[plug] = value
+
+    def nodeType(self, node_name: str) -> str:
+        return self.node_types.get(node_name, "transform")
+
+    def listRelatives(
+        self,
+        node_name: str,
+        **kwargs: Any,
+    ) -> list[str]:
+        parent = self.nodes.get(f"{node_name}.__parent__")
+        if parent and kwargs.get("parent"):
+            return [parent]
+        return []
 
 
 def test_apply_rename_texture_file_renames_disk_file_and_updates_path(tmp_path):
@@ -120,6 +134,58 @@ def test_apply_rename_node_updates_short_name_inside_undo_chunk():
     record = report.records[0]
     assert record.before_value == "body_bad"
     assert record.after_value == "geo_body_bad"
+
+
+def test_apply_rename_node_resolves_mesh_shape_target_to_parent_transform():
+    cmds = FakeCmds()
+    cmds.nodes["|world|mesh_foo_GEO"] = "|world|mesh_foo_GEO"
+    cmds.nodes["|world|mesh_foo_GEO|mesh_foo_GEOShape"] = (
+        "|world|mesh_foo_GEO|mesh_foo_GEOShape"
+    )
+    cmds.nodes["|world|mesh_foo_GEO|mesh_foo_GEOShape.__parent__"] = "|world|mesh_foo_GEO"
+    cmds.node_types["|world|mesh_foo_GEO|mesh_foo_GEOShape"] = "mesh"
+    cmds.node_types["|world|mesh_foo_GEO"] = "transform"
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:mesh_foo_GEOShape:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:mesh_foo_GEOShape",
+        target_node="|world|mesh_foo_GEO|mesh_foo_GEOShape",
+        before_value="mesh_foo_GEO",
+        after_value="geo_mesh_foo_GEO",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == [("|world|mesh_foo_GEO", "geo_mesh_foo_GEO")]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_allows_unlocked_node_when_lock_query_returns_list_false():
+    cmds = FakeCmds()
+    cmds.nodes["|world|mesh_foo_GEO"] = "|world|mesh_foo_GEO"
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:mesh_foo_GEO:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:mesh_foo_GEO",
+        target_node="|world|mesh_foo_GEO",
+        before_value="mesh_foo_GEO",
+        after_value="geo_mesh_foo_GEO",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == [("|world|mesh_foo_GEO", "geo_mesh_foo_GEO")]
+    assert report.applied_count == 1
 
 
 def test_apply_rename_node_blocks_read_only_target_without_crashing():

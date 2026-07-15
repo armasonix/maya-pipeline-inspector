@@ -280,21 +280,102 @@ def _apply_rename_node(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if not isinstance(proposed_name, str) or not proposed_name.strip():
         return _blocked(action, [INVALID_RENAME_NAME_REASON])
 
-    before_name = _node_short_name(cmds, action.target_node)
+    rename_target = _resolve_rename_target_node(cmds, action)
+    before_name = _node_short_name(cmds, rename_target)
     if before_name is None:
         return _blocked(action, [MISSING_TARGET_REASON])
 
-    if _is_read_only_node(cmds, action.target_node):
+    if _is_read_only_node(cmds, rename_target):
+        # #region agent log
+        _agent_debug_log(
+            "fix_applier.py:_apply_rename_node",
+            "rename_blocked_read_only",
+            {
+                "target_node": action.target_node,
+                "rename_target": rename_target,
+                "proposed_name": proposed_name,
+                "before_name": before_name,
+            },
+            hypothesis_id="D",
+        )
+        # #endregion
         return _blocked(action, [READ_ONLY_NODE_REASON])
 
     try:
-        renamed_node = cmds.rename(action.target_node, proposed_name.strip())
+        renamed_node = cmds.rename(rename_target, proposed_name.strip())
     except RuntimeError as exc:
         if _is_read_only_rename_error(exc):
             return _blocked(action, [READ_ONLY_NODE_REASON])
         raise
     after_name = _node_short_name(cmds, renamed_node) or str(proposed_name).strip()
+    # #region agent log
+    _agent_debug_log(
+        "fix_applier.py:_apply_rename_node",
+        "rename_applied",
+        {
+            "target_node": action.target_node,
+            "rename_target": rename_target,
+            "proposed_name": proposed_name,
+            "before_name": before_name,
+            "after_name": after_name,
+            "renamed_node": renamed_node,
+        },
+        hypothesis_id="E",
+    )
+    # #endregion
     return _applied(action, None, before_name, after_name)
+
+
+def _resolve_rename_target_node(cmds: Any, action: FixAction) -> str:
+    """Resolve the DAG node that should be renamed for Outliner-visible naming."""
+
+    target_node = str(action.target_node or "").strip()
+    if not target_node or not cmds.objExists(target_node):
+        return target_node
+
+    object_type = str(action.params.get("object_type") or "").strip()
+    if object_type != "mesh":
+        return target_node
+
+    try:
+        node_type = str(cmds.nodeType(target_node))
+    except RuntimeError:
+        return target_node
+
+    if node_type == "transform":
+        return target_node
+
+    parents = cmds.listRelatives(target_node, parent=True, fullPath=True) or []
+    if parents:
+        return str(parents[0])
+    return target_node
+
+
+def _agent_debug_log(
+    location: str,
+    message: str,
+    data: dict[str, Any],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": data,
+            "hypothesisId": hypothesis_id,
+        }
+        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 
 def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
@@ -307,17 +388,41 @@ def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
 
 
 def _is_read_only_node(cmds: Any, node_name: str) -> bool:
+    locked = _query_lock_node(cmds, node_name)
+    referenced = False
+    read_only_reference = False
     try:
-        if cmds.lockNode(node_name, q=True, lock=True):
-            return True
+        referenced = bool(cmds.referenceQuery(node_name, isNodeReferenced=True))
+        if referenced:
+            read_only_reference = bool(cmds.referenceQuery(node_name, isReadOnly=True))
     except RuntimeError:
         pass
+    # #region agent log
+    _agent_debug_log(
+        "fix_applier.py:_is_read_only_node",
+        "read_only_probe",
+        {
+            "node_name": node_name,
+            "locked": locked,
+            "referenced": referenced,
+            "read_only_reference": read_only_reference,
+        },
+        hypothesis_id="D",
+    )
+    # #endregion
+    if locked:
+        return True
+    return referenced and read_only_reference
+
+
+def _query_lock_node(cmds: Any, node_name: str) -> bool:
     try:
-        if cmds.referenceQuery(node_name, isNodeReferenced=True):
-            return bool(cmds.referenceQuery(node_name, isReadOnly=True))
+        value = cmds.lockNode(node_name, q=True, lock=True)
     except RuntimeError:
-        pass
-    return False
+        return False
+    if isinstance(value, list):
+        return bool(value[0]) if value else False
+    return bool(value)
 
 
 def _is_read_only_rename_error(exc: RuntimeError) -> bool:

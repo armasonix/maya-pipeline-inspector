@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Optional
 
-from pipeline_inspector.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot
+from pipeline_inspector.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot, ShapeSnapshot
 from pipeline_inspector.core.naming_fix import (
     propose_naming_fix,
     propose_texture_file_path_fix,
@@ -255,14 +255,37 @@ def _build_naming_action(
     if object_type == "texture":
         return _build_texture_file_naming_action(result, rule, node_index, pattern)
 
-    proposed_name = propose_naming_fix(current_name, pattern)
-    if not proposed_name or proposed_name == current_name:
+    rename_target = _resolve_naming_rename_target(
+        result,
+        node_index,
+        pattern=pattern,
+        current_name=current_name,
+        object_type=str(object_type or ""),
+    )
+    if rename_target is None:
+        return None
+    target_node, rename_before, proposed_name = rename_target
+    if not proposed_name or proposed_name == rename_before:
         return None
 
     node = node_index.find(result)
-    target_node = _target_node_name(result, node)
     block_reasons = _block_reasons(node, "low")
 
+    # #region agent log
+    _agent_debug_log(
+        "fix_plan.py:_build_naming_action",
+        "naming_fix_planned",
+        {
+            "rule_id": rule.id,
+            "object_type": object_type,
+            "current_name": current_name,
+            "rename_before": rename_before,
+            "proposed_name": proposed_name,
+            "target_node": target_node,
+        },
+        hypothesis_id="A",
+    )
+    # #endregion
 
     return FixAction(
         fix_id=_fix_id(result, NAMING_FIX_TYPE),
@@ -273,7 +296,7 @@ def _build_naming_action(
         target_kind=result.target_kind,
         target_id=result.target_id,
         target_node=target_node,
-        before_value=current_name,
+        before_value=rename_before,
         after_value=proposed_name,
         explanation=result.why or rule.why,
         referenced=bool(node.referenced) if node else False,
@@ -284,8 +307,140 @@ def _build_naming_action(
         undo_supported=True,
         blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
-        params={"pattern": pattern},
+        params={"pattern": pattern, "object_type": object_type},
     )
+
+
+def _find_transform_for_shape(
+    shape: ShapeSnapshot,
+    node_index: _NodeIndex,
+) -> Optional[tuple[str, str]]:
+    """Return (target_node, transform_short_name) for a mesh shape snapshot."""
+
+    transform = node_index.find_by_id(shape.transform_id)
+    if transform is not None and transform.type_name in ("", "transform"):
+        transform_name = transform.name or _short_dag_name(transform.full_name)
+        target_node = transform.full_name or transform.name
+        if transform_name and target_node:
+            return target_node, transform_name
+
+    transform_name = _transform_short_name_from_id(shape.transform_id)
+    if transform_name:
+        return transform_name, transform_name
+
+    parent_path = ""
+    if shape.full_name and "|" in shape.full_name:
+        parent_path = shape.full_name.rsplit("|", 1)[0]
+
+    if parent_path:
+        parent_node = node_index.find_by_id(parent_path)
+        if parent_node is not None:
+            parent_name = parent_node.name or _short_dag_name(parent_node.full_name)
+            target_node = parent_node.full_name or parent_node.name or parent_path
+            if parent_name and target_node:
+                return target_node, parent_name
+        parent_name = _short_dag_name(parent_path)
+        if parent_name:
+            return parent_path, parent_name
+
+    inferred_name = _infer_transform_name_from_shape_name(shape.name)
+    if inferred_name:
+        return inferred_name, inferred_name
+    return None
+
+
+def _transform_short_name_from_id(transform_id: str) -> str:
+    token = str(transform_id or "").strip()
+    if token.startswith("transform:"):
+        return token.split(":", 1)[1]
+    return ""
+
+
+def _infer_transform_name_from_shape_name(shape_name: str) -> str:
+    normalized = str(shape_name or "").strip()
+    if not normalized:
+        return ""
+    match = re.search(r"Shape\d*$", normalized)
+    if match:
+        return normalized[: match.start()]
+    return normalized
+
+
+def _resolve_naming_rename_target(
+    result: RuleResult,
+    node_index: _NodeIndex,
+    *,
+    pattern: str,
+    current_name: str,
+    object_type: str,
+) -> Optional[tuple[str, str, str]]:
+    """Resolve DAG target and before/after names for a naming rename fix."""
+
+    node = node_index.find(result)
+    default_target = _target_node_name(result, node)
+    if object_type == "mesh":
+        shape = node_index.find_shape(result)
+        if shape is not None:
+            transform_target = _find_transform_for_shape(shape, node_index)
+            if transform_target is not None:
+                target_node, transform_name = transform_target
+                proposed = propose_naming_fix(transform_name, pattern)
+                if proposed and proposed != transform_name:
+                    # #region agent log
+                    _agent_debug_log(
+                        "fix_plan.py:_resolve_naming_rename_target",
+                        "mesh_transform_resolved",
+                        {
+                            "shape_name": shape.name,
+                            "shape_full_name": shape.full_name,
+                            "transform_id": shape.transform_id,
+                            "transform_name": transform_name,
+                            "target_node": target_node,
+                            "proposed_name": proposed,
+                        },
+                        hypothesis_id="A",
+                    )
+                    # #endregion
+                    return target_node, transform_name, proposed
+
+    proposed_name = propose_naming_fix(current_name, pattern)
+    if not proposed_name or proposed_name == current_name:
+        return None
+    return default_target, current_name, proposed_name
+
+
+def _short_dag_name(name: str) -> str:
+    normalized = str(name or "").strip()
+    if not normalized:
+        return ""
+    return normalized.split("|")[-1].split(":")[-1]
+
+
+def _agent_debug_log(
+    location: str,
+    message: str,
+    data: dict[str, Any],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": data,
+            "hypothesisId": hypothesis_id,
+        }
+        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 
 def _build_texture_file_naming_action(
@@ -633,11 +788,14 @@ class _NodeIndex:
         self.scene_path = snapshot.scene_path or ""
         self.studio_environment = studio_environment
         self._by_key: dict[str, NodeSnapshot] = {}
+        self._shapes_by_id: dict[str, ShapeSnapshot] = {}
         self._file_dependencies: dict[str, _FileDependencyRef] = {}
         for node in snapshot.nodes:
             self._add(node.id, node)
             self._add(node.name, node)
             self._add(node.full_name, node)
+            if node.type_name == "transform":
+                self._add(f"transform:{node.name}", node)
         for material in snapshot.materials:
             self._add_material(material)
             self._add(
@@ -659,6 +817,7 @@ class _NodeIndex:
                 NodeSnapshot(id=shading_engine.node_id, name=shading_engine.name),
             )
         for shape in snapshot.shapes:
+            self._shapes_by_id[shape.node_id] = shape
             shape_node = NodeSnapshot(
                 id=shape.node_id,
                 name=shape.name,
@@ -697,6 +856,15 @@ class _NodeIndex:
             if node is not None:
                 return node
         return None
+
+    def find_shape(self, result: RuleResult) -> Optional[ShapeSnapshot]:
+        return self._shapes_by_id.get(str(result.target_id or ""))
+
+    def find_by_id(self, node_id: str) -> Optional[NodeSnapshot]:
+        normalized = str(node_id or "").strip()
+        if not normalized:
+            return None
+        return self._by_key.get(normalized)
 
     def _add(self, key: str, node: NodeSnapshot) -> None:
         if key:
