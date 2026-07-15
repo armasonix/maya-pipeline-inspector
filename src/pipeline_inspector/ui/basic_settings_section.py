@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, Optional
 
+from pipeline_inspector.core.governance import ROLE_OPTIONS
 from pipeline_inspector.maya.validation_pipeline import (
     ASSET_CLASS_NONE_ID,
     ProfileOption,
@@ -33,6 +34,8 @@ SETTINGS_DEFAULT_SCAN_SCOPE_COMBO_OBJECT_NAME = (
 )
 SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME = "pipelineInspectorSettingsUiDensityCombo"
 SETTINGS_THEME_COMBO_OBJECT_NAME = "pipelineInspectorSettingsThemeCombo"
+SETTINGS_ASSIGNED_ROLE_COMBO_OBJECT_NAME = "pipelineInspectorSettingsAssignedRoleCombo"
+SETTINGS_TRACKER_USERNAME_INPUT_OBJECT_NAME = "pipelineInspectorSettingsTrackerUsernameInput"
 SETTINGS_DOCS_URL_INPUT_OBJECT_NAME = "pipelineInspectorSettingsDocsUrlInput"
 
 _DEFAULT_WORKFLOW_PROFILE_ID = "artist_relaxed"
@@ -133,6 +136,26 @@ def build_basic_settings_section(
     wire_combo_changed(theme_combo, _on_theme_combo_changed)
     form.addRow("UI theme", theme_combo)
 
+    role_combo = _build_value_combo(
+        qt_widgets,
+        object_name=SETTINGS_ASSIGNED_ROLE_COMBO_OBJECT_NAME,
+        options=ROLE_OPTIONS,
+        selected_value=user_config.assigned_role,
+        tooltip="Self-declared pipeline role used for permission checks in the panel.",
+    )
+    wire_combo_changed(role_combo, on_preferences_changed)
+    form.addRow("Assigned role", role_combo)
+
+    tracker_username_input = qt_widgets.QLineEdit(user_config.tracker_username)
+    tracker_username_input.setObjectName(SETTINGS_TRACKER_USERNAME_INPUT_OBJECT_NAME)
+    tracker_username_input.setPlaceholderText("Ftrack/Cerebro username (optional)")
+    tracker_username_input.setToolTip(
+        "Tracker username for Ftrack security roles and Cerebro group lookup. "
+        "Overrides OS username when set."
+    )
+    wire_line_edit_finished(tracker_username_input, on_preferences_changed)
+    form.addRow("Tracker username", tracker_username_input)
+
     docs_url_input = qt_widgets.QLineEdit(user_config.docs_url)
     docs_url_input.setObjectName(SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
     docs_url_input.setPlaceholderText(DEFAULT_USER_DOCS_URL)
@@ -173,6 +196,12 @@ def read_basic_user_preferences_from_view(
     )
     density_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME)
     theme_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_THEME_COMBO_OBJECT_NAME)
+    role_combo = find_child(view, qt_widgets.QComboBox, SETTINGS_ASSIGNED_ROLE_COMBO_OBJECT_NAME)
+    tracker_username_input = find_child(
+        view,
+        qt_widgets.QLineEdit,
+        SETTINGS_TRACKER_USERNAME_INPUT_OBJECT_NAME,
+    )
     docs_url_input = find_child(view, qt_widgets.QLineEdit, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
 
     default_profile_id = _combo_data(profile_combo)
@@ -180,6 +209,8 @@ def read_basic_user_preferences_from_view(
     default_scan_scope = _combo_data(scan_scope_combo, options=_SCAN_SCOPE_OPTIONS) or "scene"
     ui_density = _combo_data(density_combo, options=_UI_DENSITY_OPTIONS) or "comfortable"
     theme = _combo_data(theme_combo, options=_THEME_OPTIONS) or "classic"
+    assigned_role = _combo_data(role_combo, options=ROLE_OPTIONS) or "technical_artist"
+    tracker_username = _line_edit_text(tracker_username_input)
 
     if default_scan_scope not in SUPPORTED_SCAN_SCOPES:
         default_scan_scope = "scene"
@@ -195,6 +226,8 @@ def read_basic_user_preferences_from_view(
         default_scan_scope=default_scan_scope,
         ui_density=ui_density,
         theme=theme,
+        assigned_role=assigned_role,
+        tracker_username=tracker_username,
         docs_url=docs_url,
     )
 
@@ -232,6 +265,20 @@ def update_basic_settings_view(
         _THEME_OPTIONS,
         user_config.theme,
     )
+    _set_value_combo_selection(
+        find_child(view, qt_widgets.QComboBox, SETTINGS_ASSIGNED_ROLE_COMBO_OBJECT_NAME),
+        ROLE_OPTIONS,
+        user_config.assigned_role,
+    )
+    tracker_username_input = find_child(
+        view,
+        qt_widgets.QLineEdit,
+        SETTINGS_TRACKER_USERNAME_INPUT_OBJECT_NAME,
+    )
+    if tracker_username_input is not None:
+        set_text = getattr(tracker_username_input, "setText", None)
+        if set_text is not None:
+            set_text(user_config.tracker_username)
     docs_url_input = find_child(view, qt_widgets.QLineEdit, SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
     if docs_url_input is not None:
         set_text = getattr(docs_url_input, "setText", None)

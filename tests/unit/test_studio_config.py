@@ -15,6 +15,7 @@ from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DeadlineConnectorSettings,
     DiscordConnectorSettings,
+    GovernanceSettings,
     PipelineSettings,
     ReadinessCheckRequirements,
     ReadinessSettings,
@@ -615,3 +616,21 @@ def test_resolve_studio_config_for_headless_discovers_env_path(tmp_path: Path, m
 
     assert resolved is not None
     assert resolved.studio_name == "Env Studio"
+
+
+def test_studio_config_round_trips_governance_section(tmp_path: Path):
+    config = StudioConfig(
+        studio_name="Example Studio",
+        governance=GovernanceSettings(
+            enforced_role="pipeline_td",
+            tracker_role_map={"Pipeline Supervisor": "pipeline_td"},
+            capability_denials={"animator": ("submit_farm",)},
+        ),
+    )
+    path = tmp_path / "pipeline_inspector_studio.json"
+    save_studio_config(path, config)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert payload["governance"]["enforced_role"] == "pipeline_td"
+    assert payload["governance"]["tracker_role_map"]["Pipeline Supervisor"] == "pipeline_td"
+    assert payload["governance"]["capability_denials"]["animator"] == ["submit_farm"]

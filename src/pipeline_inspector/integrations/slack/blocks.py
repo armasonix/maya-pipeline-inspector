@@ -81,6 +81,7 @@ def format_validation_blocks(
     matched_events: tuple[str, ...],
     report_link: str | None = None,
     thread_ts: str | None = None,
+    reporter_line: str = "",
 ) -> dict[str, Any]:
     """Format a Slack Block Kit payload for a validation summary."""
 
@@ -92,12 +93,24 @@ def format_validation_blocks(
     event_labels = ", ".join(_EVENT_LABELS.get(event, event) for event in matched_events)
     data = validation_summary_from_context(context, event_labels=event_labels)
     text = render_validation_summary_text(data, platform="chat")
-    blocks: list[dict[str, Any]] = [
+    blocks: list[dict[str, Any]] = []
+    normalized_reporter = str(reporter_line or "").strip()
+    if normalized_reporter:
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*From:* {normalized_reporter}",
+                },
+            }
+        )
+    blocks.append(
         {
             "type": "section",
             "text": {"type": "mrkdwn", "text": text},
-        },
-    ]
+        }
+    )
     if report_link:
         blocks.append(
             {

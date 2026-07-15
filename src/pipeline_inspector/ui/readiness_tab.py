@@ -15,6 +15,7 @@ READINESS_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorReadinessStatusLabel"
 READINESS_RUN_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessRunButton"
 READINESS_SEND_SYSADMIN_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSysadminButton"
 READINESS_SEND_SUPPORT_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSupportButton"
+READINESS_SEND_SUPERVISOR_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSupervisorButton"
 READINESS_ACTION_BUTTONS_OBJECT_NAME = "pipelineInspectorReadinessActionButtons"
 
 

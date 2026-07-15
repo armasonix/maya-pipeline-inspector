@@ -101,12 +101,29 @@ def should_send_slack_notification(
         return False
     return bool(route_matched_events(settings, matched))
 
+def _dedupe_routes_by_webhook(
+    routes: tuple[tuple[str, str], ...],
+) -> tuple[tuple[str, str], ...]:
+    """Keep one POST per unique webhook URL."""
+
+    seen: set[str] = set()
+    deduped: list[tuple[str, str]] = []
+    for event_id, webhook_url in routes:
+        if webhook_url in seen:
+            continue
+        seen.add(webhook_url)
+        deduped.append((event_id, webhook_url))
+    return tuple(deduped)
+
 def send_slack_validation_notification(
     studio_config: StudioConfig | None,
     context: ValidationBlocksContext,
     *,
     thread_ts: str | None = None,
     client_factory: SlackClientFactory | None = None,
+    webhook_url_override: str | None = None,
+    force_notify: bool = False,
+    reporter_line: str = "",
 ) -> SlackNotificationResult:
     """Send Slack validation blocks to routed webhooks when settings match block events."""
 
@@ -119,7 +136,7 @@ def send_slack_validation_notification(
         return SlackNotificationResult(sent=False, skipped_reason="disabled")
 
     config = resolve_slack_config(studio_config)
-    if config is None:
+    if config is None and not str(webhook_url_override or "").strip():
         return SlackNotificationResult(sent=False, skipped_reason="incomplete_config")
 
     matched_events = matched_notify_events(
@@ -127,10 +144,20 @@ def send_slack_validation_notification(
         block_publish=context.block_publish,
         block_deadline=context.block_deadline,
     )
+    override_webhook = str(webhook_url_override or "").strip()
+    if force_notify and override_webhook and not matched_events:
+        matched_events = tuple(settings.notify_on) or (SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,)
     if not matched_events:
         return SlackNotificationResult(sent=False, skipped_reason="no_matching_events")
 
-    routes = route_matched_events(settings, matched_events)
+    if override_webhook:
+        primary_event = matched_events[0] if matched_events else SLACK_NOTIFY_EVENT_BLOCK_PUBLISH
+        routes: tuple[tuple[str, str], ...] = ((primary_event, override_webhook),)
+    else:
+        if config is None:
+            return SlackNotificationResult(sent=False, skipped_reason="incomplete_config")
+        routes = route_matched_events(settings, matched_events)
+    routes = _dedupe_routes_by_webhook(routes)
     if not routes:
         return SlackNotificationResult(sent=False, skipped_reason="no_routed_webhooks")
 
@@ -151,6 +178,7 @@ def send_slack_validation_notification(
         matched_events=matched_events,
         report_link=report_link,
         thread_ts=thread_ts,
+        reporter_line=reporter_line,
     )
     factory = client_factory or SlackClient
     client = factory()
@@ -183,6 +211,9 @@ def maybe_send_slack_validation_notification(
     result: Any,
     *,
     client_factory: SlackClientFactory | None = None,
+    webhook_url_override: str | None = None,
+    force_notify: bool = False,
+    reporter_line: str = "",
 ) -> SlackNotificationResult:
     """Send Slack validation blocks for a validation run result."""
 
@@ -193,4 +224,7 @@ def maybe_send_slack_validation_notification(
         context,
         thread_ts=thread_ts,
         client_factory=client_factory,
+        webhook_url_override=webhook_url_override,
+        force_notify=force_notify,
+        reporter_line=reporter_line,
     )

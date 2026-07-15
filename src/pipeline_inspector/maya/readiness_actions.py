@@ -11,9 +11,11 @@ from pipeline_inspector.integrations.readiness import (
     ReadinessNotifyResult,
     ReadinessReport,
     run_readiness_checks,
+)
+from pipeline_inspector.integrations.readiness.notify import (
+    ReadinessRecipient,
     send_readiness_report_to_telegram,
 )
-from pipeline_inspector.integrations.readiness.notify import ReadinessRecipient
 from pipeline_inspector.integrations.readiness.probes import (
     ReadinessProbes,
     normalize_plugin_name,

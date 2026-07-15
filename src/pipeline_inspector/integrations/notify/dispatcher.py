@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from pipeline_inspector.core.supervisor_routing import SupervisorRoutingDecision
 from pipeline_inspector.integrations.discord.notify import (
     DiscordClientFactory,
     DiscordNotificationResult,
@@ -79,27 +80,64 @@ def dispatch_validation_notifications(
     studio_config: StudioConfig | None,
     result: Any,
     *,
+    supervisor_route: SupervisorRoutingDecision | None = None,
+    force_notify: bool = False,
+    reporter_line: str = "",
     telegram_client_factory: TelegramClientFactory | None = None,
     discord_client_factory: DiscordClientFactory | None = None,
     slack_client_factory: SlackClientFactory | None = None,
 ) -> ValidationNotificationDispatchResult:
     """Fan out validation notifications to all enabled notification connectors."""
 
-    telegram_result = maybe_send_telegram_validation_notification(
-        studio_config,
-        result,
-        client_factory=telegram_client_factory,
-    )
-    discord_result = maybe_send_discord_validation_notification(
-        studio_config,
-        result,
-        client_factory=discord_client_factory,
-    )
-    slack_result = maybe_send_slack_validation_notification(
-        studio_config,
-        result,
-        client_factory=slack_client_factory,
-    )
+    route = supervisor_route.route if supervisor_route is not None else None
+    telegram_chat_id = route.telegram_chat_id.strip() if route is not None else ""
+    discord_webhook = route.discord_webhook_url.strip() if route is not None else ""
+    slack_webhook = route.slack_webhook_url.strip() if route is not None else ""
+
+    supervisor_only = force_notify and route is not None
+
+    if supervisor_only and not telegram_chat_id:
+        telegram_result = TelegramNotificationResult(
+            sent=False,
+            skipped_reason="not_in_supervisor_route",
+        )
+    else:
+        telegram_result = maybe_send_telegram_validation_notification(
+            studio_config,
+            result,
+            client_factory=telegram_client_factory,
+            chat_id_override=telegram_chat_id or None,
+            force_notify=force_notify,
+        )
+
+    if supervisor_only and not discord_webhook:
+        discord_result = DiscordNotificationResult(
+            sent=False,
+            skipped_reason="not_in_supervisor_route",
+        )
+    else:
+        discord_result = maybe_send_discord_validation_notification(
+            studio_config,
+            result,
+            client_factory=discord_client_factory,
+            webhook_url_override=discord_webhook or None,
+            force_notify=force_notify,
+        )
+
+    if supervisor_only and not slack_webhook:
+        slack_result = SlackNotificationResult(
+            sent=False,
+            skipped_reason="not_in_supervisor_route",
+        )
+    else:
+        slack_result = maybe_send_slack_validation_notification(
+            studio_config,
+            result,
+            client_factory=slack_client_factory,
+            webhook_url_override=slack_webhook or None,
+            force_notify=force_notify,
+            reporter_line=reporter_line,
+        )
     return ValidationNotificationDispatchResult(
         outcomes=(
             _outcome_from_telegram(telegram_result),
@@ -123,5 +161,5 @@ def report_validation_notification_outcomes(
             writer(f"{display_name} notification sent.")
         elif outcome.error_message:
             writer(f"{display_name} notification failed: {outcome.error_message}")
-        elif outcome.skipped_reason:
+        elif outcome.skipped_reason and outcome.skipped_reason != "not_in_supervisor_route":
             writer(f"{display_name} notification skipped: {outcome.skipped_reason}")

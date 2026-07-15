@@ -35,6 +35,10 @@ from pipeline_inspector.ui.bug_report_section import (
     build_bug_report_section,
     update_bug_report_view,
 )
+from pipeline_inspector.ui.governance_section import (
+    build_governance_section,
+    update_governance_view,
+)
 from pipeline_inspector.ui.settings_dirty_state import (
     DEFAULT_SETTINGS_STATUS_MESSAGE,
     SETTINGS_DIRTY_BANNER_OBJECT_NAME,
@@ -115,6 +119,7 @@ class SettingsActionCallbacks:
     on_cerebro_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
+    on_governance_changed: Optional[Callable[[], None]] = None
     on_readiness_settings_changed: Optional[Callable[[], None]] = None
     on_bug_report_settings_changed: Optional[Callable[[], None]] = None
     on_bug_report_enabled_changed: Optional[Callable[[bool], None]] = None
@@ -286,6 +291,7 @@ def update_settings_view(
     """Refresh settings controls from the active studio and user config."""
 
     update_studio_policy_view(view, qt_widgets, config)
+    update_governance_view(view, qt_widgets, config)
     update_support_and_roles_view(view, qt_widgets, config.readiness)
     update_connector_views(view, qt_widgets, config.connectors)
     update_tracker_views(view, qt_widgets, config.connectors)
@@ -514,6 +520,13 @@ def _build_studio_tab(
             config,
             on_require_tx_changed=callbacks.on_require_tx_changed,
             on_settings_changed=callbacks.on_studio_policy_changed,
+        )
+    )
+    content_layout.addWidget(
+        build_governance_section(
+            qt_widgets,
+            config,
+            on_settings_changed=callbacks.on_governance_changed,
         )
     )
     content_layout.addWidget(

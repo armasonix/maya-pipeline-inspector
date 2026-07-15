@@ -19,6 +19,17 @@ from pipeline_inspector.ui.user_preferences_ui import apply_user_preferences_to_
 from pipeline_inspector.user_config import UserPreferences
 
 
+def _find_all(widget: Any, object_name: str) -> list[Any]:
+    matches: list[Any] = []
+    stack = [widget]
+    while stack:
+        current = stack.pop()
+        if getattr(current, "object_name", None) == object_name:
+            matches.append(current)
+        stack.extend(getattr(current, "children", []))
+    return matches
+
+
 class FakeQAction:
     def __init__(self, label: str, callback: Any = None) -> None:
         self.label = label
@@ -309,9 +320,19 @@ def test_apply_ui_density_compact_stacks_details_below_short_issues_table():
 
 
 def test_apply_ui_density_compact_omits_make_waive_filter_button_and_adds_it_to_more_menu():
-    from pipeline_inspector.ui.waiver_manager import WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME
+    from pipeline_inspector.ui.waiver_manager import (
+        VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+        WaiverManagerCallbacks,
+    )
 
-    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+    widget = main_window.build_main_widget(
+        DensityFakeQtWidgets,
+        waiver_callbacks=WaiverManagerCallbacks(
+            on_make_waive=lambda: None,
+            on_report_supervisor=lambda: None,
+        ),
+        user_config=UserPreferences(ui_density="compact"),
+    )
 
     apply_user_preferences_to_panel(
         widget,
@@ -319,11 +340,36 @@ def test_apply_ui_density_compact_omits_make_waive_filter_button_and_adds_it_to_
         UserPreferences(ui_density="compact"),
     )
 
-    make_waive = _find(widget, WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME)
+    make_waive_buttons = _find_all(widget, VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME)
     overflow = _find(widget, main_window.VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME)
 
-    assert make_waive.visible is False
+    assert make_waive_buttons == []
     assert any(action.label == "Make Waive" for action in overflow.menu.actions)
+    assert any(action.label == "Report Supervisor" for action in overflow.menu.actions)
+
+
+def test_validate_filters_row_has_single_make_waive_button():
+    from pipeline_inspector.ui.waiver_manager import (
+        VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+        WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME,
+        WaiverManagerCallbacks,
+    )
+
+    widget = main_window.build_main_widget(
+        DensityFakeQtWidgets,
+        waiver_callbacks=WaiverManagerCallbacks(
+            on_make_waive=lambda: None,
+            on_report_supervisor=lambda: None,
+        ),
+        user_config=UserPreferences(ui_density="comfortable"),
+    )
+
+    validate_buttons = _find_all(widget, VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME)
+    waiver_buttons = _find_all(widget, WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME)
+
+    assert len(validate_buttons) == 1
+    assert len(waiver_buttons) == 1
+    assert validate_buttons[0].visible is True
 
 
 def test_apply_ui_density_comfortable_tightens_panel_header_gaps():

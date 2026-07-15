@@ -28,6 +28,8 @@ ADRs help keep these decisions visible as the codebase grows.
 | 0005 | GUI-first product philosophy | Accepted |
 | 0006 | Native Maya plugin (.mll) strategy | Accepted |
 | 0007 | Settings and Connectors architecture | Accepted |
+| 0008 | Role-based governance foundation | Accepted |
+| 0009 | Report-to-supervisor routing by role | Accepted |
 
 ## Status Values
 

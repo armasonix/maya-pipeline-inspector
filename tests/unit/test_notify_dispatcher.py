@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy  # noqa: F401
 from pipeline_inspector.core.scoring import HealthScore
+from pipeline_inspector.integrations.discord.notify import DiscordNotificationResult
 from pipeline_inspector.integrations.notify.dispatcher import (
     NOTIFICATION_CONNECTOR_IDS,
     ConnectorNotificationOutcome,
@@ -11,6 +12,8 @@ from pipeline_inspector.integrations.notify.dispatcher import (
     dispatch_validation_notifications,
     report_validation_notification_outcomes,
 )
+from pipeline_inspector.integrations.slack.notify import SlackNotificationResult
+from pipeline_inspector.integrations.telegram.notify import TelegramNotificationResult
 from pipeline_inspector.studio_config import (
     ConnectorSettings,
     DiscordConnectorSettings,
@@ -117,6 +120,33 @@ def test_report_validation_notification_outcomes_prints_sent_and_failed_messages
     ]
 
 
+def test_dispatch_validation_notifications_passes_force_notify_to_connectors(monkeypatch):
+    captured: list[bool] = []
+
+    def _capture_force(*_args, force_notify: bool = False, **_kwargs):
+        captured.append(force_notify)
+        from pipeline_inspector.integrations.telegram.notify import TelegramNotificationResult
+
+        return TelegramNotificationResult(sent=False, skipped_reason="disabled")
+
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
+        _capture_force,
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
+        _capture_force,
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
+        _capture_force,
+    )
+
+    dispatch_validation_notifications(StudioConfig(), _run_result(), force_notify=True)
+
+    assert captured == [True, True, True]
+
+
 def test_dispatch_validation_notifications_passes_studio_config_to_connectors(monkeypatch):
     captured_configs: list[StudioConfig | None] = []
 
@@ -149,3 +179,52 @@ def test_dispatch_validation_notifications_passes_studio_config_to_connectors(mo
     dispatch_validation_notifications(studio_config, _run_result())
 
     assert captured_configs == [studio_config, studio_config, studio_config]
+
+
+def test_dispatch_supervisor_report_only_calls_configured_connectors(monkeypatch):
+    from pipeline_inspector.core.supervisor_routing import SupervisorRoutingDecision
+    from pipeline_inspector.studio_config import SupervisorRoute
+
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("telegram"),
+            TelegramNotificationResult(sent=True),
+        )[1],
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("discord"),
+            DiscordNotificationResult(sent=True),
+        )[1],
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("slack"),
+            SlackNotificationResult(sent=True, routes_sent=1),
+        )[1],
+    )
+
+    supervisor_route = SupervisorRoutingDecision(
+        reporter_role="technical_artist",
+        route=SupervisorRoute(
+            supervisor_label="Pipeline TD",
+            slack_webhook_url="https://hooks.slack.com/services/supervisor",
+        ),
+        reason="test",
+    )
+    result = dispatch_validation_notifications(
+        StudioConfig(),
+        _run_result(),
+        supervisor_route=supervisor_route,
+        force_notify=True,
+    )
+
+    assert calls == ["slack"]
+    assert result.outcomes[0].skipped_reason == "not_in_supervisor_route"
+    assert result.outcomes[1].skipped_reason == "not_in_supervisor_route"
+    assert result.outcomes[2].sent is True

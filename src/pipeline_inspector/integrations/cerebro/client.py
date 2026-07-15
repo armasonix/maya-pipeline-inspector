@@ -91,6 +91,26 @@ class CerebroClient:
             return None
         return resolver(project, task_name)
 
+    def list_role_names(self, *, username: str = "") -> tuple[str, ...]:
+        """Return Cerebro group names for tracker role mapping."""
+
+        if not self._ensure_connected():
+            return ()
+        list_roles = getattr(self._database, "list_role_names", None)
+        if list_roles is None:
+            return ()
+        return tuple(list_roles(username=username))
+
+    def lookup_user_display_name(self, *, username: str = "") -> str:
+        """Return a human-readable Cerebro user name for the given login."""
+
+        if not self._ensure_connected():
+            return ""
+        lookup_name = getattr(self._database, "lookup_user_display_name", None)
+        if lookup_name is None:
+            return ""
+        return str(lookup_name(username=username) or "").strip()
+
     def create_task_note(self, *, task_id: int, content: str) -> dict[str, Any] | None:
         """Create a note message on a task and return the created message payload."""
 

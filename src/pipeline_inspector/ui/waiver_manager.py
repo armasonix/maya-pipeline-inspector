@@ -14,6 +14,8 @@ WAIVER_TABLE_OBJECT_NAME = "pipelineInspectorWaiverTable"
 WAIVER_REVOKE_BUTTON_OBJECT_NAME = "pipelineInspectorRevokeWaiverButton"
 WAIVER_REFRESH_BUTTON_OBJECT_NAME = "pipelineInspectorRefreshWaiversButton"
 WAIVER_MAKE_WAIVE_BUTTON_OBJECT_NAME = "pipelineInspectorMakeWaiveButton"
+VALIDATE_MAKE_WAIVE_BUTTON_OBJECT_NAME = "pipelineInspectorValidateMakeWaiveButton"
+VALIDATE_REPORT_SUPERVISOR_BUTTON_OBJECT_NAME = "pipelineInspectorValidateReportSupervisorButton"
 
 WAIVER_TABLE_COLUMNS = (
     "Status",
@@ -41,6 +43,7 @@ class WaiverManagerCallbacks:
     on_refresh: Optional[Callable[[], None]] = None
     on_revoke_selected: Optional[Callable[[], None]] = None
     on_make_waive: Optional[Callable[[], None]] = None
+    on_report_supervisor: Optional[Callable[[], None]] = None
     on_waiver_selected: Optional[Callable[[], None]] = None
 
 def build_waiver_manager(

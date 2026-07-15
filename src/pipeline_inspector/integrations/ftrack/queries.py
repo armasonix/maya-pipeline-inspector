@@ -56,3 +56,13 @@ def task_assignees_expression(task_id: str) -> str:
         f'select resource_id, resource.username from Appointment '
         f'where context_id is "{escaped}"'
     )
+
+
+def user_security_roles_expression(username: str) -> str:
+    escaped = username.strip().replace("\\", "\\\\").replace('"', '\\"')
+    return (
+        "select name from SecurityRole where id in ("
+        "select security_role_id from UserSecurityRole where user_id in ("
+        f'select id from User where username is "{escaped}"'
+        "))"
+    )

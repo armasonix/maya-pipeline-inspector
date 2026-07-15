@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector import __version__
+from pipeline_inspector.core.governance import (
+    Capability,
+    build_permission_resolver_from_runtime,
+)
+from pipeline_inspector.core.supervisor_routing import resolve_supervisor_route
 from pipeline_inspector.maya.panel_session import (
     load_runtime_configs_from_session,
     remember_panel_visible,
@@ -31,7 +36,6 @@ from pipeline_inspector.ui.farm_tab import (
     update_farm_tab,
 )
 from pipeline_inspector.ui.fix_queue import (
-    FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
     FIX_QUEUE_RISKY_CONFIRMATION_LABEL_OBJECT_NAME,
     FIX_QUEUE_TABLE_OBJECT_NAME,
     FixQueueActionCallbacks,
@@ -46,6 +50,7 @@ from pipeline_inspector.ui.fix_queue import (
     selected_fix_rows,
     update_risky_confirmation_label,
 )
+from pipeline_inspector.ui.governance_section import read_governance_from_view
 from pipeline_inspector.ui.issues_triage import (
     apply_combo_preference,
     read_issue_filter_prefs,
@@ -286,7 +291,6 @@ def _create_dockable_panel() -> Any:
             remember_user_config_path(user_config.config_path)
         _wire_issues_table_interactions(content, qt_widgets)
         _wire_waiver_manager_interactions(content, qt_widgets)
-        _wire_fix_queue_actions(content, qt_widgets)
         _wire_scene_change_reset(content, qt_widgets)
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
@@ -676,6 +680,10 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_governance_changed=lambda: _sync_governance_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_readiness_settings_changed=lambda: _sync_readiness_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -742,6 +750,29 @@ def _user_config_for_content(content: Any) -> UserPreferences:
     if isinstance(config, UserPreferences):
         return config
     return UserPreferences.default()
+
+
+def _permission_resolver_for_content(content: Any):
+    return build_permission_resolver_from_runtime(
+        studio=_studio_config_for_content(content),
+        user=_user_config_for_content(content),
+    )
+
+
+def _guard_panel_capability(
+    content: Any,
+    qt_widgets: Any,
+    capability: Capability,
+    *,
+    title: str = "Permission denied",
+    status_object_name: str = main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+) -> bool:
+    decision = _permission_resolver_for_content(content).require(capability)
+    if decision.allowed:
+        return True
+    _show_information_dialog(qt_widgets, title, decision.reason)
+    _set_label_text(content, qt_widgets, status_object_name, decision.reason)
+    return False
 
 
 def _session_rule_overrides_for_content(content: Any) -> dict[str, Any]:
@@ -1096,33 +1127,16 @@ def _sync_studio_policy_from_ui(content: Any, qt_widgets: Any) -> None:
     _set_studio_config(content, qt_widgets, updated)
 
 
-def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
-    #region agent log
-    import json as _json
-    import time as _time
-    from pathlib import Path as _Path
+def _sync_governance_from_ui(content: Any, qt_widgets: Any) -> None:
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+    governance = read_governance_from_view(settings_view, qt_widgets, base=current)
+    _set_studio_config(content, qt_widgets, current.with_updates(governance=governance))
 
-    _log_path = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-    try:
-        with _log_path.open("a", encoding="utf-8") as _handle:
-            _handle.write(
-                _json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "ui_launcher.py:_sync_readiness_from_ui",
-                        "message": "readiness sync triggered",
-                        "data": {"refresh_view": False},
-                        "timestamp": int(_time.time() * 1000),
-                        "hypothesisId": "B",
-                        "runId": "post-fix",
-                    },
-                    ensure_ascii=False,
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    #endregion
+
+def _sync_readiness_from_ui(content: Any, qt_widgets: Any) -> None:
     current = _studio_config_for_content(content)
     settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
     if settings_view is None:
@@ -1289,9 +1303,24 @@ def _commit_saved_settings_baselines(content: Any) -> None:
 
 
 def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    if not _guard_panel_capability(
+        content,
+        qt_widgets,
+        "edit_studio_settings",
+        title="Save Studio Config",
+    ):
+        return
+    if not _guard_panel_capability(
+        content,
+        qt_widgets,
+        "edit_connectors",
+        title="Save Studio Config",
+    ):
+        return
     _sync_deadline_connector_from_ui(content, qt_widgets)
     _sync_studio_environment_from_ui(content, qt_widgets)
     _sync_studio_policy_from_ui(content, qt_widgets)
+    _sync_governance_from_ui(content, qt_widgets)
     _sync_bug_report_from_ui(content, qt_widgets)
     config = _studio_config_for_content(content)
     path = _pick_settings_save_path(qt_widgets, config.config_path)
@@ -1321,6 +1350,16 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
 def _save_user_preferences_from_ui(content: Any, qt_widgets: Any) -> None:
     _sync_user_preferences_from_ui(content, qt_widgets)
     config = _user_config_for_content(content)
+    if config.extra_rule_paths and not _permission_resolver_for_content(content).allows(
+        "manage_rules"
+    ):
+        _guard_panel_capability(
+            content,
+            qt_widgets,
+            "manage_rules",
+            title="Save User Preferences",
+        )
+        return
     path = config.config_path or default_user_config_path()
     try:
         saved_path = save_user_config(path, config.with_updates(config_path=path))
@@ -1457,6 +1496,10 @@ def _waiver_manager_callbacks(
     return WaiverManagerCallbacks(
         on_refresh=lambda: _refresh_waiver_manager(_panel_content(panel_state), qt_widgets),
         on_make_waive=lambda: _waive_selected_issue_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
+        on_report_supervisor=lambda: _report_supervisor_from_ui(
             _panel_content(panel_state),
             qt_widgets,
         ),
@@ -1917,6 +1960,7 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
         dispatch_result = dispatch_validation_notifications(
             studio_config,
             result,
+            force_notify=False,
         )
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(content, qt_widgets, dispatch_result)
@@ -1924,10 +1968,79 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
         print(f"Validation notification dispatch failed: {exc}")
 
 
+def _report_supervisor_from_ui(content: Any, qt_widgets: Any) -> None:
+    """Send the latest validation summary to the configured supervisor route."""
+
+    result = getattr(content, "_pipeline_inspector_last_validation_result", None)
+    if result is None:
+        _set_label_text(
+            content,
+            qt_widgets,
+            main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+            "Report Supervisor: run Validate first.",
+        )
+        return
+
+    try:
+        from pipeline_inspector.integrations.notify.dispatcher import (
+            dispatch_validation_notifications,
+            report_validation_notification_outcomes,
+        )
+
+        studio_config = _studio_config_for_content(content)
+        resolver = _permission_resolver_for_content(content)
+        supervisor_route = resolve_supervisor_route(
+            studio_config.governance,
+            resolver.effective_role,
+        )
+        if supervisor_route is None:
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                "Report Supervisor: no route configured for your pipeline role.",
+            )
+            return
+
+        from pipeline_inspector.integrations.trackers.display_name import (
+            format_reporter_line,
+            resolve_tracker_display_name,
+        )
+
+        reporter_line = format_reporter_line(
+            display_name=resolve_tracker_display_name(
+                studio_config,
+                user=_user_config_for_content(content),
+            ),
+            pipeline_role=resolver.effective_role,
+        )
+
+        dispatch_result = dispatch_validation_notifications(
+            studio_config,
+            result,
+            supervisor_route=supervisor_route,
+            force_notify=True,
+            reporter_line=reporter_line,
+        )
+        report_validation_notification_outcomes(dispatch_result)
+        _append_validation_notification_status(
+            content,
+            qt_widgets,
+            dispatch_result,
+            prefix="Report Supervisor:",
+        )
+    except Exception as exc:  # noqa: BLE001
+        message = f"Report Supervisor failed: {exc}"
+        _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
+        print(message)
+
+
 def _append_validation_notification_status(
     content: Any,
     qt_widgets: Any,
     dispatch_result: Any,
+    *,
+    prefix: str = "",
 ) -> None:
     """Mirror connector notification outcomes on the Validate status label."""
 
@@ -1962,7 +2075,10 @@ def _append_validation_notification_status(
         return
     current = str(text_fn()).strip()
     suffix = " ".join(lines)
-    set_text(f"{current} {suffix}".strip() if current else suffix)
+    message = f"{current} {suffix}".strip() if current else suffix
+    if prefix:
+        message = f"{prefix} {message}".strip()
+    set_text(message)
 
 
 def _finish_publish_preflight(content: Any, qt_widgets: Any, result: Any) -> None:
@@ -2126,6 +2242,14 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
 
+    if not _guard_panel_capability(
+        content,
+        qt_widgets,
+        "submit_farm",
+        title="Submit to Farm",
+    ):
+        return
+
     scene_path = getattr(content, "_pipeline_inspector_scene_path", "") or _current_scene_path()
     summary = getattr(content, "_pipeline_inspector_summary", None)
     validation_result = (
@@ -2283,7 +2407,11 @@ def _send_readiness_report_from_ui(
     if report is None:
         _set_readiness_status(content, qt_widgets, "Run Machine Readiness before sending a report.")
         return
-    result = send_readiness_report_action(config, report, recipient=recipient)
+    result = send_readiness_report_action(
+        config,
+        report,
+        recipient=recipient,
+    )
     content._pipeline_inspector_readiness_tab_state = result.tab_state
     _apply_readiness_tab_state(content, qt_widgets, result.tab_state)
 
@@ -3000,39 +3128,6 @@ def _wire_waiver_manager_interactions(content: Any, qt_widgets: Any) -> None:
             connect(lambda *_: _on_waiver_row_selected(content, qt_widgets))
 
 
-def _wire_fix_queue_actions(content: Any, qt_widgets: Any) -> None:
-    apply_selected = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        "pipelineInspectorApplySelectedFixesButton",
-    )
-    apply_safe = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        "pipelineInspectorApplySafeFixesButton",
-    )
-    export_fix_plan = _find_child(
-        content,
-        qt_widgets.QPushButton,
-        FIX_QUEUE_EXPORT_FIX_PLAN_BUTTON_OBJECT_NAME,
-    )
-    if apply_selected is not None:
-        clicked = getattr(apply_selected, "clicked", None)
-        connect = getattr(clicked, "connect", None)
-        if connect is not None:
-            connect(lambda *_: _apply_selected_fixes_from_ui(content, qt_widgets))
-    if apply_safe is not None:
-        clicked = getattr(apply_safe, "clicked", None)
-        connect = getattr(clicked, "connect", None)
-        if connect is not None:
-            connect(lambda *_: _apply_safe_fixes_from_ui(content, qt_widgets))
-    if export_fix_plan is not None:
-        clicked = getattr(export_fix_plan, "clicked", None)
-        connect = getattr(clicked, "connect", None)
-        if connect is not None:
-            connect(lambda *_: _export_fix_plan_from_ui())
-
-
 def _fix_queue_table(content: Any, qt_widgets: Any) -> Any:
     return _find_child(content, qt_widgets.QTableWidget, FIX_QUEUE_TABLE_OBJECT_NAME)
 
@@ -3098,6 +3193,8 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         )
         return
     if risky_fix_rows(selected):
+        if not _guard_panel_capability(content, qt_widgets, "apply_risky_fixes"):
+            return
         profile_id = getattr(content, "_pipeline_inspector_profile_id", "") or ""
         if not confirm_risky_fixes(qt_widgets, selected, profile_id=profile_id):
             _set_label_text(
