@@ -12,14 +12,20 @@ from pipeline_inspector.reports.json_report import (
     dumps_json_report,
     write_json_report,
 )
+from pipeline_inspector.reports.markdown_report import (
+    build_markdown_report,
+    write_markdown_report,
+)
 
 __all__ = [
     "FIX_PLAN_SCHEMA_VERSION",
     "REPORT_SCHEMA_VERSION",
     "build_fix_plan_export",
     "build_json_report",
+    "build_markdown_report",
     "dumps_fix_plan_export",
     "dumps_json_report",
     "write_fix_plan_export",
     "write_json_report",
+    "write_markdown_report",
 ]

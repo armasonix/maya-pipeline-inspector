@@ -131,6 +131,43 @@ class ShotGridClient:
             return None
         return _extract_created_entity(response.json_data)
 
+    def upload_note_attachment(
+        self,
+        *,
+        note_id: int,
+        file_bytes: bytes,
+        filename: str,
+        mime_type: str = "text/html",
+    ) -> ShotGridResponse:
+        """Upload a file and attach it to an existing ShotGrid note."""
+
+        boundary = "----PipelineInspectorBoundary"
+        body = _multipart_body(
+            boundary=boundary,
+            fields={
+                "filename": filename,
+                "mimetype": mime_type,
+            },
+            file_field="upload_file",
+            file_name=filename,
+            file_bytes=file_bytes,
+            file_mime_type=mime_type,
+        )
+        token = self._ensure_access_token()
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        request = HttpRequest(
+            method="POST",
+            url=self._build_url(f"/upload/Attachment/{int(note_id)}", None),
+            body=body,
+            headers=headers,
+        )
+        return self._transport(request, self._config.timeout_seconds)
+
     def _api_request(
         self,
         method: str,
@@ -256,3 +293,39 @@ def _extract_created_entity(json_data: dict[str, Any] | list[Any] | None) -> dic
     if isinstance(data, dict):
         return data
     return None
+
+
+def _multipart_body(
+    *,
+    boundary: str,
+    fields: Mapping[str, str],
+    file_field: str,
+    file_name: str,
+    file_bytes: bytes,
+    file_mime_type: str,
+) -> bytes:
+    lines: list[bytes] = []
+    for key, value in fields.items():
+        lines.extend(
+            [
+                f"--{boundary}".encode(),
+                f'Content-Disposition: form-data; name="{key}"'.encode(),
+                b"",
+                value.encode("utf-8"),
+            ]
+        )
+    lines.extend(
+        [
+            f"--{boundary}".encode(),
+            (
+                f'Content-Disposition: form-data; name="{file_field}"; '
+                f'filename="{file_name}"'
+            ).encode(),
+            f"Content-Type: {file_mime_type}".encode(),
+            b"",
+            file_bytes,
+            f"--{boundary}--".encode(),
+            b"",
+        ]
+    )
+    return b"\r\n".join(lines)

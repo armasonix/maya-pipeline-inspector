@@ -101,3 +101,15 @@ def test_format_tracker_publish_status_describes_success_skip_and_failure():
     )
     assert "failed" in failed
     assert "shotgrid_api_error" in failed
+
+    attached = format_tracker_publish_status(
+        SimpleNamespace(
+            display_name="Ftrack",
+            result=TrackerPublishResult(
+                published=True,
+                external_url="note-7",
+                metadata={"component_id": "comp-1"},
+            ),
+        )
+    )
+    assert "HTML report attached" in attached

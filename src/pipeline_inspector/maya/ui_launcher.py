@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import os
+import time
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from pipeline_inspector import __version__
 from pipeline_inspector.core.governance import (
@@ -1663,7 +1664,91 @@ def _export_fix_plan_from_ui() -> None:
     _print_export_result(export_fix_plan_action())
 
 
+def _studio_config_for_send_to_tracker(content: Any, qt_widgets: Any) -> StudioConfig:
+    """Read connector settings for publish without refreshing the whole Settings UI."""
+
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return current
+    connectors = read_connectors_from_settings_view(
+        settings_view,
+        qt_widgets,
+        base=current.connectors,
+    )
+    return current.with_updates(connectors=connectors)
+
+
+def _set_send_to_tracker_button_enabled(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    enabled: bool,
+) -> None:
+    button = _find_child(
+        content,
+        qt_widgets.QPushButton,
+        main_window.EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME,
+    )
+    set_enabled = getattr(button, "setEnabled", None)
+    if set_enabled is not None:
+        set_enabled(enabled)
+
+
+def _schedule_on_main_thread(callback: Callable[[], None]) -> None:
+    try:
+        import maya.utils
+
+        maya.utils.executeDeferred(callback)
+    except ImportError:
+        callback()
+
+
+def _agent_debug_log(
+    *,
+    location: str,
+    message: str,
+    hypothesis_id: str,
+    data: dict[str, object] | None = None,
+    run_id: str = "pre-fix",
+) -> None:
+    import json
+    import os
+    import time
+    from pathlib import Path
+
+    try:
+        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
+            "a",
+            encoding="utf-8",
+        ) as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "sessionId": "618f4f",
+                        "runId": run_id,
+                        "hypothesisId": hypothesis_id,
+                        "location": location,
+                        "message": message,
+                        "data": data or {},
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+            handle.flush()
+            os.fsync(handle.fileno())
+    except (OSError, TypeError, ValueError):
+        pass
+
+
 def _send_to_tracker_from_ui() -> None:
+    _send_started = time.time()
+    _agent_debug_log(
+        location="ui_launcher._send_to_tracker_from_ui",
+        message="send_to_tracker_enter",
+        hypothesis_id="H1",
+    )
     content = _active_panel_content()
     if content is None:
         return
@@ -1676,30 +1761,19 @@ def _send_to_tracker_from_ui() -> None:
         _set_reports_status_label(content, qt_widgets, message)
         return
 
-    from pipeline_inspector.integrations.trackers.publish_dispatcher import (
-        format_tracker_publish_status,
-        publish_validation_to_first_tracker,
-    )
-
-    try:
-        qt_widgets = load_qt_widgets()
-        _sync_connectors_from_ui(content, qt_widgets)
-        outcome = publish_validation_to_first_tracker(
-            _studio_config_for_content(content),
-            validation_result,
-        )
-        message = format_tracker_publish_status(outcome)
-    except Exception as exc:
-        message = f"Send to Tracker failed: {exc}"
-        print(message)
-        import traceback
-
-        traceback.print_exc()
-    print(message)
     qt_widgets = load_qt_widgets()
+    studio_config = _studio_config_for_send_to_tracker(content, qt_widgets)
     scanned_at_utc = getattr(content, "_pipeline_inspector_last_validated_at", "")
     scene_path = getattr(content, "_pipeline_inspector_scene_path", "")
     scan_scope = getattr(content, "_pipeline_inspector_scan_scope", "")
+
+    from pipeline_inspector.integrations.trackers.publish_dispatcher import (
+        format_tracker_publish_status,
+        preload_tracker_publish_modules,
+        publish_validation_to_first_tracker,
+    )
+
+    _set_send_to_tracker_button_enabled(content, qt_widgets, enabled=False)
     _set_reports_status_label(
         content,
         qt_widgets,
@@ -1707,9 +1781,72 @@ def _send_to_tracker_from_ui() -> None:
             scene_path=scene_path,
             scanned_at_utc=scanned_at_utc,
             scan_scope=scan_scope,
-            export_message=message,
+            export_message="Publishing validation summary to tracker...",
         ),
     )
+    _agent_debug_log(
+        location="ui_launcher._send_to_tracker_from_ui",
+        message="dispatch_tracker_publish_deferred",
+        hypothesis_id="H8",
+        data={
+            "elapsed_ms": int((time.time() - _send_started) * 1000),
+            "tracker_id": preload_tracker_publish_modules(studio_config),
+        },
+    )
+
+    def _run_publish_on_main_thread() -> None:
+        publish_started = time.time()
+        _agent_debug_log(
+            location="ui_launcher._send_to_tracker_deferred",
+            message="deferred_publish_enter",
+            hypothesis_id="H8",
+            run_id="post-fix",
+        )
+        try:
+            outcome = publish_validation_to_first_tracker(studio_config, validation_result)
+            message = format_tracker_publish_status(outcome)
+        except Exception as exc:
+            message = f"Send to Tracker failed: {exc}"
+            print(message)
+            import traceback
+
+            traceback.print_exc()
+        print(message)
+        _agent_debug_log(
+            location="ui_launcher._send_to_tracker_deferred",
+            message="deferred_publish_exit",
+            hypothesis_id="H8",
+            run_id="post-fix",
+            data={
+                "elapsed_ms": int((time.time() - publish_started) * 1000),
+                "status_message": message[:200],
+            },
+        )
+
+        finish_widgets = load_qt_widgets()
+        _set_send_to_tracker_button_enabled(content, finish_widgets, enabled=True)
+        _set_reports_status_label(
+            content,
+            finish_widgets,
+            main_window.build_reports_status_text(
+                scene_path=scene_path,
+                scanned_at_utc=scanned_at_utc,
+                scan_scope=scan_scope,
+                export_message=message,
+            ),
+        )
+        _agent_debug_log(
+            location="ui_launcher._send_to_tracker_from_ui",
+            message="send_to_tracker_exit",
+            hypothesis_id="H1",
+            run_id="post-fix",
+            data={
+                "elapsed_ms": int((time.time() - _send_started) * 1000),
+                "status_message": message[:200],
+            },
+        )
+
+    _schedule_on_main_thread(_run_publish_on_main_thread)
 
 
 def _panel_content(panel_state: dict[str, Any]) -> Any:

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pipeline_inspector.integrations.ftrack.client import FtrackClient
+from pipeline_inspector.integrations.ftrack.components import attach_html_report_to_task
 from pipeline_inspector.integrations.ftrack.config import FtrackConfig
 from pipeline_inspector.integrations.ftrack.helpers import (
     ftrack_username_hint,
@@ -22,10 +23,12 @@ from pipeline_inspector.integrations.ftrack.queries import (
 from pipeline_inspector.integrations.trackers.base import TrackerPublishResult
 from pipeline_inspector.integrations.trackers.publish import (
     ValidationPublishPayload,
+    format_tracker_note_content,
     format_validation_publish_summary,
     scene_task_lookup_candidates,
     scene_task_lookup_name,
 )
+from pipeline_inspector.integrations.trackers.report_bundle import TrackerReportBundle
 from pipeline_inspector.studio_config import StudioConfig, resolve_ftrack_config
 
 FtrackClientFactory = Callable[[FtrackConfig], FtrackClient]
@@ -165,6 +168,7 @@ def publish_validation_summary(
     studio_config: StudioConfig | None,
     payload: ValidationPublishPayload,
     *,
+    report_bundle: TrackerReportBundle | None = None,
     client_factory: FtrackClientFactory | None = None,
 ) -> TrackerPublishResult:
     """Publish a validation summary as an Ftrack task note."""
@@ -250,7 +254,7 @@ def publish_validation_summary(
 
     note_result = client.create_task_note(
         task_id=task_id,
-        content=format_validation_publish_summary(payload),
+        content=_tracker_note_content(payload, report_bundle),
     )
     if note_result.entity is None:
         if note_result.exception_message:
@@ -270,6 +274,18 @@ def publish_validation_summary(
     metadata: dict[str, str] = {}
     if note_id:
         metadata["note_id"] = note_id
+
+    if report_bundle is not None and report_bundle.html_report_path:
+        component_id, attach_error = attach_html_report_to_task(
+            client,
+            task_id=task_id,
+            file_path=report_bundle.html_report_path,
+            filename=report_bundle.attachment_filename,
+        )
+        if component_id:
+            metadata["component_id"] = component_id
+        elif attach_error:
+            metadata["attachment_error"] = attach_error
 
     status_result = client.update_task_status(
         task_id=task_id,
@@ -295,10 +311,30 @@ def maybe_publish_validation_summary(
     """Build a publish payload from a validation run and send it to Ftrack."""
 
     from pipeline_inspector.integrations.trackers.publish import validation_publish_payload_from_run
+    from pipeline_inspector.integrations.trackers.report_bundle import (
+        build_tracker_report_bundle_from_run,
+    )
 
-    payload = validation_publish_payload_from_run(result, report_path=report_path)
+    report_bundle = build_tracker_report_bundle_from_run(result, report_path=report_path)
+    payload = validation_publish_payload_from_run(
+        result,
+        report_path=report_bundle.html_report_path or report_path,
+    )
     return publish_validation_summary(
         studio_config,
         payload,
+        report_bundle=report_bundle,
         client_factory=client_factory,
     )
+
+
+def _tracker_note_content(
+    payload: ValidationPublishPayload,
+    report_bundle: TrackerReportBundle | None,
+) -> str:
+    if report_bundle is not None:
+        return format_tracker_note_content(
+            payload,
+            markdown_note=report_bundle.markdown_note,
+        )
+    return format_validation_publish_summary(payload)
