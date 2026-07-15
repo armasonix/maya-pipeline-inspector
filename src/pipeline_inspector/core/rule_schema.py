@@ -21,7 +21,10 @@ from pipeline_inspector.core.models import (
     ShadingEngineSnapshot,
     ShapeSnapshot,
 )
-from pipeline_inspector.core.naming_conventions import resolve_object_type
+from pipeline_inspector.core.naming_conventions import (
+    mesh_transform_name_from_shape,
+    resolve_object_type,
+)
 from pipeline_inspector.core.naming_fix import texture_filename_stem
 
 JsonDict = dict[str, Any]
@@ -808,6 +811,8 @@ class ValidationEngine:
                 current = self._read_value(target, name_field)
         else:
             current = self._read_value(target, name_field)
+            if object_type == "mesh" and isinstance(target.obj, ShapeSnapshot):
+                current = mesh_transform_name_from_shape(target.obj)
         if not isinstance(current, str) or not current.strip():
             return self._skipped(
                 rule,

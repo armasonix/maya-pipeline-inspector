@@ -804,6 +804,7 @@ def _resolve_member_shapes(cmds: Any, member_name: str) -> list[str]:
 
 
 def _shape_snapshot(cmds: Any, shape_name: str) -> ShapeSnapshot:
+    shape_name = _long_dag_path(cmds, shape_name)
     type_name = _node_type(cmds, shape_name)
     transform_name = _shape_transform_name(cmds, shape_name)
     vertex_count = _poly_count(cmds, shape_name, vertex=True)
@@ -849,7 +850,17 @@ def _shape_transform_name(cmds: Any, shape_name: str) -> Optional[str]:
     ) or []
     if not parents:
         return None
-    return str(parents[0])
+    return _long_dag_path(cmds, str(parents[0]))
+
+
+def _long_dag_path(cmds: Any, node_name: str) -> str:
+    normalized = str(node_name or "").strip()
+    if not normalized:
+        return ""
+    long_names = _call_cmds(cmds, "ls", [], normalized, long=True) or []
+    if long_names:
+        return str(long_names[0])
+    return normalized
 
 
 def _poly_count(cmds: Any, shape_name: str, **query_flags: Any) -> int:

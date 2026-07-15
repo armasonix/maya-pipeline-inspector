@@ -269,7 +269,26 @@ def _build_naming_action(
         return None
 
     node = node_index.find(result)
-    block_reasons = _block_reasons(node, "low")
+    shape = (
+        node_index.find_shape(result)
+        if str(object_type or "") == "mesh"
+        else None
+    )
+    ref_source = shape if shape is not None else node
+    referenced = bool(ref_source.referenced) if ref_source is not None else False
+    locked = bool(ref_source.locked) if ref_source is not None else False
+    if shape is not None and str(object_type or "") == "mesh":
+        transform = node_index.find_by_id(shape.transform_id)
+        if transform is not None:
+            locked = locked or bool(transform.locked)
+    reference_path = (
+        getattr(ref_source, "reference_path", None) if ref_source is not None else None
+    )
+    block_reasons = _block_reasons(
+        ref_source,
+        "low",
+        fix_type=NAMING_FIX_TYPE,
+    )
 
     # #region agent log
     _agent_debug_log(
@@ -282,6 +301,9 @@ def _build_naming_action(
             "rename_before": rename_before,
             "proposed_name": proposed_name,
             "target_node": target_node,
+            "referenced": referenced,
+            "locked": locked,
+            "blocked": bool(hard_block_reasons(block_reasons)),
         },
         hypothesis_id="A",
     )
@@ -299,10 +321,10 @@ def _build_naming_action(
         before_value=rename_before,
         after_value=proposed_name,
         explanation=result.why or rule.why,
-        referenced=bool(node.referenced) if node else False,
-        locked=bool(node.locked) if node else False,
-        reference_path=node.reference_path if node else None,
-        requires_reference_edit=bool(node.referenced) if node else False,
+        referenced=referenced,
+        locked=locked,
+        reference_path=reference_path,
+        requires_reference_edit=referenced,
         requires_supervisor=False,
         undo_supported=True,
         blocked=bool(hard_block_reasons(block_reasons)),
@@ -324,24 +346,15 @@ def _find_transform_for_shape(
         if transform_name and target_node:
             return target_node, transform_name
 
-    transform_name = _transform_short_name_from_id(shape.transform_id)
-    if transform_name:
-        return transform_name, transform_name
-
-    parent_path = ""
     if shape.full_name and "|" in shape.full_name:
         parent_path = shape.full_name.rsplit("|", 1)[0]
-
-    if parent_path:
-        parent_node = node_index.find_by_id(parent_path)
-        if parent_node is not None:
-            parent_name = parent_node.name or _short_dag_name(parent_node.full_name)
-            target_node = parent_node.full_name or parent_node.name or parent_path
-            if parent_name and target_node:
-                return target_node, parent_name
         parent_name = _short_dag_name(parent_path)
         if parent_name:
             return parent_path, parent_name
+
+    transform_name = _transform_short_name_from_id(shape.transform_id)
+    if transform_name:
+        return transform_name, transform_name
 
     inferred_name = _infer_transform_name_from_shape_name(shape.name)
     if inferred_name:
@@ -651,9 +664,16 @@ def swap_texture_version_in_path(
     start, end = match.span()
     return path[:start] + replacement + path[end:]
 
-def _block_reasons(node: Optional[NodeSnapshot], risk: str) -> list[str]:
+def _block_reasons(
+    node: Optional[NodeSnapshot],
+    risk: str,
+    *,
+    fix_type: Optional[str] = None,
+) -> list[str]:
     reasons: list[str] = []
-    if node is not None and node.locked:
+    referenced = bool(node.referenced) if node is not None else False
+    skip_reference_lock = referenced and fix_type == NAMING_FIX_TYPE
+    if node is not None and node.locked and not skip_reference_lock:
         reasons.append(_LOCKED_BLOCK_REASON)
     if risk == "high":
         reasons.append(HIGH_RISK_BLOCK_REASON)

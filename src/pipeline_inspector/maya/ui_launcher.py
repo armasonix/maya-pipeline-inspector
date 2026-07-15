@@ -3266,6 +3266,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         actions,
         allow_high_risk=allow_high_risk,
         allow_referenced=True,
+        allow_locked=True,
     )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
@@ -3277,18 +3278,82 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     _revalidate_with_current_scope(content, qt_widgets)
 
 
+def _ui_agent_debug_log(
+    location: str,
+    message: str,
+    data: dict[str, Any],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        import json
+        import time
+
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": data,
+            "hypothesisId": hypothesis_id,
+        }
+        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
+
+
 def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.core.fix_plan import NAMING_FIX_TYPE
     from pipeline_inspector.maya.fix_applier import apply_fix_actions
+    from pipeline_inspector.ui.fix_queue import HIGH_RISK, MEDIUM_RISK
 
     fix_plan = getattr(content, "_pipeline_inspector_fix_plan", None)
-    table = _fix_queue_table(content, qt_widgets)
-    stored_rows = getattr(content, "_pipeline_inspector_fix_rows", ())
-    if fix_plan is None or not stored_rows or table is None:
+    if fix_plan is None:
         return
-    fix_rows = fix_rows_from_table(table, stored_rows)
-    content._pipeline_inspector_fix_rows = fix_rows
-    safe_ids = {row.fix_id for row in safe_fix_rows(fix_rows) if row.fix_id}
-    actions = tuple(action for action in fix_plan.actions if action.fix_id in safe_ids)
+
+    def _include_apply_safe_action(action: Any) -> bool:
+        if action.requires_supervisor:
+            return False
+        if action.risk in (HIGH_RISK, MEDIUM_RISK):
+            return False
+        if action.blocked:
+            return bool(
+                action.fix_type == NAMING_FIX_TYPE
+                and (action.referenced or action.requires_reference_edit)
+            )
+        return True
+
+    # #region agent log
+    _ui_agent_debug_log(
+        "ui_launcher.py:_apply_safe_fixes_from_ui",
+        "apply_safe_filter",
+        {
+            "total_actions": len(getattr(fix_plan, "actions", ())),
+            "actions": [
+                {
+                    "fix_id": action.fix_id,
+                    "target_node": action.target_node,
+                    "blocked": action.blocked,
+                    "locked": action.locked,
+                    "referenced": action.referenced,
+                    "requires_reference_edit": action.requires_reference_edit,
+                    "risk": action.risk,
+                    "included": _include_apply_safe_action(action),
+                }
+                for action in fix_plan.actions
+            ],
+        },
+        hypothesis_id="I",
+    )
+    # #endregion
+
+    actions = tuple(
+        action
+        for action in fix_plan.actions
+        if _include_apply_safe_action(action)
+    )
     if not actions:
         _set_label_text(
             content,
@@ -3298,7 +3363,11 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
             "or unplannable fixes are skipped.",
         )
         return
-    report = apply_fix_actions(actions, allow_referenced=True)
+    report = apply_fix_actions(
+        actions,
+        allow_referenced=True,
+        allow_locked=True,
+    )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,

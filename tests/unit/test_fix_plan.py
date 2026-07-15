@@ -283,6 +283,59 @@ def test_fix_planner_resolves_mesh_transform_from_transform_id_when_node_missing
     assert action.target_node == "pHelix1"
 
 
+def test_fix_planner_allows_referenced_mesh_rename_when_shape_locked():
+    rule = RuleDefinition(
+        id="studio.naming.mesh.pattern",
+        name="Mesh name must match studio naming template",
+        enabled=True,
+        renderer=["common"],
+        scope="shape",
+        severity="warning",
+        owner="pipeline_td",
+        message="Mesh name does not match the studio naming template.",
+        why="Consistent mesh naming helps rigging and lighting.",
+        match=RuleMatch(criteria={"object_type": "mesh"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "mesh"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        node="pHelixShape1",
+        current_value="pHelixShape1",
+        expected_value=r"^geo_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        shapes=(
+            ShapeSnapshot(
+                node_id="mesh:pHelixShape1",
+                name="pHelixShape1",
+                full_name="|pHelix1|pHelixShape1",
+                type_name="mesh",
+                transform_id="transform:pHelix1",
+                referenced=True,
+                locked=True,
+            ),
+        )
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.referenced is True
+    assert action.requires_reference_edit is True
+    assert action.blocked is False
+    assert action.target_node == "|pHelix1"
+
+
 def test_apply_fix_availability_marks_matching_results():
     result = _failed_result(auto_fix_available=False)
     action = FixAction(

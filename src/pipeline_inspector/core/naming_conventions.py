@@ -125,3 +125,26 @@ def is_light_type(type_name: str) -> bool:
     """Return whether a Maya node type should be treated as a light source."""
 
     return str(type_name or "").lower().endswith("light")
+
+
+def mesh_transform_name_from_shape(shape: ShapeSnapshot) -> str:
+    """Return the Outliner-visible transform name for a mesh shape snapshot."""
+
+    transform_token = str(shape.transform_id or "").strip()
+    if transform_token.startswith("transform:"):
+        transform_name = transform_token.split(":", 1)[1].strip()
+        if transform_name:
+            return transform_name
+
+    full_name = str(shape.full_name or "").strip()
+    if "|" in full_name:
+        parent_path = full_name.rsplit("|", 1)[0]
+        parent_short = parent_path.split("|")[-1].split(":")[-1].strip()
+        if parent_short:
+            return parent_short
+
+    shape_name = str(shape.name or "").strip()
+    if not shape_name:
+        return ""
+    inferred = re.sub(r"Shape\d*$", "", shape_name, flags=re.IGNORECASE)
+    return inferred or shape_name
