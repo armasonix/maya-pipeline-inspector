@@ -34,7 +34,10 @@ def test_attach_html_report_to_note_uploads_component_and_links_note_component(t
         if action.get("action") == "get_upload_metadata":
             return FtrackResponse(
                 status_code=200,
-                body='[{"action": "get_upload_metadata", "url": "https://upload.test", "headers": {}}]',
+                body=(
+                    '[{"action": "get_upload_metadata", '
+                    '"url": "https://upload.test", "headers": {}}]'
+                ),
                 json_data=[
                     {
                         "action": "get_upload_metadata",
@@ -85,6 +88,9 @@ def test_attach_html_report_to_note_uploads_component_and_links_note_component(t
 
 
 def test_attach_html_report_to_note_reports_missing_file():
+    def _empty_transport(_request: HttpRequest, _timeout: float) -> FtrackResponse:
+        return FtrackResponse(status_code=200, body="[]", json_data=[])
+
     client = FtrackClient(
         FtrackConfig(
             api_url="https://studio.ftrackapp.com",
@@ -92,7 +98,7 @@ def test_attach_html_report_to_note_reports_missing_file():
             api_key="secret",
             project="Demo Project",
         ),
-        transport=lambda _request, _timeout: FtrackResponse(status_code=200, body="[]", json_data=[]),
+        transport=_empty_transport,
     )
 
     component_id, error = attach_html_report_to_note(

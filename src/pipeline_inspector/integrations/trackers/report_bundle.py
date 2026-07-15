@@ -28,36 +28,6 @@ def build_tracker_report_bundle_from_run(
 ) -> TrackerReportBundle:
     """Build tracker note content and an optional HTML report file from a validation run."""
 
-    # region agent log
-    import json
-    import time
-    from pathlib import Path as LogPath
-
-    _bundle_started = time.time()
-    try:
-        with (LogPath(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "H2",
-                        "location": "report_bundle.build_tracker_report_bundle_from_run",
-                        "message": "bundle_build_enter",
-                        "data": {
-                            "has_report_path": bool(str(report_path or "").strip()),
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
     snapshot = _snapshot_from_run(result)
     results = _results_from_run(result)
@@ -78,34 +48,6 @@ def build_tracker_report_bundle_from_run(
     temp_dir.mkdir(parents=True, exist_ok=True)
     html_path = temp_dir / f"{stem}_pipeline_inspector_report.html"
     write_html_report(html_path, snapshot, results)
-    # region agent log
-    try:
-        with (LogPath(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "H2",
-                        "location": "report_bundle.build_tracker_report_bundle_from_run",
-                        "message": "bundle_build_exit",
-                        "data": {
-                            "elapsed_ms": int((time.time() - _bundle_started) * 1000),
-                            "result_count": len(results),
-                            "markdown_len": len(markdown_note),
-                            "html_path": str(html_path),
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
     return TrackerReportBundle(
         markdown_note=markdown_note,
         html_report_path=str(html_path),

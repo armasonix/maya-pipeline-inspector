@@ -1,8 +1,6 @@
 """Maya menu/shelf icon path resolution and Qt icon loading."""
 from __future__ import annotations
 
-import json
-import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -51,32 +49,6 @@ _ICON_FILENAMES: Mapping[str, str] = {
     ICON_WIKI: "pipeline_inspector_wiki.png",
     ICON_REPORT_BUG: "pipeline_inspector_report_bug.png",
 }
-
-
-def _debug_log(
-    *,
-    location: str,
-    message: str,
-    data: dict[str, Any],
-    hypothesis_id: str,
-    run_id: str = "pre-fix",
-) -> None:
-    # region agent log
-    payload = {
-        "sessionId": "618f4f",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        with (repo_root() / "debug-618f4f.log").open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload) + "\n")
-    except OSError:
-        return
-    # endregion
 
 
 def repo_root() -> Path:
@@ -148,59 +120,32 @@ def apply_panel_header_icons(content: Any, qt_widgets: Any, qt_gui: Any) -> None
         CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME,
         DOCUMENTATION_BUTTON_OBJECT_NAME,
         REPORT_BUG_BUTTON_OBJECT_NAME,
-        SETTINGS_GEAR_BUTTON_OBJECT_NAME,
     )
     from pipeline_inspector.ui.settings_widgets import find_child
-
-    gear_button = find_child(content, qt_widgets.QPushButton, SETTINGS_GEAR_BUTTON_OBJECT_NAME)
-    gear_text = ""
-    if gear_button is not None:
-        gear_text = str(getattr(gear_button, "text", lambda: "")() or "")
 
     docs_button = find_child(
         content,
         qt_widgets.QPushButton,
         DOCUMENTATION_BUTTON_OBJECT_NAME,
     )
-    docs_icon_applied = (
-        apply_button_icon(docs_button, qt_gui, ICON_WIKI) if docs_button is not None else False
-    )
+    if docs_button is not None:
+        apply_button_icon(docs_button, qt_gui, ICON_WIKI)
 
     report_bug_button = find_child(
         content,
         qt_widgets.QPushButton,
         REPORT_BUG_BUTTON_OBJECT_NAME,
     )
-    report_bug_icon_applied = (
+    if report_bug_button is not None:
         apply_button_icon(report_bug_button, qt_gui, ICON_REPORT_BUG)
-        if report_bug_button is not None
-        else False
-    )
 
     updates_button = find_child(
         content,
         qt_widgets.QPushButton,
         CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME,
     )
-    updates_icon_applied = (
+    if updates_button is not None:
         apply_button_icon(updates_button, qt_gui, ICON_CHECK_FOR_UPDATES)
-        if updates_button is not None
-        else False
-    )
-
-    _debug_log(
-        location="ui_icons.apply_panel_header_icons",
-        message="panel header icon wiring",
-        data={
-            "gear_text": gear_text,
-            "docs_icon_applied": docs_icon_applied,
-            "report_bug_icon_applied": report_bug_icon_applied,
-            "updates_icon_applied": updates_icon_applied,
-            "wiki_exists": icon_path_exists(ICON_WIKI),
-            "report_bug_exists": icon_path_exists(ICON_REPORT_BUG),
-        },
-        hypothesis_id="A",
-    )
 
 
 def menu_item_image_kwargs(icon_id: str) -> dict[str, str]:

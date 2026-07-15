@@ -152,38 +152,6 @@ def publish_validation_summary(
 
     factory = client_factory or CerebroClient
     client = factory(config)
-    # region agent log
-    import json
-    import time
-    from pathlib import Path as LogPath
-
-    _publish_started = time.time()
-    try:
-        with (LogPath(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "H3",
-                        "location": "cerebro.publish_validation_summary",
-                        "message": "before_ping",
-                        "data": {
-                            "timeout_seconds": config.timeout_seconds,
-                            "project": config.project,
-                            "scene_name": payload.scene_name,
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
     if not client.ping():
         if client.last_error == "py_cerebro_missing":
             _module, import_error = probe_cerebro_runtime(
@@ -204,61 +172,8 @@ def publish_validation_summary(
             error_message=f"cerebro_connect_error: {client.last_error or 'connect_failed'}",
         )
 
-    # region agent log
-    try:
-        with (LogPath(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "H3",
-                        "location": "cerebro.publish_validation_summary",
-                        "message": "after_ping",
-                        "data": {
-                            "elapsed_ms": int((time.time() - _publish_started) * 1000),
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
-    _resolve_started = time.time()
     task_id = resolve_task_id_for_publish(client, config, payload)
-    # region agent log
-    try:
-        with (LogPath(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "H4",
-                        "location": "cerebro.publish_validation_summary",
-                        "message": "after_resolve_task_id",
-                        "data": {
-                            "elapsed_ms": int((time.time() - _resolve_started) * 1000),
-                            "task_id": task_id,
-                            "candidate_count": len(task_url_candidates(config, payload)),
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
     if task_id is None:
         tried = ", ".join(task_url_candidates(config, payload)) or "(none)"
         if client.last_error and client.last_error not in ("", "task_not_found"):
@@ -277,32 +192,6 @@ def publish_validation_summary(
         )
 
     note_content = _tracker_note_content(payload, report_bundle)
-    # region agent log
-    try:
-        with (LogPath(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "H5",
-                        "location": "cerebro.publish_validation_summary",
-                        "message": "before_create_task_note",
-                        "data": {
-                            "task_id": task_id,
-                            "note_content_len": len(note_content),
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
     note = client.create_task_note(
         task_id=task_id,
         content=note_content,

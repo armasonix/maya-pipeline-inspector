@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipeline_inspector.integrations.shotgrid import ShotGridClient, ShotGridConfig, ShotGridResponse
+from pipeline_inspector.integrations.shotgrid import (
+    ShotGridClient,
+    ShotGridConfig,
+    ShotGridResponse,
+)
 from pipeline_inspector.integrations.shotgrid.attachments import attach_html_report_to_note
 from pipeline_inspector.integrations.shotgrid.client import HttpRequest
 
@@ -53,6 +57,9 @@ def test_attach_html_report_to_note_uploads_multipart_payload(tmp_path: Path):
 
 
 def test_attach_html_report_to_note_reports_missing_file():
+    def _empty_transport(_request: HttpRequest, _timeout: float) -> ShotGridResponse:
+        return ShotGridResponse(status_code=200, body="{}", json_data={})
+
     client = ShotGridClient(
         ShotGridConfig(
             site_url="https://studio.shotgrid.autodesk.com",
@@ -60,7 +67,7 @@ def test_attach_html_report_to_note_reports_missing_file():
             api_key="secret",
             project="Demo Project",
         ),
-        transport=lambda _request, _timeout: ShotGridResponse(status_code=200, body="{}", json_data={}),
+        transport=_empty_transport,
     )
 
     attachment_id, error = attach_html_report_to_note(

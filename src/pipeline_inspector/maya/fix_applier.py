@@ -203,31 +203,6 @@ def _apply_rename_texture_file(action: FixAction, cmds: Any) -> AppliedFixRecord
                 return _blocked(action, [READ_ONLY_NODE_REASON])
             raise
 
-    # region agent log
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "618f4f",
-            "runId": "texture-file-fix-apply",
-            "hypothesisId": "H2",
-            "location": "fix_applier.py:_apply_rename_texture_file",
-            "message": "texture file rename applied",
-            "data": {
-                "target_node": action.target_node,
-                "file_before": raw_before,
-                "file_after": raw_after,
-                "node_after": node_after,
-            },
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
 
     return path_record
 
@@ -309,33 +284,7 @@ def _apply_rename_node(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if before_name is None:
         return _blocked(action, [MISSING_TARGET_REASON])
 
-    # region agent log
-    read_only = _is_read_only_node(cmds, action.target_node)
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "618f4f",
-            "runId": "rename-node-fix",
-            "hypothesisId": "H1",
-            "location": "fix_applier.py:_apply_rename_node",
-            "message": "rename_node_precheck",
-            "data": {
-                "target_node": action.target_node,
-                "proposed_name": proposed_name.strip(),
-                "read_only": read_only,
-            },
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
-
-    if read_only:
+    if _is_read_only_node(cmds, action.target_node):
         return _blocked(action, [READ_ONLY_NODE_REASON])
 
     try:

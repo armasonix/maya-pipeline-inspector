@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import time
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
@@ -1704,51 +1703,7 @@ def _schedule_on_main_thread(callback: Callable[[], None]) -> None:
         callback()
 
 
-def _agent_debug_log(
-    *,
-    location: str,
-    message: str,
-    hypothesis_id: str,
-    data: dict[str, object] | None = None,
-    run_id: str = "pre-fix",
-) -> None:
-    import json
-    import os
-    import time
-    from pathlib import Path
-
-    try:
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": run_id,
-                        "hypothesisId": hypothesis_id,
-                        "location": location,
-                        "message": message,
-                        "data": data or {},
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-            handle.flush()
-            os.fsync(handle.fileno())
-    except (OSError, TypeError, ValueError):
-        pass
-
-
 def _send_to_tracker_from_ui() -> None:
-    _send_started = time.time()
-    _agent_debug_log(
-        location="ui_launcher._send_to_tracker_from_ui",
-        message="send_to_tracker_enter",
-        hypothesis_id="H1",
-    )
     content = _active_panel_content()
     if content is None:
         return
@@ -1773,6 +1728,7 @@ def _send_to_tracker_from_ui() -> None:
         publish_validation_to_first_tracker,
     )
 
+    preload_tracker_publish_modules(studio_config)
     _set_send_to_tracker_button_enabled(content, qt_widgets, enabled=False)
     _set_reports_status_label(
         content,
@@ -1784,24 +1740,8 @@ def _send_to_tracker_from_ui() -> None:
             export_message="Publishing validation summary to tracker...",
         ),
     )
-    _agent_debug_log(
-        location="ui_launcher._send_to_tracker_from_ui",
-        message="dispatch_tracker_publish_deferred",
-        hypothesis_id="H8",
-        data={
-            "elapsed_ms": int((time.time() - _send_started) * 1000),
-            "tracker_id": preload_tracker_publish_modules(studio_config),
-        },
-    )
 
     def _run_publish_on_main_thread() -> None:
-        publish_started = time.time()
-        _agent_debug_log(
-            location="ui_launcher._send_to_tracker_deferred",
-            message="deferred_publish_enter",
-            hypothesis_id="H8",
-            run_id="post-fix",
-        )
         try:
             outcome = publish_validation_to_first_tracker(studio_config, validation_result)
             message = format_tracker_publish_status(outcome)
@@ -1812,16 +1752,6 @@ def _send_to_tracker_from_ui() -> None:
 
             traceback.print_exc()
         print(message)
-        _agent_debug_log(
-            location="ui_launcher._send_to_tracker_deferred",
-            message="deferred_publish_exit",
-            hypothesis_id="H8",
-            run_id="post-fix",
-            data={
-                "elapsed_ms": int((time.time() - publish_started) * 1000),
-                "status_message": message[:200],
-            },
-        )
 
         finish_widgets = load_qt_widgets()
         _set_send_to_tracker_button_enabled(content, finish_widgets, enabled=True)
@@ -1834,16 +1764,6 @@ def _send_to_tracker_from_ui() -> None:
                 scan_scope=scan_scope,
                 export_message=message,
             ),
-        )
-        _agent_debug_log(
-            location="ui_launcher._send_to_tracker_from_ui",
-            message="send_to_tracker_exit",
-            hypothesis_id="H1",
-            run_id="post-fix",
-            data={
-                "elapsed_ms": int((time.time() - _send_started) * 1000),
-                "status_message": message[:200],
-            },
         )
 
     _schedule_on_main_thread(_run_publish_on_main_thread)

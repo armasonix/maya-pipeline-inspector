@@ -155,37 +155,6 @@ class CerebroClient:
     def _ensure_connected(self) -> bool:
         if self._connected:
             return True
-        # region agent log
-        import json
-        import time
-        from pathlib import Path
-
-        _connect_started = time.time()
-        try:
-            with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-                "a",
-                encoding="utf-8",
-            ) as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "sessionId": "618f4f",
-                            "runId": "pre-fix",
-                            "hypothesisId": "H3",
-                            "location": "cerebro.client._ensure_connected",
-                            "message": "connect_enter",
-                            "data": {
-                                "timeout_seconds": self._config.timeout_seconds,
-                                "server_url": self._config.normalized_server_url,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except (OSError, TypeError, ValueError):
-            pass
-        # endregion
         if not self._uses_injected_port:
             _module, import_error = probe_cerebro_runtime(
                 service_tools_path=self._config.service_tools_path,
@@ -208,33 +177,6 @@ class CerebroClient:
         self._connected = bool(connected)
         if not self._connected:
             self._last_error = "cerebro_connect_failed"
-        # region agent log
-        try:
-            with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-                "a",
-                encoding="utf-8",
-            ) as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "sessionId": "618f4f",
-                            "runId": "pre-fix",
-                            "hypothesisId": "H3",
-                            "location": "cerebro.client._ensure_connected",
-                            "message": "connect_exit",
-                            "data": {
-                                "elapsed_ms": int((time.time() - _connect_started) * 1000),
-                                "connected": self._connected,
-                                "last_error": self._last_error,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except (OSError, TypeError, ValueError):
-            pass
-        # endregion
         return self._connected
 
 

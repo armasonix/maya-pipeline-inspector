@@ -286,31 +286,6 @@ def publish_validation_summary(
             metadata["component_id"] = component_id
         elif attach_error:
             metadata["attachment_error"] = attach_error
-        # region agent log
-        try:
-            import json
-            import time
-            from pathlib import Path
-
-            payload = {
-                "sessionId": "618f4f",
-                "runId": "ftrack-attach",
-                "hypothesisId": "H2",
-                "location": "ftrack/publish.py:publish_validation_summary",
-                "message": "ftrack_note_attachment_result",
-                "data": {
-                    "note_id": note_id,
-                    "component_id": component_id,
-                    "attach_error": attach_error,
-                },
-                "timestamp": int(time.time() * 1000),
-            }
-            log_path = Path(__file__).resolve().parents[4] / "debug-618f4f.log"
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        except OSError:
-            pass
-        # endregion
 
     status_result = client.update_task_status(
         task_id=task_id,

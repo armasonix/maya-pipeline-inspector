@@ -263,33 +263,6 @@ def _build_naming_action(
     target_node = _target_node_name(result, node)
     block_reasons = _block_reasons(node, "low")
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path as LogPath
-
-        payload = {
-            "sessionId": "618f4f",
-            "runId": "naming-fix-plan",
-            "hypothesisId": "H1",
-            "location": "fix_plan.py:_build_naming_action",
-            "message": "naming fix action planned",
-            "data": {
-                "rule_id": rule.id,
-                "target_id": result.target_id,
-                "before": current_name,
-                "after": proposed_name,
-                "target_node": target_node,
-            },
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = LogPath(__file__).resolve().parents[3] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
 
     return FixAction(
         fix_id=_fix_id(result, NAMING_FIX_TYPE),
@@ -344,34 +317,6 @@ def _build_texture_file_naming_action(
     if dependency is not None and dependency.is_udim and not dependency.exists:
         block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path as LogPath
-
-        payload = {
-            "sessionId": "618f4f",
-            "runId": "texture-file-fix-plan",
-            "hypothesisId": "H2",
-            "location": "fix_plan.py:_build_texture_file_naming_action",
-            "message": "texture file naming fix planned",
-            "data": {
-                "rule_id": rule.id,
-                "target_id": result.target_id,
-                "file_before": raw_path,
-                "file_after": proposed_path,
-                "node_after": proposed_node,
-                "exists": dependency.exists if dependency else False,
-            },
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = LogPath(__file__).resolve().parents[3] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
 
     return FixAction(
         fix_id=_fix_id(result, TEXTURE_FILE_FIX_TYPE),

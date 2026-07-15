@@ -2074,52 +2074,6 @@ def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> N
         if set_fixed_height is not None:
             set_fixed_height(tokens.panel_header_max_height)
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        content_layout = _widget_layout(content)
-        content_margins = getattr(content_layout, "getContentsMargins", None)
-        margins = None
-        if callable(content_margins):
-            margins = list(content_margins())
-        elif content_layout is not None:
-            margins = getattr(content_layout, "margins", None)
-        content_spacing = None
-        if content_layout is not None:
-            spacing_fn = getattr(content_layout, "spacing", None)
-            if callable(spacing_fn):
-                content_spacing = int(spacing_fn())
-            else:
-                content_spacing = getattr(content_layout, "spacing", None)
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_panel_header_density",
-                        "message": "applied panel header density",
-                        "data": {
-                            "content_margins": margins,
-                            "content_spacing": content_spacing,
-                            "panel_header_overflow": tokens.panel_header_overflow,
-                            "panel_header_max_height": tokens.panel_header_max_height,
-                            "header_chrome_applied": bool(tokens.panel_header_chrome_stylesheet),
-                        },
-                        "hypothesisId": "comfortable-header-gap",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "comfortable-header-inset",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _apply_main_tab_chrome_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2148,40 +2102,6 @@ def _apply_main_tab_chrome_density(content: Any, qt_widgets: Any, tokens: Any) -
             if set_margins is not None:
                 set_margins(0, 0, 0, 0)
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        document_mode = None
-        if set_document_mode is not None:
-            is_document_mode = getattr(tabs, "documentMode", None)
-            if callable(is_document_mode):
-                document_mode = bool(is_document_mode())
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_main_tab_chrome_density",
-                        "message": "applied main tab chrome density",
-                        "data": {
-                            "tab_chrome_applied": bool(tokens.main_tab_chrome_stylesheet),
-                            "document_mode": document_mode,
-                        },
-                        "hypothesisId": "tab-bar-gap",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "comfortable-header-inset",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2256,36 +2176,6 @@ def _apply_summary_header_density(content: Any, qt_widgets: Any, tokens: Any) ->
                     )
                 )
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        stored_counts = getattr(content, _SEVERITY_COUNTS_ATTR, None)
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_summary_header_density",
-                        "message": "applied severity count density",
-                        "data": {
-                            "stored_counts": stored_counts,
-                            "numbers_only": tokens.severity_counts_numbers_only,
-                        },
-                        "hypothesisId": "severity-parse",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "severity-count-fix",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _severity_count_for_density_apply(
@@ -2378,36 +2268,6 @@ def _apply_secondary_tabs_density(content: Any, qt_widgets: Any, tokens: Any) ->
             panel_max_width=tokens.panel_max_width,
         )
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_secondary_tabs_density",
-                        "message": "applied secondary tab button density",
-                        "data": {
-                            "button_columns": tokens.secondary_tab_button_columns,
-                            "severity_numbers_only": tokens.severity_counts_numbers_only,
-                            "panel_max_width": tokens.panel_max_width,
-                        },
-                        "hypothesisId": "compact-secondary-tabs",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "compact-polish",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _apply_button_grid_density(
@@ -2586,43 +2446,6 @@ def _apply_issues_table_density(content: Any, qt_widgets: Any, tokens: Any) -> N
         if set_max_width is not None:
             set_max_width(tokens.panel_max_width)
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        hidden_columns = sorted(tokens.hidden_issue_columns)
-        make_waive_visible = None
-        if make_waive_button is not None:
-            is_visible = getattr(make_waive_button, "isVisible", None)
-            make_waive_visible = bool(is_visible()) if callable(is_visible) else None
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_issues_table_density",
-                        "message": "applied issues table density",
-                        "data": {
-                            "hidden_columns": hidden_columns,
-                            "hidden_filters": sorted(tokens.hidden_filter_object_names),
-                            "make_waive_visible": make_waive_visible,
-                            "shrink_to_contents": tokens.issues_table_shrink_to_contents,
-                            "panel_max_width": tokens.panel_max_width,
-                        },
-                        "hypothesisId": "compact-width",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "compact-narrow-v2",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _shrink_issues_table_to_visible_columns(table: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2752,40 +2575,6 @@ def _apply_validate_issues_pane_layout(content: Any, qt_widgets: Any, tokens: An
         if set_minimum_width is not None:
             set_minimum_width(0 if tokens.issues_pane_vertical else DETAILS_PANEL_MIN_WIDTH)
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        orientation_fn = getattr(splitter, "orientation", None)
-        sizes_fn = getattr(splitter, "sizes", None)
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_validate_issues_pane_layout",
-                        "message": "applied issues pane layout",
-                        "data": {
-                            "vertical": tokens.issues_pane_vertical,
-                            "sizes": list(sizes_fn()) if callable(sizes_fn) else [],
-                            "orientation": int(orientation_fn())
-                            if callable(orientation_fn)
-                            else None,
-                        },
-                        "hypothesisId": "pane-layout",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "pane-fix",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _apply_validate_sticky_chrome_spacing(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2856,39 +2645,6 @@ def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None
         if adjust_size is not None and tokens.panel_max_width is not None:
             adjust_size()
 
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        content_max_width = None
-        get_max_width = getattr(content, "maximumWidth", None)
-        if callable(get_max_width):
-            content_max_width = int(get_max_width())
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a", encoding="utf-8"
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "location": "main_window.py:_apply_panel_shell_width",
-                        "message": "applied panel shell width",
-                        "data": {
-                            "panel_max_width": tokens.panel_max_width,
-                            "content_max_width": content_max_width,
-                        },
-                        "hypothesisId": "panel-width",
-                        "timestamp": int(time.time() * 1000),
-                        "runId": "compact-narrow-v2",
-                    }
-                )
-                + "\n"
-            )
-    except (OSError, TypeError, ValueError):
-        pass
-    # endregion
 
 
 def _widget_layout(widget: Any) -> Any | None:

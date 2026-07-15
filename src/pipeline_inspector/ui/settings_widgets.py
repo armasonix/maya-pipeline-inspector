@@ -439,10 +439,8 @@ def _refresh_plain_text_viewport(widget: Any) -> None:
 def _safe_widget_call(fn: Any) -> None:
     if not callable(fn):
         return
-    try:
+    with contextlib.suppress(RuntimeError, TypeError):
         fn()
-    except (RuntimeError, TypeError):
-        pass
 
 
 def _schedule_plain_text_placeholder_refresh(

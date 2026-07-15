@@ -54,17 +54,6 @@ def attach_html_report_to_note(
         ]
     )
     entity, exception_message = _extract_batch_operation(create_response.json_data)
-    # region agent log
-    _agent_debug_log(
-        "component_create",
-        {
-            "status_code": create_response.status_code,
-            "exception_message": exception_message,
-            "entity_id": str((entity or {}).get("id", "")),
-        },
-        hypothesis_id="H3",
-    )
-    # endregion
     if create_response.status_code != 200 or exception_message or entity is None:
         message = exception_message or f"component_create_failed_http_{create_response.status_code}"
         return "", message
@@ -81,18 +70,6 @@ def attach_html_report_to_note(
         ]
     )
     upload_meta, upload_error = _extract_upload_metadata(metadata_response.json_data)
-    # region agent log
-    _agent_debug_log(
-        "upload_metadata",
-        {
-            "status_code": metadata_response.status_code,
-            "upload_error": upload_error,
-            "response_keys": _response_keys(metadata_response.json_data),
-            "upload_url_present": bool(str((upload_meta or {}).get("url", "") or "").strip()),
-        },
-        hypothesis_id="H6",
-    )
-    # endregion
     if metadata_response.status_code != 200 or upload_error or upload_meta is None:
         message = upload_error or f"upload_metadata_failed_http_{metadata_response.status_code}"
         return "", message
@@ -132,17 +109,6 @@ def attach_html_report_to_note(
         ]
     )
     finalize_entity, finalize_error = _extract_batch_operation(finalize_response.json_data)
-    # region agent log
-    _agent_debug_log(
-        "component_location_create",
-        {
-            "status_code": finalize_response.status_code,
-            "exception_message": finalize_error,
-            "entity_id": str((finalize_entity or {}).get("id", "")),
-        },
-        hypothesis_id="H4",
-    )
-    # endregion
     if finalize_response.status_code != 200 or finalize_error or finalize_entity is None:
         message = (
             finalize_error
@@ -167,18 +133,6 @@ def attach_html_report_to_note(
         ]
     )
     link_entity, link_error = _extract_batch_operation(link_response.json_data)
-    # region agent log
-    _agent_debug_log(
-        "note_component_create",
-        {
-            "status_code": link_response.status_code,
-            "exception_message": link_error,
-            "note_id": normalized_note_id,
-            "component_id": component_id,
-        },
-        hypothesis_id="H5",
-    )
-    # endregion
     if link_response.status_code != 200 or link_error or link_entity is None:
         message = link_error or f"note_component_failed_http_{link_response.status_code}"
         return "", message
@@ -240,32 +194,3 @@ def _extract_upload_metadata(json_data: Any) -> tuple[dict[str, Any] | None, str
             return candidate, ""
     return None, exception_message or "missing_upload_metadata"
 
-
-def _response_keys(json_data: Any) -> list[str]:
-    if not isinstance(json_data, list) or not json_data:
-        return []
-    first = json_data[0]
-    if not isinstance(first, dict):
-        return []
-    return sorted(str(key) for key in first.keys())
-
-
-def _agent_debug_log(message: str, data: dict[str, Any], *, hypothesis_id: str) -> None:
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "618f4f",
-            "runId": "ftrack-attach-v2",
-            "hypothesisId": hypothesis_id,
-            "location": "ftrack/components.py:attach_html_report_to_note",
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parents[4] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass

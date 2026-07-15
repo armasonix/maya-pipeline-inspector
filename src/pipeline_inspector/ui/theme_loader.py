@@ -1,6 +1,7 @@
 """Load and apply packaged Qt stylesheets for the Maya panel."""
 from __future__ import annotations
 
+import contextlib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -134,10 +135,8 @@ def _widget_children(widget: Any) -> list[Any]:
 def _safe_widget_call(fn: Any) -> None:
     if not callable(fn):
         return
-    try:
+    with contextlib.suppress(RuntimeError, TypeError):
         fn()
-    except (RuntimeError, TypeError):
-        pass
 
 
 def _repolish_widget_tree(root: Any) -> None:

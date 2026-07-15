@@ -462,38 +462,6 @@ def install_menu(parent: Optional[str] = None) -> str:
         command=lambda *_: close_ui(),
         icon_id=ICON_CLOSE,
     )
-    # region agent log
-    try:
-        with (Path(__file__).resolve().parents[3] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "runId": "pre-fix",
-                        "hypothesisId": "F",
-                        "location": "commands.install_menu",
-                        "message": "menu installed",
-                        "data": {
-                            "first_item": OPEN_MENU_ITEM_LABEL,
-                            "last_item": CLOSE_MENU_ITEM_LABEL,
-                            "close_icon_exists": (
-                                Path(__file__).resolve().parents[3]
-                                / "maya_module"
-                                / "icons"
-                                / "pipeline_inspector_close.png"
-                            ).is_file(),
-                        },
-                        "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
     return str(menu_name)
 
 
