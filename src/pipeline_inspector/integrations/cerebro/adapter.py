@@ -130,6 +130,10 @@ class PycerebroHttpDatabaseAdapter:
         database = _require_database(self._database)
         return _list_role_names(database, username=username)
 
+    def lookup_user_display_name(self, *, username: str = "") -> str:
+        database = _require_database(self._database)
+        return _lookup_user_display_name(database, username=username)
+
 
 class PyCerebroDatabaseAdapter:
     """Wrap py_cerebro.database.Database when the server package is installed."""
@@ -230,6 +234,43 @@ class PyCerebroDatabaseAdapter:
     def list_role_names(self, *, username: str = "") -> tuple[str, ...]:
         database = _require_database(self._database)
         return _list_role_names(database, username=username)
+
+    def lookup_user_display_name(self, *, username: str = "") -> str:
+        database = _require_database(self._database)
+        return _lookup_user_display_name(database, username=username)
+
+
+def _lookup_user_display_name(database: Any, *, username: str = "") -> str:
+    normalized = normalize_cerebro_field(username).lower()
+    if not normalized:
+        return ""
+    queries: tuple[tuple[str, tuple[Any, ...]], ...] = (
+        (
+            "select name from users where del = 0 and lower(login) = lower(?) limit 1",
+            (normalized,),
+        ),
+        (
+            "select full_name from users where del = 0 and lower(login) = lower(?) limit 1",
+            (normalized,),
+        ),
+        (
+            "select name from users where del = 0 and lower(uname) = lower(?) limit 1",
+            (normalized,),
+        ),
+    )
+    for query, params in queries:
+        try:
+            rows = _database_query(database, True, query, *params)
+        except Exception:
+            continue
+        for row in rows or ():
+            try:
+                name = str(row[0] or "").strip()
+            except (IndexError, TypeError, ValueError):
+                continue
+            if name:
+                return name
+    return ""
 
 
 def _list_role_names(database: Any, *, username: str = "") -> tuple[str, ...]:

@@ -82,6 +82,7 @@ def dispatch_validation_notifications(
     *,
     supervisor_route: SupervisorRoutingDecision | None = None,
     force_notify: bool = False,
+    reporter_line: str = "",
     telegram_client_factory: TelegramClientFactory | None = None,
     discord_client_factory: DiscordClientFactory | None = None,
     slack_client_factory: SlackClientFactory | None = None,
@@ -94,40 +95,6 @@ def dispatch_validation_notifications(
     slack_webhook = route.slack_webhook_url.strip() if route is not None else ""
 
     supervisor_only = force_notify and route is not None
-
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        with (Path(__file__).resolve().parents[4] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "hypothesisId": "H4",
-                        "location": "dispatcher.py:dispatch_validation_notifications",
-                        "message": "dispatch validation notifications",
-                        "data": {
-                            "force_notify": force_notify,
-                            "supervisor_only": supervisor_only,
-                            "has_supervisor_route": route is not None,
-                            "has_slack_override": bool(slack_webhook),
-                            "has_telegram_override": bool(telegram_chat_id),
-                            "has_discord_override": bool(discord_webhook),
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
 
     if supervisor_only and not telegram_chat_id:
         telegram_result = TelegramNotificationResult(
@@ -169,6 +136,7 @@ def dispatch_validation_notifications(
             client_factory=slack_client_factory,
             webhook_url_override=slack_webhook or None,
             force_notify=force_notify,
+            reporter_line=reporter_line,
         )
     return ValidationNotificationDispatchResult(
         outcomes=(

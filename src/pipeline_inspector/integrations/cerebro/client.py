@@ -101,6 +101,16 @@ class CerebroClient:
             return ()
         return tuple(list_roles(username=username))
 
+    def lookup_user_display_name(self, *, username: str = "") -> str:
+        """Return a human-readable Cerebro user name for the given login."""
+
+        if not self._ensure_connected():
+            return ""
+        lookup_name = getattr(self._database, "lookup_user_display_name", None)
+        if lookup_name is None:
+            return ""
+        return str(lookup_name(username=username) or "").strip()
+
     def create_task_note(self, *, task_id: int, content: str) -> dict[str, Any] | None:
         """Create a note message on a task and return the created message payload."""
 

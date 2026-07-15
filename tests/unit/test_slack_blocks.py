@@ -102,3 +102,14 @@ def test_format_validation_blocks_includes_thread_ts_when_provided():
     )
 
     assert threaded["thread_ts"] == "1710000000.000100"
+
+
+def test_format_validation_blocks_includes_reporter_line_at_top():
+    payload = format_validation_blocks(
+        _context(),
+        matched_events=(SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,),
+        reporter_line="John Doe (Technical Artist)",
+    )
+
+    assert payload["blocks"][0]["text"]["text"] == "*From:* John Doe (Technical Artist)"
+    assert payload["blocks"][1]["text"]["text"].startswith("🔍 Health Validation")

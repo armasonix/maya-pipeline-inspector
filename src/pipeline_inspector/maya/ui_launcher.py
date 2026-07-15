@@ -1962,32 +1962,6 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
             result,
             force_notify=False,
         )
-        # region agent log
-        try:
-            import json
-            import time
-
-            with open(
-                r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
-                "a",
-                encoding="utf-8",
-            ) as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "sessionId": "618f4f",
-                            "hypothesisId": "H8",
-                            "location": "ui_launcher.py:_maybe_notify_validation",
-                            "message": "auto validation notify dispatch",
-                            "data": {"force_notify": False},
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # endregion
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(content, qt_widgets, dispatch_result)
     except Exception as exc:  # noqa: BLE001
@@ -2028,74 +2002,26 @@ def _report_supervisor_from_ui(content: Any, qt_widgets: Any) -> None:
             )
             return
 
-        # region agent log
-        try:
-            import json
-            import time
+        from pipeline_inspector.integrations.trackers.display_name import (
+            format_reporter_line,
+            resolve_tracker_display_name,
+        )
 
-            with open(
-                r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
-                "a",
-                encoding="utf-8",
-            ) as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "sessionId": "618f4f",
-                            "hypothesisId": "H5",
-                            "location": "ui_launcher.py:_report_supervisor_from_ui",
-                            "message": "manual supervisor validation report",
-                            "data": {
-                                "reporter_role": resolver.effective_role,
-                                "has_slack": bool(
-                                    supervisor_route.route.slack_webhook_url.strip()
-                                ),
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # endregion
+        reporter_line = format_reporter_line(
+            display_name=resolve_tracker_display_name(
+                studio_config,
+                user=_user_config_for_content(content),
+            ),
+            pipeline_role=resolver.effective_role,
+        )
 
         dispatch_result = dispatch_validation_notifications(
             studio_config,
             result,
             supervisor_route=supervisor_route,
             force_notify=True,
+            reporter_line=reporter_line,
         )
-        # region agent log
-        try:
-            import json
-            import time
-
-            slack_sent = next(
-                (outcome.sent for outcome in dispatch_result.outcomes if outcome.connector_id == "slack"),
-                False,
-            )
-            with open(
-                r"D:\Workspace\portfolio\maya-pipeline-inspector\debug-618f4f.log",
-                "a",
-                encoding="utf-8",
-            ) as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "sessionId": "618f4f",
-                            "hypothesisId": "H7",
-                            "location": "ui_launcher.py:_report_supervisor_from_ui",
-                            "message": "supervisor dispatch complete",
-                            "data": {"slack_sent": slack_sent},
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # endregion
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(
             content,
@@ -2485,7 +2411,6 @@ def _send_readiness_report_from_ui(
         config,
         report,
         recipient=recipient,
-        permission_resolver=_permission_resolver_for_content(content),
     )
     content._pipeline_inspector_readiness_tab_state = result.tab_state
     _apply_readiness_tab_state(content, qt_widgets, result.tab_state)

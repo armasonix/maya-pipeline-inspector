@@ -123,6 +123,7 @@ def send_slack_validation_notification(
     client_factory: SlackClientFactory | None = None,
     webhook_url_override: str | None = None,
     force_notify: bool = False,
+    reporter_line: str = "",
 ) -> SlackNotificationResult:
     """Send Slack validation blocks to routed webhooks when settings match block events."""
 
@@ -151,7 +152,7 @@ def send_slack_validation_notification(
 
     if override_webhook:
         primary_event = matched_events[0] if matched_events else SLACK_NOTIFY_EVENT_BLOCK_PUBLISH
-        routes = ((primary_event, override_webhook),)
+        routes: tuple[tuple[str, str], ...] = ((primary_event, override_webhook),)
     else:
         if config is None:
             return SlackNotificationResult(sent=False, skipped_reason="incomplete_config")
@@ -177,45 +178,12 @@ def send_slack_validation_notification(
         matched_events=matched_events,
         report_link=report_link,
         thread_ts=thread_ts,
+        reporter_line=reporter_line,
     )
     factory = client_factory or SlackClient
     client = factory()
     errors: list[str] = []
     routes_sent = 0
-
-    # region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        with (Path(__file__).resolve().parents[4] / "debug-618f4f.log").open(
-            "a",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "618f4f",
-                        "hypothesisId": "H6",
-                        "location": "slack/notify.py:send_slack_validation_notification",
-                        "message": "slack routes prepared",
-                        "data": {
-                            "force_notify": force_notify,
-                            "has_override": bool(override_webhook),
-                            "matched_events": list(matched_events),
-                            "route_count": len(routes),
-                            "webhook_urls": [url for _, url in routes],
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
-
     for event_id, webhook_url in routes:
         try:
             response = client.send_blocks(webhook_url, payload)
@@ -245,6 +213,7 @@ def maybe_send_slack_validation_notification(
     client_factory: SlackClientFactory | None = None,
     webhook_url_override: str | None = None,
     force_notify: bool = False,
+    reporter_line: str = "",
 ) -> SlackNotificationResult:
     """Send Slack validation blocks for a validation run result."""
 
@@ -257,4 +226,5 @@ def maybe_send_slack_validation_notification(
         client_factory=client_factory,
         webhook_url_override=webhook_url_override,
         force_notify=force_notify,
+        reporter_line=reporter_line,
     )

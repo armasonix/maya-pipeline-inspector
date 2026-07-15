@@ -21,3 +21,6 @@ class CerebroDatabasePort(Protocol):
 
     def list_role_names(self, *, username: str = "") -> tuple[str, ...]:
         """Return role or group names visible to the connected API session."""
+
+    def lookup_user_display_name(self, *, username: str = "") -> str:
+        """Return a human-readable user name for the given Cerebro login."""
