@@ -4,15 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from pipeline_inspector.integrations.notification_triggers import NOTIFY_EVENT_LABELS
 from pipeline_inspector.studio_config import (
     DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE,
     DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH,
 )
 
-_EVENT_LABELS = {
-    DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH: "Publish block",
-    DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE: "Deadline block",
-}
+_EVENT_LABELS = NOTIFY_EVENT_LABELS
 
 _COLOR_PUBLISH_BLOCK = 0xE74C3C
 _COLOR_DEADLINE_BLOCK = 0xF39C12

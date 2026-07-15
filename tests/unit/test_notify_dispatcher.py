@@ -147,40 +147,6 @@ def test_dispatch_validation_notifications_passes_force_notify_to_connectors(mon
     assert captured == [True, True, True]
 
 
-def test_dispatch_validation_notifications_passes_studio_config_to_connectors(monkeypatch):
-    captured_configs: list[StudioConfig | None] = []
-
-    def _capture_config(studio_config: StudioConfig | None, *_args, **_kwargs):
-        captured_configs.append(studio_config)
-        from pipeline_inspector.integrations.telegram.notify import TelegramNotificationResult
-
-        return TelegramNotificationResult(sent=False, skipped_reason="disabled")
-
-    monkeypatch.setattr(
-        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
-        _capture_config,
-    )
-    monkeypatch.setattr(
-        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
-        _capture_config,
-    )
-    monkeypatch.setattr(
-        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
-        _capture_config,
-    )
-
-    studio_config = StudioConfig(
-        connectors=ConnectorSettings(
-            telegram=TelegramConnectorSettings(enabled=True),
-            discord=DiscordConnectorSettings(enabled=True),
-            slack=SlackConnectorSettings(enabled=True),
-        )
-    )
-    dispatch_validation_notifications(studio_config, _run_result())
-
-    assert captured_configs == [studio_config, studio_config, studio_config]
-
-
 def test_dispatch_supervisor_report_only_calls_configured_connectors(monkeypatch):
     from pipeline_inspector.core.supervisor_routing import SupervisorRoutingDecision
     from pipeline_inspector.studio_config import SupervisorRoute
@@ -228,3 +194,112 @@ def test_dispatch_supervisor_report_only_calls_configured_connectors(monkeypatch
     assert result.outcomes[0].skipped_reason == "not_in_supervisor_route"
     assert result.outcomes[1].skipped_reason == "not_in_supervisor_route"
     assert result.outcomes[2].sent is True
+
+
+def test_dispatch_readiness_notifications_fans_out_to_all_connectors(monkeypatch):
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_readiness_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("telegram"),
+            TelegramNotificationResult(sent=True),
+        )[1],
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_readiness_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("discord"),
+            DiscordNotificationResult(sent=False, skipped_reason="no_matching_events"),
+        )[1],
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_readiness_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("slack"),
+            SlackNotificationResult(sent=True, routes_sent=1),
+        )[1],
+    )
+
+    from pipeline_inspector.integrations.notify.dispatcher import dispatch_readiness_notifications
+
+    result = dispatch_readiness_notifications(StudioConfig(), "readiness failed")
+
+    assert calls == ["telegram", "discord", "slack"]
+    assert result.outcomes[0].sent is True
+    assert result.outcomes[1].skipped_reason == "no_matching_events"
+    assert result.outcomes[2].sent is True
+
+
+def test_dispatch_farm_notifications_fans_out_to_all_connectors(monkeypatch):
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_farm_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("telegram"),
+            TelegramNotificationResult(sent=False, skipped_reason="disabled"),
+        )[1],
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_farm_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("discord"),
+            DiscordNotificationResult(sent=True),
+        )[1],
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_farm_notification",
+        lambda *_args, **_kwargs: (
+            calls.append("slack"),
+            SlackNotificationResult(sent=True, routes_sent=1),
+        )[1],
+    )
+
+    from pipeline_inspector.integrations.notify.dispatcher import (
+        FarmNotificationContext,
+        dispatch_farm_notifications,
+    )
+
+    result = dispatch_farm_notifications(
+        StudioConfig(),
+        FarmNotificationContext(job_id="42", job_name="hero_render", status="Completed"),
+    )
+
+    assert calls == ["telegram", "discord", "slack"]
+    assert result.outcomes[0].skipped_reason == "disabled"
+    assert result.outcomes[1].sent is True
+    assert result.outcomes[2].sent is True
+
+
+
+def test_dispatch_validation_notifications_passes_studio_config_to_connectors(monkeypatch):
+    captured_configs: list[StudioConfig | None] = []
+
+    def _capture_config(studio_config: StudioConfig | None, *_args, **_kwargs):
+        captured_configs.append(studio_config)
+        return TelegramNotificationResult(sent=False, skipped_reason="disabled")
+
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_telegram_validation_notification",
+        _capture_config,
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_discord_validation_notification",
+        _capture_config,
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.integrations.notify.dispatcher.maybe_send_slack_validation_notification",
+        _capture_config,
+    )
+
+    studio_config = StudioConfig(
+        connectors=ConnectorSettings(
+            telegram=TelegramConnectorSettings(enabled=True),
+            discord=DiscordConnectorSettings(enabled=True),
+            slack=SlackConnectorSettings(enabled=True),
+        )
+    )
+    dispatch_validation_notifications(studio_config, _run_result())
+
+    assert captured_configs == [studio_config, studio_config, studio_config]

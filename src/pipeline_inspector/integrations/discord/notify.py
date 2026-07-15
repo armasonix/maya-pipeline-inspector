@@ -12,9 +12,19 @@ from pipeline_inspector.integrations.discord.embed import (
     ValidationEmbedContext,
     format_validation_embed,
 )
+from pipeline_inspector.integrations.notification_triggers import (
+    NOTIFY_EVENT_BLOCK_PUBLISH,
+    NOTIFY_EVENT_ON_FARM_COMPLETE,
+    NOTIFY_EVENT_ON_READINESS_FAIL,
+    ValidationTriggerContext,
+    match_validation_notify_events,
+    standalone_event_enabled,
+)
+from pipeline_inspector.integrations.notify.routing import (
+    ResolvedNotifyRoute,
+    resolve_discord_routes,
+)
 from pipeline_inspector.studio_config import (
-    DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE,
-    DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH,
     DiscordConnectorSettings,
     StudioConfig,
     resolve_discord_config,
@@ -63,21 +73,34 @@ def validation_notification_context_from_run(result: Any) -> ValidationEmbedCont
     )
 
 
+def _configured_validation_events(settings: DiscordConnectorSettings) -> tuple[str, ...]:
+    configured = set(settings.notify_on)
+    for target in settings.notify_targets:
+        configured.update(target.events)
+    return tuple(configured)
+
+
 def matched_notify_events(
     settings: DiscordConnectorSettings,
     *,
     block_publish: bool,
     block_deadline: bool,
+    critical_count: int = 0,
+    health_score: int = 0,
 ) -> tuple[str, ...]:
-    """Return configured notify events that match active block flags."""
+    """Return configured notify events that match the validation run state."""
 
-    notify_on = set(settings.notify_on)
-    events: list[str] = []
-    if block_publish and DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH in notify_on:
-        events.append(DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH)
-    if block_deadline and DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE in notify_on:
-        events.append(DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE)
-    return tuple(events)
+    configured = _configured_validation_events(settings)
+    return match_validation_notify_events(
+        configured,
+        ValidationTriggerContext(
+            block_publish=block_publish,
+            block_deadline=block_deadline,
+            critical_count=critical_count,
+            health_score=health_score,
+        ),
+        notify_score_below=settings.notify_score_below,
+    )
 
 
 def should_send_discord_notification(
@@ -85,18 +108,24 @@ def should_send_discord_notification(
     *,
     block_publish: bool,
     block_deadline: bool,
+    critical_count: int = 0,
+    health_score: int = 0,
+    studio_config: StudioConfig | None = None,
 ) -> bool:
     """Return True when Discord notifications should be sent for this validation."""
 
     if not settings.enabled:
         return False
-    return bool(
-        matched_notify_events(
-            settings,
-            block_publish=block_publish,
-            block_deadline=block_deadline,
-        )
+    matched = matched_notify_events(
+        settings,
+        block_publish=block_publish,
+        block_deadline=block_deadline,
+        critical_count=critical_count,
+        health_score=health_score,
     )
+    if not matched:
+        return False
+    return bool(resolve_discord_routes(settings, studio_config, matched))
 
 
 def format_discord_http_error(response: Any) -> str:
@@ -137,38 +166,50 @@ def send_discord_validation_notification(
         return DiscordNotificationResult(sent=False, skipped_reason="incomplete_config")
 
     override_webhook = str(webhook_url_override or "").strip()
-    if override_webhook:
-        from pipeline_inspector.integrations.discord.config import DiscordConfig
-
-        config = DiscordConfig(webhook_url=override_webhook)
-    elif config is None:
-        return DiscordNotificationResult(sent=False, skipped_reason="incomplete_config")
 
     matched_events = matched_notify_events(
         settings,
         block_publish=context.block_publish,
         block_deadline=context.block_deadline,
+        critical_count=context.critical_count,
+        health_score=context.health_score,
     )
     if force_notify and override_webhook and not matched_events:
-        from pipeline_inspector.studio_config import DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH
-
-        matched_events = tuple(settings.notify_on) or (DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH,)
+        matched_events = tuple(settings.notify_on) or (NOTIFY_EVENT_BLOCK_PUBLISH,)
     if not matched_events:
         return DiscordNotificationResult(sent=False, skipped_reason="no_matching_events")
 
+    if override_webhook:
+        routes: tuple[ResolvedNotifyRoute, ...] = (
+            ResolvedNotifyRoute(events=matched_events, webhook_url=override_webhook),
+        )
+    else:
+        routes = resolve_discord_routes(settings, studio_config, matched_events)
+    if not routes:
+        return DiscordNotificationResult(sent=False, skipped_reason="no_routed_webhooks")
+
     embed = format_validation_embed(context, matched_events=matched_events)
     factory = client_factory or DiscordClient
-    try:
-        response = factory(config).send_embed(embed)
-    except Exception as exc:  # noqa: BLE001
-        return DiscordNotificationResult(sent=False, error_message=str(exc))
+    errors: list[str] = []
+    routes_sent = 0
+    for route in routes:
+        webhook_url = route.webhook_url.strip() or override_webhook
+        if not webhook_url:
+            continue
+        route_config = DiscordConfig(webhook_url=webhook_url)
+        try:
+            response = factory(route_config).send_embed(embed)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
+            continue
 
-    if response.status_code not in (200, 204):
-        return DiscordNotificationResult(
-            sent=False,
-            error_message=format_discord_http_error(response),
-        )
+        if response.status_code not in (200, 204):
+            errors.append(format_discord_http_error(response))
+            continue
+        routes_sent += 1
 
+    if routes_sent == 0:
+        return DiscordNotificationResult(sent=False, error_message="; ".join(errors))
     return DiscordNotificationResult(sent=True)
 
 
@@ -189,4 +230,88 @@ def maybe_send_discord_validation_notification(
         client_factory=client_factory,
         webhook_url_override=webhook_url_override,
         force_notify=force_notify,
+    )
+
+
+def _send_discord_content_to_routes(
+    studio_config: StudioConfig | None,
+    settings: DiscordConnectorSettings,
+    *,
+    matched_events: tuple[str, ...],
+    content: str,
+    client_factory: DiscordClientFactory | None = None,
+) -> DiscordNotificationResult:
+    routes = resolve_discord_routes(settings, studio_config, matched_events)
+    if not routes:
+        return DiscordNotificationResult(sent=False, skipped_reason="no_routed_webhooks")
+
+    factory = client_factory or DiscordClient
+    errors: list[str] = []
+    routes_sent = 0
+    for route in routes:
+        webhook_url = route.webhook_url.strip()
+        if not webhook_url:
+            continue
+        try:
+            response = factory(DiscordConfig(webhook_url=webhook_url)).request(
+                payload={"content": content}
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
+            continue
+        if response.status_code not in (200, 204):
+            errors.append(format_discord_http_error(response))
+            continue
+        routes_sent += 1
+
+    if routes_sent == 0:
+        return DiscordNotificationResult(sent=False, error_message="; ".join(errors))
+    return DiscordNotificationResult(sent=True)
+
+
+def maybe_send_discord_readiness_notification(
+    studio_config: StudioConfig | None,
+    message: str,
+    *,
+    client_factory: DiscordClientFactory | None = None,
+) -> DiscordNotificationResult:
+    settings = (
+        StudioConfig().connectors.discord
+        if studio_config is None
+        else studio_config.connectors.discord
+    )
+    if not settings.enabled:
+        return DiscordNotificationResult(sent=False, skipped_reason="disabled")
+    if not standalone_event_enabled(settings.notify_on, NOTIFY_EVENT_ON_READINESS_FAIL):
+        return DiscordNotificationResult(sent=False, skipped_reason="no_matching_events")
+    return _send_discord_content_to_routes(
+        studio_config,
+        settings,
+        matched_events=(NOTIFY_EVENT_ON_READINESS_FAIL,),
+        content=message,
+        client_factory=client_factory,
+    )
+
+
+def maybe_send_discord_farm_notification(
+    studio_config: StudioConfig | None,
+    message: str,
+    *,
+    client_factory: DiscordClientFactory | None = None,
+) -> DiscordNotificationResult:
+    settings = (
+        StudioConfig().connectors.discord
+        if studio_config is None
+        else studio_config.connectors.discord
+    )
+    if not settings.enabled:
+        return DiscordNotificationResult(sent=False, skipped_reason="disabled")
+    if not standalone_event_enabled(settings.notify_on, NOTIFY_EVENT_ON_FARM_COMPLETE):
+        return DiscordNotificationResult(sent=False, skipped_reason="no_matching_events")
+    return _send_discord_content_to_routes(
+        studio_config,
+        settings,
+        matched_events=(NOTIFY_EVENT_ON_FARM_COMPLETE,),
+        content=message,
+        client_factory=client_factory,
     )

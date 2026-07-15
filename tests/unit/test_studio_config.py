@@ -202,7 +202,17 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
                 enabled=True,
                 bot_token="token",
                 chat_id="12345",
-                notify_on=("block_publish",),
+                notify_on=("block_publish", "on_critical"),
+                notify_targets=(
+                    __import__(
+                        "pipeline_inspector.studio_config",
+                        fromlist=["NotifyTarget"],
+                    ).NotifyTarget(
+                        chat_id="99999",
+                        events=("on_critical",),
+                    ),
+                ),
+                notify_score_below=60,
             ),
             discord=DiscordConnectorSettings(
                 enabled=True,
@@ -236,7 +246,9 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.connectors.telegram.enabled is True
     assert loaded.connectors.telegram.chat_id == "12345"
     assert loaded.connectors.telegram.bot_token == "token"
-    assert loaded.connectors.telegram.notify_on == ("block_publish",)
+    assert loaded.connectors.telegram.notify_on == ("block_publish", "on_critical")
+    assert loaded.connectors.telegram.notify_score_below == 60
+    assert loaded.connectors.telegram.notify_targets[0].chat_id == "99999"
     assert loaded.connectors.discord.enabled is True
     assert loaded.connectors.discord.webhook_url == "https://discord.com/api/webhooks/1/secret"
     assert loaded.connectors.discord.notify_on == ("block_deadline",)
