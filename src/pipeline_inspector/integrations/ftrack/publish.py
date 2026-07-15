@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pipeline_inspector.integrations.ftrack.client import FtrackClient
-from pipeline_inspector.integrations.ftrack.components import attach_html_report_to_task
+from pipeline_inspector.integrations.ftrack.components import attach_html_report_to_note
 from pipeline_inspector.integrations.ftrack.config import FtrackConfig
 from pipeline_inspector.integrations.ftrack.helpers import (
     ftrack_username_hint,
@@ -275,10 +275,10 @@ def publish_validation_summary(
     if note_id:
         metadata["note_id"] = note_id
 
-    if report_bundle is not None and report_bundle.html_report_path:
-        component_id, attach_error = attach_html_report_to_task(
+    if report_bundle is not None and report_bundle.html_report_path and note_id:
+        component_id, attach_error = attach_html_report_to_note(
             client,
-            task_id=task_id,
+            note_id=note_id,
             file_path=report_bundle.html_report_path,
             filename=report_bundle.attachment_filename,
         )
@@ -286,6 +286,31 @@ def publish_validation_summary(
             metadata["component_id"] = component_id
         elif attach_error:
             metadata["attachment_error"] = attach_error
+        # region agent log
+        try:
+            import json
+            import time
+            from pathlib import Path
+
+            payload = {
+                "sessionId": "618f4f",
+                "runId": "ftrack-attach",
+                "hypothesisId": "H2",
+                "location": "ftrack/publish.py:publish_validation_summary",
+                "message": "ftrack_note_attachment_result",
+                "data": {
+                    "note_id": note_id,
+                    "component_id": component_id,
+                    "attach_error": attach_error,
+                },
+                "timestamp": int(time.time() * 1000),
+            }
+            log_path = Path(__file__).resolve().parents[4] / "debug-618f4f.log"
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+        # endregion
 
     status_result = client.update_task_status(
         task_id=task_id,
@@ -316,10 +341,7 @@ def maybe_publish_validation_summary(
     )
 
     report_bundle = build_tracker_report_bundle_from_run(result, report_path=report_path)
-    payload = validation_publish_payload_from_run(
-        result,
-        report_path=report_bundle.html_report_path or report_path,
-    )
+    payload = validation_publish_payload_from_run(result, report_path="")
     return publish_validation_summary(
         studio_config,
         payload,

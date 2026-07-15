@@ -8,28 +8,28 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from pipeline_inspector.integrations.ftrack.client import FtrackClient
+from pipeline_inspector.integrations.ftrack.client import FtrackClient, _extract_batch_operation
 
 BinaryTransport = Callable[[str, bytes, Mapping[str, str], float], int]
 
 
-def attach_html_report_to_task(
+def attach_html_report_to_note(
     client: FtrackClient,
     *,
-    task_id: str,
+    note_id: str,
     file_path: str,
     filename: str,
     binary_transport: BinaryTransport | None = None,
 ) -> tuple[str, str]:
-    """Attach an HTML report to a Ftrack task as a component.
+    """Attach an HTML report to a Ftrack note via NoteComponent.
 
     Returns ``(component_id, error_message)``. ``component_id`` is empty on failure.
     """
 
-    normalized_task_id = str(task_id or "").strip()
+    normalized_note_id = str(note_id or "").strip()
     source_path = Path(file_path)
-    if not normalized_task_id or not source_path.is_file():
-        return "", "missing_task_or_report_file"
+    if not normalized_note_id or not source_path.is_file():
+        return "", "missing_note_or_report_file"
 
     location_id = _server_location_id(client)
     if not location_id:
@@ -49,13 +49,22 @@ def attach_html_report_to_task(
                     "name": filename,
                     "file_type": source_path.suffix.lstrip(".") or "html",
                     "size": len(file_bytes),
-                    "parent_id": normalized_task_id,
-                    "parent_type": "Task",
                 },
             }
         ]
     )
-    entity, exception_message = _extract_batch_entity(create_response.json_data)
+    entity, exception_message = _extract_batch_operation(create_response.json_data)
+    # region agent log
+    _agent_debug_log(
+        "component_create",
+        {
+            "status_code": create_response.status_code,
+            "exception_message": exception_message,
+            "entity_id": str((entity or {}).get("id", "")),
+        },
+        hypothesis_id="H3",
+    )
+    # endregion
     if create_response.status_code != 200 or exception_message or entity is None:
         message = exception_message or f"component_create_failed_http_{create_response.status_code}"
         return "", message
@@ -63,13 +72,27 @@ def attach_html_report_to_task(
     metadata_response = client.request(
         [
             {
-                "action": "upload_component",
+                "action": "get_upload_metadata",
                 "component_id": component_id,
-                "size": len(file_bytes),
+                "file_name": filename,
+                "file_size": len(file_bytes),
+                "checksum": _content_md5(file_bytes),
             }
         ]
     )
     upload_meta, upload_error = _extract_upload_metadata(metadata_response.json_data)
+    # region agent log
+    _agent_debug_log(
+        "upload_metadata",
+        {
+            "status_code": metadata_response.status_code,
+            "upload_error": upload_error,
+            "response_keys": _response_keys(metadata_response.json_data),
+            "upload_url_present": bool(str((upload_meta or {}).get("url", "") or "").strip()),
+        },
+        hypothesis_id="H6",
+    )
+    # endregion
     if metadata_response.status_code != 200 or upload_error or upload_meta is None:
         message = upload_error or f"upload_metadata_failed_http_{metadata_response.status_code}"
         return "", message
@@ -108,12 +131,56 @@ def attach_html_report_to_task(
             }
         ]
     )
-    finalize_entity, finalize_error = _extract_batch_entity(finalize_response.json_data)
+    finalize_entity, finalize_error = _extract_batch_operation(finalize_response.json_data)
+    # region agent log
+    _agent_debug_log(
+        "component_location_create",
+        {
+            "status_code": finalize_response.status_code,
+            "exception_message": finalize_error,
+            "entity_id": str((finalize_entity or {}).get("id", "")),
+        },
+        hypothesis_id="H4",
+    )
+    # endregion
     if finalize_response.status_code != 200 or finalize_error or finalize_entity is None:
         message = (
             finalize_error
             or f"component_location_failed_http_{finalize_response.status_code}"
         )
+        return "", message
+
+    note_component_id = str(uuid.uuid4())
+    link_response = client.request(
+        [
+            {
+                "action": "create",
+                "entity_type": "NoteComponent",
+                "entity_key": [note_component_id],
+                "entity_data": {
+                    "__entity_type__": "NoteComponent",
+                    "id": note_component_id,
+                    "component_id": component_id,
+                    "note_id": normalized_note_id,
+                },
+            }
+        ]
+    )
+    link_entity, link_error = _extract_batch_operation(link_response.json_data)
+    # region agent log
+    _agent_debug_log(
+        "note_component_create",
+        {
+            "status_code": link_response.status_code,
+            "exception_message": link_error,
+            "note_id": normalized_note_id,
+            "component_id": component_id,
+        },
+        hypothesis_id="H5",
+    )
+    # endregion
+    if link_response.status_code != 200 or link_error or link_entity is None:
+        message = link_error or f"note_component_failed_http_{link_response.status_code}"
         return "", message
 
     return component_id, ""
@@ -153,27 +220,52 @@ def _default_binary_transport(
         return int(exc.code)
 
 
-def _extract_batch_entity(json_data: Any) -> tuple[dict[str, Any] | None, str]:
-    if not isinstance(json_data, list) or not json_data:
-        return None, "empty_batch_response"
-    first = json_data[0]
-    if not isinstance(first, dict):
-        return None, "invalid_batch_response"
-    exception_message = str(first.get("exception_message", "") or "").strip()
-    entity = first.get("entity")
-    if isinstance(entity, dict):
-        return entity, exception_message
-    return None, exception_message or "missing_entity"
-
-
 def _extract_upload_metadata(json_data: Any) -> tuple[dict[str, Any] | None, str]:
     if not isinstance(json_data, list) or not json_data:
         return None, "empty_upload_metadata"
     first = json_data[0]
     if not isinstance(first, dict):
         return None, "invalid_upload_metadata"
-    exception_message = str(first.get("exception_message", "") or "").strip()
-    metadata = first.get("metadata") or first.get("upload_metadata") or first
-    if isinstance(metadata, dict) and str(metadata.get("url", "") or "").strip():
-        return metadata, exception_message
+    _, exception_message = _extract_batch_operation(json_data)
+    if exception_message:
+        return None, exception_message
+
+    for candidate in (
+        first,
+        first.get("data"),
+        first.get("metadata"),
+        first.get("upload_metadata"),
+    ):
+        if isinstance(candidate, dict) and str(candidate.get("url", "") or "").strip():
+            return candidate, ""
     return None, exception_message or "missing_upload_metadata"
+
+
+def _response_keys(json_data: Any) -> list[str]:
+    if not isinstance(json_data, list) or not json_data:
+        return []
+    first = json_data[0]
+    if not isinstance(first, dict):
+        return []
+    return sorted(str(key) for key in first.keys())
+
+
+def _agent_debug_log(message: str, data: dict[str, Any], *, hypothesis_id: str) -> None:
+    try:
+        import json
+        import time
+
+        payload = {
+            "sessionId": "618f4f",
+            "runId": "ftrack-attach-v2",
+            "hypothesisId": hypothesis_id,
+            "location": "ftrack/components.py:attach_html_report_to_note",
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        log_path = Path(__file__).resolve().parents[4] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass

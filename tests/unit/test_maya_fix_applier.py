@@ -10,6 +10,9 @@ class FakeCmds:
     def __init__(self, attrs: Optional[dict[str, Any]] = None) -> None:
         self.attrs = attrs or {}
         self.nodes: dict[str, str] = {}
+        self.read_only_nodes: set[str] = set()
+        self.referenced_nodes: set[str] = set()
+        self.locked_nodes: set[str] = set()
         self.undo_calls: list[dict[str, Any]] = []
         self.set_calls: list[tuple[str, Any, dict[str, Any]]] = []
         self.rename_calls: list[tuple[str, str]] = []
@@ -31,6 +34,8 @@ class FakeCmds:
         return []
 
     def rename(self, node_name: str, new_name: str) -> str:
+        if node_name in self.read_only_nodes:
+            raise RuntimeError("Cannot rename a read only node.")
         self.rename_calls.append((node_name, new_name))
         current = self.nodes.get(node_name, node_name)
         parent = "|".join(current.split("|")[:-1])
@@ -38,6 +43,18 @@ class FakeCmds:
         self.nodes[node_name] = renamed
         self.nodes[renamed] = renamed
         return renamed
+
+    def lockNode(self, node_name: str, **kwargs: Any) -> bool:
+        if kwargs.get("q") and kwargs.get("lock"):
+            return node_name in self.locked_nodes
+        return False
+
+    def referenceQuery(self, node_name: str, **kwargs: Any) -> bool:
+        if kwargs.get("isNodeReferenced"):
+            return node_name in self.referenced_nodes
+        if kwargs.get("isReadOnly"):
+            return node_name in self.read_only_nodes
+        return False
 
     def getAttr(self, plug: str) -> Any:
         return self.attrs[plug]
@@ -103,6 +120,32 @@ def test_apply_rename_node_updates_short_name_inside_undo_chunk():
     record = report.records[0]
     assert record.before_value == "body_bad"
     assert record.after_value == "geo_body_bad"
+
+
+def test_apply_rename_node_blocks_read_only_target_without_crashing():
+    cmds = FakeCmds()
+    cmds.nodes["|world|body_bad"] = "|world|body_bad"
+    cmds.read_only_nodes.add("|world|body_bad")
+    cmds.referenced_nodes.add("|world|body_bad")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:body_bad:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:body_bad",
+        target_node="|world|body_bad",
+        before_value="body_bad",
+        after_value="geo_body_bad",
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == []
+    assert report.applied_count == 0
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["target_read_only"]
 
 
 def test_apply_fix_actions_uses_undo_chunk_and_records_before_after_values():

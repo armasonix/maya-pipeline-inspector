@@ -44,9 +44,19 @@ def test_format_tracker_note_content_appends_report_path_reference():
     note = format_tracker_note_content(
         _payload(report_path=r"C:\temp\report.html"),
         markdown_note="# Report",
+        include_report_path_reference=True,
     )
 
     assert "**Attached report path:** `C:\\temp\\report.html`" in note
+
+
+def test_format_tracker_note_content_omits_report_path_by_default():
+    note = format_tracker_note_content(
+        _payload(report_path=r"C:\temp\report.html"),
+        markdown_note="# Report",
+    )
+
+    assert "Attached report path" not in note
 
 
 def test_tracker_capabilities_describe_attachment_support():

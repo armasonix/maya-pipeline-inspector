@@ -122,8 +122,22 @@ def _widget_children(widget: Any) -> list[Any]:
     if children_attr is None:
         return []
     if callable(children_attr):
-        return list(children_attr() or [])
-    return list(children_attr)
+        try:
+            return list(children_attr() or [])
+        except TypeError:
+            return []
+    if isinstance(children_attr, list):
+        return children_attr
+    return []
+
+
+def _safe_widget_call(fn: Any) -> None:
+    if not callable(fn):
+        return
+    try:
+        fn()
+    except (RuntimeError, TypeError):
+        pass
 
 
 def _repolish_widget_tree(root: Any) -> None:
@@ -151,8 +165,7 @@ def _repolish_widget_tree(root: Any) -> None:
             except Exception:
                 pass
         update_fn = getattr(widget, "update", None)
-        if update_fn is not None:
-            update_fn()
+        _safe_widget_call(update_fn)
         stack.extend(_widget_children(widget))
 
 
@@ -169,11 +182,7 @@ def apply_panel_theme(content: Any, theme: str, *, dock: Any | None = None) -> s
         _apply_palette_theme(content, normalized)
     for widget in (root, content):
         _repolish_widget_tree(widget)
-        update_fn = getattr(widget, "update", None)
-        if update_fn is not None:
-            update_fn()
-        repaint_fn = getattr(widget, "repaint", None)
-        if repaint_fn is not None:
-            repaint_fn()
+        _safe_widget_call(getattr(widget, "update", None))
+        _safe_widget_call(getattr(widget, "repaint", None))
     content._pipeline_inspector_theme = normalized
     return normalized

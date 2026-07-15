@@ -376,5 +376,6 @@ def _tracker_note_content(
         return format_tracker_note_content(
             payload,
             markdown_note=report_bundle.markdown_note,
+            include_report_path_reference=bool(payload.report_path),
         )
     return format_validation_publish_summary(payload)

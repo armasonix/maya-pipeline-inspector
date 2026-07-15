@@ -427,17 +427,22 @@ def _apply_plain_text_palette(
 
 
 def _refresh_plain_text_viewport(widget: Any) -> None:
-    update = getattr(widget, "update", None)
-    if update is not None:
-        update()
+    _safe_widget_call(getattr(widget, "update", None))
     viewport_fn = getattr(widget, "viewport", None)
     if viewport_fn is None:
         return
-    with contextlib.suppress(TypeError):
+    with contextlib.suppress(TypeError, RuntimeError):
         viewport = viewport_fn()
-        viewport_update = getattr(viewport, "update", None)
-        if viewport_update is not None:
-            viewport_update()
+        _safe_widget_call(getattr(viewport, "update", None))
+
+
+def _safe_widget_call(fn: Any) -> None:
+    if not callable(fn):
+        return
+    try:
+        fn()
+    except (RuntimeError, TypeError):
+        pass
 
 
 def _schedule_plain_text_placeholder_refresh(
@@ -458,10 +463,11 @@ def _schedule_plain_text_placeholder_refresh(
         return
 
     def _refresh() -> None:
-        set_placeholder = getattr(widget, "setPlaceholderText", None)
-        if set_placeholder is not None:
-            set_placeholder(placeholder)
-        _refresh_plain_text_viewport(widget)
+        with contextlib.suppress(RuntimeError, TypeError):
+            set_placeholder = getattr(widget, "setPlaceholderText", None)
+            if callable(set_placeholder):
+                set_placeholder(placeholder)
+            _refresh_plain_text_viewport(widget)
 
     single_shot(0, _refresh)
 

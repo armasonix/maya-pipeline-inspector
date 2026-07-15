@@ -30,6 +30,7 @@ DEFAULT_UNDO_CHUNK_NAME = "Pipeline Inspector Apply Fixes"
 DEFAULT_TEXTURE_PATH_ATTR = "fileTextureName"
 REFERENCED_BLOCK_REASON = "target_referenced"
 LOCKED_BLOCK_REASON = "target_locked"
+READ_ONLY_NODE_REASON = "target_read_only"
 UNSUPPORTED_FIX_REASON = "unsupported_fix_type"
 MISSING_TARGET_REASON = "target_node_missing"
 MISSING_ATTR_REASON = "target_attr_missing"
@@ -193,7 +194,14 @@ def _apply_rename_texture_file(action: FixAction, cmds: Any) -> AppliedFixRecord
 
     node_after = action.params.get("node_name_after")
     if isinstance(node_after, str) and node_after.strip() and cmds.objExists(action.target_node):
-        cmds.rename(action.target_node, node_after.strip())
+        if _is_read_only_node(cmds, action.target_node):
+            return _blocked(action, [READ_ONLY_NODE_REASON])
+        try:
+            cmds.rename(action.target_node, node_after.strip())
+        except RuntimeError as exc:
+            if _is_read_only_rename_error(exc):
+                return _blocked(action, [READ_ONLY_NODE_REASON])
+            raise
 
     # region agent log
     try:
@@ -301,7 +309,41 @@ def _apply_rename_node(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if before_name is None:
         return _blocked(action, [MISSING_TARGET_REASON])
 
-    renamed_node = cmds.rename(action.target_node, proposed_name.strip())
+    # region agent log
+    read_only = _is_read_only_node(cmds, action.target_node)
+    try:
+        import json
+        import time
+
+        payload = {
+            "sessionId": "618f4f",
+            "runId": "rename-node-fix",
+            "hypothesisId": "H1",
+            "location": "fix_applier.py:_apply_rename_node",
+            "message": "rename_node_precheck",
+            "data": {
+                "target_node": action.target_node,
+                "proposed_name": proposed_name.strip(),
+                "read_only": read_only,
+            },
+            "timestamp": int(time.time() * 1000),
+        }
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # endregion
+
+    if read_only:
+        return _blocked(action, [READ_ONLY_NODE_REASON])
+
+    try:
+        renamed_node = cmds.rename(action.target_node, proposed_name.strip())
+    except RuntimeError as exc:
+        if _is_read_only_rename_error(exc):
+            return _blocked(action, [READ_ONLY_NODE_REASON])
+        raise
     after_name = _node_short_name(cmds, renamed_node) or str(proposed_name).strip()
     return _applied(action, None, before_name, after_name)
 
@@ -313,6 +355,25 @@ def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
     if not short_names:
         return None
     return str(short_names[0]).split("|")[-1].split(":")[-1]
+
+
+def _is_read_only_node(cmds: Any, node_name: str) -> bool:
+    try:
+        if cmds.lockNode(node_name, q=True, lock=True):
+            return True
+    except RuntimeError:
+        pass
+    try:
+        if cmds.referenceQuery(node_name, isNodeReferenced=True):
+            return bool(cmds.referenceQuery(node_name, isReadOnly=True))
+    except RuntimeError:
+        pass
+    return False
+
+
+def _is_read_only_rename_error(exc: RuntimeError) -> bool:
+    message = str(exc).casefold()
+    return "read only" in message or "read-only" in message
 
 
 def _apply_disable_feature(action: FixAction, cmds: Any) -> AppliedFixRecord:

@@ -130,10 +130,7 @@ def maybe_publish_validation_summary(
     )
 
     report_bundle = build_tracker_report_bundle_from_run(result, report_path=report_path)
-    payload = validation_publish_payload_from_run(
-        result,
-        report_path=report_bundle.html_report_path or report_path,
-    )
+    payload = validation_publish_payload_from_run(result, report_path="")
     return publish_validation_summary(
         studio_config,
         payload,
