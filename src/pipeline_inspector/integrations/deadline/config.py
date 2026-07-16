@@ -24,6 +24,7 @@ _ENV_QUEUE = "PIPELINE_INSPECTOR_DEADLINE_QUEUE"
 _ENV_POOL = "PIPELINE_INSPECTOR_DEADLINE_POOL"
 _ENV_GROUP = "PIPELINE_INSPECTOR_DEADLINE_GROUP"
 _ENV_USER_NAME = "PIPELINE_INSPECTOR_DEADLINE_USER_NAME"
+_ENV_STUDIO_CONFIG = "PIPELINE_INSPECTOR_DEADLINE_STUDIO_CONFIG"
 
 _LEGACY_ENV = {
     _ENV_API_URL: "SHADER_HEALTH_DEADLINE_API_URL",
@@ -36,6 +37,7 @@ _LEGACY_ENV = {
     _ENV_POOL: "SHADER_HEALTH_DEADLINE_POOL",
     _ENV_GROUP: "SHADER_HEALTH_DEADLINE_GROUP",
     _ENV_USER_NAME: "SHADER_HEALTH_DEADLINE_USER_NAME",
+    _ENV_STUDIO_CONFIG: "SHADER_HEALTH_DEADLINE_STUDIO_CONFIG",
 }
 
 
@@ -64,6 +66,7 @@ class DeadlineConfig:
     pool: str | None = None
     group: str | None = None
     user_name: str | None = None
+    studio_config_path: Path | None = None
 
     def resolved_profile_path(self) -> Path:
         """Return the profile JSON path used by preflight validation."""
@@ -84,6 +87,7 @@ class DeadlineConfig:
         values = os.environ if environ is None else environ
         profile_path = _optional_path(_env_get(values, _ENV_PROFILE_PATH))
         repo_root = _optional_path(_env_get(values, _ENV_REPO_ROOT))
+        studio_config_path = _optional_path(_env_get(values, _ENV_STUDIO_CONFIG))
         return cls(
             api_url=_env_get(values, _ENV_API_URL, DEFAULT_API_URL) or DEFAULT_API_URL,
             timeout_seconds=_optional_float(
@@ -98,6 +102,7 @@ class DeadlineConfig:
             pool=_optional_str(_env_get(values, _ENV_POOL)),
             group=_optional_str(_env_get(values, _ENV_GROUP)),
             user_name=_optional_str(_env_get(values, _ENV_USER_NAME)),
+            studio_config_path=studio_config_path,
         )
 
     @classmethod
@@ -109,6 +114,7 @@ class DeadlineConfig:
             raise ValueError(f"Deadline config must be a JSON object: {path}")
         profile_path = _optional_path(payload.get("profile_path"))
         repo_root = _optional_path(payload.get("repo_root"))
+        studio_config_path = _optional_path(payload.get("studio_config_path"))
         return cls(
             api_url=str(payload.get("api_url", DEFAULT_API_URL)),
             timeout_seconds=_optional_float(
@@ -123,6 +129,7 @@ class DeadlineConfig:
             pool=_optional_str(payload.get("pool")),
             group=_optional_str(payload.get("group")),
             user_name=_optional_str(payload.get("user_name")),
+            studio_config_path=studio_config_path,
         )
 
 def _optional_str(value: Any) -> str | None:

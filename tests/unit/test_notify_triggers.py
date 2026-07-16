@@ -47,6 +47,20 @@ def test_match_validation_notify_events_supports_pass_critical_and_score_thresho
     ) == ("on_critical",)
 
 
+def test_match_validation_notify_events_supports_failed_issues_trigger():
+    warning_context = ValidationTriggerContext(
+        block_publish=False,
+        block_deadline=False,
+        critical_count=0,
+        health_score=73,
+        failed_count=9,
+    )
+    assert match_validation_notify_events(
+        ("on_fail",),
+        warning_context,
+    ) == ("on_fail",)
+
+
 def test_standalone_event_enabled_checks_notify_on_membership():
     assert standalone_event_enabled(("on_readiness_fail",), "on_readiness_fail")
     assert not standalone_event_enabled(("on_pass",), "on_farm_complete")

@@ -91,11 +91,7 @@ class DeadlineClient:
 
         response = self.get("/api/jobs", query={"JobID": job_id})
         self._raise_for_status(response, f"get job {job_id}")
-        if not isinstance(response.json_data, dict):
-            raise DeadlineClientError(
-                f"Expected JSON object for job {job_id}, got {response.body!r}"
-            )
-        return response.json_data
+        return _normalize_job_payload(response.json_data, job_id)
 
     def submit_job(
         self,
@@ -169,6 +165,22 @@ def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     if isinstance(parsed, (dict, list)):
         return parsed
     return None
+
+def _normalize_job_payload(payload: dict[str, Any] | list[Any] | None, job_id: str) -> dict[str, Any]:
+    """Normalize Deadline Web Service job payloads to a single dict record."""
+
+    if isinstance(payload, list):
+        if not payload:
+            raise DeadlineClientError(f"Job {job_id} not found")
+        first = payload[0]
+        if not isinstance(first, dict):
+            raise DeadlineClientError(
+                f"Expected JSON object for job {job_id}, got {payload!r}"
+            )
+        return first
+    if isinstance(payload, dict):
+        return payload
+    raise DeadlineClientError(f"Expected JSON object for job {job_id}, got {payload!r}")
 
 def _extract_job_id(response: DeadlineResponse) -> str:
     if isinstance(response.json_data, dict):

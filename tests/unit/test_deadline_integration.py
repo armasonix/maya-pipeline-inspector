@@ -93,6 +93,18 @@ def test_build_validator_command_runs_validator_in_critical_mode(tmp_path: Path)
     )
 
 
+def test_build_validator_command_includes_studio_config_when_provided(tmp_path: Path):
+    studio_config = tmp_path / "pipeline_inspector_studio.json"
+    command = build_validator_command(
+        mayapy="mayapy",
+        scene_path=tmp_path / "scene.ma",
+        report_path=tmp_path / "report.json",
+        profile_path=tmp_path / "deadline_critical.json",
+        studio_config_path=studio_config,
+    )
+    assert command[-2:] == ("--studio-config", str(studio_config))
+
+
 def test_deadline_preflight_blocks_submission_on_farm_blocking_issue(tmp_path: Path):
     calls: list[tuple[str, ...]] = []
 
@@ -174,6 +186,21 @@ def test_deadline_client_get_job():
     payload = client.get_job("job-42")
     assert payload["_id"] == "job-42"
     assert payload["JobStatus"] == "Completed"
+
+
+def test_deadline_client_get_job_accepts_list_payload():
+    def transport(request: HttpRequest, timeout: float) -> DeadlineResponse:
+        assert request.url == "http://farm:8082/api/jobs?JobID=job-42"
+        return DeadlineResponse(
+            status_code=200,
+            body='[{"_id":"job-42","Stat":3,"Props":{"Name":"hero_render"}}]',
+            json_data=[{"_id": "job-42", "Stat": 3, "Props": {"Name": "hero_render"}}],
+        )
+
+    client = DeadlineClient(DeadlineConfig(api_url="http://farm:8082"), transport=transport)
+    payload = client.get_job("job-42")
+    assert payload["_id"] == "job-42"
+    assert payload["Stat"] == 3
 
 
 def test_deadline_client_submit_job_returns_plain_text_id():

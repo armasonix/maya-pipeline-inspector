@@ -12,8 +12,10 @@ from pipeline_inspector.integrations.notification_triggers import (
     NOTIFY_EVENT_ON_FARM_COMPLETE,
     NOTIFY_EVENT_ON_READINESS_FAIL,
     ValidationTriggerContext,
+    describe_validation_notify_skip,
     match_validation_notify_events,
     standalone_event_enabled,
+    validation_trigger_context_from_counts,
 )
 from pipeline_inspector.integrations.notify.routing import (
     ResolvedNotifyRoute,
@@ -94,12 +96,16 @@ def _validation_trigger_context(
     block_deadline: bool,
     critical_count: int = 0,
     health_score: int = 0,
+    error_count: int = 0,
+    warning_count: int = 0,
 ) -> ValidationTriggerContext:
-    return ValidationTriggerContext(
+    return validation_trigger_context_from_counts(
         block_publish=block_publish,
         block_deadline=block_deadline,
         critical_count=critical_count,
         health_score=health_score,
+        error_count=error_count,
+        warning_count=warning_count,
     )
 
 
@@ -117,6 +123,8 @@ def matched_notify_events(
     block_deadline: bool,
     critical_count: int = 0,
     health_score: int = 0,
+    error_count: int = 0,
+    warning_count: int = 0,
 ) -> tuple[str, ...]:
     """Return configured notify events that match the validation run state."""
 
@@ -128,6 +136,8 @@ def matched_notify_events(
             block_deadline=block_deadline,
             critical_count=critical_count,
             health_score=health_score,
+            error_count=error_count,
+            warning_count=warning_count,
         ),
         notify_score_below=settings.notify_score_below,
     )
@@ -209,11 +219,27 @@ def send_telegram_validation_notification(
         block_deadline=context.block_deadline,
         critical_count=context.critical_count,
         health_score=context.health_score,
+        error_count=context.error_count,
+        warning_count=context.warning_count,
     )
     if force_notify and override_chat_id and not matched_events:
         matched_events = tuple(settings.notify_on) or (NOTIFY_EVENT_BLOCK_PUBLISH,)
     if not matched_events:
-        return TelegramNotificationResult(sent=False, skipped_reason="no_matching_events")
+        return TelegramNotificationResult(
+            sent=False,
+            skipped_reason=describe_validation_notify_skip(
+                _configured_validation_events(settings),
+                _validation_trigger_context(
+                    block_publish=context.block_publish,
+                    block_deadline=context.block_deadline,
+                    critical_count=context.critical_count,
+                    health_score=context.health_score,
+                    error_count=context.error_count,
+                    warning_count=context.warning_count,
+                ),
+                notify_score_below=settings.notify_score_below,
+            ),
+        )
 
     if override_chat_id:
         routes: tuple[ResolvedNotifyRoute, ...] = (

@@ -1917,6 +1917,14 @@ def _schedule_ui_validation(
     post_validate: Optional[Any] = None,
 ) -> None:
     if getattr(content, "_pipeline_inspector_validate_running", False):
+        # region agent log
+        _ui_agent_debug_log(
+            "ui_launcher.py:_schedule_ui_validation",
+            "validation skipped because another run is active",
+            {"scan_scope": scan_scope},
+            hypothesis_id="H5",
+        )
+        # endregion
         return
 
     content._pipeline_inspector_validate_running = True
@@ -1929,6 +1937,14 @@ def _schedule_ui_validation(
 
     def _job() -> None:
         try:
+            # region agent log
+            _ui_agent_debug_log(
+                "ui_launcher.py:_schedule_ui_validation",
+                "validation job started",
+                {"scan_scope": scan_scope, "profile_id": profile_id or ""},
+                hypothesis_id="H5",
+            )
+            # endregion
             _run_validation_job(
                 content,
                 qt_widgets,
@@ -1939,13 +1955,32 @@ def _schedule_ui_validation(
         finally:
             content._pipeline_inspector_validate_running = False
             _set_validate_busy_state(content, qt_widgets, busy=False)
+            # region agent log
+            _ui_agent_debug_log(
+                "ui_launcher.py:_schedule_ui_validation",
+                "validation job finished",
+                {"scan_scope": scan_scope},
+                hypothesis_id="H5",
+            )
+            # endregion
 
-    cmds = _maya_cmds()
-    eval_deferred = getattr(cmds, "evalDeferred", None)
-    if eval_deferred is not None:
-        eval_deferred(_job, lowestPriority=True)
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    scheduler = "direct"
+    if single_shot is not None:
+        scheduler = "qt_timer"
+        single_shot(0, _job)
     else:
-        _job()
+        scheduler = "execute_deferred"
+        _schedule_on_main_thread(_job)
+    # region agent log
+    _ui_agent_debug_log(
+        "ui_launcher.py:_schedule_ui_validation",
+        "validation job scheduled",
+        {"scan_scope": scan_scope, "scheduler": scheduler},
+        hypothesis_id="H6",
+    )
+    # endregion
 
 
 def _run_validation_job(
@@ -2019,6 +2054,28 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
             result,
             force_notify=False,
         )
+        # region agent log
+        health = getattr(result, "health_score", None)
+        _ui_agent_debug_log(
+            "ui_launcher.py:_maybe_notify_validation",
+            "validation notification dispatch",
+            {
+                "critical": int(getattr(health, "critical", 0) or 0),
+                "error": int(getattr(health, "error", 0) or 0),
+                "warning": int(getattr(health, "warning", 0) or 0),
+                "score": int(getattr(health, "score", 0) or 0),
+                "outcomes": [
+                    {
+                        "connector": outcome.connector_id,
+                        "sent": outcome.sent,
+                        "skipped_reason": outcome.skipped_reason,
+                    }
+                    for outcome in dispatch_result.outcomes
+                ],
+            },
+            hypothesis_id="H7",
+        )
+        # endregion
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(content, qt_widgets, dispatch_result)
     except Exception as exc:  # noqa: BLE001
@@ -2324,6 +2381,26 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
     title = "Submit to Farm" if result.succeeded else "Farm Submit Blocked"
     _show_information_dialog(qt_widgets, title, result.message)
     print(result.message)
+    # region agent log
+    _ui_agent_debug_log(
+        "ui_launcher.py:_submit_farm_from_ui",
+        "farm submit completed",
+        {
+            "succeeded": bool(result.succeeded),
+            "job_id": str(getattr(result, "job_id", "") or ""),
+        },
+        hypothesis_id="H3",
+    )
+    # endregion
+    if result.succeeded and result.job_id:
+        from pipeline_inspector.maya.farm_job_monitor import start_farm_job_notification_poll
+
+        start_farm_job_notification_poll(
+            config=_deadline_config_for_content(content),
+            studio_config=_studio_config_for_content(content),
+            job_id=result.job_id,
+            job_name=Path(scene_path).name if scene_path else "",
+        )
 
 
 def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:

@@ -1,10 +1,13 @@
 """Deadline submit preflight helpers for Pipeline Inspector."""
 from __future__ import annotations
 
+import json
 import subprocess
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 VALIDATOR_OK = 0
 VALIDATOR_PUBLISH_BLOCK = 1
@@ -30,17 +33,19 @@ class DeadlinePreflightResult:
     stdout: str = ""
     stderr: str = ""
 
+
 def build_validator_command(
     *,
     mayapy: str,
     scene_path: Path,
     report_path: Path,
     profile_path: Path,
+    studio_config_path: Path | None = None,
     extra_args: Sequence[str] = (),
 ) -> tuple[str, ...]:
     """Build the critical-mode headless validator command."""
 
-    return (
+    command: tuple[str, ...] = (
         mayapy,
         "-m",
         "pipeline_inspector",
@@ -52,8 +57,24 @@ def build_validator_command(
         str(report_path),
         "--profile",
         str(profile_path),
-        *tuple(extra_args),
     )
+    if studio_config_path is not None:
+        command = command + ("--studio-config", str(studio_config_path))
+    command = command + tuple(extra_args)
+    # region agent log
+    _farm_debug_log(
+        "preflight.py:build_validator_command",
+        "built validator command",
+        {
+            "studio_config_path": str(studio_config_path) if studio_config_path else "",
+            "includes_studio_config_flag": studio_config_path is not None,
+            "command_tail": list(command[-6:]),
+        },
+        hypothesis_id="H1",
+    )
+    # endregion
+    return command
+
 
 def run_deadline_preflight(
     *,
@@ -62,6 +83,7 @@ def run_deadline_preflight(
     profile_path: Path,
     mayapy: str = "mayapy",
     repo_root: Path | None = None,
+    studio_config_path: Path | None = None,
     extra_args: Sequence[str] = (),
     runner: Runner = subprocess.run,
 ) -> DeadlinePreflightResult:
@@ -72,6 +94,7 @@ def run_deadline_preflight(
         scene_path=scene_path,
         report_path=report_path,
         profile_path=profile_path,
+        studio_config_path=studio_config_path,
         extra_args=extra_args,
     )
     completed = runner(
@@ -91,6 +114,7 @@ def run_deadline_preflight(
         )
     return _result(False, PREFLIGHT_ERROR, validator_exit_code, command, report_path, completed)
 
+
 def blocked_message(result: DeadlinePreflightResult) -> str:
     """Return a stderr-friendly message for blocked preflight runs."""
 
@@ -99,6 +123,7 @@ def blocked_message(result: DeadlinePreflightResult) -> str:
         f"validator_exit_code={result.validator_exit_code}; "
         f"report={result.report_path}"
     )
+
 
 def _result(
     allowed: bool,
@@ -117,3 +142,26 @@ def _result(
         stdout=completed.stdout,
         stderr=completed.stderr,
     )
+
+
+def _farm_debug_log(
+    location: str,
+    message: str,
+    data: dict[str, Any],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": data,
+            "hypothesisId": hypothesis_id,
+        }
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return

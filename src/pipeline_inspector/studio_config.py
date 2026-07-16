@@ -1359,7 +1359,30 @@ def resolve_deadline_config(config: StudioConfig | None) -> Any:
     deadline = config.connectors.deadline
     if not deadline.enabled:
         return None
-    return deadline.to_deadline_config()
+    runtime = deadline.to_deadline_config()
+    if config.config_path is not None:
+        runtime = runtime.with_overrides(studio_config_path=config.config_path)
+        # region agent log
+        try:
+            import json
+            import time
+            from pathlib import Path as _Path
+
+            payload = {
+                "sessionId": "618f4f",
+                "timestamp": int(time.time() * 1000),
+                "location": "studio_config.py:resolve_deadline_config",
+                "message": "merged studio config path into deadline runtime config",
+                "data": {"studio_config_path": str(config.config_path)},
+                "hypothesisId": "H2",
+            }
+            log_path = _Path(__file__).resolve().parents[1] / "debug-618f4f.log"
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        except OSError:
+            pass
+        # endregion
+    return runtime
 
 
 def resolve_telegram_config(config: StudioConfig | None) -> Any | None:

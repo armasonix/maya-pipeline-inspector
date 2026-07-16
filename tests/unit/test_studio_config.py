@@ -436,6 +436,7 @@ def test_resolve_deadline_config_uses_connector_when_enabled():
 
     assert resolved is not None
     assert resolved.api_url == "http://deadline-host:9090"
+    assert resolved.studio_config_path == Path("C:/studio/pipeline_inspector_studio.json")
 
 
 def test_resolve_deadline_config_returns_none_when_disabled_in_saved_file():
