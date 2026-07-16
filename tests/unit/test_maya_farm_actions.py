@@ -123,7 +123,9 @@ def test_submit_farm_validation_action_blocks_unreachable_service(tmp_path: Path
 
 def test_default_farm_paths_use_scene_stem(tmp_path: Path):
     scene = tmp_path / "hero.ma"
-    assert farm_actions.default_farm_report_path(scene).name == "hero_pipeline_inspector_farm.json"
+    assert farm_actions.default_farm_report_path(scene) == (
+        tmp_path / "reports" / "farm" / "hero_pipeline_inspector_farm.json"
+    )
     assert (
         farm_actions.default_command_script_path(scene).name
         == "hero_pipeline_inspector_deadline_command.txt"

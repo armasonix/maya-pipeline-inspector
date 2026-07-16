@@ -95,7 +95,20 @@ Report flow:
 
 ### Reports tab
 
-Open the **Reports** tab and click **Export Farm HTML Report**. The panel collects live analytics from the Deadline Web Service and writes `{scene}_deadline_farm_report.html` next to the open scene.
+Open the **Reports** tab and click **Export Farm HTML Report**. The panel collects live analytics from the Deadline Web Service and writes `reports/farm/{scene}_deadline_farm_report.html` next to the open scene.
+
+### Organized output layout
+
+Default exports are grouped under a `reports/` folder beside the scene:
+
+| Folder | Artifacts |
+| --- | --- |
+| `reports/validation/` | JSON/HTML validation reports |
+| `reports/manifests/` | shader manifest + manifest diff JSON/HTML |
+| `reports/fix_plans/` | fix plan JSON exports |
+| `reports/farm/` | farm validation JSON + farm HTML report |
+
+Legacy flat files directly beside the scene are still recognized as approved manifest sidecars when present.
 
 ### CLI
 

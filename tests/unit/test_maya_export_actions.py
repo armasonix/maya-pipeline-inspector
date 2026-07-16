@@ -158,7 +158,9 @@ def test_export_fix_plan_uses_scene_based_default_path(tmp_path: Path):
         profile_id="artist_relaxed",
     )
 
-    assert Path(result.path) == tmp_path / "asset_shading_pipeline_inspector_fix_plan.json"
+    assert Path(result.path) == (
+        tmp_path / "reports" / "fix_plans" / "asset_shading_pipeline_inspector_fix_plan.json"
+    )
 
 
 def test_export_json_report_uses_scene_based_default_path(tmp_path: Path):
@@ -166,7 +168,9 @@ def test_export_json_report_uses_scene_based_default_path(tmp_path: Path):
 
     result = export_actions.export_json_report(snapshot=make_snapshot(str(scene_path)))
 
-    assert Path(result.path) == tmp_path / "asset_shading_pipeline_inspector_report.json"
+    assert Path(result.path) == (
+        tmp_path / "reports" / "validation" / "asset_shading_pipeline_inspector_report.json"
+    )
 
 
 def test_export_manifest_diff_writes_json_and_html_outputs(tmp_path: Path):
@@ -202,8 +206,12 @@ def test_export_manifest_diff_uses_scene_based_default_paths(tmp_path: Path):
     )
 
     assert result.succeeded is True
-    assert Path(result.path) == tmp_path / "asset_shading_pipeline_inspector_manifest_diff.json"
-    assert (tmp_path / "asset_shading_pipeline_inspector_manifest_diff.html").is_file()
+    assert Path(result.path) == (
+        tmp_path / "reports" / "manifests" / "asset_shading_pipeline_inspector_manifest_diff.json"
+    )
+    assert (
+        tmp_path / "reports" / "manifests" / "asset_shading_pipeline_inspector_manifest_diff.html"
+    ).is_file()
 
 
 def test_export_manifest_diff_reports_invalid_baseline(tmp_path: Path):
@@ -416,6 +424,18 @@ class FakeQtWidgets:
 
 def test_approved_manifest_sidecar_path_uses_scene_sidecar(tmp_path: Path):
     scene_path = tmp_path / "hero_shading.ma"
+    sidecar = tmp_path / "reports" / "manifests" / "hero_shading_pipeline_inspector_manifest.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text("{}", encoding="utf-8")
+    snapshot = SimpleNamespace(scene_path=str(scene_path))
+
+    resolved = commands._approved_manifest_sidecar_path(snapshot)
+
+    assert resolved == str(sidecar)
+
+
+def test_approved_manifest_sidecar_path_supports_legacy_sidecar(tmp_path: Path):
+    scene_path = tmp_path / "hero_shading.ma"
     sidecar = tmp_path / "hero_shading_pipeline_inspector_manifest.json"
     sidecar.write_text("{}", encoding="utf-8")
     snapshot = SimpleNamespace(scene_path=str(scene_path))
@@ -436,7 +456,8 @@ def test_export_manifest_diff_prefers_approved_sidecar_without_dialog(
     tmp_path: Path,
 ):
     scene_path = tmp_path / "hero_shading.ma"
-    sidecar = tmp_path / "hero_shading_pipeline_inspector_manifest.json"
+    sidecar = tmp_path / "reports" / "manifests" / "hero_shading_pipeline_inspector_manifest.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(old_manifest()), encoding="utf-8")
     snapshot = make_snapshot(str(scene_path))
     snapshot = GraphSnapshot(
@@ -466,7 +487,9 @@ def test_export_manifest_diff_prefers_approved_sidecar_without_dialog(
 
     assert result.succeeded is True
     assert Path(result.path).name == "hero_shading_pipeline_inspector_manifest_diff.json"
-    assert (tmp_path / "hero_shading_pipeline_inspector_manifest_diff.html").is_file()
+    assert (
+        tmp_path / "reports" / "manifests" / "hero_shading_pipeline_inspector_manifest_diff.html"
+    ).is_file()
 
 
 def test_export_buttons_connect_to_callbacks():

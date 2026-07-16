@@ -76,8 +76,9 @@ def farm_validation_result_from_summary(summary: Any) -> FarmValidationResult:
 def default_farm_report_path(scene_path: str | Path) -> Path:
     """Return the default JSON report path written by farm validation."""
 
-    scene = Path(scene_path)
-    return scene.with_name(f"{scene.stem}_pipeline_inspector_farm.json")
+    from pipeline_inspector.reports.scene_output_paths import default_farm_validation_json_path
+
+    return default_farm_validation_json_path(scene_path)
 
 def default_command_script_path(scene_path: str | Path) -> Path:
     """Return the default CommandScript aux file path beside the scene."""
@@ -186,9 +187,9 @@ def _farm_html_report_path(
 ) -> Path:
     if path:
         return Path(path)
-    scene = Path(str(scene_path or "unsaved_scene.ma"))
-    stem = scene.stem or "unsaved_scene"
-    return scene.with_name(f"{stem}_deadline_farm_report.html")
+    from pipeline_inspector.reports.scene_output_paths import default_farm_html_report_path
+
+    return default_farm_html_report_path(scene_path)
 
 
 def run_farm_preflight_action(

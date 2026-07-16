@@ -1593,6 +1593,44 @@ def _export_json_from_ui() -> None:
 
 
 def _export_html_from_ui() -> None:
+    content = _active_panel_content()
+    snapshot = _panel_content_attr(content, "_pipeline_inspector_snapshot")
+    results = _panel_content_attr(content, "_pipeline_inspector_results")
+    if snapshot is not None and results is not None:
+        from pipeline_inspector.core.scoring import compute_health_score
+        from pipeline_inspector.maya import export_actions
+
+        cached_health = compute_health_score(results).score
+        # region agent log
+        _debug_health_log(
+            "ui_launcher.py:_export_html_from_ui",
+            "export html from cached validation state",
+            {
+                "path": "cached",
+                "cached_health": cached_health,
+                "profile_id": _panel_content_attr(content, "_pipeline_inspector_profile_id", ""),
+                "scan_scope": _panel_content_attr(content, "_pipeline_inspector_scan_scope", ""),
+                "failed_count": sum(1 for item in results if item.status == "failed"),
+            },
+            hypothesis_id="H1",
+        )
+        # endregion
+        _print_export_result(
+            export_actions.export_html_report(
+                snapshot=snapshot,
+                results=results,
+            )
+        )
+        return
+
+    # region agent log
+    _debug_health_log(
+        "ui_launcher.py:_export_html_from_ui",
+        "export html falling back to revalidation",
+        {"path": "revalidate"},
+        hypothesis_id="H1",
+    )
+    # endregion
     from pipeline_inspector.maya.commands import export_html_report_action
 
     _print_export_result(export_html_report_action())
@@ -2871,6 +2909,21 @@ def _resolution_probe_hint(snapshot: Any, asset_class_id: str) -> str:
 
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
     health = result.health_score
+    # region agent log
+    _debug_health_log(
+        "ui_launcher.py:_populate_validation_result",
+        "gui validation health score",
+        {
+            "gui_health": health.score,
+            "profile_id": getattr(result, "profile_id", ""),
+            "scan_scope": getattr(result, "scan_scope", ""),
+            "failed_count": sum(
+                1 for item in getattr(result, "results", ()) if item.status == "failed"
+            ),
+        },
+        hypothesis_id="H1",
+    )
+    # endregion
     _set_label_text(
         content,
         qt_widgets,
@@ -3944,6 +3997,32 @@ def _format_fix_apply_message(report: Any, *, selected_count: int) -> str:
 
 def _yes_no(value: bool) -> str:
     return "YES" if value else "NO"
+
+
+def _debug_health_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        import json
+        import time
+
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": {key: str(value) for key, value in data.items()},
+            "hypothesisId": hypothesis_id,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 
 def _print_export_result(result: Any) -> None:
