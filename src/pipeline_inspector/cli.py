@@ -268,6 +268,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print JSON instead of a human-readable summary.",
     )
+    farm_analytics.add_argument(
+        "--html",
+        type=Path,
+        help="Write a management-facing HTML report to this path.",
+    )
+    farm_analytics.add_argument(
+        "--history-path",
+        type=Path,
+        help="Append this analytics snapshot to a JSONL history file.",
+    )
+    farm_analytics.add_argument(
+        "--shot-key-pattern",
+        default="",
+        help="Optional regex override for extracting shot keys from job metadata.",
+    )
     return parser
 
 
@@ -455,6 +470,7 @@ def farm_analytics_command(args: argparse.Namespace) -> int:
         farm_analytics_to_dict,
         format_farm_analytics_summary,
     )
+    from pipeline_inspector.reports.farm_html_report import write_farm_html_report
 
     try:
         config = (
@@ -467,10 +483,23 @@ def farm_analytics_command(args: argparse.Namespace) -> int:
             client,
             pool_filter=str(args.pool or "").strip() or None,
             window_hours=float(args.window_hours),
+            history_path=args.history_path,
+            shot_key_pattern=str(args.shot_key_pattern or "").strip() or None,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"Farm analytics failed: {exc}", file=sys.stderr)
         return EXIT_RUNTIME_ERROR
+
+    if args.html:
+        try:
+            written = write_farm_html_report(args.html, report, api_url=config.api_url)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Farm HTML report failed: {exc}", file=sys.stderr)
+            return EXIT_RUNTIME_ERROR
+        print(f"Deadline farm HTML report exported: {written}")
+        if args.json:
+            print(json.dumps(farm_analytics_to_dict(report), indent=2))
+        return EXIT_OK
 
     if args.json:
         print(json.dumps(farm_analytics_to_dict(report), indent=2))

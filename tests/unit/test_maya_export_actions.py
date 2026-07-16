@@ -478,6 +478,7 @@ def test_export_buttons_connect_to_callbacks():
         on_export_manifest_diff=lambda: calls.append("manifest_diff"),
         on_compare_approved_manifest=lambda: calls.append("compare_approved_manifest"),
         on_send_to_tracker=lambda: calls.append("send_to_tracker"),
+        on_export_farm_html=lambda: calls.append("farm_html"),
     )
 
     widget = main_window.build_export_actions(FakeQtWidgets, callbacks=callbacks)
@@ -491,6 +492,7 @@ def test_export_buttons_connect_to_callbacks():
         main_window.EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
     ).clicked.emit()
     _find(widget, main_window.EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME).clicked.emit()
+    _find(widget, main_window.EXPORT_FARM_HTML_BUTTON_OBJECT_NAME).clicked.emit()
     assert calls == [
         "json",
         "html",
@@ -498,7 +500,15 @@ def test_export_buttons_connect_to_callbacks():
         "manifest_diff",
         "compare_approved_manifest",
         "send_to_tracker",
+        "farm_html",
     ]
+
+
+def test_reports_export_grid_includes_farm_html_button():
+    widget = main_window.build_export_actions(FakeQtWidgets)
+
+    button = _find(widget, main_window.EXPORT_FARM_HTML_BUTTON_OBJECT_NAME)
+    assert button.text == "Export Farm HTML Report"
 
 
 def test_reports_export_grid_includes_send_to_tracker_button():

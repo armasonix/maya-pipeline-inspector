@@ -1560,6 +1560,7 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_compare_approved_manifest=_compare_approved_manifest_from_ui,
         on_compare_after_fixes=_compare_after_fixes_from_ui,
         on_send_to_tracker=_send_to_tracker_from_ui,
+        on_export_farm_html=_export_farm_html_from_ui,
     )
 
 
@@ -1595,6 +1596,25 @@ def _export_html_from_ui() -> None:
     from pipeline_inspector.maya.commands import export_html_report_action
 
     _print_export_result(export_html_report_action())
+
+
+def _export_farm_html_from_ui() -> None:
+    from pipeline_inspector.maya import farm_actions
+
+    scene_path = ""
+    content = _active_panel_content()
+    if content is not None:
+        scene_path = str(getattr(content, "_pipeline_inspector_scene_path", "") or "")
+    if not scene_path:
+        try:
+            import maya.cmds as cmds
+
+            scene_path = str(cmds.file(query=True, sceneName=True) or "")
+        except ImportError:
+            scene_path = ""
+    _print_export_result(
+        farm_actions.export_farm_html_report(scene_path=scene_path or None)
+    )
 
 
 def _export_manifest_from_ui() -> None:

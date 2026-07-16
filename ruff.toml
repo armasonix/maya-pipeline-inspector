@@ -8,5 +8,8 @@ ignore = ["UP045"]
 
 [lint.per-file-ignores]
 "src/pipeline_inspector/reports/html_report.py" = ["E501"]
+"src/pipeline_inspector/reports/farm_html_report.py" = ["E501"]
+"src/pipeline_inspector/integrations/deadline/analytics.py" = ["E501"]
+"src/pipeline_inspector/integrations/deadline/job_payload.py" = ["E501"]
 "tests/unit/test_manifest_diff_command.py" = ["I001"]
 "tests/unit/test_maya_summary_header.py" = ["E501"]

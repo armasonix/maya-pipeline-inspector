@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
@@ -20,6 +20,9 @@ from pipeline_inspector.integrations.deadline import (
 )
 from pipeline_inspector.integrations.deadline.eligibility import FarmEligibilityResult
 from pipeline_inspector.ui.farm_tab import FarmTabState
+
+if TYPE_CHECKING:
+    from pipeline_inspector.maya.export_actions import ExportActionResult
 
 RENDERER_PLUGIN_CANDIDATES = {
     "vray": ("vrayformaya", "vray"),
@@ -120,6 +123,8 @@ def collect_farm_analytics_report(
     pool_filter: str | None = None,
     client_factory: DeadlineClientFactory | None = None,
     window_hours: float = 24.0,
+    history_path: str | Path | None = None,
+    shot_key_pattern: str | None = None,
 ) -> FarmAnalyticsReport:
     """Collect Deadline farm analytics for the Farm tab or headless callers."""
 
@@ -129,6 +134,8 @@ def collect_farm_analytics_report(
         factory(effective_config),
         pool_filter=pool_filter,
         window_hours=window_hours,
+        history_path=history_path,
+        shot_key_pattern=shot_key_pattern,
     )
 
 
@@ -136,6 +143,52 @@ def format_farm_analytics_status(report: FarmAnalyticsReport) -> str:
     """Return a Farm-tab friendly analytics status line."""
 
     return format_farm_analytics_summary(report)
+
+
+def export_farm_html_report(
+    path: str | Path | None = None,
+    *,
+    config: DeadlineConfig | None = None,
+    pool_filter: str | None = None,
+    window_hours: float = 24.0,
+    client_factory: DeadlineClientFactory | None = None,
+    scene_path: str | Path | None = None,
+) -> ExportActionResult:
+    """Collect farm analytics and write a management HTML report."""
+
+    from pipeline_inspector.maya.export_actions import ExportActionResult
+    from pipeline_inspector.reports.farm_html_report import write_farm_html_report
+
+    effective_config = config or DeadlineConfig.from_env()
+    report = collect_farm_analytics_report(
+        effective_config,
+        pool_filter=pool_filter,
+        client_factory=client_factory,
+        window_hours=window_hours,
+    )
+    output_path = _farm_html_report_path(path, scene_path)
+    written_path = write_farm_html_report(
+        output_path,
+        report,
+        api_url=effective_config.api_url,
+    )
+    return ExportActionResult(
+        action="export_farm_html_report",
+        path=str(written_path),
+        succeeded=True,
+        message="Deadline farm HTML report exported.",
+    )
+
+
+def _farm_html_report_path(
+    path: str | Path | None,
+    scene_path: str | Path | None,
+) -> Path:
+    if path:
+        return Path(path)
+    scene = Path(str(scene_path or "unsaved_scene.ma"))
+    stem = scene.stem or "unsaved_scene"
+    return scene.with_name(f"{stem}_deadline_farm_report.html")
 
 
 def run_farm_preflight_action(

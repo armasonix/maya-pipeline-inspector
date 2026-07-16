@@ -12,7 +12,13 @@ from pipeline_inspector.integrations.deadline.client import (
 from pipeline_inspector.integrations.deadline.job_payload import (
     duration_seconds_from_value,
     job_completion_epoch_seconds,
+    job_frame_count,
+    job_start_epoch_seconds,
+    job_submit_epoch_seconds,
     render_time_seconds_from_statistics,
+    task_frame_number,
+    task_is_failed,
+    task_render_time_seconds,
     worker_is_rendering,
 )
 
@@ -86,6 +92,31 @@ def test_job_payload_parsers():
         {"Props": {"DateComp": "Jul 16 2026 10:00:00"}}
     )
     assert completed_at is not None
+    assert job_frame_count({"Frames": "1-10,20"}) == 11
+    submit = job_submit_epoch_seconds({"DateSubmit": "Jul 16 2026 09:00:00"})
+    start = job_start_epoch_seconds({"DateStart": "Jul 16 2026 09:10:00"})
+    assert submit is not None and start is not None
+    assert task_render_time_seconds({"RenderTime": 42}) == 42.0
+    assert task_frame_number({"Frame": 101}) == 101
+    assert task_is_failed({"Stat": 4}) is True
+
+
+def test_deadline_client_list_tasks():
+    def transport(request: HttpRequest, timeout: float) -> DeadlineResponse:
+        assert request.url == "http://farm:8082/api/tasks?JobID=job-9"
+        return DeadlineResponse(
+            status_code=200,
+            body="[]",
+            json_data=[
+                {"Frame": 10, "RenderTime": 30, "Stat": 3},
+                {"Frame": 11, "RenderTime": 45, "Stat": 4},
+            ],
+        )
+
+    client = DeadlineClient(DeadlineConfig(api_url="http://farm:8082"), transport=transport)
+    tasks = client.list_tasks("job-9")
+    assert len(tasks) == 2
+    assert tasks[1]["Frame"] == 11
 
 
 def test_collect_farm_analytics_aggregates_metrics(monkeypatch):
@@ -100,6 +131,18 @@ def test_collect_farm_analytics_aggregates_metrics(monkeypatch):
                     {
                         "_id": "job-ok",
                         "Stat": 3,
+                        "Name": "show_seq010_sh010_beauty",
+                        "Pool": "lookdev",
+                        "Plugin": "MayaBatch",
+                        "UserName": "artist-a",
+                        "DateSubmit": time.strftime(
+                            "%b %d %Y %H:%M:%S",
+                            time.gmtime(now - 2400),
+                        ),
+                        "DateStart": time.strftime(
+                            "%b %d %Y %H:%M:%S",
+                            time.gmtime(now - 2100),
+                        ),
                         "Props": {
                             "DateComp": time.strftime(
                                 "%b %d %Y %H:%M:%S",
@@ -107,15 +150,39 @@ def test_collect_farm_analytics_aggregates_metrics(monkeypatch):
                             )
                         },
                     },
-                    {"_id": "job-bad", "Stat": 4},
-                    {"_id": "job-live", "Stat": 1},
+                    {
+                        "_id": "job-bad",
+                        "Stat": 4,
+                        "Name": "show_seq010_sh010_beauty",
+                        "Pool": "lookdev",
+                        "Errs": 3,
+                    },
+                    {"_id": "job-live", "Stat": 1, "Name": "utility_job"},
+                ],
+            )
+        if "States=Pending%2CSuspended" in request.url:
+            return DeadlineResponse(
+                status_code=200,
+                body="[]",
+                json_data=[
+                    {"_id": "job-pending", "Stat": 6},
+                    {"_id": "job-suspended", "Stat": 2},
                 ],
             )
         if "Statistics=true" in request.url and "job-ok" in request.url:
             return DeadlineResponse(
                 status_code=200,
                 body="{}",
-                json_data={"TotalRenderTime": 600},
+                json_data={"TotalRenderTime": 600, "AverageFrameRenderTime": 60},
+            )
+        if request.url.endswith("/api/tasks?JobID=job-ok"):
+            return DeadlineResponse(
+                status_code=200,
+                body="[]",
+                json_data=[
+                    {"Frame": 10, "RenderTime": 40, "Stat": 3},
+                    {"Frame": 11, "RenderTime": 80, "Stat": 3},
+                ],
             )
         if request.url.endswith("/api/pools"):
             return DeadlineResponse(status_code=200, body="[]", json_data=["lookdev"])
@@ -140,3 +207,13 @@ def test_collect_farm_analytics_aggregates_metrics(monkeypatch):
     assert report.throughput_estimated is False
     assert report.metrics.average_render_time_seconds == 600.0
     assert report.metrics.pool_utilization["lookdev"] == 1.0
+    assert report.operations is not None
+    assert report.operations.pending_jobs == 1
+    assert report.operations.suspended_jobs == 1
+    assert report.operations.top_failed_jobs[0].job_id == "job-bad"
+    assert report.frame_economics is not None
+    assert report.frame_economics.median_frame_render_seconds > 0
+    assert report.frame_economics.sampled_job_count == 1
+    assert report.shot_intelligence is not None
+    assert report.shot_intelligence.rerender_watchlist[0].shot_key == "show_seq010_sh010"
+    assert any(entry.pass_label == "beauty" for entry in report.shot_intelligence.pass_mix)

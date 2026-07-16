@@ -40,6 +40,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print JSON instead of a human-readable summary.",
     )
+    parser.add_argument(
+        "--html",
+        type=Path,
+        help="Write a management-facing HTML report to this path.",
+    )
+    parser.add_argument(
+        "--history-path",
+        type=Path,
+        help="Append this analytics snapshot to a JSONL history file.",
+    )
+    parser.add_argument(
+        "--shot-key-pattern",
+        default="",
+        help="Optional regex override for extracting shot keys from job metadata.",
+    )
     args = parser.parse_args(argv)
 
     config = DeadlineConfig.from_json(args.config) if args.config else DeadlineConfig.from_env()
@@ -49,14 +64,26 @@ def main(argv: list[str] | None = None) -> int:
             client,
             pool_filter=str(args.pool or "").strip() or None,
             window_hours=float(args.window_hours),
+            history_path=args.history_path,
+            shot_key_pattern=str(args.shot_key_pattern or "").strip() or None,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"Farm analytics failed: {exc}", file=sys.stderr)
         return 3
 
+    if args.html:
+        from pipeline_inspector.reports.farm_html_report import write_farm_html_report
+
+        try:
+            written = write_farm_html_report(args.html, report, api_url=config.api_url)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Farm HTML report failed: {exc}", file=sys.stderr)
+            return 3
+        print(f"Deadline farm HTML report exported: {written}")
+
     if args.json:
         print(json.dumps(farm_analytics_to_dict(report), indent=2))
-    else:
+    elif not args.html:
         print(format_farm_analytics_summary(report))
     return 0
 

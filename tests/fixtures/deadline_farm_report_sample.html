@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadline Farm Intelligence Report</title>
+<style>:root {
+  color-scheme: light dark;
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --critical: #b91c1c;
+  --error: #c2410c;
+  --warning: #b45309;
+  --info: #2563eb;
+  --passed: #15803d;
+  --failed: #b91c1c;
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  font-family: "Segoe UI", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --text: #e5e7eb;
+    --text-muted: #94a3b8;
+    --border: #334155;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+}
+* { box-sizing: border-box; }
+body {
+  background: linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 80%, var(--accent) 20%) 100%);
+  color: var(--text);
+  margin: 0;
+  min-height: 100vh;
+}
+.page {
+  margin: 0 auto;
+  max-width: none;
+  padding: 24px clamp(16px, 2.5vw, 48px) 40px;
+  width: 100%;
+}
+.hero, .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+  padding: 24px;
+}
+.hero-top {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+.hero-copy h1 {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+.hero-subtitle {
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 42rem;
+}
+.score-ring {
+  align-items: center;
+  border: 4px solid var(--border);
+  border-radius: 999px;
+  display: flex;
+  flex-direction: column;
+  height: 112px;
+  justify-content: center;
+  min-width: 112px;
+  padding: 12px;
+}
+.score-ring.status-failed { border-color: var(--failed); }
+.score-ring.status-passed { border-color: var(--passed); }
+.score-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.score-label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+.hero-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.status-pill, .meta-chip, .severity-badge, .result-status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  text-transform: uppercase;
+}
+.status-pill.status-failed { background: color-mix(in srgb, var(--failed) 15%, transparent); color: var(--failed); }
+.status-pill.status-passed { background: color-mix(in srgb, var(--passed) 15%, transparent); color: var(--passed); }
+.meta-chip {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  text-transform: none;
+}
+.meta-list {
+  display: grid;
+  gap: 12px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 20px 0 0;
+}
+.meta-list div {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.meta-list dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.meta-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+h2, h3 { margin-top: 0; }
+.metric-grid, .blocking-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.metric, .block-card {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.metric-label {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.metric-value {
+  display: block;
+  font-size: 1.35rem;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.block-card.blocked {
+  border-color: color-mix(in srgb, var(--failed) 40%, var(--border));
+  color: var(--failed);
+}
+.block-card.clear {
+  border-color: color-mix(in srgb, var(--passed) 40%, var(--border));
+  color: var(--passed);
+}
+.panel-hint {
+  color: var(--text-muted);
+  margin: -4px 0 16px;
+}
+.severity {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.severity-summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  list-style: none;
+  padding: 14px 16px;
+  user-select: none;
+}
+.severity-summary::-webkit-details-marker { display: none; }
+.severity-summary-main {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+.severity-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.severity-summary::before {
+  color: var(--text-muted);
+  content: "▸";
+  flex: 0 0 auto;
+  font-size: 0.95rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.severity[open] > .severity-summary::before {
+  content: "▾";
+}
+.severity-body {
+  border-top: 1px solid var(--border);
+  padding: 0 16px 16px;
+}
+.severity-critical .severity-badge { background: color-mix(in srgb, var(--critical) 15%, transparent); color: var(--critical); }
+.severity-error .severity-badge { background: color-mix(in srgb, var(--error) 15%, transparent); color: var(--error); }
+.severity-warning .severity-badge { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
+.severity-info .severity-badge { background: color-mix(in srgb, var(--info) 15%, transparent); color: var(--info); }
+.table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow-x: auto;
+  width: 100%;
+}
+.results {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+.results th, .results td {
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+.results th:nth-child(1), .results td:nth-child(1) { width: 7%; }
+.results th:nth-child(2), .results td:nth-child(2) { width: 14%; }
+.results th:nth-child(3), .results td:nth-child(3) { width: 12%; }
+.results th:nth-child(4), .results td:nth-child(4) { width: 18%; }
+.results th:nth-child(5), .results td:nth-child(5) { width: 18%; }
+.results th:nth-child(6), .results td:nth-child(6) { width: 11%; }
+.results th:nth-child(7), .results td:nth-child(7) { width: 11%; }
+.results th:nth-child(8), .results td:nth-child(8) { width: 9%; }
+.results th {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  position: sticky;
+  top: 0;
+  text-transform: uppercase;
+  z-index: 1;
+}
+.results tbody tr:last-child td { border-bottom: 0; }
+.results tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88rem; }
+.muted { color: var(--text-muted); }
+.result-status.status-failed { background: color-mix(in srgb, var(--failed) 15%, transparent); color: var(--failed); }
+.result-status.status-passed { background: color-mix(in srgb, var(--passed) 15%, transparent); color: var(--passed); }
+.result-status.status-skipped { background: color-mix(in srgb, var(--text-muted) 15%, transparent); color: var(--text-muted); }
+.empty {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+.report-footer {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 8px 4px 0;
+  text-align: center;
+}
+@media (max-width: 720px) {
+  .hero-top { align-items: flex-start; flex-direction: column; }
+  .page { padding-inline: 14px; }
+}</style>
+<style>.chart-svg {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+}
+.chart-title {
+  fill: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+.chart-label {
+  fill: var(--text-muted);
+  font-size: 12px;
+}
+.chart-value {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.chart-track {
+  fill: color-mix(in srgb, var(--border) 70%, transparent);
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.chart-card {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+}
+.chart-card-span-2 {
+  grid-column: span 2;
+}
+.chart-svg-compact {
+  min-height: 200px;
+}
+.chart-svg-compact .chart-title {
+  font-size: 12px;
+}
+.chart-label-compact {
+  font-size: 10px;
+}
+.donut-track,
+.gauge-track {
+  stroke: color-mix(in srgb, var(--border) 75%, transparent);
+}
+.chart-svg-compact .donut-center-value {
+  font-size: 17px;
+  font-weight: 700;
+}
+.donut-center-value {
+  fill: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+}
+.donut-center-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 1200px) {
+  .chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .chart-card-span-2 {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 720px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+  .chart-card-span-2 {
+    grid-column: span 1;
+  }
+}
+.score-ring.status-healthy { border-color: var(--passed); }
+.score-ring.status-warning { border-color: var(--warning); }
+.score-ring.status-critical { border-color: var(--failed); }
+.status-pill.status-healthy { background: color-mix(in srgb, var(--passed) 15%, transparent); color: var(--passed); }
+.status-pill.status-warning { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
+.status-pill.status-critical { background: color-mix(in srgb, var(--failed) 15%, transparent); color: var(--failed); }</style>
+</head>
+<body>
+<div class="page">
+<header class="hero">
+<div class="hero-top">
+<div class="hero-copy">
+<h1>Deadline Farm Intelligence Report</h1>
+<p class="hero-subtitle">Management summary of render-farm throughput, reliability, and pool usage.</p>
+</div>
+<div class="score-ring status-warning">
+<span class="score-value">12.0%</span>
+<span class="score-label">Failure Rate</span>
+</div>
+</div>
+<div class="hero-meta">
+<span class="status-pill status-warning">WARNING</span>
+<span class="meta-chip">Window: <strong>24.0h</strong></span>
+<span class="meta-chip">Pools: <strong>2</strong></span>
+<span class="meta-chip">Jobs tracked: <strong>48</strong></span>
+</div>
+<dl class="meta-list">
+<div><dt>Collected (UTC)</dt><dd>2026-07-16 09:30 UTC</dd></div>
+<div><dt>Deadline Web Service</dt><dd>Configured via studio settings</dd></div>
+<div><dt>Throughput note</dt><dd>Throughput calculated from completed jobs inside the reporting window.</dd></div>
+<div><dt>Render-time sample</dt><dd>18 completed jobs</dd></div>
+</dl>
+</header>
+<section class="panel" id="farm-kpis">
+<h2>Key Metrics</h2>
+<p class="panel-hint">High-level indicators for supervisors and pipeline managers.</p>
+<div class="metric-grid">
+<article class="metric"><span class="metric-label">Throughput (jobs/hour)</span><strong class="metric-value">4.50</strong></article>
+<article class="metric"><span class="metric-label">Failure Rate</span><strong class="metric-value">12.0%</strong></article>
+<article class="metric"><span class="metric-label">Avg Render Time</span><strong class="metric-value">31m 0s</strong></article>
+<article class="metric"><span class="metric-label">Active Jobs</span><strong class="metric-value">12</strong></article>
+<article class="metric"><span class="metric-label">Completed Jobs</span><strong class="metric-value">32</strong></article>
+<article class="metric"><span class="metric-label">Failed Jobs</span><strong class="metric-value">4</strong></article>
+</div>
+</section>
+<section class="panel" id="farm-kpi-visuals">
+<h2>Farm KPI Dashboard</h2>
+<p class="panel-hint">Visual snapshot of throughput, reliability, utilization, and render cost.</p>
+<div class="chart-grid">
+<div class="chart-card">
+<svg class="chart-svg chart-svg-compact" viewBox="0 0 240 210" role="img" aria-label="Job state mix">
+<text x="120.0" y="20" text-anchor="middle" class="chart-title">Job state mix</text>
+<circle cx="120.0" cy="92.0" r="52.0" class="donut-track" fill="none" stroke-width="20" />
+<path d="M 75.0 118.0 A 52.0 52.0 0 1 0 120.0 40.0" fill="none" stroke="#15803d" stroke-width="20.0" stroke-linecap="round" />
+<path d="M 68.0 92.0 A 52.0 52.0 0 0 0 75.0 118.0" fill="none" stroke="#b91c1c" stroke-width="20.0" stroke-linecap="round" />
+<path d="M 120.0 40.0 A 52.0 52.0 0 0 0 68.0 92.0" fill="none" stroke="#2563eb" stroke-width="20.0" stroke-linecap="round" />
+<text x="120.0" y="92.0" text-anchor="middle" class="donut-center-value">48</text>
+<text x="120.0" y="106.0" text-anchor="middle" class="donut-center-label">Jobs</text>
+<rect x="16" y="149" width="8" height="8" rx="2" fill="#15803d" />
+<text x="28" y="158" class="chart-label chart-label-compact">Completed (32)</text>
+<rect x="16" y="163" width="8" height="8" rx="2" fill="#b91c1c" />
+<text x="28" y="172" class="chart-label chart-label-compact">Failed (4)</text>
+<rect x="16" y="177" width="8" height="8" rx="2" fill="#2563eb" />
+<text x="28" y="186" class="chart-label chart-label-compact">Active (12)</text>
+</svg>
+</div>
+<div class="chart-card">
+<svg class="chart-svg chart-svg-compact" viewBox="0 0 240 210" role="img" aria-label="Finished reliability">
+<text x="120.0" y="20" text-anchor="middle" class="chart-title">Finished reliability</text>
+<circle cx="120.0" cy="92.0" r="52.0" class="donut-track" fill="none" stroke-width="20" />
+<path d="M 86.6 52.2 A 52.0 52.0 0 1 0 120.0 40.0" fill="none" stroke="#15803d" stroke-width="20.0" stroke-linecap="round" />
+<path d="M 120.0 40.0 A 52.0 52.0 0 0 0 86.6 52.2" fill="none" stroke="#b91c1c" stroke-width="20.0" stroke-linecap="round" />
+<text x="120.0" y="92.0" text-anchor="middle" class="donut-center-value">88.0%</text>
+<text x="120.0" y="106.0" text-anchor="middle" class="donut-center-label">Success</text>
+<rect x="16" y="149" width="8" height="8" rx="2" fill="#15803d" />
+<text x="28" y="158" class="chart-label chart-label-compact">Reliable (32)</text>
+<rect x="16" y="163" width="8" height="8" rx="2" fill="#b91c1c" />
+<text x="28" y="172" class="chart-label chart-label-compact">Failed (4)</text>
+</svg>
+</div>
+<div class="chart-card">
+<svg class="chart-svg chart-svg-compact" viewBox="0 0 240 210" role="img" aria-label="Throughput">
+<text x="120.0" y="20" text-anchor="middle" class="chart-title">Throughput</text>
+<path d="M 178.0 108.0 A 58.0 58.0 0 0 0 62.0 108.0" class="gauge-track" fill="none" stroke-width="14" />
+<path d="M 110.9 50.7 A 58.0 58.0 0 0 0 62.0 108.0" fill="none" stroke="#0f766e" stroke-width="14.0" stroke-linecap="round" />
+<text x="120.0" y="114.0" text-anchor="middle" class="donut-center-value">4.50 jobs/h</text>
+<text x="120.0" y="130.0" text-anchor="middle" class="donut-center-label">45.0%</text>
+</svg>
+</div>
+<div class="chart-card">
+<svg class="chart-svg chart-svg-compact" viewBox="0 0 240 210" role="img" aria-label="Failure rate">
+<text x="120.0" y="20" text-anchor="middle" class="chart-title">Failure rate</text>
+<path d="M 178.0 108.0 A 58.0 58.0 0 0 0 62.0 108.0" class="gauge-track" fill="none" stroke-width="14" />
+<path d="M 66.1 86.6 A 58.0 58.0 0 0 0 62.0 108.0" fill="none" stroke="#2563eb" stroke-width="14.0" stroke-linecap="round" />
+<text x="120.0" y="114.0" text-anchor="middle" class="donut-center-value">12.0%</text>
+<text x="120.0" y="130.0" text-anchor="middle" class="donut-center-label">12.0%</text>
+</svg>
+</div>
+<div class="chart-card">
+<svg class="chart-svg chart-svg-compact" viewBox="0 0 240 210" role="img" aria-label="Render efficiency">
+<text x="120.0" y="20" text-anchor="middle" class="chart-title">Render efficiency</text>
+<path d="M 178.0 108.0 A 58.0 58.0 0 0 0 62.0 108.0" class="gauge-track" fill="none" stroke-width="14" />
+<path d="M 155.5 62.2 A 58.0 58.0 0 0 0 62.0 108.0" fill="none" stroke="#15803d" stroke-width="14.0" stroke-linecap="round" />
+<text x="120.0" y="114.0" text-anchor="middle" class="donut-center-value">71.0%</text>
+<text x="120.0" y="130.0" text-anchor="middle" class="donut-center-label">71.0%</text>
+</svg>
+</div>
+<div class="chart-card">
+<svg class="chart-svg" viewBox="0 0 720 260" role="img" aria-label="Backlog pressure">
+<text x="48" y="18" class="chart-title">Backlog pressure</text>
+<rect x="120.9" y="28.0" width="178.2" height="184.0" rx="8" fill="#2563eb" />
+<rect x="444.9" y="150.7" width="178.2" height="61.3" rx="8" fill="#7c3aed" />
+<text x="210.0" y="244" text-anchor="middle" class="chart-label">Pending</text>
+<text x="210.0" y="20.0" text-anchor="middle" class="chart-value">3</text>
+<text x="534.0" y="244" text-anchor="middle" class="chart-label">Suspended</text>
+<text x="534.0" y="142.7" text-anchor="middle" class="chart-value">1</text>
+</svg>
+</div>
+<div class="chart-card chart-card-span-2">
+<svg class="chart-svg" viewBox="0 0 720 128" role="img" aria-label="Pool utilization">
+<text x="0" y="18" class="chart-title">Pool utilization</text>
+<text x="0" y="52" class="chart-label">lookdev</text>
+<rect x="140" y="36" width="556" height="18" rx="9" class="chart-track" />
+<rect x="140" y="36" width="372.5" height="18" rx="9" fill="#7c3aed" />
+<text x="704" y="50" class="chart-value">67.0%</text>
+<text x="0" y="94" class="chart-label">utility</text>
+<rect x="140" y="78" width="556" height="18" rx="9" class="chart-track" />
+<rect x="140" y="78" width="139.0" height="18" rx="9" fill="#7c3aed" />
+<text x="704" y="92" class="chart-value">25.0%</text>
+</svg>
+</div>
+<div class="chart-card chart-card-span-2">
+<svg class="chart-svg" viewBox="0 0 720 260" role="img" aria-label="Frame cost profile">
+<text x="48" y="18" class="chart-title">Frame cost profile</text>
+<rect x="96.6" y="120.0" width="118.8" height="92.0" rx="8" fill="#0f766e" />
+<rect x="312.6" y="28.0" width="118.8" height="184.0" rx="8" fill="#2563eb" />
+<rect x="528.6" y="210.0" width="118.8" height="2.0" rx="8" fill="#b91c1c" />
+<text x="156.0" y="244" text-anchor="middle" class="chart-label">Median sec/frame</text>
+<text x="156.0" y="112.0" text-anchor="middle" class="chart-value">92</text>
+<text x="372.0" y="244" text-anchor="middle" class="chart-label">P95 sec/frame</text>
+<text x="372.0" y="20.0" text-anchor="middle" class="chart-value">184</text>
+<text x="588.0" y="244" text-anchor="middle" class="chart-label">Failed frames</text>
+<text x="588.0" y="202.0" text-anchor="middle" class="chart-value">2</text>
+</svg>
+</div>
+<div class="chart-card chart-card-span-2">
+<svg class="chart-svg" viewBox="0 0 720 260" role="img" aria-label="Pass render time (seconds)">
+<text x="48" y="18" class="chart-title">Pass render time (seconds)</text>
+<rect x="96.6" y="28.0" width="118.8" height="184.0" rx="8" fill="#7c3aed" />
+<rect x="312.6" y="166.0" width="118.8" height="46.0" rx="8" fill="#7c3aed" />
+<rect x="528.6" y="200.5" width="118.8" height="11.5" rx="8" fill="#7c3aed" />
+<text x="156.0" y="244" text-anchor="middle" class="chart-label">Beauty</text>
+<text x="156.0" y="20.0" text-anchor="middle" class="chart-value">28800</text>
+<text x="372.0" y="244" text-anchor="middle" class="chart-label">Matte</text>
+<text x="372.0" y="158.0" text-anchor="middle" class="chart-value">7200</text>
+<text x="588.0" y="244" text-anchor="middle" class="chart-label">Other</text>
+<text x="588.0" y="192.5" text-anchor="middle" class="chart-value">1800</text>
+</svg>
+</div>
+</div>
+</section>
+<section class="panel" id="farm-operations">
+<h2>Farm Operations Detail</h2>
+<p class="panel-hint">Routing breakdowns and failed-job follow-up after the KPI dashboard.</p>
+<dl class="meta-list">
+<div><dt>Avg queue wait</dt><dd>7m 0s</dd></div>
+<div><dt>Avg wall clock</dt><dd>35m 0s</dd></div>
+<div><dt>Task error rate</dt><dd>3.0%</dd></div>
+</dl>
+<h3>Pool Breakdown</h3>
+<div class="table-wrap"><table class="results">
+<thead><tr><th>Label</th><th>Jobs</th><th>Failure Rate</th><th>Avg Render</th></tr></thead>
+<tbody><tr><td>lookdev</td><td>30</td><td>8.0%</td><td>30m 0s</td></tr><tr><td>utility</td><td>18</td><td>18.0%</td><td>15m 0s</td></tr></tbody>
+</table></div>
+<h3>Plugin Breakdown</h3>
+<div class="table-wrap"><table class="results">
+<thead><tr><th>Label</th><th>Jobs</th><th>Failure Rate</th><th>Avg Render</th></tr></thead>
+<tbody><tr><td>MayaBatch</td><td>40</td><td>10.0%</td><td>25m 0s</td></tr></tbody>
+</table></div>
+<h3>Top Failed Jobs</h3>
+<div class="table-wrap"><table class="results">
+<thead><tr><th>Job</th><th>Pool</th><th>Status</th><th>Errors</th></tr></thead>
+<tbody><tr><td class='mono'>show_seq010_sh010_beauty</td><td>lookdev</td><td>Failed</td><td>6</td></tr></tbody>
+</table></div>
+</section>
+<section class="panel" id="frame-economics">
+<h2>Frame Economics Detail</h2>
+<p class="panel-hint">Slowest frames and per-task samples behind the dashboard chart.</p>
+<div class="metric-grid">
+<article class="metric"><span class="metric-label">Median sec/frame</span><strong class="metric-value">92.0</strong></article>
+<article class="metric"><span class="metric-label">P95 sec/frame</span><strong class="metric-value">184.0</strong></article>
+<article class="metric"><span class="metric-label">Sampled Jobs</span><strong class="metric-value">6</strong></article>
+<article class="metric"><span class="metric-label">Failed Frames</span><strong class="metric-value">2</strong></article>
+</div>
+<div class="table-wrap"><table class="results">
+<thead><tr><th>Job</th><th>Frame</th><th>Render Time</th></tr></thead>
+<tbody><tr><td class='mono'>job-slow</td><td class='mono'>1042</td><td>5m 12s</td></tr><tr><td class='mono'>job-slow</td><td class='mono'>1043</td><td>4m 48s</td></tr></tbody>
+</table></div>
+</section>
+<section class="panel" id="shot-intelligence">
+<h2>Shot Intelligence Detail</h2>
+<p class="panel-hint">Repeated submits and validation-linked jobs behind the pass chart.</p>
+<div class="metric-grid">
+<article class="metric"><span class="metric-label">Rerender Rate</span><strong class="metric-value">25.0%</strong></article>
+<article class="metric"><span class="metric-label">Watchlist Shots</span><strong class="metric-value">1</strong></article>
+<article class="metric"><span class="metric-label">Validation-linked Jobs</span><strong class="metric-value">5</strong></article>
+</div>
+<div class="table-wrap"><table class="results">
+<thead><tr><th>Shot</th><th>Submits</th><th>Prior Fail</th><th>Latest</th><th>Scene Hint</th></tr></thead>
+<tbody><tr><td class='mono'>show_seq010_sh010</td><td>3</td><td>yes</td><td>Completed</td><td class='mono'>show_seq010_sh010.ma</td></tr></tbody>
+</table></div>
+</section>
+
+<footer class="report-footer">
+<p>Generated by Maya Pipeline Inspector · Deadline farm analytics · 2 pools</p>
+</footer>
+</div>
+</body>
+</html>

@@ -125,6 +125,15 @@ class DeadlineClient:
             item for item in _normalize_json_list(response.json_data) if isinstance(item, dict)
         ]
 
+    def list_tasks(self, job_id: str) -> list[dict[str, Any]]:
+        """Return task records for one Deadline job."""
+
+        response = self.get("/api/tasks", query={"JobID": job_id})
+        self._raise_for_status(response, f"list tasks for job {job_id}")
+        return [
+            item for item in _normalize_json_list(response.json_data) if isinstance(item, dict)
+        ]
+
     def get_job_statistics(self, job_id: str) -> dict[str, Any]:
         """Return calculated statistics for one Deadline job."""
 
@@ -262,7 +271,7 @@ def _normalize_json_list(payload: Any) -> list[Any]:
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict):
-        for key in ("Jobs", "JobIDs", "Slaves", "Pools", "Pool", "Names", "Workers"):
+        for key in ("Jobs", "JobIDs", "Slaves", "Pools", "Pool", "Names", "Workers", "Tasks"):
             value = payload.get(key)
             if isinstance(value, list):
                 return value
