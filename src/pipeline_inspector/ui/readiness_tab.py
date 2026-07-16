@@ -18,6 +18,21 @@ READINESS_SEND_SUPPORT_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSuppo
 READINESS_SEND_SUPERVISOR_BUTTON_OBJECT_NAME = "pipelineInspectorReadinessSendSupervisorButton"
 READINESS_ACTION_BUTTONS_OBJECT_NAME = "pipelineInspectorReadinessActionButtons"
 
+READINESS_RESULTS_TABLE_COLUMNS = (
+    "Status",
+    "Check",
+    "Description",
+    "Details",
+)
+
+READINESS_CATEGORY_LABELS = {
+    "maya_plugin": "Maya plugin",
+    "mapped_drive": "Mapped drive",
+    "env_var": "Environment variable",
+    "network_path": "Network path",
+    "software_version": "Installed software",
+}
+
 
 @dataclass(frozen=True)
 class ReadinessTabState:
@@ -67,9 +82,9 @@ def build_readiness_tab(
     if set_row_count is not None:
         set_row_count(0)
     if set_column_count is not None:
-        set_column_count(3)
+        set_column_count(len(READINESS_RESULTS_TABLE_COLUMNS))
     results_table.setObjectName(READINESS_RESULTS_TABLE_OBJECT_NAME)
-    results_table.setHorizontalHeaderLabels(("Status", "Check", "Details"))
+    results_table.setHorizontalHeaderLabels(READINESS_RESULTS_TABLE_COLUMNS)
     configure_read_only_table(results_table, qt_widgets)
     layout.addWidget(results_table)
 
@@ -165,6 +180,21 @@ def _populate_results_table(
         _set_table_item(table, qt_widgets, row_index, 0, "PASS" if result.ok else "FAIL")
         _set_table_item(table, qt_widgets, row_index, 1, result.label)
         _set_table_item(table, qt_widgets, row_index, 2, result.message)
+        _set_table_item(
+            table,
+            qt_widgets,
+            row_index,
+            3,
+            _readiness_result_details(result),
+        )
+
+
+def _readiness_result_details(result: ReadinessCheckResult) -> str:
+    category_label = READINESS_CATEGORY_LABELS.get(result.category, result.category)
+    check_id = str(result.check_id or "").strip()
+    if check_id:
+        return f"{category_label} · {check_id}"
+    return category_label
 
 
 def _update_action_buttons(tab_root: Any, qt_widgets: Any, state: ReadinessTabState) -> None:
