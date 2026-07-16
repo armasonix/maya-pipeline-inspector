@@ -40,6 +40,7 @@ STUDIO_TEMPLATES = {
     "texture": r"^tex_[A-Za-z0-9_]+$",
     "shading_engine": r"^SG_[A-Za-z0-9_]+$",
     "light_source": r"^lgt_[A-Za-z0-9_]+$",
+    "camera": r"^cam_[A-Za-z0-9_]+$",
 }
 
 
@@ -74,6 +75,18 @@ def test_parse_and_format_naming_templates_round_trip():
 
 def test_resolve_object_type_maps_snapshot_targets():
     assert resolve_object_type(ShapeSnapshot(node_id="mesh:geo_body", name="geo_body")) == "mesh"
+    assert (
+        resolve_object_type(
+            ShapeSnapshot(
+                node_id="camera:cam_main",
+                name="cam_mainShape",
+                full_name="|world|cam_main|cam_mainShape",
+                transform_id="transform:cam_main",
+                type_name="camera",
+            )
+        )
+        == "camera"
+    )
     assert (
         resolve_object_type(
             NodeSnapshot(
@@ -256,6 +269,42 @@ def test_rule_stack_loads_studio_naming_rules():
 
     assert "studio.naming.mesh.pattern" in rule_ids
     assert "studio.naming.material.pattern" in rule_ids
+    assert "studio.naming.camera.pattern" in rule_ids
+
+
+def test_camera_naming_rule_passes_and_fails_from_fixture():
+    snapshot = load_naming_fixture()
+    valid_camera = ShapeSnapshot(
+        node_id="camera:cam_main",
+        name="cam_mainShape",
+        full_name="|world|cam_main|cam_mainShape",
+        transform_id="transform:cam_main",
+        type_name="camera",
+    )
+    passed_snapshot = GraphSnapshot(
+        scene_path=snapshot.scene_path,
+        renderer=snapshot.renderer,
+        shapes=[*snapshot.shapes, valid_camera],
+    )
+    passed = evaluate_rule("studio.naming.camera.pattern", passed_snapshot)[0]
+    assert passed.status == "passed"
+    assert passed.current_value == "cam_main"
+
+    invalid_camera = ShapeSnapshot(
+        node_id="camera:main_cam",
+        name="main_camShape",
+        full_name="|world|main_cam|main_camShape",
+        transform_id="transform:main_cam",
+        type_name="camera",
+    )
+    failed_snapshot = GraphSnapshot(
+        scene_path=snapshot.scene_path,
+        renderer=snapshot.renderer,
+        shapes=[invalid_camera],
+    )
+    failed = evaluate_rule("studio.naming.camera.pattern", failed_snapshot)[0]
+    assert failed.status == "failed"
+    assert failed.current_value == "main_cam"
 
 
 def test_studio_config_round_trips_naming_templates(tmp_path: Path):

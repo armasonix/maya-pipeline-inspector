@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
 from pipeline_inspector.core.naming_conventions import normalize_naming_templates
+from pipeline_inspector.core.render_presets import RenderSettings
 from pipeline_inspector.core.rule_loader import RuleOverride
 from pipeline_inspector.integrations.notification_triggers import (
     CONNECTOR_NOTIFY_EVENTS,
@@ -461,6 +462,28 @@ class DeadlineConnectorSettings:
     pool: str = ""
     group: str = ""
     user_name: str = ""
+    allow_draft_submit: bool = True
+    allow_production_submit: bool = False
+
+    @property
+    def enabled_submit_qualities(self) -> tuple[str, ...]:
+        from pipeline_inspector.core.render_presets import (
+            RENDER_QUALITY_DRAFT,
+            RENDER_QUALITY_PRODUCTION,
+        )
+
+        qualities: list[str] = []
+        if self.allow_draft_submit:
+            qualities.append(RENDER_QUALITY_DRAFT)
+        if self.allow_production_submit:
+            qualities.append(RENDER_QUALITY_PRODUCTION)
+        return tuple(qualities)
+
+    def to_deadline_config_for_quality(self, quality: str) -> Any:
+        """Convert connector settings into a Deadline config for a quality tier."""
+
+        _ = quality
+        return self.to_deadline_config()
 
     @property
     def api_url(self) -> str:
@@ -501,6 +524,8 @@ class DeadlineConnectorSettings:
             "pool": self.pool,
             "group": self.group,
             "user_name": self.user_name,
+            "allow_draft_submit": self.allow_draft_submit,
+            "allow_production_submit": self.allow_production_submit,
         }
 
     @classmethod
@@ -511,6 +536,10 @@ class DeadlineConnectorSettings:
         port = data.get("web_service_port")
         if not host and data.get("api_url"):
             host, port = _parse_api_url(str(data["api_url"]))
+        allow_draft, allow_production = _normalize_farm_submit_qualities(
+            bool(data.get("allow_draft_submit", True)),
+            bool(data.get("allow_production_submit", False)),
+        )
         return cls(
             enabled=bool(data.get("enabled", False)),
             web_service_host=host or "localhost",
@@ -526,6 +555,8 @@ class DeadlineConnectorSettings:
             pool=str(data.get("pool", "") or ""),
             group=str(data.get("group", "") or ""),
             user_name=str(data.get("user_name", "") or ""),
+            allow_draft_submit=allow_draft,
+            allow_production_submit=allow_production,
         )
 
     @classmethod
@@ -1201,6 +1232,7 @@ class StudioConfig:
     updates: StudioUpdatesSettings = StudioUpdatesSettings()
     connectors: ConnectorSettings = ConnectorSettings()
     governance: GovernanceSettings = GovernanceSettings()
+    render: RenderSettings = RenderSettings()
     config_path: Optional[Path] = None
 
     def with_updates(
@@ -1216,6 +1248,7 @@ class StudioConfig:
         updates: Optional[StudioUpdatesSettings] = None,
         connectors: Optional[ConnectorSettings] = None,
         governance: Optional[GovernanceSettings] = None,
+        render: Optional[RenderSettings] = None,
         config_path: Optional[Path] = None,
     ) -> StudioConfig:
         return replace(
@@ -1232,6 +1265,7 @@ class StudioConfig:
             updates=self.updates if updates is None else updates,
             connectors=self.connectors if connectors is None else connectors,
             governance=self.governance if governance is None else governance,
+            render=self.render if render is None else render,
             config_path=self.config_path if config_path is None else config_path,
         )
 
@@ -1264,6 +1298,7 @@ class StudioConfig:
             "updates": self.updates.to_dict(),
             "connectors": self.connectors.to_dict(),
             "governance": self.governance.to_dict(),
+            "render": self.render.to_dict(),
         }
 
     @classmethod
@@ -1318,6 +1353,12 @@ class StudioConfig:
             if isinstance(governance_raw, Mapping)
             else GovernanceSettings()
         )
+        render_raw = data.get("render")
+        render = (
+            RenderSettings.from_mapping(render_raw)
+            if isinstance(render_raw, Mapping)
+            else RenderSettings()
+        )
         return cls(
             schema_version=schema_version,
             studio_name=studio_name,
@@ -1329,6 +1370,7 @@ class StudioConfig:
             updates=updates,
             connectors=connectors,
             governance=governance,
+            render=render,
             config_path=config_path,
         )
 
@@ -1468,6 +1510,15 @@ def _parse_api_url(api_url: str) -> tuple[str, int]:
     host = parsed.hostname or "localhost"
     port = parsed.port or DEFAULT_DEADLINE_WEB_SERVICE_PORT
     return host, port
+
+
+def _normalize_farm_submit_qualities(
+    allow_draft: bool,
+    allow_production: bool,
+) -> tuple[bool, bool]:
+    if allow_production and not allow_draft:
+        return False, True
+    return True, False
 
 
 def _optional_str(value: str) -> str | None:

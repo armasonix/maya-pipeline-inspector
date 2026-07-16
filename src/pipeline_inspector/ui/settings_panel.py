@@ -39,6 +39,10 @@ from pipeline_inspector.ui.governance_section import (
     build_governance_section,
     update_governance_view,
 )
+from pipeline_inspector.ui.render_settings_section import (
+    build_render_settings_section,
+    update_render_settings_view,
+)
 from pipeline_inspector.ui.settings_dirty_state import (
     DEFAULT_SETTINGS_STATUS_MESSAGE,
     SETTINGS_DIRTY_BANNER_OBJECT_NAME,
@@ -50,6 +54,7 @@ from pipeline_inspector.ui.settings_tabs import (
     SETTINGS_BASIC_TAB_OBJECT_NAME,
     SETTINGS_BUG_REPORT_TAB_OBJECT_NAME,
     SETTINGS_CONNECTORS_TAB_OBJECT_NAME,
+    SETTINGS_RENDER_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME,
     SETTINGS_STUDIO_TAB_OBJECT_NAME,
     SETTINGS_TAB_SPECS,
@@ -78,6 +83,14 @@ from pipeline_inspector.user_config import UserPreferences
 
 SETTINGS_VIEW_OBJECT_NAME = "pipelineInspectorSettingsView"
 SETTINGS_TAB_WIDGET_OBJECT_NAME = "pipelineInspectorSettingsTabWidget"
+_SETTINGS_TAB_PANE_STYLESHEET = """
+QTabWidget::pane {
+    top: -1px;
+    padding: 0px;
+    margin: 0px;
+}
+""".strip()
+
 SETTINGS_BACK_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsBackButton"
 SETTINGS_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorSettingsStatusLabel"
 SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsSaveStudioButton"
@@ -95,6 +108,10 @@ SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJEC
 SETTINGS_PIPELINE_SECTION_OBJECT_NAME = "pipelineInspectorSettingsPipelineSection"
 SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollArea"
 SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollContent"
+SETTINGS_CONNECTORS_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorSettingsConnectorsScrollArea"
+SETTINGS_CONNECTORS_SCROLL_CONTENT_OBJECT_NAME = (
+    "pipelineInspectorSettingsConnectorsScrollContent"
+)
 
 
 @dataclass(frozen=True)
@@ -117,6 +134,7 @@ class SettingsActionCallbacks:
     on_shotgrid_settings_changed: Optional[Callable[[], None]] = None
     on_cerebro_enabled_changed: Optional[Callable[[bool], None]] = None
     on_cerebro_settings_changed: Optional[Callable[[], None]] = None
+    on_render_settings_changed: Optional[Callable[[], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
     on_governance_changed: Optional[Callable[[], None]] = None
@@ -164,6 +182,9 @@ def build_settings_view(
 
     tabs = qt_widgets.QTabWidget()
     tabs.setObjectName(SETTINGS_TAB_WIDGET_OBJECT_NAME)
+    set_tab_style = getattr(tabs, "setStyleSheet", None)
+    if set_tab_style is not None:
+        set_tab_style(_SETTINGS_TAB_PANE_STYLESHEET)
     for spec in SETTINGS_TAB_SPECS:
         tab_widget = _build_settings_tab(
             qt_widgets,
@@ -296,6 +317,7 @@ def update_settings_view(
     update_connector_views(view, qt_widgets, config.connectors)
     update_tracker_views(view, qt_widgets, config.connectors)
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
+    update_render_settings_view(view, qt_widgets, config.render)
     update_bug_report_view(view, qt_widgets, config.bug_report)
 
     if user_config is not None:
@@ -380,6 +402,8 @@ def _build_settings_tab(
         )
     if tab_id == "studio_environment":
         return _build_studio_environment_tab(qt_widgets, config, callbacks)
+    if tab_id == "render":
+        return _build_render_tab(qt_widgets, config, callbacks)
     if tab_id == "bug_report":
         return _build_bug_report_tab(qt_widgets, config, callbacks)
     return build_placeholder_tab(qt_widgets, spec)
@@ -441,17 +465,85 @@ def _build_connectors_tab(
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
 
+    scroll_content = qt_widgets.QWidget()
+    scroll_content.setObjectName(SETTINGS_CONNECTORS_SCROLL_CONTENT_OBJECT_NAME)
+    content_layout = qt_widgets.QVBoxLayout(scroll_content)
+    content_layout.setContentsMargins(0, 0, 0, 0)
+    content_layout.setSpacing(8)
+
+    connector_count = 0
     for connector in iter_connectors():
         section = connector.build_section(qt_widgets, config, callbacks)
-        layout.addWidget(section)
+        content_layout.addWidget(section)
+        connector_count += 1
 
     for tracker in iter_trackers():
         if tracker.build_section is None:
             continue
         section = tracker.build_section(qt_widgets, config, callbacks)
-        layout.addWidget(section)
+        content_layout.addWidget(section)
+        connector_count += 1
 
-    layout.addStretch(1)
+    content_layout.addStretch(1)
+
+    scroll_area = build_borderless_scroll_area(
+        qt_widgets,
+        object_name=SETTINGS_CONNECTORS_SCROLL_AREA_OBJECT_NAME,
+        content_widget=scroll_content,
+        allow_horizontal_scroll=True,
+    )
+    layout.addWidget(scroll_area)
+    # region agent log
+    _debug_log_connectors_tab_layout(
+        connector_count=connector_count,
+        has_scroll_area=scroll_area is not scroll_content,
+    )
+    # endregion
+    return tab
+
+
+def _debug_log_connectors_tab_layout(*, connector_count: int, has_scroll_area: bool) -> None:
+    import contextlib
+    import json
+    import time
+    from pathlib import Path
+
+    payload = {
+        "sessionId": "618f4f",
+        "runId": "connectors-scroll",
+        "hypothesisId": "H1",
+        "location": "settings_panel.py:_build_connectors_tab",
+        "message": "connectors tab scroll layout built",
+        "data": {
+            "connector_count": connector_count,
+            "has_scroll_area": has_scroll_area,
+        },
+        "timestamp": int(time.time() * 1000),
+    }
+    with (
+        contextlib.suppress(OSError),
+        Path("debug-618f4f.log").open("a", encoding="utf-8") as log_file,
+    ):
+        log_file.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def _build_render_tab(
+    qt_widgets: Any,
+    config: StudioConfig,
+    callbacks: SettingsActionCallbacks,
+) -> Any:
+    tab = qt_widgets.QWidget()
+    tab.setObjectName(SETTINGS_RENDER_TAB_OBJECT_NAME)
+    layout = qt_widgets.QVBoxLayout(tab)
+    layout.setContentsMargins(0, 4, 8, 4)
+    layout.setSpacing(6)
+    layout.addWidget(
+        build_render_settings_section(
+            qt_widgets,
+            config,
+            on_settings_changed=callbacks.on_render_settings_changed,
+        )
+    )
     return tab
 
 

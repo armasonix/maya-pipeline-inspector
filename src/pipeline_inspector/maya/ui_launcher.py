@@ -704,6 +704,10 @@ def _settings_action_callbacks(
         on_shotgrid_settings_changed=sync_connectors,
         on_cerebro_enabled_changed=lambda _enabled: sync_connectors(),
         on_cerebro_settings_changed=sync_connectors,
+        on_render_settings_changed=lambda: _sync_render_settings_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
         on_studio_environment_changed=lambda: _sync_studio_environment_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -1297,6 +1301,76 @@ def _verify_ftrack_connector_if_enabled(content: Any, qt_widgets: Any) -> None:
     _verify_connectors_if_enabled(content, qt_widgets)
 
 
+def _sync_render_settings_from_ui(content: Any, qt_widgets: Any) -> None:
+    """Read render preset fields from Settings and update in-session studio config."""
+
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return
+
+    from pipeline_inspector.ui.render_settings_section import read_render_settings_from_view
+
+    render = read_render_settings_from_view(
+        settings_view,
+        qt_widgets,
+        base=current.render,
+    )
+    updated = current.with_updates(render=render)
+    setattr(content, STUDIO_CONFIG_ATTR, updated)
+    _refresh_settings_view(content, qt_widgets)
+
+
+def _sync_farm_quality_from_ui(content: Any, qt_widgets: Any) -> None:
+    """Read Draft/Production checkboxes from the Farm tab into studio config."""
+
+    from dataclasses import replace
+
+    from pipeline_inspector.ui.farm_tab import read_farm_submit_qualities_from_view
+
+    farm_tab = _farm_tab_widget(content, qt_widgets)
+    if farm_tab is None:
+        return
+    allow_draft, allow_production = read_farm_submit_qualities_from_view(
+        farm_tab,
+        qt_widgets,
+    )
+    # region agent log
+    import contextlib
+    import json
+    from pathlib import Path
+
+    payload = json.dumps(
+        {
+            "sessionId": "618f4f",
+            "location": "ui_launcher.py:_sync_farm_quality_from_ui",
+            "message": "farm quality synced",
+            "data": {
+                "allow_draft": allow_draft,
+                "allow_production": allow_production,
+            },
+            "timestamp": __import__("time").time() * 1000,
+            "hypothesisId": "farm-exclusive-quality",
+            "runId": "post-fix",
+        }
+    ) + "\n"
+    with (
+        contextlib.suppress(OSError),
+        Path("debug-618f4f.log").open("a", encoding="utf-8") as log_file,
+    ):
+        log_file.write(payload)
+    # endregion
+    current = _studio_config_for_content(content)
+    deadline = replace(
+        current.connectors.deadline,
+        allow_draft_submit=allow_draft,
+        allow_production_submit=allow_production,
+    )
+    updated = current.with_updates(connectors=replace(current.connectors, deadline=deadline))
+    setattr(content, STUDIO_CONFIG_ATTR, updated)
+    _refresh_settings_view(content, qt_widgets)
+
+
 def _sync_connectors_from_ui(content: Any, qt_widgets: Any) -> None:
     """Read all connector sections from Settings and update in-session studio config."""
 
@@ -1356,6 +1430,8 @@ def _save_studio_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     ):
         return
     _sync_deadline_connector_from_ui(content, qt_widgets)
+    _sync_render_settings_from_ui(content, qt_widgets)
+    _sync_farm_quality_from_ui(content, qt_widgets)
     _sync_studio_environment_from_ui(content, qt_widgets)
     _sync_studio_policy_from_ui(content, qt_widgets)
     _sync_governance_from_ui(content, qt_widgets)
@@ -1963,6 +2039,10 @@ def _farm_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_farm_quality_changed=lambda: _sync_farm_quality_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+        ),
     )
 
 
@@ -2445,6 +2525,14 @@ def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
 
 def _apply_farm_tab_state(content: Any, qt_widgets: Any, tab_state: FarmTabState) -> None:
     if content is not None:
+        from dataclasses import replace
+
+        deadline = _studio_config_for_content(content).connectors.deadline
+        tab_state = replace(
+            tab_state,
+            allow_draft_submit=deadline.allow_draft_submit,
+            allow_production_submit=deadline.allow_production_submit,
+        )
         content._pipeline_inspector_farm_tab_state = tab_state
         content._pipeline_inspector_farm_last_job_id = tab_state.last_job_id
     farm_tab = _farm_tab_widget(content, qt_widgets)
@@ -2468,9 +2556,11 @@ def _set_farm_status(content: Any, qt_widgets: Any, message: str) -> None:
                 eligibility_decision=stored.eligibility_decision,
                 eligibility_allowed=stored.eligibility_allowed,
                 last_report_path=stored.last_report_path,
-                last_job_id=stored.last_job_id,
-                status_message=message,
-            ),
+        last_job_id=stored.last_job_id,
+        status_message=message,
+        allow_draft_submit=stored.allow_draft_submit,
+        allow_production_submit=stored.allow_production_submit,
+    ),
         )
         return
     _set_label_text(content, qt_widgets, FARM_STATUS_LABEL_OBJECT_NAME, message)

@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
+from pipeline_inspector.core.render_presets import (
+    ArnoldRenderQualitySettings,
+    CommonRenderQualitySettings,
+    RenderQualityPreset,
+    RenderSettings,
+    VrayRenderQualitySettings,
+)
 from pipeline_inspector.core.rule_loader import RuleOverride
 from pipeline_inspector.integrations.bug_report.config import DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
 from pipeline_inspector.integrations.deadline.config import DeadlineConfig
@@ -394,6 +401,45 @@ def test_deadline_connector_builds_api_url_from_host_and_port():
 
     assert settings.api_url == "http://10.0.0.8:8082"
     assert settings.to_deadline_config().api_url == "http://10.0.0.8:8082"
+
+
+def test_studio_config_round_trips_render_quality_presets(tmp_path: Path):
+    path = tmp_path / STUDIO_CONFIG_FILENAME
+    original = StudioConfig(
+        render=RenderSettings(
+            draft=RenderQualityPreset(
+                common=CommonRenderQualitySettings(width=960, height=540),
+                vray=VrayRenderQualitySettings(max_subdivs=4),
+                arnold=ArnoldRenderQualitySettings(aa_samples=2),
+            ),
+            production=RenderQualityPreset(
+                common=CommonRenderQualitySettings(width=1920, height=1080),
+                vray=VrayRenderQualitySettings(max_subdivs=16, ray_depth=8),
+            ),
+        )
+    )
+
+    save_studio_config(path, original)
+    loaded = load_studio_config(path)
+
+    assert loaded.render.to_dict() == original.render.to_dict()
+
+
+def test_deadline_connector_to_deadline_config_for_quality_ignores_quality_tier():
+    settings = DeadlineConnectorSettings(
+        enabled=True,
+        profile_id="deadline_critical",
+        pool="default_pool",
+        group="render",
+    )
+
+    draft_config = settings.to_deadline_config_for_quality("draft")
+    production_config = settings.to_deadline_config_for_quality("production")
+
+    assert draft_config.profile_id == "deadline_critical"
+    assert draft_config.pool == "default_pool"
+    assert production_config.profile_id == "deadline_critical"
+    assert production_config.group == "render"
 
 
 def test_deadline_connector_round_trips_in_studio_config_file(tmp_path):

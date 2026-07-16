@@ -20,6 +20,7 @@ NAMING_OBJECT_TYPES: tuple[str, ...] = (
     "texture",
     "shading_engine",
     "light_source",
+    "camera",
 )
 
 
@@ -77,6 +78,8 @@ def resolve_object_type(target_obj: object) -> Optional[str]:
         return "shading_engine"
     if isinstance(target_obj, ShapeSnapshot):
         type_name = target_obj.type_name.lower()
+        if type_name == "camera":
+            return "camera"
         if type_name == "nurbscurve":
             return "control"
         if type_name in {"mesh", "nurbssurface", "subdiv", "aistandin", "vrayproxy"}:

@@ -3,6 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from pipeline_inspector.core.render_presets import (
+    CommonRenderQualitySettings,
+    RenderQualityPreset,
+    RenderSettings,
+    VrayRenderQualitySettings,
+)
 from pipeline_inspector.studio_config import (
     BugReportSettings,
     CerebroConnectorSettings,
@@ -23,6 +29,7 @@ from pipeline_inspector.ui import (
     cerebro_connector_section,
     deadline_connector_section,
     discord_connector_section,
+    farm_tab,
     ftrack_connector_section,
     main_window,
     settings_panel,
@@ -43,6 +50,9 @@ from pipeline_inspector.ui.basic_settings_section import (
     SETTINGS_DOCS_URL_INPUT_OBJECT_NAME,
     SETTINGS_THEME_COMBO_OBJECT_NAME,
     SETTINGS_UI_DENSITY_COMBO_OBJECT_NAME,
+)
+from pipeline_inspector.ui.render_settings_section import (
+    SETTINGS_RENDER_SECTION_OBJECT_NAME,
 )
 from pipeline_inspector.ui.settings_dirty_state import (
     SETTINGS_DIRTY_BANNER_OBJECT_NAME,
@@ -74,6 +84,9 @@ _DEADLINE_PORT = deadline_connector_section.SETTINGS_DEADLINE_PORT_INPUT_OBJECT_
 _DEADLINE_LEFT = deadline_connector_section.SETTINGS_DEADLINE_LEFT_COLUMN_OBJECT_NAME
 _DEADLINE_RIGHT = deadline_connector_section.SETTINGS_DEADLINE_RIGHT_COLUMN_OBJECT_NAME
 _DEADLINE_MAYAPY = deadline_connector_section.SETTINGS_DEADLINE_MAYAPY_INPUT_OBJECT_NAME
+_CONNECTORS_SCROLL = settings_panel.SETTINGS_CONNECTORS_SCROLL_AREA_OBJECT_NAME
+_FARM_ALLOW_DRAFT = farm_tab.FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME
+_FARM_ALLOW_PRODUCTION = farm_tab.FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME
 _TELEGRAM_ENABLED = telegram_connector_section.SETTINGS_TELEGRAM_ENABLED_TOGGLE_OBJECT_NAME
 _TELEGRAM_DETAILS = telegram_connector_section.SETTINGS_TELEGRAM_DETAILS_OBJECT_NAME
 _TELEGRAM_BOT_TOKEN = telegram_connector_section.SETTINGS_TELEGRAM_BOT_TOKEN_INPUT_OBJECT_NAME
@@ -746,6 +759,7 @@ def test_settings_view_includes_category_tabs_and_studio_pipeline_toggle():
         "Connectors",
         "Studio",
         "Studio Environment",
+        "Render",
         "Bug Report",
     ]
     toggle = _find(view, settings_panel.SETTINGS_REQUIRE_TX_TOGGLE_OBJECT_NAME)
@@ -775,7 +789,7 @@ def test_bug_report_tab_exposes_relay_settings_and_privacy_notice():
         ),
     )
     tabs = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME)
-    bug_report_tab = tabs.tabs[5][1]
+    bug_report_tab = tabs.tabs[6][1]
     section = bug_report_tab.layout.widgets[0]
     relay_url = _find(section, bug_report_section.SETTINGS_BUG_REPORT_RELAY_URL_INPUT_OBJECT_NAME)
     api_key = _find(section, bug_report_section.SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME)
@@ -792,7 +806,7 @@ def test_bug_report_tab_exposes_relay_settings_and_privacy_notice():
 
 def test_studio_config_from_settings_view_reads_bug_report_fields():
     view = settings_panel.build_settings_view(FakeQtWidgets)
-    bug_report_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[5][1]
+    bug_report_tab = _find(view, settings_panel.SETTINGS_TAB_WIDGET_OBJECT_NAME).tabs[6][1]
     section = bug_report_tab.layout.widgets[0]
     _find(section, bug_report_section.SETTINGS_BUG_REPORT_ENABLED_TOGGLE_OBJECT_NAME).setChecked(
         True
@@ -1048,7 +1062,31 @@ def test_read_connectors_from_settings_view_reads_deadline_fields():
     assert connectors.deadline.web_service_port == 9090
 
 
-def test_connectors_tab_uses_parallel_deadline_columns():
+def test_connectors_tab_uses_scroll_area_for_long_connector_list():
+    view = settings_panel.build_settings_view(FakeQtWidgets, config=StudioConfig())
+    scroll_area = _find(view, _CONNECTORS_SCROLL)
+    assert scroll_area is not None
+
+
+def test_render_tab_exposes_draft_and_production_quality_fields():
+    view = settings_panel.build_settings_view(
+        FakeQtWidgets,
+        config=StudioConfig(
+            render=RenderSettings(
+                draft=RenderQualityPreset(
+                    common=CommonRenderQualitySettings(width=960, height=540),
+                    vray=VrayRenderQualitySettings(max_subdivs=4),
+                ),
+            )
+        ),
+    )
+    render_section = _find(view, SETTINGS_RENDER_SECTION_OBJECT_NAME)
+    draft_width = _find(view, "pipelineInspectorSettingsRenderDraftCommonWidthInput")
+    assert render_section is not None
+    assert draft_width.text() == "960"
+
+
+def test_connectors_tab_deadline_grid_layout_fields():
     view = settings_panel.build_settings_view(
         FakeQtWidgets,
         config=StudioConfig(

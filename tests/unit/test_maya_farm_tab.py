@@ -33,8 +33,25 @@ class FakeFarmPushButton(FakePushButton):
         self.enabled = enabled
 
 
+class FakeCheckBox(FakePushButton):
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self.checked = False
+        self.stateChanged = FakeSignal()
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
+    def isChecked(self) -> bool:
+        return self.checked
+
+    def setEnabled(self, enabled: bool) -> None:
+        self.enabled = enabled
+
+
 class FakeFarmQtWidgets(FakeQtWidgets):
     QPushButton = FakeFarmPushButton
+    QCheckBox = FakeCheckBox
 
 
 def test_build_main_widget_includes_farm_tab():
@@ -43,6 +60,54 @@ def test_build_main_widget_includes_farm_tab():
     assert tabs is not None
     assert tabs.tabs[-1][0] == "Farm"
     assert tabs.tabs[-1][1].object_name == farm_tab.FARM_TAB_OBJECT_NAME
+
+
+def test_build_farm_tab_exposes_submission_quality_checkboxes():
+    tab = farm_tab.build_farm_tab(
+        FakeFarmQtWidgets,
+        state=farm_tab.FarmTabState(
+            allow_draft_submit=True,
+            allow_production_submit=False,
+        ),
+    )
+    draft = _find(tab, farm_tab.FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME)
+    production = _find(tab, farm_tab.FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME)
+    assert draft.checked is True
+    assert production.checked is False
+
+
+def test_normalize_farm_submit_qualities_allows_only_one_selection():
+    assert farm_tab.normalize_farm_submit_qualities(True, False) == (True, False)
+    assert farm_tab.normalize_farm_submit_qualities(False, True) == (False, True)
+    assert farm_tab.normalize_farm_submit_qualities(True, True) == (True, False)
+    assert farm_tab.normalize_farm_submit_qualities(False, False) == (True, False)
+
+
+def test_farm_quality_checkboxes_are_mutually_exclusive():
+    tab = farm_tab.build_farm_tab(
+        FakeFarmQtWidgets,
+        state=farm_tab.FarmTabState(
+            allow_draft_submit=True,
+            allow_production_submit=False,
+        ),
+    )
+    draft = _find(tab, farm_tab.FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME)
+    production = _find(tab, farm_tab.FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME)
+
+    production.setChecked(True)
+    production.stateChanged.emit()
+    assert draft.checked is False
+    assert production.checked is True
+
+    draft.setChecked(True)
+    draft.stateChanged.emit()
+    assert draft.checked is True
+    assert production.checked is False
+
+    production.setChecked(False)
+    production.stateChanged.emit()
+    assert draft.checked is True
+    assert production.checked is False
 
 
 def test_build_farm_tab_exposes_status_and_actions():

@@ -203,7 +203,14 @@ def read_connectors_from_settings_view(
 
     connectors = base or ConnectorSettings()
     for connector in iter_connectors():
-        settings = connector.read_from_view(view, qt_widgets)
+        if connector.id == "deadline":
+            settings = read_deadline_connector_from_view(
+                view,
+                qt_widgets,
+                base=connector.get_settings(connectors),
+            )
+        else:
+            settings = connector.read_from_view(view, qt_widgets)
         connectors = connector.apply_settings(connectors, settings)
     return connectors
 

@@ -11,6 +11,8 @@ FARM_SCENE_STATE_LABEL_OBJECT_NAME = "pipelineInspectorFarmSceneStateLabel"
 FARM_ELIGIBILITY_LABEL_OBJECT_NAME = "pipelineInspectorFarmEligibilityLabel"
 FARM_LAST_REPORT_LABEL_OBJECT_NAME = "pipelineInspectorFarmLastReportLabel"
 FARM_LAST_JOB_LABEL_OBJECT_NAME = "pipelineInspectorFarmLastJobLabel"
+FARM_QUALITIES_LABEL_OBJECT_NAME = "pipelineInspectorFarmQualitiesLabel"
+FARM_QUALITIES_ROW_OBJECT_NAME = "pipelineInspectorFarmQualitiesRow"
 FARM_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorFarmStatusLabel"
 FARM_CONNECTION_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorFarmConnectionStatusLabel"
 FARM_CONNECTION_LAMP_OBJECT_NAME = "pipelineInspectorFarmConnectionLamp"
@@ -37,6 +39,9 @@ FARM_BUTTON_LAYOUT_ORDER = (
     FARM_SUBMIT_BUTTON_OBJECT_NAME,
 )
 
+FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME = "pipelineInspectorFarmAllowDraftCheckbox"
+FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME = "pipelineInspectorFarmAllowProductionCheckbox"
+
 @dataclass(frozen=True)
 class FarmTabState:
     """Display data for the Farm tab."""
@@ -49,6 +54,8 @@ class FarmTabState:
     renderer_plugin_loaded: bool = True
     eligibility_decision: str = "unknown"
     eligibility_allowed: bool = False
+    allow_draft_submit: bool = True
+    allow_production_submit: bool = False
     last_report_path: str = ""
     last_job_id: str = ""
     status_message: str = "Run Farm Preflight to evaluate deadline_critical readiness."
@@ -60,6 +67,7 @@ class FarmActionCallbacks:
     on_refresh_connection: Optional[Callable[[], None]] = None
     on_run_farm_preflight: Optional[Callable[[], None]] = None
     on_submit_to_farm: Optional[Callable[[], None]] = None
+    on_farm_quality_changed: Optional[Callable[[], None]] = None
 
 def build_farm_tab(
     qt_widgets: Any,
@@ -101,6 +109,48 @@ def build_farm_tab(
     last_job_label.setObjectName(FARM_LAST_JOB_LABEL_OBJECT_NAME)
     last_job_label.setWordWrap(True)
     layout.addWidget(last_job_label)
+
+    qualities_label = qt_widgets.QLabel(_farm_qualities_text(farm_state))
+    qualities_label.setObjectName(FARM_QUALITIES_LABEL_OBJECT_NAME)
+    qualities_label.setWordWrap(True)
+    layout.addWidget(qualities_label)
+
+    qualities_row = qt_widgets.QWidget()
+    qualities_row.setObjectName(FARM_QUALITIES_ROW_OBJECT_NAME)
+    qualities_layout = qt_widgets.QHBoxLayout(qualities_row)
+    qualities_layout.setContentsMargins(0, 0, 0, 0)
+    qualities_layout.setSpacing(12)
+    draft_checkbox = _farm_quality_checkbox(
+        qt_widgets,
+        label="Draft",
+        object_name=FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME,
+        checked=normalize_farm_submit_qualities(
+            farm_state.allow_draft_submit,
+            farm_state.allow_production_submit,
+        )[0],
+        enabled=farm_state.integration_enabled,
+        on_changed=None,
+    )
+    production_checkbox = _farm_quality_checkbox(
+        qt_widgets,
+        label="Production",
+        object_name=FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME,
+        checked=normalize_farm_submit_qualities(
+            farm_state.allow_draft_submit,
+            farm_state.allow_production_submit,
+        )[1],
+        enabled=farm_state.integration_enabled,
+        on_changed=None,
+    )
+    qualities_layout.addWidget(draft_checkbox)
+    qualities_layout.addWidget(production_checkbox)
+    _wire_exclusive_farm_quality_checkboxes(
+        draft_checkbox,
+        production_checkbox,
+        farm_callbacks.on_farm_quality_changed,
+    )
+    qualities_layout.addStretch(1)
+    layout.addWidget(qualities_row)
 
     actions_section = qt_widgets.QWidget()
     actions_section_layout = qt_widgets.QVBoxLayout(actions_section)
@@ -170,6 +220,8 @@ def update_farm_tab(
     _set_label(tab_root, qt_widgets, FARM_ELIGIBILITY_LABEL_OBJECT_NAME, _eligibility_text(state))
     _set_label(tab_root, qt_widgets, FARM_LAST_REPORT_LABEL_OBJECT_NAME, _last_report_text(state))
     _set_label(tab_root, qt_widgets, FARM_LAST_JOB_LABEL_OBJECT_NAME, _last_job_text(state))
+    _set_label(tab_root, qt_widgets, FARM_QUALITIES_LABEL_OBJECT_NAME, _farm_qualities_text(state))
+    _update_farm_quality_checkboxes(tab_root, qt_widgets, state)
     _set_label(tab_root, qt_widgets, FARM_STATUS_LABEL_OBJECT_NAME, state.status_message)
     _update_connection_indicator(tab_root, qt_widgets, state)
     _update_farm_action_buttons(tab_root, qt_widgets, state)
@@ -279,6 +331,136 @@ def _last_report_text(state: FarmTabState) -> str:
 def _last_job_text(state: FarmTabState) -> str:
     job_id = state.last_job_id or "none"
     return f"Last Deadline job id: {job_id}"
+
+def _farm_qualities_text(state: FarmTabState) -> str:
+    allow_draft, allow_production = normalize_farm_submit_qualities(
+        state.allow_draft_submit,
+        state.allow_production_submit,
+    )
+    quality = "production" if allow_production else "draft"
+    return f"Farm submission quality: {quality}"
+
+def _farm_quality_checkbox(
+    qt_widgets: Any,
+    *,
+    label: str,
+    object_name: str,
+    checked: bool,
+    enabled: bool,
+    on_changed: Optional[Callable[[], None]],
+) -> Any:
+    from pipeline_inspector.ui.settings_widgets import wire_checkbox_changed
+
+    checkbox = qt_widgets.QCheckBox(label)
+    checkbox.setObjectName(object_name)
+    set_checked = getattr(checkbox, "setChecked", None)
+    if set_checked is not None:
+        set_checked(checked)
+    set_enabled = getattr(checkbox, "setEnabled", None)
+    if set_enabled is not None:
+        set_enabled(enabled)
+    wire_checkbox_changed(checkbox, on_changed)
+    return checkbox
+
+
+def _update_farm_quality_checkboxes(tab_root: Any, qt_widgets: Any, state: FarmTabState) -> None:
+    allow_draft, allow_production = normalize_farm_submit_qualities(
+        state.allow_draft_submit,
+        state.allow_production_submit,
+    )
+    for object_name, checked in (
+        (FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME, allow_draft),
+        (FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME, allow_production),
+    ):
+        checkbox = _find_child(tab_root, qt_widgets.QCheckBox, object_name)
+        if checkbox is None:
+            continue
+        set_checked = getattr(checkbox, "setChecked", None)
+        if set_checked is not None:
+            set_checked(checked)
+        set_enabled = getattr(checkbox, "setEnabled", None)
+        if set_enabled is not None:
+            set_enabled(state.integration_enabled)
+
+
+def read_farm_submit_qualities_from_view(view: Any, qt_widgets: Any) -> tuple[bool, bool]:
+    """Read the selected Draft/Production submission quality from the Farm tab."""
+
+    from pipeline_inspector.ui.settings_widgets import checkbox_checked
+
+    draft = checkbox_checked(view, qt_widgets, FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME)
+    production = checkbox_checked(view, qt_widgets, FARM_ALLOW_PRODUCTION_CHECKBOX_OBJECT_NAME)
+    if _find_child(view, qt_widgets.QCheckBox, FARM_ALLOW_DRAFT_CHECKBOX_OBJECT_NAME) is None:
+        return True, False
+    return normalize_farm_submit_qualities(draft, production)
+
+
+def normalize_farm_submit_qualities(
+    allow_draft: bool,
+    allow_production: bool,
+) -> tuple[bool, bool]:
+    """Return exactly one enabled farm submission quality."""
+
+    if allow_production and not allow_draft:
+        return False, True
+    return True, False
+
+
+def _wire_exclusive_farm_quality_checkboxes(
+    draft_checkbox: Any,
+    production_checkbox: Any,
+    on_changed: Optional[Callable[[], None]],
+) -> None:
+    set_auto_exclusive = getattr(draft_checkbox, "setAutoExclusive", None)
+    if set_auto_exclusive is not None:
+        set_auto_exclusive(True)
+    set_auto_exclusive = getattr(production_checkbox, "setAutoExclusive", None)
+    if set_auto_exclusive is not None:
+        set_auto_exclusive(True)
+
+    def _commit_selection() -> None:
+        if on_changed is not None:
+            on_changed()
+
+    def _on_draft_changed() -> None:
+        if _checkbox_is_checked(draft_checkbox):
+            _set_checkbox_checked(production_checkbox, False)
+        elif not _checkbox_is_checked(production_checkbox):
+            _set_checkbox_checked(production_checkbox, True)
+        _commit_selection()
+
+    def _on_production_changed() -> None:
+        if _checkbox_is_checked(production_checkbox):
+            _set_checkbox_checked(draft_checkbox, False)
+        elif not _checkbox_is_checked(draft_checkbox):
+            _set_checkbox_checked(draft_checkbox, True)
+        _commit_selection()
+
+    from pipeline_inspector.ui.settings_widgets import wire_checkbox_changed
+
+    wire_checkbox_changed(draft_checkbox, _on_draft_changed)
+    wire_checkbox_changed(production_checkbox, _on_production_changed)
+
+
+def _checkbox_is_checked(checkbox: Any) -> bool:
+    is_checked = getattr(checkbox, "isChecked", None)
+    if is_checked is not None:
+        return bool(is_checked())
+    return bool(getattr(checkbox, "checked", False))
+
+
+def _set_checkbox_checked(checkbox: Any, checked: bool) -> None:
+    block_signals = getattr(checkbox, "blockSignals", None)
+    if block_signals is not None:
+        block_signals(True)
+    set_checked = getattr(checkbox, "setChecked", None)
+    if set_checked is not None:
+        set_checked(checked)
+    else:
+        checkbox.checked = checked
+    if block_signals is not None:
+        block_signals(False)
+
 
 def _farm_button(
     qt_widgets: Any,

@@ -346,6 +346,8 @@ def _merge_tab_state(
         last_report_path=last_report_path or base.last_report_path,
         last_job_id=last_job_id or base.last_job_id,
         status_message=status_message or base.status_message,
+        allow_draft_submit=base.allow_draft_submit,
+        allow_production_submit=base.allow_production_submit,
     )
 
 def _eligibility_message(eligibility: FarmEligibilityResult) -> str:

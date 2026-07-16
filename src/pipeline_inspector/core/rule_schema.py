@@ -811,7 +811,7 @@ class ValidationEngine:
                 current = self._read_value(target, name_field)
         else:
             current = self._read_value(target, name_field)
-            if object_type == "mesh" and isinstance(target.obj, ShapeSnapshot):
+            if object_type in {"mesh", "camera"} and isinstance(target.obj, ShapeSnapshot):
                 current = mesh_transform_name_from_shape(target.obj)
         if not isinstance(current, str) or not current.strip():
             return self._skipped(
