@@ -184,7 +184,8 @@ def build_slack_connector_section(
     _set_slack_details_visible(details_row, config.connectors.slack.enabled)
 
     hint = qt_widgets.QLabel(
-        "Route Slack notifications by event. Block events use publish/deadline webhooks; "
+        "Route Slack notifications by event. Publish block uses the publish webhook; "
+        "Deadline block and farm job complete use the deadline webhook; "
         "other triggers fall back to the publish webhook. Use notify_targets in studio JSON "
         "for per-target routing."
     )

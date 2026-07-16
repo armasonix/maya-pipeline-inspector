@@ -5,7 +5,8 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 DEFAULT_API_BASE_URL = "https://api.telegram.org"
-DEFAULT_TIMEOUT_SECONDS = 10.0
+DEFAULT_TIMEOUT_SECONDS = 30.0
+TELEGRAM_REQUEST_RETRIES = 3
 
 @dataclass(frozen=True)
 class TelegramConfig:

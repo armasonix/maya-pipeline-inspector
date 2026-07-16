@@ -8,8 +8,14 @@ from collections.abc import Callable
 from typing import Any
 
 from pipeline_inspector.integrations.deadline.client import DeadlineClient, DeadlineConfig
+from pipeline_inspector.integrations.deadline.farm_notify import (
+    farm_notification_context_from_job_payload,
+)
+from pipeline_inspector.integrations.deadline.job_payload import (
+    job_name_from_payload,
+    job_status_from_payload,
+)
 from pipeline_inspector.integrations.notify.dispatcher import (
-    FarmNotificationContext,
     dispatch_farm_notifications,
     report_validation_notification_outcomes,
 )
@@ -26,46 +32,6 @@ DEFAULT_POLL_INTERVAL_SECONDS = 5.0
 MAX_POLL_DURATION_SECONDS = 6 * 60 * 60
 
 DeadlineClientFactory = Callable[[DeadlineConfig], DeadlineClient]
-
-_DEADLINE_JOB_STAT_NAMES = {
-    0: "Unknown",
-    1: "Active",
-    2: "Suspended",
-    3: "Completed",
-    4: "Failed",
-    6: "Pending",
-}
-
-
-def job_status_from_payload(payload: dict[str, Any]) -> str:
-    """Return a Deadline job status string from a Web Service payload."""
-
-    for key in ("JobStatus", "Status", "JobState"):
-        value = payload.get(key)
-        if value:
-            return str(value)
-    stat = payload.get("Stat")
-    if stat is not None:
-        try:
-            return _DEADLINE_JOB_STAT_NAMES.get(int(stat), str(stat))
-        except (TypeError, ValueError):
-            return str(stat)
-    return ""
-
-
-def job_name_from_payload(payload: dict[str, Any], *, fallback_job_id: str) -> str:
-    """Return a human-readable job name from a Web Service payload."""
-
-    props = payload.get("Props")
-    if isinstance(props, dict):
-        nested_name = props.get("Name")
-        if nested_name:
-            return str(nested_name)
-    for key in ("JobName", "Name"):
-        value = payload.get(key)
-        if value:
-            return str(value)
-    return fallback_job_id
 
 
 def start_farm_job_notification_poll(
@@ -121,13 +87,14 @@ def start_farm_job_notification_poll(
                 )
                 # endregion
                 if status in FARM_JOB_TERMINAL_STATUSES:
+                    notify_context = farm_notification_context_from_job_payload(
+                        payload,
+                        fallback_job_id=normalized_job_id,
+                        fallback_job_name=resolved_name,
+                    )
                     dispatch_result = dispatch_farm_notifications(
                         studio_config,
-                        FarmNotificationContext(
-                            job_id=normalized_job_id,
-                            job_name=resolved_name,
-                            status=status,
-                        ),
+                        notify_context,
                     )
                     # region agent log
                     _farm_monitor_debug_log(
@@ -136,6 +103,8 @@ def start_farm_job_notification_poll(
                         {
                             "job_id": normalized_job_id,
                             "status": status,
+                            "worker_machine": notify_context.worker_machine,
+                            "duration_text": notify_context.duration_text,
                             "outcomes": [
                                 {
                                     "connector": outcome.connector_id,

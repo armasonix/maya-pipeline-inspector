@@ -5,11 +5,11 @@ from typing import Any
 
 from pipeline_inspector.integrations.deadline.client import DeadlineClient, DeadlineConfig
 from pipeline_inspector.integrations.telegram.notify import TelegramNotificationResult
-from pipeline_inspector.maya.farm_job_monitor import (
+from pipeline_inspector.integrations.deadline.job_payload import (
     job_name_from_payload,
     job_status_from_payload,
-    start_farm_job_notification_poll,
 )
+from pipeline_inspector.maya.farm_job_monitor import start_farm_job_notification_poll
 from pipeline_inspector.studio_config import ConnectorSettings, StudioConfig, TelegramConnectorSettings
 from pipeline_inspector.integrations.notification_triggers import NOTIFY_EVENT_ON_FARM_COMPLETE
 

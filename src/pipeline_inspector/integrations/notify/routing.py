@@ -7,6 +7,7 @@ from typing import Literal
 from pipeline_inspector.integrations.notification_triggers import (
     NOTIFY_EVENT_BLOCK_DEADLINE,
     NOTIFY_EVENT_BLOCK_PUBLISH,
+    NOTIFY_EVENT_ON_FARM_COMPLETE,
 )
 from pipeline_inspector.studio_config import (
     DiscordConnectorSettings,
@@ -93,7 +94,7 @@ def _default_discord_route(
 def _slack_webhook_for_event(settings: SlackConnectorSettings, event_id: str) -> str | None:
     if event_id == NOTIFY_EVENT_BLOCK_PUBLISH:
         url = settings.publish_webhook_url.strip()
-    elif event_id == NOTIFY_EVENT_BLOCK_DEADLINE:
+    elif event_id in (NOTIFY_EVENT_BLOCK_DEADLINE, NOTIFY_EVENT_ON_FARM_COMPLETE):
         url = settings.deadline_webhook_url.strip()
     else:
         return None
@@ -108,25 +109,30 @@ def _default_slack_routes(
     if not default_events:
         return ()
 
-    block_events = tuple(
-        event
-        for event in default_events
-        if event in (NOTIFY_EVENT_BLOCK_PUBLISH, NOTIFY_EVENT_BLOCK_DEADLINE)
-    )
-    other_events = tuple(
-        event
-        for event in default_events
-        if event not in (NOTIFY_EVENT_BLOCK_PUBLISH, NOTIFY_EVENT_BLOCK_DEADLINE)
-    )
+    publish_events: list[str] = []
+    deadline_events: list[str] = []
+    other_events: list[str] = []
+    for event_id in default_events:
+        if event_id == NOTIFY_EVENT_BLOCK_PUBLISH:
+            publish_events.append(event_id)
+        elif event_id in (NOTIFY_EVENT_BLOCK_DEADLINE, NOTIFY_EVENT_ON_FARM_COMPLETE):
+            deadline_events.append(event_id)
+        else:
+            other_events.append(event_id)
 
     routes: list[ResolvedNotifyRoute] = []
-    if block_events:
-        for event_id in block_events:
-            webhook_url = _slack_webhook_for_event(settings, event_id)
-            if webhook_url:
-                routes.append(
-                    ResolvedNotifyRoute(events=(event_id,), webhook_url=webhook_url)
-                )
+    if publish_events:
+        webhook_url = settings.publish_webhook_url.strip()
+        if webhook_url:
+            routes.append(
+                ResolvedNotifyRoute(events=tuple(publish_events), webhook_url=webhook_url)
+            )
+    if deadline_events:
+        webhook_url = settings.deadline_webhook_url.strip()
+        if webhook_url:
+            routes.append(
+                ResolvedNotifyRoute(events=tuple(deadline_events), webhook_url=webhook_url)
+            )
     if other_events:
         fallback = settings.publish_webhook_url.strip()
         if fallback:

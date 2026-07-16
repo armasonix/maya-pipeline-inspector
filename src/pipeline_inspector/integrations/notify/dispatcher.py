@@ -62,14 +62,39 @@ class FarmNotificationContext:
     job_id: str
     job_name: str
     status: str
+    worker_machine: str = ""
+    submitted_by: str = ""
+    started_at: str = ""
+    completed_at: str = ""
+    duration_text: str = ""
+    error_count: int = 0
 
 
 def _format_farm_notification_message(context: FarmNotificationContext) -> str:
-    return (
-        "Farm job complete\n"
-        f"Job: {context.job_name or context.job_id}\n"
-        f"Status: {context.status or 'unknown'}"
-    )
+    status = context.status or "unknown"
+    if status == "Completed":
+        headline = "Farm job completed successfully"
+    elif status == "Failed":
+        headline = "Farm job failed"
+    else:
+        headline = f"Farm job {status.lower()}"
+
+    lines = [headline, f"Job: {context.job_name or context.job_id}"]
+    lines.append(f"Job ID: {context.job_id}")
+    lines.append(f"Status: {status}")
+    if context.worker_machine:
+        lines.append(f"Worker: {context.worker_machine}")
+    if context.submitted_by:
+        lines.append(f"User: {context.submitted_by}")
+    if context.started_at:
+        lines.append(f"Started: {context.started_at}")
+    if context.completed_at:
+        lines.append(f"Finished: {context.completed_at}")
+    if context.duration_text:
+        lines.append(f"Duration: {context.duration_text}")
+    if context.error_count:
+        lines.append(f"Errors: {context.error_count}")
+    return "\n".join(lines)
 
 
 def _outcome_from_telegram(result: TelegramNotificationResult) -> ConnectorNotificationOutcome:

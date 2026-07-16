@@ -3,6 +3,7 @@ from __future__ import annotations
 from pipeline_inspector.integrations.notification_triggers import (
     NOTIFY_EVENT_BLOCK_PUBLISH,
     NOTIFY_EVENT_ON_CRITICAL,
+    NOTIFY_EVENT_ON_FARM_COMPLETE,
     NOTIFY_EVENT_ON_PASS,
     ValidationTriggerContext,
     match_validation_notify_events,
@@ -122,3 +123,28 @@ def test_resolve_slack_routes_routes_non_block_events_to_publish_webhook():
     assert len(routes) == 1
     assert routes[0].webhook_url == "https://hooks.slack.com/publish"
     assert set(routes[0].events) == {NOTIFY_EVENT_BLOCK_PUBLISH, NOTIFY_EVENT_ON_PASS}
+
+
+def test_resolve_slack_routes_routes_farm_complete_to_deadline_webhook():
+    settings = __import__(
+        "pipeline_inspector.studio_config",
+        fromlist=["SlackConnectorSettings"],
+    ).SlackConnectorSettings(
+        enabled=True,
+        publish_webhook_url="https://hooks.slack.com/publish",
+        deadline_webhook_url="https://hooks.slack.com/deadline",
+        notify_on=(NOTIFY_EVENT_ON_FARM_COMPLETE,),
+    )
+
+    routes = resolve_slack_routes(
+        settings,
+        None,
+        (NOTIFY_EVENT_ON_FARM_COMPLETE,),
+    )
+
+    assert routes == (
+        ResolvedNotifyRoute(
+            events=(NOTIFY_EVENT_ON_FARM_COMPLETE,),
+            webhook_url="https://hooks.slack.com/deadline",
+        ),
+    )
