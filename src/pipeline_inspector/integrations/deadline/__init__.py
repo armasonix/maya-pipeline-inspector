@@ -1,5 +1,13 @@
 """Thinkbox Deadline 10 on-prem integration for Pipeline Inspector."""
 
+from pipeline_inspector.integrations.deadline.analytics import (
+    FarmAnalyticsMetrics,
+    FarmAnalyticsReport,
+    FarmJobTotals,
+    collect_farm_analytics,
+    farm_analytics_to_dict,
+    format_farm_analytics_summary,
+)
 from pipeline_inspector.integrations.deadline.client import (
     DeadlineClient,
     DeadlineClientError,
@@ -54,8 +62,11 @@ __all__ = [
     "DeadlinePreflightResult",
     "DeadlineResponse",
     "DeadlineSubmitError",
+    "FarmAnalyticsMetrics",
+    "FarmAnalyticsReport",
     "FarmEligibilityDecision",
     "FarmEligibilityResult",
+    "FarmJobTotals",
     "FarmSceneState",
     "FarmValidationResult",
     "HttpRequest",
@@ -75,8 +86,11 @@ __all__ = [
     "build_command_script_line",
     "build_maya_batch_script_job",
     "build_validator_command",
+    "collect_farm_analytics",
     "default_http_transport",
     "evaluate_farm_submit_eligibility",
+    "farm_analytics_to_dict",
+    "format_farm_analytics_summary",
     "run_deadline_preflight",
     "submit_pipeline_inspector_validation_job",
     "write_command_script_file",

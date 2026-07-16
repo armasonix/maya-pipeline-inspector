@@ -80,6 +80,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return apply_fixes_command(args)
     if args.command == "rules":
         return rules_command(args)
+    if args.command == "farm-analytics":
+        return farm_analytics_command(args)
     parser.print_help()
     return EXIT_CONFIG_ERROR
 
@@ -240,6 +242,31 @@ def build_parser() -> argparse.ArgumentParser:
         "--quiet",
         action="store_true",
         help="Only print errors.",
+    )
+    farm_analytics = subparsers.add_parser(
+        "farm-analytics",
+        help="Collect Deadline farm analytics via the Web Service.",
+    )
+    farm_analytics.add_argument(
+        "--config",
+        type=Path,
+        help="Optional Deadline JSON config. Defaults to PIPELINE_INSPECTOR_DEADLINE_* env vars.",
+    )
+    farm_analytics.add_argument(
+        "--pool",
+        default="",
+        help="Optional pool name filter for utilization metrics.",
+    )
+    farm_analytics.add_argument(
+        "--window-hours",
+        type=float,
+        default=24.0,
+        help="Throughput window in hours for completed jobs.",
+    )
+    farm_analytics.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON instead of a human-readable summary.",
     )
     return parser
 
@@ -418,6 +445,38 @@ def diff_command(args: argparse.Namespace) -> int:
     if exit_code == DIFF_EXIT_INPUT_ERROR:
         return EXIT_CONFIG_ERROR
     return exit_code
+
+
+def farm_analytics_command(args: argparse.Namespace) -> int:
+    from pipeline_inspector.integrations.deadline import (
+        DeadlineClient,
+        DeadlineConfig,
+        collect_farm_analytics,
+        farm_analytics_to_dict,
+        format_farm_analytics_summary,
+    )
+
+    try:
+        config = (
+            DeadlineConfig.from_json(args.config)
+            if args.config
+            else DeadlineConfig.from_env()
+        )
+        client = DeadlineClient(config)
+        report = collect_farm_analytics(
+            client,
+            pool_filter=str(args.pool or "").strip() or None,
+            window_hours=float(args.window_hours),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"Farm analytics failed: {exc}", file=sys.stderr)
+        return EXIT_RUNTIME_ERROR
+
+    if args.json:
+        print(json.dumps(farm_analytics_to_dict(report), indent=2))
+    else:
+        print(format_farm_analytics_summary(report))
+    return EXIT_OK
 
 
 def _manifest_gate_exit(

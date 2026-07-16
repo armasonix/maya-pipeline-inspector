@@ -10,9 +10,12 @@ from pipeline_inspector.integrations.deadline import (
     DeadlineClient,
     DeadlineConfig,
     DeadlineSubmitError,
+    FarmAnalyticsReport,
     FarmSceneState,
     FarmValidationResult,
+    collect_farm_analytics,
     evaluate_farm_submit_eligibility,
+    format_farm_analytics_summary,
     submit_pipeline_inspector_validation_job,
 )
 from pipeline_inspector.integrations.deadline.eligibility import FarmEligibilityResult
@@ -109,6 +112,31 @@ def check_deadline_connection(
             else "Deadline Web Service did not respond to ping."
         ),
     )
+
+
+def collect_farm_analytics_report(
+    config: DeadlineConfig | None = None,
+    *,
+    pool_filter: str | None = None,
+    client_factory: DeadlineClientFactory | None = None,
+    window_hours: float = 24.0,
+) -> FarmAnalyticsReport:
+    """Collect Deadline farm analytics for the Farm tab or headless callers."""
+
+    effective_config = config or DeadlineConfig.from_env()
+    factory = client_factory or (lambda cfg: DeadlineClient(cfg))
+    return collect_farm_analytics(
+        factory(effective_config),
+        pool_filter=pool_filter,
+        window_hours=window_hours,
+    )
+
+
+def format_farm_analytics_status(report: FarmAnalyticsReport) -> str:
+    """Return a Farm-tab friendly analytics status line."""
+
+    return format_farm_analytics_summary(report)
+
 
 def run_farm_preflight_action(
     *,
