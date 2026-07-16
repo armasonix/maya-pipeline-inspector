@@ -46,7 +46,6 @@ from pipeline_inspector.ui.fix_queue import (
     fix_rows_from_table,
     populate_fix_queue,
     risky_fix_rows,
-    safe_fix_rows,
     selected_fix_rows,
     update_risky_confirmation_label,
 )
@@ -588,7 +587,28 @@ def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
             validation_summary=validation_summary,
             health_score=health_score,
         )
-        return maybe_submit_bug_report(_studio_config_for_content(content), payload)
+        screenshot_jpeg = None
+        if values.attach_screenshot:
+            if values.screenshot_path:
+                from pipeline_inspector.integrations.bug_report.screenshot import (
+                    read_image_file_as_jpeg,
+                )
+
+                screenshot_jpeg = read_image_file_as_jpeg(
+                    values.screenshot_path,
+                    qt_widgets=qt_widgets,
+                )
+            else:
+                from pipeline_inspector.maya.bug_report_screenshot import (
+                    capture_maya_main_window_jpeg,
+                )
+
+                screenshot_jpeg = capture_maya_main_window_jpeg(qt_widgets=qt_widgets)
+        return maybe_submit_bug_report(
+            _studio_config_for_content(content),
+            payload,
+            screenshot_jpeg=screenshot_jpeg,
+        )
 
     show_bug_report_dialog(
         qt_widgets,
@@ -1917,14 +1937,6 @@ def _schedule_ui_validation(
     post_validate: Optional[Any] = None,
 ) -> None:
     if getattr(content, "_pipeline_inspector_validate_running", False):
-        # region agent log
-        _ui_agent_debug_log(
-            "ui_launcher.py:_schedule_ui_validation",
-            "validation skipped because another run is active",
-            {"scan_scope": scan_scope},
-            hypothesis_id="H5",
-        )
-        # endregion
         return
 
     content._pipeline_inspector_validate_running = True
@@ -1937,14 +1949,6 @@ def _schedule_ui_validation(
 
     def _job() -> None:
         try:
-            # region agent log
-            _ui_agent_debug_log(
-                "ui_launcher.py:_schedule_ui_validation",
-                "validation job started",
-                {"scan_scope": scan_scope, "profile_id": profile_id or ""},
-                hypothesis_id="H5",
-            )
-            # endregion
             _run_validation_job(
                 content,
                 qt_widgets,
@@ -1955,32 +1959,13 @@ def _schedule_ui_validation(
         finally:
             content._pipeline_inspector_validate_running = False
             _set_validate_busy_state(content, qt_widgets, busy=False)
-            # region agent log
-            _ui_agent_debug_log(
-                "ui_launcher.py:_schedule_ui_validation",
-                "validation job finished",
-                {"scan_scope": scan_scope},
-                hypothesis_id="H5",
-            )
-            # endregion
 
     timer_cls = getattr(qt_widgets, "QTimer", None)
     single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
-    scheduler = "direct"
     if single_shot is not None:
-        scheduler = "qt_timer"
         single_shot(0, _job)
     else:
-        scheduler = "execute_deferred"
         _schedule_on_main_thread(_job)
-    # region agent log
-    _ui_agent_debug_log(
-        "ui_launcher.py:_schedule_ui_validation",
-        "validation job scheduled",
-        {"scan_scope": scan_scope, "scheduler": scheduler},
-        hypothesis_id="H6",
-    )
-    # endregion
 
 
 def _run_validation_job(
@@ -2054,28 +2039,6 @@ def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None
             result,
             force_notify=False,
         )
-        # region agent log
-        health = getattr(result, "health_score", None)
-        _ui_agent_debug_log(
-            "ui_launcher.py:_maybe_notify_validation",
-            "validation notification dispatch",
-            {
-                "critical": int(getattr(health, "critical", 0) or 0),
-                "error": int(getattr(health, "error", 0) or 0),
-                "warning": int(getattr(health, "warning", 0) or 0),
-                "score": int(getattr(health, "score", 0) or 0),
-                "outcomes": [
-                    {
-                        "connector": outcome.connector_id,
-                        "sent": outcome.sent,
-                        "skipped_reason": outcome.skipped_reason,
-                    }
-                    for outcome in dispatch_result.outcomes
-                ],
-            },
-            hypothesis_id="H7",
-        )
-        # endregion
         report_validation_notification_outcomes(dispatch_result)
         _append_validation_notification_status(content, qt_widgets, dispatch_result)
     except Exception as exc:  # noqa: BLE001
@@ -2381,17 +2344,6 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
     title = "Submit to Farm" if result.succeeded else "Farm Submit Blocked"
     _show_information_dialog(qt_widgets, title, result.message)
     print(result.message)
-    # region agent log
-    _ui_agent_debug_log(
-        "ui_launcher.py:_submit_farm_from_ui",
-        "farm submit completed",
-        {
-            "succeeded": bool(result.succeeded),
-            "job_id": str(getattr(result, "job_id", "") or ""),
-        },
-        hypothesis_id="H3",
-    )
-    # endregion
     if result.succeeded and result.job_id:
         from pipeline_inspector.maya.farm_job_monitor import start_farm_job_notification_poll
 
@@ -3355,32 +3307,6 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     _revalidate_with_current_scope(content, qt_widgets)
 
 
-def _ui_agent_debug_log(
-    location: str,
-    message: str,
-    data: dict[str, Any],
-    *,
-    hypothesis_id: str,
-) -> None:
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
-
-
 def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.core.fix_plan import NAMING_FIX_TYPE
     from pipeline_inspector.maya.fix_applier import apply_fix_actions
@@ -3401,30 +3327,6 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
                 and (action.referenced or action.requires_reference_edit)
             )
         return True
-
-    # #region agent log
-    _ui_agent_debug_log(
-        "ui_launcher.py:_apply_safe_fixes_from_ui",
-        "apply_safe_filter",
-        {
-            "total_actions": len(getattr(fix_plan, "actions", ())),
-            "actions": [
-                {
-                    "fix_id": action.fix_id,
-                    "target_node": action.target_node,
-                    "blocked": action.blocked,
-                    "locked": action.locked,
-                    "referenced": action.referenced,
-                    "requires_reference_edit": action.requires_reference_edit,
-                    "risk": action.risk,
-                    "included": _include_apply_safe_action(action),
-                }
-                for action in fix_plan.actions
-            ],
-        },
-        hypothesis_id="I",
-    )
-    # #endregion
 
     actions = tuple(
         action

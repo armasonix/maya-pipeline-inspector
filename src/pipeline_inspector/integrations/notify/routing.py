@@ -137,7 +137,7 @@ def _default_slack_routes(
         fallback = settings.publish_webhook_url.strip()
         if fallback:
             routes.append(
-                ResolvedNotifyRoute(events=other_events, webhook_url=fallback)
+                ResolvedNotifyRoute(events=tuple(other_events), webhook_url=fallback)
             )
     return tuple(routes)
 

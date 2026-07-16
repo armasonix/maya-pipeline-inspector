@@ -7,7 +7,12 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Optional
 
-from pipeline_inspector.core.models import GraphSnapshot, MaterialSnapshot, NodeSnapshot, ShapeSnapshot
+from pipeline_inspector.core.models import (
+    GraphSnapshot,
+    MaterialSnapshot,
+    NodeSnapshot,
+    ShapeSnapshot,
+)
 from pipeline_inspector.core.naming_fix import (
     propose_naming_fix,
     propose_texture_file_path_fix,
@@ -290,25 +295,6 @@ def _build_naming_action(
         fix_type=NAMING_FIX_TYPE,
     )
 
-    # #region agent log
-    _agent_debug_log(
-        "fix_plan.py:_build_naming_action",
-        "naming_fix_planned",
-        {
-            "rule_id": rule.id,
-            "object_type": object_type,
-            "current_name": current_name,
-            "rename_before": rename_before,
-            "proposed_name": proposed_name,
-            "target_node": target_node,
-            "referenced": referenced,
-            "locked": locked,
-            "blocked": bool(hard_block_reasons(block_reasons)),
-        },
-        hypothesis_id="A",
-    )
-    # #endregion
-
     return FixAction(
         fix_id=_fix_id(result, NAMING_FIX_TYPE),
         rule_id=rule.id,
@@ -399,21 +385,6 @@ def _resolve_naming_rename_target(
                 target_node, transform_name = transform_target
                 proposed = propose_naming_fix(transform_name, pattern)
                 if proposed and proposed != transform_name:
-                    # #region agent log
-                    _agent_debug_log(
-                        "fix_plan.py:_resolve_naming_rename_target",
-                        "mesh_transform_resolved",
-                        {
-                            "shape_name": shape.name,
-                            "shape_full_name": shape.full_name,
-                            "transform_id": shape.transform_id,
-                            "transform_name": transform_name,
-                            "target_node": target_node,
-                            "proposed_name": proposed,
-                        },
-                        hypothesis_id="A",
-                    )
-                    # #endregion
                     return target_node, transform_name, proposed
 
     proposed_name = propose_naming_fix(current_name, pattern)
@@ -427,33 +398,6 @@ def _short_dag_name(name: str) -> str:
     if not normalized:
         return ""
     return normalized.split("|")[-1].split(":")[-1]
-
-
-def _agent_debug_log(
-    location: str,
-    message: str,
-    data: dict[str, Any],
-    *,
-    hypothesis_id: str,
-) -> None:
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
 
 
 def _build_texture_file_naming_action(
@@ -665,7 +609,7 @@ def swap_texture_version_in_path(
     return path[:start] + replacement + path[end:]
 
 def _block_reasons(
-    node: Optional[NodeSnapshot],
+    node: NodeSnapshot | ShapeSnapshot | None,
     risk: str,
     *,
     fix_type: Optional[str] = None,

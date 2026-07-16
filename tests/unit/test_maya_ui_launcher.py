@@ -203,7 +203,6 @@ def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
         "_run_validation_job",
         lambda *_args, **_kwargs: calls.append("run"),
     )
-    monkeypatch.setattr(ui_launcher, "_ui_agent_debug_log", lambda *_args, **_kwargs: None)
 
     ui_launcher._schedule_ui_validation(content, FakeQtWidgets(), scan_scope="scene")
 
@@ -233,7 +232,6 @@ def test_schedule_ui_validation_falls_back_to_main_thread_schedule(monkeypatch: 
         "_schedule_on_main_thread",
         lambda callback: scheduled.append(callback),
     )
-    monkeypatch.setattr(ui_launcher, "_ui_agent_debug_log", lambda *_args, **_kwargs: None)
 
     ui_launcher._schedule_ui_validation(content, object(), scan_scope="selection")
 

@@ -17,6 +17,16 @@ BUG_REPORT_INTRO_LABEL_OBJECT_NAME = "pipelineInspectorBugReportIntroLabel"
 BUG_REPORT_TITLE_INPUT_OBJECT_NAME = "pipelineInspectorBugReportTitleInput"
 BUG_REPORT_DESCRIPTION_INPUT_OBJECT_NAME = "pipelineInspectorBugReportDescriptionInput"
 BUG_REPORT_STEPS_INPUT_OBJECT_NAME = "pipelineInspectorBugReportStepsInput"
+BUG_REPORT_ATTACH_SCREENSHOT_CHECKBOX_OBJECT_NAME = (
+    "pipelineInspectorBugReportAttachScreenshotCheckbox"
+)
+BUG_REPORT_SCREENSHOT_ROW_OBJECT_NAME = "pipelineInspectorBugReportScreenshotRow"
+BUG_REPORT_SCREENSHOT_PATH_INPUT_OBJECT_NAME = (
+    "pipelineInspectorBugReportScreenshotPathInput"
+)
+BUG_REPORT_SCREENSHOT_BROWSE_BUTTON_OBJECT_NAME = (
+    "pipelineInspectorBugReportScreenshotBrowseButton"
+)
 BUG_REPORT_FORM_WIDGET_OBJECT_NAME = "pipelineInspectorBugReportFormWidget"
 BUG_REPORT_SUCCESS_WIDGET_OBJECT_NAME = "pipelineInspectorBugReportSuccessWidget"
 BUG_REPORT_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorBugReportStatusLabel"
@@ -42,6 +52,8 @@ class BugReportFormValues:
     title: str
     description: str
     steps_to_reproduce: str = ""
+    attach_screenshot: bool = False
+    screenshot_path: str = ""
 
 @dataclass
 class BugReportDialog:
@@ -54,6 +66,10 @@ class BugReportDialog:
     title_input: Any
     description_input: Any
     steps_input: Any
+    attach_screenshot_checkbox: Any
+    screenshot_row: Any
+    screenshot_path_input: Any
+    screenshot_browse_button: Any
     status_label: Any
     issue_url_caption: Any
     issue_url_label: Any
@@ -115,6 +131,67 @@ class BugReportDialog:
         )
         form_layout.addWidget(qt_widgets.QLabel("Steps to reproduce"))
         form_layout.addWidget(steps_input)
+
+        attach_screenshot_checkbox = qt_widgets.QCheckBox(
+            "Attach screenshot (optional)"
+        )
+        attach_screenshot_checkbox.setObjectName(
+            BUG_REPORT_ATTACH_SCREENSHOT_CHECKBOX_OBJECT_NAME
+        )
+        form_layout.addWidget(attach_screenshot_checkbox)
+
+        screenshot_row = qt_widgets.QWidget()
+        screenshot_row.setObjectName(BUG_REPORT_SCREENSHOT_ROW_OBJECT_NAME)
+        screenshot_row_layout = qt_widgets.QHBoxLayout(screenshot_row)
+        set_row_margins = getattr(screenshot_row_layout, "setContentsMargins", None)
+        if set_row_margins is not None:
+            set_row_margins(0, 0, 0, 0)
+
+        screenshot_path_input = _build_line_edit(
+            qt_widgets,
+            object_name=BUG_REPORT_SCREENSHOT_PATH_INPUT_OBJECT_NAME,
+            placeholder="Browse for PNG or JPEG screenshot",
+        )
+        set_read_only = getattr(screenshot_path_input, "setReadOnly", None)
+        if set_read_only is not None:
+            set_read_only(True)
+
+        screenshot_browse_button = qt_widgets.QPushButton("Browse...")
+        screenshot_browse_button.setObjectName(BUG_REPORT_SCREENSHOT_BROWSE_BUTTON_OBJECT_NAME)
+        screenshot_row_layout.addWidget(screenshot_path_input, 1)
+        screenshot_row_layout.addWidget(screenshot_browse_button)
+        form_layout.addWidget(screenshot_row)
+        _set_widget_visible(screenshot_row, False)
+
+        def _on_attach_screenshot_toggled(checked: bool) -> None:
+            _set_widget_visible(screenshot_row, checked)
+            if not checked:
+                _set_line_edit_text(screenshot_path_input, "")
+
+        toggled = getattr(attach_screenshot_checkbox, "toggled", None)
+        if toggled is not None:
+            connect_toggled = getattr(toggled, "connect", None)
+            if connect_toggled is not None:
+                connect_toggled(_on_attach_screenshot_toggled)
+        else:
+            state_changed = getattr(attach_screenshot_checkbox, "stateChanged", None)
+            if state_changed is not None:
+                connect_state = getattr(state_changed, "connect", None)
+                if connect_state is not None:
+                    connect_state(
+                        lambda _state: _on_attach_screenshot_toggled(
+                            _checkbox_checked(attach_screenshot_checkbox)
+                        )
+                    )
+
+        wire_button(
+            screenshot_browse_button,
+            lambda: _pick_screenshot_file(
+                qt_widgets,
+                dialog,
+                screenshot_path_input,
+            ),
+        )
         layout.addWidget(form_widget)
 
         success_widget = qt_widgets.QWidget()
@@ -176,6 +253,10 @@ class BugReportDialog:
             title_input=title_input,
             description_input=description_input,
             steps_input=steps_input,
+            attach_screenshot_checkbox=attach_screenshot_checkbox,
+            screenshot_row=screenshot_row,
+            screenshot_path_input=screenshot_path_input,
+            screenshot_browse_button=screenshot_browse_button,
             status_label=status_label,
             issue_url_caption=issue_url_caption,
             issue_url_label=issue_url_label,
@@ -187,10 +268,18 @@ class BugReportDialog:
         return controller
 
     def read_form_values(self) -> BugReportFormValues:
+        attach_screenshot = _checkbox_checked(self.attach_screenshot_checkbox)
+        screenshot_path = (
+            _read_line_edit_text(self.screenshot_path_input)
+            if attach_screenshot
+            else ""
+        )
         return BugReportFormValues(
             title=_read_line_edit_text(self.title_input),
             description=_read_text_edit_text(self.description_input),
             steps_to_reproduce=_read_text_edit_text(self.steps_input),
+            attach_screenshot=attach_screenshot,
+            screenshot_path=screenshot_path,
         )
 
     def apply_submit_result(self, result: BugReportRelayResult) -> None:
@@ -287,6 +376,34 @@ def _read_text_edit_text(widget: Any) -> str:
     if callable(to_plain_text):
         return str(to_plain_text() or "").strip()
     return ""
+
+
+def _set_line_edit_text(widget: Any, text: str) -> None:
+    set_text = getattr(widget, "setText", None)
+    if set_text is not None:
+        set_text(text)
+
+
+def _pick_screenshot_file(qt_widgets: Any, parent: Any, path_input: Any) -> None:
+    file_dialog = getattr(qt_widgets, "QFileDialog", None)
+    get_open = getattr(file_dialog, "getOpenFileName", None) if file_dialog is not None else None
+    if get_open is None:
+        return
+    selected, _filter = get_open(
+        parent,
+        "Attach Screenshot",
+        _read_line_edit_text(path_input),
+        "Images (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)",
+    )
+    if selected:
+        _set_line_edit_text(path_input, str(selected))
+
+
+def _checkbox_checked(widget: Any) -> bool:
+    is_checked = getattr(widget, "isChecked", None)
+    if is_checked is None:
+        return False
+    return bool(is_checked())
 
 def _set_label_text(widget: Any, text: str) -> None:
     set_text = getattr(widget, "setText", None)

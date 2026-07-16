@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
+BUG_REPORT_MAX_REPORTS_PER_DAY = 3
 DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL = (
     "https://maya-pipeline-inspector-bug-report.armasonix.workers.dev"
 )
@@ -34,8 +35,7 @@ class BugReportRelayConfig:
 
     relay_url: str
     api_key: str
-    allow_screenshot: bool = True
-    max_reports_per_day: int = 5
+    max_reports_per_day: int = BUG_REPORT_MAX_REPORTS_PER_DAY
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
 
     def with_overrides(self, **kwargs: Any) -> BugReportRelayConfig:

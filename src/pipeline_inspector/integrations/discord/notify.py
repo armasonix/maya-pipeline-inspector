@@ -16,7 +16,6 @@ from pipeline_inspector.integrations.notification_triggers import (
     NOTIFY_EVENT_BLOCK_PUBLISH,
     NOTIFY_EVENT_ON_FARM_COMPLETE,
     NOTIFY_EVENT_ON_READINESS_FAIL,
-    ValidationTriggerContext,
     describe_validation_notify_skip,
     match_validation_notify_events,
     standalone_event_enabled,

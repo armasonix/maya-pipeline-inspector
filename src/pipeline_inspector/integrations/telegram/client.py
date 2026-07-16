@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from pipeline_inspector.integrations.telegram.config import (
-    DEFAULT_TIMEOUT_SECONDS,
     TELEGRAM_REQUEST_RETRIES,
     TelegramConfig,
 )

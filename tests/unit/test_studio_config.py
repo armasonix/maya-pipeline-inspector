@@ -192,8 +192,6 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
             enabled=True,
             relay_url="https://pipeline.studio.internal/shader-health/bug-report",
             api_key="studio-secret",
-            allow_screenshot=False,
-            max_reports_per_day=3,
         ),
         updates=StudioUpdatesSettings(allow_check=False, pinned_version="0.4.0"),
         connectors=ConnectorSettings(
@@ -239,8 +237,9 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.bug_report.enabled is True
     assert loaded.bug_report.relay_url.endswith("/bug-report")
     assert loaded.bug_report.api_key == "studio-secret"
-    assert loaded.bug_report.allow_screenshot is False
-    assert loaded.bug_report.max_reports_per_day == 3
+    resolved_bug_report = loaded.bug_report.to_bug_report_config()
+    assert resolved_bug_report is not None
+    assert resolved_bug_report.max_reports_per_day == 3
     assert loaded.updates.allow_check is False
     assert loaded.updates.pinned_version == "0.4.0"
     assert loaded.connectors.telegram.enabled is True

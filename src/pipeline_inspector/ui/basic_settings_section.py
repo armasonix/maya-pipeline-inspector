@@ -14,7 +14,6 @@ from pipeline_inspector.maya.validation_pipeline import (
 from pipeline_inspector.ui.settings_widgets import (
     configure_compact_line_edit,
     find_child,
-    set_fixed_horizontal_size_policy,
     wire_combo_changed,
     wire_line_edit_finished,
 )

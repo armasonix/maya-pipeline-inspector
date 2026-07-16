@@ -3,15 +3,18 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from pipeline_inspector.integrations.deadline.client import DeadlineClient, DeadlineConfig
-from pipeline_inspector.integrations.telegram.notify import TelegramNotificationResult
+from pipeline_inspector.integrations.deadline.client import DeadlineConfig
 from pipeline_inspector.integrations.deadline.job_payload import (
     job_name_from_payload,
     job_status_from_payload,
 )
-from pipeline_inspector.maya.farm_job_monitor import start_farm_job_notification_poll
-from pipeline_inspector.studio_config import ConnectorSettings, StudioConfig, TelegramConnectorSettings
 from pipeline_inspector.integrations.notification_triggers import NOTIFY_EVENT_ON_FARM_COMPLETE
+from pipeline_inspector.maya.farm_job_monitor import start_farm_job_notification_poll
+from pipeline_inspector.studio_config import (
+    ConnectorSettings,
+    StudioConfig,
+    TelegramConnectorSettings,
+)
 
 
 def test_job_status_from_payload_prefers_job_status_key():
@@ -60,7 +63,10 @@ def test_start_farm_job_notification_poll_dispatches_on_completed(monkeypatch):
         "pipeline_inspector.maya.farm_job_monitor.report_validation_notification_outcomes",
         lambda *_args, **_kwargs: None,
     )
-    monkeypatch.setattr("pipeline_inspector.maya.farm_job_monitor.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        "pipeline_inspector.maya.farm_job_monitor.time.sleep",
+        lambda _seconds: None,
+    )
 
     studio = StudioConfig(
         connectors=ConnectorSettings(

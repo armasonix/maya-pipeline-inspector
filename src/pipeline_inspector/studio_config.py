@@ -33,7 +33,6 @@ DEFAULT_DEADLINE_WEB_SERVICE_PORT = 8081
 DEFAULT_DEADLINE_PROFILE_ID = "deadline_critical"
 DEFAULT_DEADLINE_TIMEOUT_SECONDS = 30.0
 DEFAULT_DEADLINE_API_URL = "http://localhost:8081"
-DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY = 5
 
 TX_DERIVATIVE_RULE_IDS = (
     "common.texture.optimized.exists",
@@ -376,22 +375,19 @@ class BugReportSettings:
     enabled: bool = False
     relay_url: str = ""
     api_key: str = ""
-    allow_screenshot: bool = True
-    max_reports_per_day: int = DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
             "relay_url": self.relay_url,
             "api_key": self.api_key,
-            "allow_screenshot": self.allow_screenshot,
-            "max_reports_per_day": int(self.max_reports_per_day),
         }
 
     def to_bug_report_config(self) -> Any | None:
         """Convert connector settings into a bug report relay runtime config object."""
 
         from pipeline_inspector.integrations.bug_report.config import (
+            BUG_REPORT_MAX_REPORTS_PER_DAY,
             BugReportRelayConfig,
             effective_bug_report_relay_url,
         )
@@ -403,8 +399,7 @@ class BugReportSettings:
         return BugReportRelayConfig(
             relay_url=relay_url,
             api_key=api_key,
-            allow_screenshot=self.allow_screenshot,
-            max_reports_per_day=int(self.max_reports_per_day),
+            max_reports_per_day=BUG_REPORT_MAX_REPORTS_PER_DAY,
         )
 
     @classmethod
@@ -415,10 +410,6 @@ class BugReportSettings:
             enabled=bool(data.get("enabled", False)),
             relay_url=str(data.get("relay_url", "") or ""),
             api_key=str(data.get("api_key", "") or ""),
-            allow_screenshot=bool(data.get("allow_screenshot", True)),
-            max_reports_per_day=int(
-                data.get("max_reports_per_day", DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY)
-            ),
         )
 
 

@@ -166,7 +166,10 @@ def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
         return parsed
     return None
 
-def _normalize_job_payload(payload: dict[str, Any] | list[Any] | None, job_id: str) -> dict[str, Any]:
+def _normalize_job_payload(
+    payload: dict[str, Any] | list[Any] | None,
+    job_id: str,
+) -> dict[str, Any]:
     """Normalize Deadline Web Service job payloads to a single dict record."""
 
     if isinstance(payload, list):

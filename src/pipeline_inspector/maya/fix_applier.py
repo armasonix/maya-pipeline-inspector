@@ -1,6 +1,7 @@
 """Maya-side execution for planned safe actions."""
 from __future__ import annotations
 
+import contextlib
 import glob
 import importlib
 import os
@@ -12,7 +13,11 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from pipeline_inspector.core.fix_plan import FixAction
 
-from pipeline_inspector.core.fix_plan import HIGH_RISK_BLOCK_REASON, NAMING_FIX_TYPE, resolve_normalize_path_value
+from pipeline_inspector.core.fix_plan import (
+    HIGH_RISK_BLOCK_REASON,
+    NAMING_FIX_TYPE,
+    resolve_normalize_path_value,
+)
 from pipeline_inspector.core.naming_fix import texture_tile_filename_from_paths
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
@@ -118,21 +123,6 @@ def apply_fix_actions(
     if not queued:
         return ApplyFixReport(records=(), undo_chunk_name=undo_chunk_name)
 
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:apply_fix_actions",
-        "apply_queued",
-        {
-            "count": len(queued),
-            "fix_ids": [action.fix_id for action in queued],
-            "target_nodes": [action.target_node for action in queued],
-            "allow_referenced": allow_referenced,
-            "allow_locked": allow_locked,
-        },
-        hypothesis_id="C",
-    )
-    # #endregion
-
     records: list[AppliedFixRecord] = []
     maya_cmds.undoInfo(openChunk=True, chunkName=undo_chunk_name)
     try:
@@ -159,18 +149,6 @@ def _apply_one(
 ) -> AppliedFixRecord:
     reasons = _reasons(action, allow_referenced, allow_locked, allow_high_risk)
     if reasons:
-        # #region agent log
-        _agent_debug_log(
-            "fix_applier.py:_apply_one",
-            "apply_blocked",
-            {
-                "fix_id": action.fix_id,
-                "target_node": action.target_node,
-                "reasons": reasons,
-            },
-            hypothesis_id="C",
-        )
-        # #endregion
         return _blocked(action, reasons)
     if action.fix_type not in SUPPORTED_FIX_TYPES:
         return _blocked(action, [UNSUPPORTED_FIX_REASON])
@@ -182,18 +160,6 @@ def _apply_one(
             prefer_referenced=bool(action.referenced or action.requires_reference_edit),
         )
     if not exists_target or not _node_exists(cmds, exists_target):
-        # #region agent log
-        _agent_debug_log(
-            "fix_applier.py:_apply_one",
-            "apply_missing_target",
-            {
-                "fix_id": action.fix_id,
-                "target_node": action.target_node,
-                "exists_target": exists_target,
-            },
-            hypothesis_id="G",
-        )
-        # #endregion
         return _blocked(action, [MISSING_TARGET_REASON])
     if action.fix_type == "set_attr":
         return _apply_set_attr(action, cmds)
@@ -342,17 +308,6 @@ def _apply_rename_node(
     rename_target = _resolve_rename_target_node(cmds, action)
     before_name = _node_short_name(cmds, rename_target)
     if before_name is None:
-        # #region agent log
-        _agent_debug_log(
-            "fix_applier.py:_apply_rename_node",
-            "rename_missing_short_name",
-            {
-                "target_node": action.target_node,
-                "rename_target": rename_target,
-            },
-            hypothesis_id="F",
-        )
-        # #endregion
         return _blocked(action, [MISSING_TARGET_REASON])
 
     runtime_referenced = _node_is_referenced(cmds, rename_target)
@@ -371,24 +326,6 @@ def _apply_rename_node(
         if isinstance(updated_target, str) and updated_target.strip():
             rename_target = updated_target
     elif not allow_locked and target_node_locked:
-        # #region agent log
-        _agent_debug_log(
-            "fix_applier.py:_apply_rename_node",
-            "rename_blocked_read_only",
-            {
-                "target_node": action.target_node,
-                "rename_target": rename_target,
-                "proposed_name": proposed_name,
-                "before_name": before_name,
-                "action_referenced": action.referenced,
-                "runtime_referenced": runtime_referenced,
-                "allow_reference_edit": allow_reference_edit,
-                "target_node_locked": target_node_locked,
-                "target_name_locked": target_name_locked,
-            },
-            hypothesis_id="D",
-        )
-        # #endregion
         return _blocked(action, [READ_ONLY_NODE_REASON])
 
     renamed_node, rename_error = _rename_dag_node(
@@ -399,21 +336,6 @@ def _apply_rename_node(
         allow_unlock=target_node_locked or target_name_locked,
     )
     if renamed_node is None:
-        # #region agent log
-        _agent_debug_log(
-            "fix_applier.py:_apply_rename_node",
-            "rename_runtime_error",
-            {
-                "target_node": action.target_node,
-                "rename_target": rename_target,
-                "proposed_name": proposed_name,
-                "error": rename_error,
-                "allow_reference_edit": allow_reference_edit,
-                "runtime_referenced": runtime_referenced,
-            },
-            hypothesis_id="H",
-        )
-        # #endregion
         if rename_error and _is_read_only_rename_error(RuntimeError(rename_error)):
             return _blocked(action, [READ_ONLY_NODE_REASON])
         return _blocked(action, [RENAME_FAILED_REASON])
@@ -430,59 +352,9 @@ def _apply_rename_node(
             after_name == str(proposed_name).strip() and after_name != before_name
         )
         if not persisted:
-            # #region agent log
-            _agent_debug_log(
-                "fix_applier.py:_apply_rename_node",
-                "rename_not_persisted",
-                {
-                    "target_node": action.target_node,
-                    "rename_target": rename_target,
-                    "before_name": before_name,
-                    "after_name": after_name,
-                    "expected_name": proposed_name.strip(),
-                    "renamed_node": renamed_node,
-                },
-                hypothesis_id="K",
-            )
-            # #endregion
             return _blocked(action, [REFERENCE_RENAME_NOT_PERSISTED_REASON])
     else:
         after_name = _node_short_name(cmds, renamed_node) or str(proposed_name).strip()
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:_apply_rename_node",
-        "rename_verify",
-        {
-            "target_node": action.target_node,
-            "rename_target": rename_target,
-            "before_name": before_name,
-            "after_name": after_name,
-            "expected_name": proposed_name.strip(),
-            "renamed_node": renamed_node,
-            "runtime_referenced": runtime_referenced,
-            "target_still_exists": bool(cmds.objExists(rename_target)),
-        },
-        hypothesis_id="H",
-    )
-    # #endregion
-
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:_apply_rename_node",
-        "rename_applied",
-        {
-            "target_node": action.target_node,
-            "rename_target": rename_target,
-            "proposed_name": proposed_name,
-            "before_name": before_name,
-            "after_name": after_name,
-            "renamed_node": renamed_node,
-            "allow_reference_edit": allow_reference_edit,
-            "runtime_referenced": runtime_referenced,
-        },
-        hypothesis_id="E",
-    )
-    # #endregion
     return _applied(action, None, before_name, after_name)
 
 
@@ -617,33 +489,6 @@ def _node_is_referenced(cmds: Any, node_name: str) -> bool:
         return False
 
 
-def _agent_debug_log(
-    location: str,
-    message: str,
-    data: dict[str, Any],
-    *,
-    hypothesis_id: str,
-) -> None:
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
-
-
 def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
     resolved = _resolve_existing_dag_path(cmds, node_name)
     if not resolved or not _node_exists(cmds, resolved):
@@ -655,21 +500,7 @@ def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
 
 
 def _is_read_only_node(cmds: Any, node_name: str) -> bool:
-    locked = _query_lock_node(cmds, node_name)
-    referenced = _node_is_referenced(cmds, node_name)
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:_is_read_only_node",
-        "read_only_probe",
-        {
-            "node_name": node_name,
-            "locked": locked,
-            "referenced": referenced,
-        },
-        hypothesis_id="D",
-    )
-    # #endregion
-    return locked
+    return _query_lock_node(cmds, node_name)
 
 
 def _query_lock_node(cmds: Any, node_name: str) -> bool:
@@ -726,10 +557,8 @@ def _mel_unlock_node(mel_module: Any, node_name: str) -> None:
         f'lockNode -l 0 -ln 0 "{node_name}";',
         f'lockNode -lock 0 -lockName 0 "{node_name}";',
     ):
-        try:
+        with contextlib.suppress(RuntimeError, TypeError):
             mel_module.eval(script)
-        except (RuntimeError, TypeError):
-            pass
 
 
 def _reference_namespace(cmds: Any, ref_node: str) -> Optional[str]:
@@ -818,10 +647,8 @@ def _force_unlock_node(cmds: Any, target: str) -> dict[str, Any]:
         {"lock": False, "lockName": False, "ignoreComponents": True},
         {"lock": False, "lockName": False, "lockUnpublished": False},
     ):
-        try:
+        with contextlib.suppress(RuntimeError, TypeError):
             cmds.lockNode(target, **kwargs)
-        except (RuntimeError, TypeError):
-            pass
         after_lock = _query_lock_node(cmds, target)
         after_name = _query_lock_node_name(cmds, target)
         if not after_lock and not after_name:
@@ -854,14 +681,6 @@ def _unlock_rename_name_lock(cmds: Any, node_name: str) -> dict[str, Any]:
     results: dict[str, Any] = {}
     for target in _rename_unlock_targets(cmds, node_name):
         results[target] = _force_unlock_node(cmds, target)
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:_unlock_rename_name_lock",
-        "unlock_result",
-        {"node_name": node_name, "targets": results},
-        hypothesis_id="M",
-    )
-    # #endregion
     return results
 
 
@@ -882,10 +701,8 @@ def _rename_dag_node(
             ref_locked = _query_reference_locked(cmds, ref_node)
             ref_node_locked = _query_lock_node(cmds, ref_node)
             if ref_locked or ref_node_locked:
-                try:
+                with contextlib.suppress(RuntimeError, TypeError):
                     cmds.file(lockReference=False, referenceNode=ref_node)
-                except (RuntimeError, TypeError):
-                    pass
                 _force_unlock_reference_node(cmds, ref_node)
             _unlock_referenced_shape_nodes(cmds, canonical_target)
             _clear_failed_rename_reference_edits(cmds, ref_node)
@@ -895,32 +712,6 @@ def _rename_dag_node(
         ref_node = _reference_node_for_dag(cmds, canonical_target)
         if ref_node:
             ref_namespace = _reference_namespace(cmds, ref_node)
-
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:_rename_dag_node",
-        "rename_attempt_start",
-        {
-            "rename_target": canonical_target,
-            "proposed_name": proposed_name,
-            "allow_reference_edit": allow_reference_edit,
-            "allow_unlock": allow_unlock,
-            "ref_namespace": ref_namespace,
-            "rename_targets": (
-                _dag_rename_candidates(cmds, canonical_target)
-                if allow_reference_edit
-                else [canonical_target]
-            ),
-            "proposed_variants": _proposed_rename_variants(proposed_name, ref_namespace),
-            "lock_probe": {
-                "lock": _query_lock_node(cmds, canonical_target),
-                "lockName": _query_lock_node_name(cmds, canonical_target),
-                "readOnly": _query_node_read_only(cmds, canonical_target),
-            },
-        },
-        hypothesis_id="L",
-    )
-    # #endregion
 
     last_error: Optional[str] = None
     rename_targets = (
@@ -937,18 +728,6 @@ def _rename_dag_node(
             allow_api_fallback=allow_reference_edit,
         )
         if renamed_node is not None:
-            # #region agent log
-            _agent_debug_log(
-                "fix_applier.py:_rename_dag_node",
-                "rename_attempt_success",
-                {
-                    "rename_targets": rename_targets,
-                    "renamed_node": renamed_node,
-                    "attempt": attempt,
-                },
-                hypothesis_id="N",
-            )
-            # #endregion
             return renamed_node, None
         last_error = rename_error
         if attempt == 0 and rename_error and (
@@ -958,15 +737,7 @@ def _rename_dag_node(
             if allow_reference_edit:
                 ref_node = _reference_node_for_dag(cmds, canonical_target)
                 if ref_node:
-                    reload_result = _reload_reference_for_edit(cmds, ref_node)
-                    # #region agent log
-                    _agent_debug_log(
-                        "fix_applier.py:_rename_dag_node",
-                        "reference_reload_for_rename",
-                        {"ref_node": ref_node, "result": reload_result},
-                        hypothesis_id="N",
-                    )
-                    # #endregion
+                    _reload_reference_for_edit(cmds, ref_node)
                 prep = _prepare_reference_edit(cmds, canonical_target)
                 updated_target = prep.get("node_name")
                 if isinstance(updated_target, str) and updated_target.strip():
@@ -1027,10 +798,8 @@ def _force_unlock_reference_node(cmds: Any, ref_node: str) -> dict[str, Any]:
         {"lock": False, "lockName": False, "lockUnpublished": False},
         {"lock": False, "lockName": False, "ignoreComponents": True},
     ):
-        try:
+        with contextlib.suppress(RuntimeError, TypeError):
             cmds.lockNode(ref_node, **kwargs)
-        except (RuntimeError, TypeError):
-            pass
     try:
         import maya.mel as mel_module
 
@@ -1130,7 +899,10 @@ def _clear_failed_rename_reference_edits(cmds: Any, ref_node: str) -> str:
         return f"failed:{exc}"
 
 
-def _rename_via_dag_modifier(target: str, proposed_name: str) -> tuple[Optional[str], Optional[str]]:
+def _rename_via_dag_modifier(
+    target: str,
+    proposed_name: str,
+) -> tuple[Optional[str], Optional[str]]:
     try:
         import maya.api.OpenMaya as om
     except ImportError:
@@ -1186,18 +958,6 @@ def _attempt_rename(
                 renamed_node, api_error = _rename_via_dag_modifier(target, variant)
                 if renamed_node:
                     resolved = _resolve_renamed_dag_path(cmds, renamed_node) or renamed_node
-                    # #region agent log
-                    _agent_debug_log(
-                        "fix_applier.py:_attempt_rename",
-                        "rename_api_fallback_success",
-                        {
-                            "target": target,
-                            "proposed_name": variant,
-                            "renamed_node": resolved,
-                        },
-                        hypothesis_id="P",
-                    )
-                    # #endregion
                     return resolved, None
                 last_error = api_error
     return None, last_error
@@ -1313,18 +1073,6 @@ def _prepare_reference_edit(cmds: Any, node_name: str) -> dict[str, Any]:
         "unlock_targets": unlock_targets,
         "shape_unlock_targets": shape_unlock_targets,
     }
-    # #region agent log
-    _agent_debug_log(
-        "fix_applier.py:_prepare_reference_edit",
-        "reference_prepared",
-        {
-            **state,
-            "unlock_result": unlock_result,
-            "assigned_namespace": assigned_ns,
-        },
-        hypothesis_id="J",
-    )
-    # #endregion
     return state
 
 
