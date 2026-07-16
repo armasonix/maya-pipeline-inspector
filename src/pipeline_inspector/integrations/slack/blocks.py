@@ -43,7 +43,7 @@ def build_optional_report_link(*, scene_path: str, render_root: str) -> str | No
     scene_stem = Path(normalized_scene).stem
     if not scene_stem:
         return None
-    report_name = f"{scene_stem}_pipeline_inspector_report.json"
+    report_name = f"reports/validation/{scene_stem}_pipeline_inspector_report.json"
     return str(Path(root.replace("\\", "/")) / report_name)
 
 

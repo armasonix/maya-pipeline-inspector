@@ -7,6 +7,7 @@ from tests.unit.test_maya_summary_header import FakePushButton, FakeQtWidgets, F
 from pipeline_inspector.integrations.readiness.engine import ReadinessCheckResult
 from pipeline_inspector.ui import main_window
 from pipeline_inspector.ui.readiness_tab import (
+    READINESS_RESULTS_TABLE_OBJECT_NAME,
     READINESS_RUN_BUTTON_OBJECT_NAME,
     READINESS_SEND_SUPPORT_BUTTON_OBJECT_NAME,
     READINESS_TAB_OBJECT_NAME,
@@ -97,7 +98,7 @@ def test_update_readiness_tab_enables_send_buttons_after_failed_check():
                 category="env_var",
                 label="Environment variable PIPELINE_ROOT",
                 ok=False,
-                message="missing",
+                message="Required environment variable 'PIPELINE_ROOT' is not set.",
             ),
         ),
         checks_configured=True,
@@ -107,4 +108,15 @@ def test_update_readiness_tab_enables_send_buttons_after_failed_check():
 
     update_readiness_tab(tab, FakeReadinessQtWidgets, state)
 
+    table = _find(tab, READINESS_RESULTS_TABLE_OBJECT_NAME)
+    assert list(table.headers) == [
+        "Status",
+        "Check",
+        "Description",
+        "Details",
+    ]
+    assert table.items[(0, 2)].text == (
+        "Required environment variable 'PIPELINE_ROOT' is not set."
+    )
+    assert table.items[(0, 3)].text == "Environment variable · env_var:PIPELINE_ROOT"
     assert _find(tab, READINESS_SEND_SUPPORT_BUTTON_OBJECT_NAME).enabled is True

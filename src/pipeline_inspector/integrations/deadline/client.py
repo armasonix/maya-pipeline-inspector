@@ -93,6 +93,105 @@ class DeadlineClient:
         self._raise_for_status(response, f"get job {job_id}")
         return _normalize_job_payload(response.json_data, job_id)
 
+    def list_job_ids(self, *, deleted: bool = False) -> list[str]:
+        """Return all job IDs in the repository."""
+
+        query: dict[str, str] = {"IdOnly": "true"}
+        if deleted:
+            query["Deleted"] = "true"
+        response = self.get("/api/jobs", query=query)
+        self._raise_for_status(response, "list job ids")
+        return [str(item) for item in _normalize_json_list(response.json_data)]
+
+    def list_jobs(
+        self,
+        *,
+        states: Sequence[str] | None = None,
+        job_ids: Sequence[str] | None = None,
+        deleted: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Return job records filtered by state and/or job IDs."""
+
+        query: dict[str, str] = {}
+        if states:
+            query["States"] = ",".join(states)
+        if job_ids:
+            query["JobID"] = ",".join(job_ids)
+        if deleted:
+            query["Deleted"] = "true"
+        response = self.get("/api/jobs", query=query or None)
+        self._raise_for_status(response, "list jobs")
+        return [
+            item for item in _normalize_json_list(response.json_data) if isinstance(item, dict)
+        ]
+
+    def list_tasks(self, job_id: str) -> list[dict[str, Any]]:
+        """Return task records for one Deadline job."""
+
+        response = self.get("/api/tasks", query={"JobID": job_id})
+        self._raise_for_status(response, f"list tasks for job {job_id}")
+        return [
+            item for item in _normalize_json_list(response.json_data) if isinstance(item, dict)
+        ]
+
+    def get_job_statistics(self, job_id: str) -> dict[str, Any]:
+        """Return calculated statistics for one Deadline job."""
+
+        response = self.get(
+            "/api/jobs",
+            query={"JobID": job_id, "Statistics": "true"},
+        )
+        self._raise_for_status(response, f"get job statistics {job_id}")
+        payload = response.json_data
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+            return payload[0]
+        raise DeadlineClientError(
+            f"Expected JSON object for job statistics {job_id}, got {payload!r}"
+        )
+
+    def list_pool_names(self) -> list[str]:
+        """Return all pool names configured in the repository."""
+
+        response = self.get("/api/pools")
+        self._raise_for_status(response, "list pools")
+        return [str(item) for item in _normalize_json_list(response.json_data)]
+
+    def list_pool_workers(self, pool_names: Sequence[str]) -> list[str]:
+        """Return worker names assigned to one or more pools."""
+
+        if not pool_names:
+            return []
+        response = self.get(
+            "/api/pools",
+            query={"Pool": ",".join(pool_names)},
+        )
+        self._raise_for_status(response, "list pool workers")
+        return [str(item) for item in _normalize_json_list(response.json_data)]
+
+    def list_worker_names(self) -> list[str]:
+        """Return all worker names in the repository."""
+
+        response = self.get("/api/slaves", query={"NamesOnly": "true"})
+        self._raise_for_status(response, "list worker names")
+        return [str(item) for item in _normalize_json_list(response.json_data)]
+
+    def list_workers_info(
+        self,
+        worker_names: Sequence[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return worker info records for the provided names or all workers."""
+
+        query: dict[str, str] = {"Data": "info"}
+        if worker_names:
+            query["Name"] = ",".join(worker_names)
+        response = self.get("/api/slaves", query=query)
+        self._raise_for_status(response, "list workers info")
+        return [
+            item for item in _normalize_json_list(response.json_data) if isinstance(item, dict)
+        ]
+
     def submit_job(
         self,
         *,
@@ -165,6 +264,19 @@ def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     if isinstance(parsed, (dict, list)):
         return parsed
     return None
+
+def _normalize_json_list(payload: Any) -> list[Any]:
+    """Normalize Deadline list endpoints that may return arrays or keyed objects."""
+
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("Jobs", "JobIDs", "Slaves", "Pools", "Pool", "Names", "Workers", "Tasks"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+    return []
+
 
 def _normalize_job_payload(
     payload: dict[str, Any] | list[Any] | None,

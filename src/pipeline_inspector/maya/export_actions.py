@@ -18,6 +18,7 @@ from pipeline_inspector.reports.manifest_diff_cli import (
     load_manifest_json,
     write_manifest_diff_outputs,
 )
+from pipeline_inspector.reports.scene_output_paths import default_scene_export_path
 
 SnapshotProvider = Callable[[], GraphSnapshot]
 
@@ -172,15 +173,7 @@ def _output_path(
 ) -> Path:
     if path is not None:
         return Path(path)
-
-    scene_path = Path(snapshot.scene_path) if snapshot.scene_path else None
-    if scene_path is not None and scene_path.name:
-        output_dir = scene_path.parent
-        scene_stem = scene_path.stem
-    else:
-        output_dir = Path.cwd()
-        scene_stem = "untitled_scene"
-    return output_dir / f"{scene_stem}_pipeline_inspector_{suffix}.{extension}"
+    return default_scene_export_path(snapshot.scene_path, suffix=suffix, extension=extension)
 
 def _result(action: str, path: Path, message: str) -> ExportActionResult:
     return ExportActionResult(

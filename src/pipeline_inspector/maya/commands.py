@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -646,6 +647,21 @@ def _export_html_report(path: Optional[str]) -> Any:
     from pipeline_inspector.reports.html_report import write_html_report
 
     validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
+    export_health = validation.health_score.score
+    # region agent log
+    _debug_health_log_command(
+        "commands.py:_export_html_report",
+        "revalidated export health score",
+        {
+            "path": "revalidate",
+            "export_health": export_health,
+            "profile_id": DEFAULT_PROFILE_ID,
+            "scan_scope": "scene",
+            "failed_count": sum(1 for item in validation.results if item.status == "failed"),
+        },
+        hypothesis_id="H1",
+    )
+    # endregion
     output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "html")
     write_html_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_html_report", output_path, "HTML report exported.")
@@ -754,8 +770,10 @@ def _approved_manifest_sidecar_path(snapshot: Any = None) -> Optional[str]:
         scene_path = _current_scene_path()
     if not scene_path:
         return None
-    sidecar = _runtime_output_path(None, scene_path, "manifest", "json")
-    if sidecar.is_file():
+    from pipeline_inspector.reports.scene_output_paths import resolve_existing_scene_export_path
+
+    sidecar = resolve_existing_scene_export_path(scene_path, suffix="manifest", extension="json")
+    if sidecar is not None:
         return str(sidecar)
     return None
 
@@ -768,14 +786,9 @@ def _runtime_output_path(
 ) -> Path:
     if path:
         return Path(path)
-    if scene_path:
-        scene = Path(scene_path)
-        output_dir = scene.parent
-        scene_stem = scene.stem
-    else:
-        output_dir = Path.cwd()
-        scene_stem = "untitled_scene"
-    return output_dir / f"{scene_stem}_pipeline_inspector_{suffix}.{extension}"
+    from pipeline_inspector.reports.scene_output_paths import default_scene_export_path
+
+    return default_scene_export_path(scene_path or None, suffix=suffix, extension=extension)
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -985,3 +998,26 @@ def _maya_mel() -> Any:
         return importlib.import_module("maya.mel")
     except ImportError as exc:
         raise RuntimeError("Maya MEL is available only inside Autodesk Maya.") from exc
+
+
+def _debug_health_log_command(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": {key: str(value) for key, value in data.items()},
+            "hypothesisId": hypothesis_id,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return

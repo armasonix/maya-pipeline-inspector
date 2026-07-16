@@ -14,11 +14,14 @@ from pipeline_inspector.core.governance import (
 )
 from pipeline_inspector.core.supervisor_routing import resolve_supervisor_route
 from pipeline_inspector.maya.panel_session import (
+    load_panel_session,
     load_runtime_configs_from_session,
     remember_panel_visible,
     remember_plugin_version,
     remember_studio_config_path,
+    remember_table_column_widths,
     remember_user_config_path,
+    remember_validate_splitter_sizes,
 )
 from pipeline_inspector.studio_config import (
     STUDIO_CONFIG_FILENAME,
@@ -261,6 +264,7 @@ def _create_dockable_panel() -> Any:
 
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        panel_session = load_panel_session()
         studio_config, user_config = _load_runtime_configs()
         merged_runtime = merge_runtime_config(studio_config, user_config)
         content = main_window.build_main_widget(
@@ -280,6 +284,12 @@ def _create_dockable_panel() -> Any:
         panel_state["content"] = content
         self._pipeline_inspector_content = content
         content._pipeline_inspector_dock = self
+        if panel_session.validate_splitter_sizes:
+            setattr(
+                content,
+                VALIDATE_SPLITTER_SIZES_ATTR,
+                panel_session.validate_splitter_sizes,
+            )
         setattr(content, STUDIO_CONFIG_ATTR, studio_config)
         setattr(content, USER_CONFIG_ATTR, user_config)
         setattr(content, MERGED_RUNTIME_CONFIG_ATTR, merged_runtime)
@@ -293,8 +303,10 @@ def _create_dockable_panel() -> Any:
         _wire_scene_change_reset(content, qt_widgets)
         _wire_validate_shortcuts(content, qt_widgets, panel_state)
         _wire_validate_tab_focus(content, qt_widgets)
-        _wire_validate_splitter_persistence(content, qt_widgets)
         apply_user_preferences_to_panel(content, qt_widgets, user_config)
+        _restore_table_column_widths_from_session(content, qt_widgets, panel_session)
+        _wire_validate_splitter_persistence(content, qt_widgets)
+        _wire_table_column_persistence(content, qt_widgets)
         _sync_workspace_control_width(content)
         _set_panel_view(content, qt_widgets, settings=False)
         layout.addWidget(content)
@@ -1058,6 +1070,12 @@ def _apply_user_preferences_to_panel(
     user_config: UserPreferences,
 ) -> None:
     apply_user_preferences_to_panel(content, qt_widgets, user_config)
+    _restore_table_column_widths_from_session(
+        content,
+        qt_widgets,
+        load_panel_session(),
+    )
+    _wire_table_column_persistence(content, qt_widgets)
 
 
 def _refresh_settings_view(content: Any, qt_widgets: Any, *, status_message: str = "") -> None:
@@ -1560,6 +1578,7 @@ def _export_action_callbacks() -> main_window.ExportActionCallbacks:
         on_compare_approved_manifest=_compare_approved_manifest_from_ui,
         on_compare_after_fixes=_compare_after_fixes_from_ui,
         on_send_to_tracker=_send_to_tracker_from_ui,
+        on_export_farm_html=_export_farm_html_from_ui,
     )
 
 
@@ -1592,9 +1611,66 @@ def _export_json_from_ui() -> None:
 
 
 def _export_html_from_ui() -> None:
+    content = _active_panel_content()
+    snapshot = _panel_content_attr(content, "_pipeline_inspector_snapshot")
+    results = _panel_content_attr(content, "_pipeline_inspector_results")
+    if snapshot is not None and results is not None:
+        from pipeline_inspector.core.scoring import compute_health_score
+        from pipeline_inspector.maya import export_actions
+
+        cached_health = compute_health_score(results).score
+        # region agent log
+        _debug_health_log(
+            "ui_launcher.py:_export_html_from_ui",
+            "export html from cached validation state",
+            {
+                "path": "cached",
+                "cached_health": cached_health,
+                "profile_id": _panel_content_attr(content, "_pipeline_inspector_profile_id", ""),
+                "scan_scope": _panel_content_attr(content, "_pipeline_inspector_scan_scope", ""),
+                "failed_count": sum(1 for item in results if item.status == "failed"),
+            },
+            hypothesis_id="H1",
+        )
+        # endregion
+        _print_export_result(
+            export_actions.export_html_report(
+                snapshot=snapshot,
+                results=results,
+            )
+        )
+        return
+
+    # region agent log
+    _debug_health_log(
+        "ui_launcher.py:_export_html_from_ui",
+        "export html falling back to revalidation",
+        {"path": "revalidate"},
+        hypothesis_id="H1",
+    )
+    # endregion
     from pipeline_inspector.maya.commands import export_html_report_action
 
     _print_export_result(export_html_report_action())
+
+
+def _export_farm_html_from_ui() -> None:
+    from pipeline_inspector.maya import farm_actions
+
+    scene_path = ""
+    content = _active_panel_content()
+    if content is not None:
+        scene_path = str(getattr(content, "_pipeline_inspector_scene_path", "") or "")
+    if not scene_path:
+        try:
+            import maya.cmds as cmds
+
+            scene_path = str(cmds.file(query=True, sceneName=True) or "")
+        except ImportError:
+            scene_path = ""
+    _print_export_result(
+        farm_actions.export_farm_html_report(scene_path=scene_path or None)
+    )
 
 
 def _export_manifest_from_ui() -> None:
@@ -2851,6 +2927,21 @@ def _resolution_probe_hint(snapshot: Any, asset_class_id: str) -> str:
 
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
     health = result.health_score
+    # region agent log
+    _debug_health_log(
+        "ui_launcher.py:_populate_validation_result",
+        "gui validation health score",
+        {
+            "gui_health": health.score,
+            "profile_id": getattr(result, "profile_id", ""),
+            "scan_scope": getattr(result, "scan_scope", ""),
+            "failed_count": sum(
+                1 for item in getattr(result, "results", ()) if item.status == "failed"
+            ),
+        },
+        hypothesis_id="H1",
+    )
+    # endregion
     _set_label_text(
         content,
         qt_widgets,
@@ -3133,6 +3224,68 @@ def _wire_issues_table_interactions(content: Any, qt_widgets: Any) -> None:
             connect(lambda *_: _on_issue_filters_changed(content, qt_widgets))
 
 
+def _layout_persistence_enabled(content: Any) -> bool:
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
+    return density != "compact"
+
+
+def _tracked_table_object_names() -> tuple[str, ...]:
+    from pipeline_inspector.ui.fix_queue import FIX_QUEUE_TABLE_OBJECT_NAME
+    from pipeline_inspector.ui.readiness_tab import READINESS_RESULTS_TABLE_OBJECT_NAME
+    from pipeline_inspector.ui.waiver_manager import WAIVER_TABLE_OBJECT_NAME
+
+    return (
+        main_window.ISSUES_TABLE_OBJECT_NAME,
+        FIX_QUEUE_TABLE_OBJECT_NAME,
+        WAIVER_TABLE_OBJECT_NAME,
+        READINESS_RESULTS_TABLE_OBJECT_NAME,
+    )
+
+
+def _restore_table_column_widths_from_session(
+    content: Any,
+    qt_widgets: Any,
+    panel_session: Any,
+) -> None:
+    if not _layout_persistence_enabled(content):
+        return
+
+    from pipeline_inspector.ui.table_column_persistence import apply_table_column_widths
+
+    widths_by_table = getattr(panel_session, "table_column_widths", {}) or {}
+    for table_key in _tracked_table_object_names():
+        widths = widths_by_table.get(table_key)
+        if not widths:
+            continue
+        table = _find_child(content, qt_widgets.QTableWidget, table_key)
+        if table is None:
+            continue
+        apply_table_column_widths(table, qt_widgets, widths)
+
+
+def _wire_table_column_persistence(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.ui.table_column_persistence import wire_table_column_persistence
+
+    enabled = _layout_persistence_enabled(content)
+
+    def _persist_widths(table_key: str, widths: tuple[int, ...]) -> None:
+        remember_table_column_widths(table_key, widths)
+
+    for table_key in _tracked_table_object_names():
+        table = _find_child(content, qt_widgets.QTableWidget, table_key)
+        if table is None:
+            continue
+        wire_table_column_persistence(
+            table,
+            qt_widgets,
+            table_key=table_key,
+            on_widths_changed=_persist_widths,
+            enabled=enabled,
+        )
+
+
 def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
     splitter = _find_child(
         content,
@@ -3159,6 +3312,7 @@ def _wire_validate_splitter_persistence(content: Any, qt_widgets: Any) -> None:
         sizes = tuple(int(size) for size in sizes_fn())
         if len(sizes) >= 2 and sizes[1] >= main_window.DETAILS_PANEL_MIN_WIDTH:
             setattr(content, VALIDATE_SPLITTER_SIZES_ATTR, sizes)
+            remember_validate_splitter_sizes(sizes)
 
     splitter_moved = getattr(splitter, "splitterMoved", None)
     connect = getattr(splitter_moved, "connect", None)
@@ -3924,6 +4078,32 @@ def _format_fix_apply_message(report: Any, *, selected_count: int) -> str:
 
 def _yes_no(value: bool) -> str:
     return "YES" if value else "NO"
+
+
+def _debug_health_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        import json
+        import time
+
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": {key: str(value) for key, value in data.items()},
+            "hypothesisId": hypothesis_id,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 
 def _print_export_result(result: Any) -> None:

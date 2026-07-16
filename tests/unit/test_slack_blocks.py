@@ -69,7 +69,9 @@ def test_build_optional_report_link_uses_render_root_and_scene_stem():
     )
 
     assert link is not None
-    assert link.replace("\\", "/").endswith("/hero_pipeline_inspector_report.json")
+    assert link.replace("\\", "/").endswith(
+        "/reports/validation/hero_pipeline_inspector_report.json"
+    )
 
 
 def test_format_validation_blocks_uses_unified_chat_layout():

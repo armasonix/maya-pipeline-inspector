@@ -119,6 +119,7 @@ VALIDATE_PUBLISH_PREFLIGHT_BUTTON_OBJECT_NAME = "pipelineInspectorPublishPreflig
 VALIDATE_MANIFEST_GATE_BUTTON_OBJECT_NAME = "pipelineInspectorManifestGateButton"
 EXPORT_COMPARE_AFTER_FIXES_BUTTON_OBJECT_NAME = "pipelineInspectorCompareAfterFixesButton"
 EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME = "pipelineInspectorSendToTrackerButton"
+EXPORT_FARM_HTML_BUTTON_OBJECT_NAME = "pipelineInspectorExportFarmHtmlButton"
 ASSET_CLASS_HINT_LABEL_OBJECT_NAME = "pipelineInspectorAssetClassHintLabel"
 ISSUES_OWNER_FILTER_OBJECT_NAME = "pipelineInspectorIssuesOwnerFilter"
 ISSUES_VIEW_FILTER_OBJECT_NAME = "pipelineInspectorIssuesViewFilter"
@@ -185,6 +186,7 @@ _FULL_EXPORT_BUTTON_LABELS = {
     EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME: "Export Manifest Diff",
     EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME: "Compare to Approved Manifest",
     EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME: "Send to Tracker",
+    EXPORT_FARM_HTML_BUTTON_OBJECT_NAME: "Export Farm HTML Report",
 }
 _COMPACT_EXPORT_BUTTON_LABELS = {
     EXPORT_JSON_BUTTON_OBJECT_NAME: "JSON Report",
@@ -194,6 +196,7 @@ _COMPACT_EXPORT_BUTTON_LABELS = {
     EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME: "Manifest Diff",
     EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME: "Approved Diff",
     EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME: "Send Tracker",
+    EXPORT_FARM_HTML_BUTTON_OBJECT_NAME: "Farm HTML",
 }
 _EXPORT_BUTTON_LAYOUT_ORDER = (
     EXPORT_JSON_BUTTON_OBJECT_NAME,
@@ -203,6 +206,7 @@ _EXPORT_BUTTON_LAYOUT_ORDER = (
     EXPORT_MANIFEST_DIFF_BUTTON_OBJECT_NAME,
     EXPORT_COMPARE_APPROVED_MANIFEST_BUTTON_OBJECT_NAME,
     EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME,
+    EXPORT_FARM_HTML_BUTTON_OBJECT_NAME,
 )
 BLOCK_LAMP_COLORS = {
     True: "#e74c3c",
@@ -277,6 +281,7 @@ class ExportActionCallbacks:
     on_compare_after_fixes: Optional[Callable[[], None]] = None
     on_manifest_gate: Optional[Callable[[], None]] = None
     on_send_to_tracker: Optional[Callable[[], None]] = None
+    on_export_farm_html: Optional[Callable[[], None]] = None
 
 
 @dataclass(frozen=True)
@@ -1021,6 +1026,12 @@ def build_export_actions(
             EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME,
             "Publish the last validation summary to the first enabled task tracker.",
             export_callbacks.on_send_to_tracker,
+        ),
+        (
+            "Export Farm HTML Report",
+            EXPORT_FARM_HTML_BUTTON_OBJECT_NAME,
+            "Collect Deadline farm analytics and write a management HTML report.",
+            export_callbacks.on_export_farm_html,
         ),
     )
     for index, (label, object_name, tooltip, callback) in enumerate(buttons):

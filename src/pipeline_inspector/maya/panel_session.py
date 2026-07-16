@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pipeline_inspector.studio_config import (
@@ -31,6 +31,8 @@ class PanelSessionState:
     user_config_path: str = ""
     last_plugin_version: str = ""
     panel_visible: bool = False
+    table_column_widths: dict[str, tuple[int, ...]] = field(default_factory=dict)
+    validate_splitter_sizes: tuple[int, ...] = ()
 
 
 def panel_session_path() -> Path:
@@ -62,6 +64,8 @@ def load_panel_session() -> PanelSessionState:
         user_config_path=str(payload.get("user_config_path", "") or "").strip(),
         last_plugin_version=str(payload.get("last_plugin_version", "") or "").strip(),
         panel_visible=bool(payload.get("panel_visible", False)),
+        table_column_widths=_parse_table_column_widths(payload.get("table_column_widths")),
+        validate_splitter_sizes=_parse_splitter_sizes(payload.get("validate_splitter_sizes")),
     )
 
 
@@ -71,8 +75,10 @@ def save_panel_session(
     user_config_path: Path | None = None,
     last_plugin_version: str | None = None,
     panel_visible: bool | None = None,
+    table_column_widths: dict[str, tuple[int, ...]] | None = None,
+    validate_splitter_sizes: tuple[int, ...] | None = None,
 ) -> None:
-    """Write remembered config paths, preserving the other path when omitted."""
+    """Write remembered config paths, preserving omitted fields."""
 
     current = load_panel_session()
     studio_value = (
@@ -95,6 +101,16 @@ def save_panel_session(
         if panel_visible is not None
         else current.panel_visible
     )
+    widths_value = (
+        dict(table_column_widths)
+        if table_column_widths is not None
+        else current.table_column_widths
+    )
+    splitter_value = (
+        tuple(int(size) for size in validate_splitter_sizes)
+        if validate_splitter_sizes is not None
+        else current.validate_splitter_sizes
+    )
     path = panel_session_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -102,6 +118,10 @@ def save_panel_session(
         "user_config_path": user_value,
         "last_plugin_version": version_value,
         "panel_visible": visible_value,
+        "table_column_widths": {
+            key: list(widths) for key, widths in sorted(widths_value.items())
+        },
+        "validate_splitter_sizes": list(splitter_value),
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -124,6 +144,51 @@ def remember_plugin_version(version: str) -> None:
 
 def remember_panel_visible(visible: bool) -> None:
     save_panel_session(panel_visible=visible)
+
+
+def remember_table_column_widths(table_key: str, widths: tuple[int, ...]) -> None:
+    """Persist one table's column widths in the Maya panel session."""
+
+    key = str(table_key or "").strip()
+    cleaned = tuple(int(width) for width in widths if int(width) > 0)
+    if not key or not cleaned:
+        return
+    current = load_panel_session()
+    updated = dict(current.table_column_widths)
+    updated[key] = cleaned
+    save_panel_session(table_column_widths=updated)
+
+
+def remember_validate_splitter_sizes(sizes: tuple[int, ...]) -> None:
+    """Persist the Validate tab issues/details splitter sizes."""
+
+    cleaned = tuple(int(size) for size in sizes if int(size) > 0)
+    if len(cleaned) < 2:
+        return
+    save_panel_session(validate_splitter_sizes=cleaned)
+
+
+def _parse_table_column_widths(raw: object) -> dict[str, tuple[int, ...]]:
+    if not isinstance(raw, dict):
+        return {}
+    parsed: dict[str, tuple[int, ...]] = {}
+    for table_key, widths in raw.items():
+        key = str(table_key or "").strip()
+        if not key or not isinstance(widths, list):
+            continue
+        cleaned = tuple(int(width) for width in widths if int(width) > 0)
+        if cleaned:
+            parsed[key] = cleaned
+    return parsed
+
+
+def _parse_splitter_sizes(raw: object) -> tuple[int, ...]:
+    if not isinstance(raw, list):
+        return ()
+    cleaned = tuple(int(size) for size in raw if int(size) > 0)
+    if len(cleaned) < 2:
+        return ()
+    return cleaned
 
 
 def load_runtime_configs_from_session() -> tuple[StudioConfig, UserPreferences]:
