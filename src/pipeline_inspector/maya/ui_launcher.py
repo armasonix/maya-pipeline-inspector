@@ -5,7 +5,7 @@ import os
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from pipeline_inspector import __version__
 from pipeline_inspector.core.governance import (
@@ -46,7 +46,6 @@ from pipeline_inspector.ui.fix_queue import (
     fix_rows_from_table,
     populate_fix_queue,
     risky_fix_rows,
-    safe_fix_rows,
     selected_fix_rows,
     update_risky_confirmation_label,
 )
@@ -588,7 +587,28 @@ def _report_bug_from_ui(content: Any, qt_widgets: Any) -> None:
             validation_summary=validation_summary,
             health_score=health_score,
         )
-        return maybe_submit_bug_report(_studio_config_for_content(content), payload)
+        screenshot_jpeg = None
+        if values.attach_screenshot:
+            if values.screenshot_path:
+                from pipeline_inspector.integrations.bug_report.screenshot import (
+                    read_image_file_as_jpeg,
+                )
+
+                screenshot_jpeg = read_image_file_as_jpeg(
+                    values.screenshot_path,
+                    qt_widgets=qt_widgets,
+                )
+            else:
+                from pipeline_inspector.maya.bug_report_screenshot import (
+                    capture_maya_main_window_jpeg,
+                )
+
+                screenshot_jpeg = capture_maya_main_window_jpeg(qt_widgets=qt_widgets)
+        return maybe_submit_bug_report(
+            _studio_config_for_content(content),
+            payload,
+            screenshot_jpeg=screenshot_jpeg,
+        )
 
     show_bug_report_dialog(
         qt_widgets,
@@ -1663,6 +1683,46 @@ def _export_fix_plan_from_ui() -> None:
     _print_export_result(export_fix_plan_action())
 
 
+def _studio_config_for_send_to_tracker(content: Any, qt_widgets: Any) -> StudioConfig:
+    """Read connector settings for publish without refreshing the whole Settings UI."""
+
+    current = _studio_config_for_content(content)
+    settings_view = _find_child(content, qt_widgets.QWidget, SETTINGS_VIEW_OBJECT_NAME)
+    if settings_view is None:
+        return current
+    connectors = read_connectors_from_settings_view(
+        settings_view,
+        qt_widgets,
+        base=current.connectors,
+    )
+    return current.with_updates(connectors=connectors)
+
+
+def _set_send_to_tracker_button_enabled(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    enabled: bool,
+) -> None:
+    button = _find_child(
+        content,
+        qt_widgets.QPushButton,
+        main_window.EXPORT_SEND_TO_TRACKER_BUTTON_OBJECT_NAME,
+    )
+    set_enabled = getattr(button, "setEnabled", None)
+    if set_enabled is not None:
+        set_enabled(enabled)
+
+
+def _schedule_on_main_thread(callback: Callable[[], None]) -> None:
+    try:
+        import maya.utils
+
+        maya.utils.executeDeferred(callback)
+    except ImportError:
+        callback()
+
+
 def _send_to_tracker_from_ui() -> None:
     content = _active_panel_content()
     if content is None:
@@ -1676,30 +1736,20 @@ def _send_to_tracker_from_ui() -> None:
         _set_reports_status_label(content, qt_widgets, message)
         return
 
-    from pipeline_inspector.integrations.trackers.publish_dispatcher import (
-        format_tracker_publish_status,
-        publish_validation_to_first_tracker,
-    )
-
-    try:
-        qt_widgets = load_qt_widgets()
-        _sync_connectors_from_ui(content, qt_widgets)
-        outcome = publish_validation_to_first_tracker(
-            _studio_config_for_content(content),
-            validation_result,
-        )
-        message = format_tracker_publish_status(outcome)
-    except Exception as exc:
-        message = f"Send to Tracker failed: {exc}"
-        print(message)
-        import traceback
-
-        traceback.print_exc()
-    print(message)
     qt_widgets = load_qt_widgets()
+    studio_config = _studio_config_for_send_to_tracker(content, qt_widgets)
     scanned_at_utc = getattr(content, "_pipeline_inspector_last_validated_at", "")
     scene_path = getattr(content, "_pipeline_inspector_scene_path", "")
     scan_scope = getattr(content, "_pipeline_inspector_scan_scope", "")
+
+    from pipeline_inspector.integrations.trackers.publish_dispatcher import (
+        format_tracker_publish_status,
+        preload_tracker_publish_modules,
+        publish_validation_to_first_tracker,
+    )
+
+    preload_tracker_publish_modules(studio_config)
+    _set_send_to_tracker_button_enabled(content, qt_widgets, enabled=False)
     _set_reports_status_label(
         content,
         qt_widgets,
@@ -1707,9 +1757,36 @@ def _send_to_tracker_from_ui() -> None:
             scene_path=scene_path,
             scanned_at_utc=scanned_at_utc,
             scan_scope=scan_scope,
-            export_message=message,
+            export_message="Publishing validation summary to tracker...",
         ),
     )
+
+    def _run_publish_on_main_thread() -> None:
+        try:
+            outcome = publish_validation_to_first_tracker(studio_config, validation_result)
+            message = format_tracker_publish_status(outcome)
+        except Exception as exc:
+            message = f"Send to Tracker failed: {exc}"
+            print(message)
+            import traceback
+
+            traceback.print_exc()
+        print(message)
+
+        finish_widgets = load_qt_widgets()
+        _set_send_to_tracker_button_enabled(content, finish_widgets, enabled=True)
+        _set_reports_status_label(
+            content,
+            finish_widgets,
+            main_window.build_reports_status_text(
+                scene_path=scene_path,
+                scanned_at_utc=scanned_at_utc,
+                scan_scope=scan_scope,
+                export_message=message,
+            ),
+        )
+
+    _schedule_on_main_thread(_run_publish_on_main_thread)
 
 
 def _panel_content(panel_state: dict[str, Any]) -> Any:
@@ -1883,12 +1960,12 @@ def _schedule_ui_validation(
             content._pipeline_inspector_validate_running = False
             _set_validate_busy_state(content, qt_widgets, busy=False)
 
-    cmds = _maya_cmds()
-    eval_deferred = getattr(cmds, "evalDeferred", None)
-    if eval_deferred is not None:
-        eval_deferred(_job, lowestPriority=True)
+    timer_cls = getattr(qt_widgets, "QTimer", None)
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    if single_shot is not None:
+        single_shot(0, _job)
     else:
-        _job()
+        _schedule_on_main_thread(_job)
 
 
 def _run_validation_job(
@@ -2267,6 +2344,15 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
     title = "Submit to Farm" if result.succeeded else "Farm Submit Blocked"
     _show_information_dialog(qt_widgets, title, result.message)
     print(result.message)
+    if result.succeeded and result.job_id:
+        from pipeline_inspector.maya.farm_job_monitor import start_farm_job_notification_poll
+
+        start_farm_job_notification_poll(
+            config=_deadline_config_for_content(content),
+            studio_config=_studio_config_for_content(content),
+            job_id=result.job_id,
+            job_name=Path(scene_path).name if scene_path else "",
+        )
 
 
 def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
@@ -3209,6 +3295,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         actions,
         allow_high_risk=allow_high_risk,
         allow_referenced=True,
+        allow_locked=True,
     )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
@@ -3221,17 +3308,31 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
+    from pipeline_inspector.core.fix_plan import NAMING_FIX_TYPE
     from pipeline_inspector.maya.fix_applier import apply_fix_actions
+    from pipeline_inspector.ui.fix_queue import HIGH_RISK, MEDIUM_RISK
 
     fix_plan = getattr(content, "_pipeline_inspector_fix_plan", None)
-    table = _fix_queue_table(content, qt_widgets)
-    stored_rows = getattr(content, "_pipeline_inspector_fix_rows", ())
-    if fix_plan is None or not stored_rows or table is None:
+    if fix_plan is None:
         return
-    fix_rows = fix_rows_from_table(table, stored_rows)
-    content._pipeline_inspector_fix_rows = fix_rows
-    safe_ids = {row.fix_id for row in safe_fix_rows(fix_rows) if row.fix_id}
-    actions = tuple(action for action in fix_plan.actions if action.fix_id in safe_ids)
+
+    def _include_apply_safe_action(action: Any) -> bool:
+        if action.requires_supervisor:
+            return False
+        if action.risk in (HIGH_RISK, MEDIUM_RISK):
+            return False
+        if action.blocked:
+            return bool(
+                action.fix_type == NAMING_FIX_TYPE
+                and (action.referenced or action.requires_reference_edit)
+            )
+        return True
+
+    actions = tuple(
+        action
+        for action in fix_plan.actions
+        if _include_apply_safe_action(action)
+    )
     if not actions:
         _set_label_text(
             content,
@@ -3241,7 +3342,11 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
             "or unplannable fixes are skipped.",
         )
         return
-    report = apply_fix_actions(actions, allow_referenced=True)
+    report = apply_fix_actions(
+        actions,
+        allow_referenced=True,
+        allow_locked=True,
+    )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
         content,

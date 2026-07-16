@@ -71,6 +71,32 @@ def test_build_maya_batch_script_job_payload(tmp_path: Path):
     assert aux_files == ()
 
 
+def test_submit_pipeline_inspector_validation_job_includes_studio_config_in_command(
+    tmp_path: Path,
+):
+    studio_config = tmp_path / "pipeline_inspector_studio.json"
+    studio_config.write_text("{}", encoding="utf-8")
+
+    def transport(request: HttpRequest, timeout: float) -> DeadlineResponse:
+        return DeadlineResponse(status_code=200, body="job-553")
+
+    client = DeadlineClient(
+        DeadlineConfig(mayapy="mayapy", studio_config_path=studio_config),
+        transport=transport,
+    )
+    command_script = tmp_path / "pipeline_inspector_command.txt"
+    result = submit_pipeline_inspector_validation_job(
+        client=client,
+        scene_path=tmp_path / "scene.ma",
+        report_path=tmp_path / "report.json",
+        command_script_path=command_script,
+    )
+
+    assert result.command_script_line is not None
+    assert "--studio-config" in result.command_script_line
+    assert str(studio_config) in result.command_script_line
+
+
 def test_submit_pipeline_inspector_validation_job_submits_command_script(tmp_path: Path):
     requests: list[HttpRequest] = []
 

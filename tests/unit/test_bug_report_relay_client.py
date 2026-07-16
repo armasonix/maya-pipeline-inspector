@@ -22,7 +22,6 @@ def _config() -> BugReportRelayConfig:
     return BugReportRelayConfig(
         relay_url="https://pipeline.studio.internal/shader-health/bug-report",
         api_key="studio-secret",
-        allow_screenshot=True,
     )
 
 
@@ -99,28 +98,6 @@ def test_bug_report_relay_client_omits_invalid_screenshot_and_still_submits():
     assert result.submitted is True
     assert 'filename="screenshot.jpg"' not in captured[0].body.decode("utf-8", errors="replace")
 
-
-def test_bug_report_relay_client_skips_screenshot_when_not_allowed():
-    captured: list[HttpRequest] = []
-
-    def transport(request: HttpRequest, timeout: float) -> RelayResponse:
-        captured.append(request)
-        _ = timeout
-        return RelayResponse(
-            status_code=201,
-            body='{"issue_url":"https://github.com/org/repo/issues/12"}',
-            json_data={"issue_url": "https://github.com/org/repo/issues/12"},
-        )
-
-    client = BugReportRelayClient(
-        _config().with_overrides(allow_screenshot=False),
-        transport=transport,
-    )
-
-    result = client.submit(_payload(), screenshot_jpeg=b"\xff\xd8\xff\xe0jpeg")
-
-    assert result.submitted is True
-    assert 'filename="screenshot.jpg"' not in captured[0].body.decode("utf-8", errors="replace")
 
 
 def test_bug_report_relay_client_submits_without_api_key_for_public_relay():
@@ -240,6 +217,12 @@ def test_maybe_submit_bug_report_blocks_when_local_daily_limit_reached(tmp_path:
         now_utc=now,
         state_path=state_path,
     )
+    record_bug_report_submission(
+        machine_id="workstation-01",
+        os_user="artist",
+        now_utc=now,
+        state_path=state_path,
+    )
 
     result = maybe_submit_bug_report(
         StudioConfig(
@@ -247,7 +230,6 @@ def test_maybe_submit_bug_report_blocks_when_local_daily_limit_reached(tmp_path:
                 enabled=True,
                 relay_url="https://pipeline.studio.internal/shader-health/bug-report",
                 api_key="studio-secret",
-                max_reports_per_day=2,
             )
         ),
         payload,
@@ -256,7 +238,7 @@ def test_maybe_submit_bug_report_blocks_when_local_daily_limit_reached(tmp_path:
 
     assert result.submitted is False
     assert result.skipped_reason == "rate_limited"
-    assert "2/2" in result.error_message
+    assert "3/3" in result.error_message
 
 
 def test_maybe_submit_bug_report_records_successful_submission(tmp_path: Path):
@@ -285,7 +267,6 @@ def test_maybe_submit_bug_report_records_successful_submission(tmp_path: Path):
                 enabled=True,
                 relay_url="https://pipeline.studio.internal/shader-health/bug-report",
                 api_key="studio-secret",
-                max_reports_per_day=2,
             )
         ),
         payload,
@@ -294,13 +275,22 @@ def test_maybe_submit_bug_report_records_successful_submission(tmp_path: Path):
     )
 
     assert result.submitted is True
+    record_bug_report_submission(
+        machine_id="workstation-01",
+        os_user="artist",
+        state_path=state_path,
+    )
+    record_bug_report_submission(
+        machine_id="workstation-01",
+        os_user="artist",
+        state_path=state_path,
+    )
     blocked = maybe_submit_bug_report(
         StudioConfig(
             bug_report=BugReportSettings(
                 enabled=True,
                 relay_url="https://pipeline.studio.internal/shader-health/bug-report",
                 api_key="studio-secret",
-                max_reports_per_day=1,
             )
         ),
         payload,

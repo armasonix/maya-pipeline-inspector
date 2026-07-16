@@ -15,21 +15,6 @@ from pipeline_inspector.studio_config import (
     resolve_ftrack_config,
     resolve_shotgrid_config,
 )
-from pipeline_inspector.ui.cerebro_connector_section import (
-    build_cerebro_connector_section,
-    read_cerebro_connector_from_view,
-    update_cerebro_connector_view,
-)
-from pipeline_inspector.ui.ftrack_connector_section import (
-    build_ftrack_connector_section,
-    read_ftrack_connector_from_view,
-    update_ftrack_connector_view,
-)
-from pipeline_inspector.ui.shotgrid_connector_section import (
-    build_shotgrid_connector_section,
-    read_shotgrid_connector_from_view,
-    update_shotgrid_connector_view,
-)
 
 TrackerSettingsValue = Any
 
@@ -80,6 +65,8 @@ def _build_ftrack_section(
     config: StudioConfig,
     callbacks: Any,
 ) -> Any:
+    from pipeline_inspector.ui.ftrack_connector_section import build_ftrack_connector_section
+
     return build_ftrack_connector_section(
         qt_widgets,
         config,
@@ -87,11 +74,30 @@ def _build_ftrack_section(
         on_settings_changed=getattr(callbacks, "on_ftrack_settings_changed", None),
     )
 
+
+def _read_ftrack_from_view(view: Any, qt_widgets: Any) -> FtrackConnectorSettings:
+    from pipeline_inspector.ui.ftrack_connector_section import read_ftrack_connector_from_view
+
+    return read_ftrack_connector_from_view(view, qt_widgets)
+
+
+def _update_ftrack_view(
+    view: Any,
+    qt_widgets: Any,
+    settings: TrackerSettingsValue,
+) -> None:
+    from pipeline_inspector.ui.ftrack_connector_section import update_ftrack_connector_view
+
+    update_ftrack_connector_view(view, qt_widgets, settings)
+
+
 def _build_shotgrid_section(
     qt_widgets: Any,
     config: StudioConfig,
     callbacks: Any,
 ) -> Any:
+    from pipeline_inspector.ui.shotgrid_connector_section import build_shotgrid_connector_section
+
     return build_shotgrid_connector_section(
         qt_widgets,
         config,
@@ -99,17 +105,53 @@ def _build_shotgrid_section(
         on_settings_changed=getattr(callbacks, "on_shotgrid_settings_changed", None),
     )
 
+
+def _read_shotgrid_from_view(view: Any, qt_widgets: Any) -> ShotGridConnectorSettings:
+    from pipeline_inspector.ui.shotgrid_connector_section import read_shotgrid_connector_from_view
+
+    return read_shotgrid_connector_from_view(view, qt_widgets)
+
+
+def _update_shotgrid_view(
+    view: Any,
+    qt_widgets: Any,
+    settings: TrackerSettingsValue,
+) -> None:
+    from pipeline_inspector.ui.shotgrid_connector_section import update_shotgrid_connector_view
+
+    update_shotgrid_connector_view(view, qt_widgets, settings)
+
+
 def _build_cerebro_section(
     qt_widgets: Any,
     config: StudioConfig,
     callbacks: Any,
 ) -> Any:
+    from pipeline_inspector.ui.cerebro_connector_section import build_cerebro_connector_section
+
     return build_cerebro_connector_section(
         qt_widgets,
         config,
         on_enabled_changed=getattr(callbacks, "on_cerebro_enabled_changed", None),
         on_settings_changed=getattr(callbacks, "on_cerebro_settings_changed", None),
     )
+
+
+def _read_cerebro_from_view(view: Any, qt_widgets: Any) -> CerebroConnectorSettings:
+    from pipeline_inspector.ui.cerebro_connector_section import read_cerebro_connector_from_view
+
+    return read_cerebro_connector_from_view(view, qt_widgets)
+
+
+def _update_cerebro_view(
+    view: Any,
+    qt_widgets: Any,
+    settings: TrackerSettingsValue,
+) -> None:
+    from pipeline_inspector.ui.cerebro_connector_section import update_cerebro_connector_view
+
+    update_cerebro_connector_view(view, qt_widgets, settings)
+
 
 TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
     TrackerConnectorDefinition(
@@ -120,8 +162,8 @@ TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
         get_settings=_get_ftrack_settings,
         apply_settings=_apply_ftrack_settings,
         build_section=_build_ftrack_section,
-        read_from_view=read_ftrack_connector_from_view,
-        update_view=update_ftrack_connector_view,
+        read_from_view=_read_ftrack_from_view,
+        update_view=_update_ftrack_view,
         secret_field_names=frozenset({"api_key"}),
     ),
     TrackerConnectorDefinition(
@@ -132,8 +174,8 @@ TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
         get_settings=_get_shotgrid_settings,
         apply_settings=_apply_shotgrid_settings,
         build_section=_build_shotgrid_section,
-        read_from_view=read_shotgrid_connector_from_view,
-        update_view=update_shotgrid_connector_view,
+        read_from_view=_read_shotgrid_from_view,
+        update_view=_update_shotgrid_view,
         secret_field_names=frozenset({"api_key"}),
     ),
     TrackerConnectorDefinition(
@@ -144,8 +186,8 @@ TRACKERS: tuple[TrackerConnectorDefinition, ...] = (
         get_settings=_get_cerebro_settings,
         apply_settings=_apply_cerebro_settings,
         build_section=_build_cerebro_section,
-        read_from_view=read_cerebro_connector_from_view,
-        update_view=update_cerebro_connector_view,
+        read_from_view=_read_cerebro_from_view,
+        update_view=_update_cerebro_view,
         secret_field_names=frozenset({"api_password"}),
     ),
 )

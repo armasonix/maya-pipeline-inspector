@@ -9,16 +9,22 @@ from pipeline_inspector.core.supervisor_routing import SupervisorRoutingDecision
 from pipeline_inspector.integrations.discord.notify import (
     DiscordClientFactory,
     DiscordNotificationResult,
+    maybe_send_discord_farm_notification,
+    maybe_send_discord_readiness_notification,
     maybe_send_discord_validation_notification,
 )
 from pipeline_inspector.integrations.slack.notify import (
     SlackClientFactory,
     SlackNotificationResult,
+    maybe_send_slack_farm_notification,
+    maybe_send_slack_readiness_notification,
     maybe_send_slack_validation_notification,
 )
 from pipeline_inspector.integrations.telegram.notify import (
     TelegramClientFactory,
     TelegramNotificationResult,
+    maybe_send_telegram_farm_notification,
+    maybe_send_telegram_readiness_notification,
     maybe_send_telegram_validation_notification,
 )
 from pipeline_inspector.studio_config import StudioConfig
@@ -47,6 +53,48 @@ class ValidationNotificationDispatchResult:
     """Aggregated outcomes from fan-out to all notification connectors."""
 
     outcomes: tuple[ConnectorNotificationOutcome, ...]
+
+
+@dataclass(frozen=True)
+class FarmNotificationContext:
+    """Normalized farm job completion payload for notification dispatch."""
+
+    job_id: str
+    job_name: str
+    status: str
+    worker_machine: str = ""
+    submitted_by: str = ""
+    started_at: str = ""
+    completed_at: str = ""
+    duration_text: str = ""
+    error_count: int = 0
+
+
+def _format_farm_notification_message(context: FarmNotificationContext) -> str:
+    status = context.status or "unknown"
+    if status == "Completed":
+        headline = "Farm job completed successfully"
+    elif status == "Failed":
+        headline = "Farm job failed"
+    else:
+        headline = f"Farm job {status.lower()}"
+
+    lines = [headline, f"Job: {context.job_name or context.job_id}"]
+    lines.append(f"Job ID: {context.job_id}")
+    lines.append(f"Status: {status}")
+    if context.worker_machine:
+        lines.append(f"Worker: {context.worker_machine}")
+    if context.submitted_by:
+        lines.append(f"User: {context.submitted_by}")
+    if context.started_at:
+        lines.append(f"Started: {context.started_at}")
+    if context.completed_at:
+        lines.append(f"Finished: {context.completed_at}")
+    if context.duration_text:
+        lines.append(f"Duration: {context.duration_text}")
+    if context.error_count:
+        lines.append(f"Errors: {context.error_count}")
+    return "\n".join(lines)
 
 
 def _outcome_from_telegram(result: TelegramNotificationResult) -> ConnectorNotificationOutcome:
@@ -138,6 +186,75 @@ def dispatch_validation_notifications(
             force_notify=force_notify,
             reporter_line=reporter_line,
         )
+    return ValidationNotificationDispatchResult(
+        outcomes=(
+            _outcome_from_telegram(telegram_result),
+            _outcome_from_discord(discord_result),
+            _outcome_from_slack(slack_result),
+        )
+    )
+
+
+def dispatch_readiness_notifications(
+    studio_config: StudioConfig | None,
+    message: str,
+    *,
+    telegram_client_factory: TelegramClientFactory | None = None,
+    discord_client_factory: DiscordClientFactory | None = None,
+    slack_client_factory: SlackClientFactory | None = None,
+) -> ValidationNotificationDispatchResult:
+    """Fan out readiness failure notifications to enabled connectors."""
+
+    telegram_result = maybe_send_telegram_readiness_notification(
+        studio_config,
+        message,
+        client_factory=telegram_client_factory,
+    )
+    discord_result = maybe_send_discord_readiness_notification(
+        studio_config,
+        message,
+        client_factory=discord_client_factory,
+    )
+    slack_result = maybe_send_slack_readiness_notification(
+        studio_config,
+        message,
+        client_factory=slack_client_factory,
+    )
+    return ValidationNotificationDispatchResult(
+        outcomes=(
+            _outcome_from_telegram(telegram_result),
+            _outcome_from_discord(discord_result),
+            _outcome_from_slack(slack_result),
+        )
+    )
+
+
+def dispatch_farm_notifications(
+    studio_config: StudioConfig | None,
+    context: FarmNotificationContext,
+    *,
+    telegram_client_factory: TelegramClientFactory | None = None,
+    discord_client_factory: DiscordClientFactory | None = None,
+    slack_client_factory: SlackClientFactory | None = None,
+) -> ValidationNotificationDispatchResult:
+    """Fan out farm completion notifications to enabled connectors."""
+
+    message = _format_farm_notification_message(context)
+    telegram_result = maybe_send_telegram_farm_notification(
+        studio_config,
+        message,
+        client_factory=telegram_client_factory,
+    )
+    discord_result = maybe_send_discord_farm_notification(
+        studio_config,
+        message,
+        client_factory=discord_client_factory,
+    )
+    slack_result = maybe_send_slack_farm_notification(
+        studio_config,
+        message,
+        client_factory=slack_client_factory,
+    )
     return ValidationNotificationDispatchResult(
         outcomes=(
             _outcome_from_telegram(telegram_result),

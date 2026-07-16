@@ -119,6 +119,66 @@ def test_should_send_telegram_notification_requires_enabled_connector_and_matchi
     )
 
 
+def test_matched_notify_events_returns_on_pass_when_no_blocks_or_critical():
+    settings = _telegram_settings(notify_on=("on_pass", "block_publish"))
+
+    assert matched_notify_events(
+        settings,
+        block_publish=False,
+        block_deadline=False,
+        critical_count=0,
+        health_score=90,
+    ) == ("on_pass",)
+
+
+def test_matched_notify_events_returns_score_below_when_threshold_configured():
+    settings = _telegram_settings(notify_on=("score_below",), notify_score_below=70)
+
+    assert matched_notify_events(
+        settings,
+        block_publish=False,
+        block_deadline=False,
+        critical_count=0,
+        health_score=55,
+    ) == ("score_below",)
+
+
+def test_send_telegram_validation_notification_posts_to_notify_targets(monkeypatch):
+    captured_chat_ids: list[str] = []
+
+    class _Client:
+        def __init__(self, config: TelegramConfig) -> None:
+            captured_chat_ids.append(config.chat_id)
+
+        def send_message(self, _message: str) -> TelegramResponse:
+            return TelegramResponse(
+                status_code=200,
+                body='{"ok": true}',
+                json_data={"ok": True},
+            )
+
+    settings = _telegram_settings(
+        notify_on=("block_publish",),
+        notify_targets=(
+            __import__(
+                "pipeline_inspector.studio_config",
+                fromlist=["NotifyTarget"],
+            ).NotifyTarget(
+                chat_id="-10099",
+                events=("on_critical",),
+            ),
+        ),
+    )
+    result = send_telegram_validation_notification(
+        _studio_config(settings),
+        _context(block_publish=False, block_deadline=False, critical_count=3),
+        client_factory=lambda _config: _Client(_config),
+    )
+
+    assert result.sent is True
+    assert captured_chat_ids == ["-10099"]
+
+
 def test_matched_notify_events_returns_only_configured_active_blocks():
     settings = _telegram_settings(notify_on=("block_publish", "block_deadline"))
 
@@ -166,7 +226,7 @@ def test_send_telegram_validation_notification_skips_without_matching_block_even
     )
 
     assert result.sent is False
-    assert result.skipped_reason == "no_matching_events"
+    assert result.skipped_reason.startswith("no_matching_events")
 
 
 def test_send_telegram_validation_notification_posts_summary_on_publish_block():

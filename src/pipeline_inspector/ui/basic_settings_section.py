@@ -12,6 +12,7 @@ from pipeline_inspector.maya.validation_pipeline import (
     list_workflow_profile_options,
 )
 from pipeline_inspector.ui.settings_widgets import (
+    configure_compact_line_edit,
     find_child,
     wire_combo_changed,
     wire_line_edit_finished,
@@ -37,6 +38,8 @@ SETTINGS_THEME_COMBO_OBJECT_NAME = "pipelineInspectorSettingsThemeCombo"
 SETTINGS_ASSIGNED_ROLE_COMBO_OBJECT_NAME = "pipelineInspectorSettingsAssignedRoleCombo"
 SETTINGS_TRACKER_USERNAME_INPUT_OBJECT_NAME = "pipelineInspectorSettingsTrackerUsernameInput"
 SETTINGS_DOCS_URL_INPUT_OBJECT_NAME = "pipelineInspectorSettingsDocsUrlInput"
+
+_BASIC_FIELD_WIDTH = 292
 
 _DEFAULT_WORKFLOW_PROFILE_ID = "artist_relaxed"
 _SCAN_SCOPE_OPTIONS = (
@@ -149,6 +152,7 @@ def build_basic_settings_section(
     tracker_username_input = qt_widgets.QLineEdit(user_config.tracker_username)
     tracker_username_input.setObjectName(SETTINGS_TRACKER_USERNAME_INPUT_OBJECT_NAME)
     tracker_username_input.setPlaceholderText("Ftrack/Cerebro username (optional)")
+    configure_compact_line_edit(qt_widgets, tracker_username_input, _BASIC_FIELD_WIDTH)
     tracker_username_input.setToolTip(
         "Tracker username for Ftrack security roles and Cerebro group lookup. "
         "Overrides OS username when set."
@@ -159,6 +163,7 @@ def build_basic_settings_section(
     docs_url_input = qt_widgets.QLineEdit(user_config.docs_url)
     docs_url_input.setObjectName(SETTINGS_DOCS_URL_INPUT_OBJECT_NAME)
     docs_url_input.setPlaceholderText(DEFAULT_USER_DOCS_URL)
+    configure_compact_line_edit(qt_widgets, docs_url_input, _BASIC_FIELD_WIDTH)
     docs_url_input.setToolTip(
         "Documentation opened by the panel header Documentation button."
     )

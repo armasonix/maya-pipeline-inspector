@@ -122,7 +122,9 @@ def test_mesh_naming_rule_fails_for_invalid_fixture_name():
     snapshot = load_naming_fixture()
     invalid_shape = ShapeSnapshot(
         node_id="mesh:body_bad",
-        name="body_bad",
+        name="body_badShape",
+        full_name="|world|body_bad|body_badShape",
+        transform_id="transform:body_bad",
         type_name="mesh",
     )
     snapshot = GraphSnapshot(
@@ -133,6 +135,7 @@ def test_mesh_naming_rule_fails_for_invalid_fixture_name():
     result = evaluate_rule("studio.naming.mesh.pattern", snapshot)[0]
 
     assert result.status == "failed"
+    assert result.current_value == "body_bad"
     assert result.expected_value == STUDIO_TEMPLATES["mesh"]
 
 

@@ -10,9 +10,82 @@ class FakeCmds:
     def __init__(self, attrs: Optional[dict[str, Any]] = None) -> None:
         self.attrs = attrs or {}
         self.nodes: dict[str, str] = {}
+        self.read_only_nodes: set[str] = set()
+        self.sticky_read_only_nodes: set[str] = set()
+        self.referenced_nodes: set[str] = set()
+        self.locked_nodes: set[str] = set()
+        self.locked_name_nodes: set[str] = set()
+        self.locked_unpublished_nodes: set[str] = set()
         self.undo_calls: list[dict[str, Any]] = []
         self.set_calls: list[tuple[str, Any, dict[str, Any]]] = []
         self.rename_calls: list[tuple[str, str]] = []
+        self.node_types: dict[str, str] = {}
+        self.unlocked_refs: set[str] = set()
+        self.loaded_refs: set[str] = set()
+        self.ref_locked: dict[str, bool] = {
+            "pipeline_inspector_reference_sceneRN": True,
+        }
+        self.ref_deferred: dict[str, bool] = {
+            "pipeline_inspector_reference_sceneRN": True,
+        }
+        self.ref_fully_loaded: set[str] = set()
+        self.persist_renames = True
+        self.locked_nodes.add("pipeline_inspector_reference_sceneRN")
+        self.ref_namespace: dict[str, str] = {
+            "pipeline_inspector_reference_sceneRN": ":",
+        }
+        self.ref_is_top_level: dict[str, bool] = {
+            "pipeline_inspector_reference_sceneRN": True,
+        }
+        self.failed_rename_edits: dict[str, list[str]] = {}
+
+    def _remap_reference_namespace(self, ref_node: str, new_ns: str) -> None:
+        if ref_node != "pipeline_inspector_reference_sceneRN":
+            return
+        for old_path in list(self.referenced_nodes):
+            short = old_path.split("|")[-1].split(":")[-1]
+            new_path = f"|{new_ns}:{short}"
+            current = self.nodes.get(old_path, old_path)
+            if old_path in self.nodes:
+                del self.nodes[old_path]
+            if short in self.nodes and self.nodes.get(short) == current:
+                del self.nodes[short]
+            self.nodes[new_path] = new_path
+            self.nodes[f"{new_ns}:{short}"] = new_path
+            self.referenced_nodes.discard(old_path)
+            self.referenced_nodes.add(new_path)
+            self.read_only_nodes.discard(old_path)
+            self.locked_nodes.discard(old_path)
+            self.locked_name_nodes.discard(old_path)
+
+    def file(self, *args: Any, **kwargs: Any) -> Any:
+        ref_node = kwargs.get("referenceNode")
+        if ref_node is None and args:
+            ref_node = str(args[0])
+        ref_token = str(ref_node) if ref_node else ""
+        if kwargs.get("query") and kwargs.get("deferReference") and ref_token:
+            return self.ref_deferred.get(ref_token, False)
+        if kwargs.get("query") and kwargs.get("lockReference") and ref_token:
+            return self.ref_locked.get(ref_token, ref_token not in self.unlocked_refs)
+        if kwargs.get("loadReference") and ref_token:
+            self.loaded_refs.add(ref_token)
+            if str(kwargs.get("loadReferenceDepth") or "").casefold() == "all":
+                self.ref_fully_loaded.add(ref_token)
+                # Maya re-applies lockNode on reference RN when loading depth=all.
+                self.locked_nodes.add(ref_token)
+        if kwargs.get("unloadReference") and ref_token:
+            self.loaded_refs.discard(ref_token)
+            self.ref_fully_loaded.discard(ref_token)
+        if kwargs.get("lockReference") is False and ref_token:
+            self.unlocked_refs.add(ref_token)
+            self.ref_locked[ref_token] = False
+            for node in list(self.referenced_nodes):
+                if node not in self.sticky_read_only_nodes:
+                    self.read_only_nodes.discard(node)
+        if kwargs.get("edit") and kwargs.get("namespace") and ref_token:
+            new_ns = str(kwargs["namespace"])
+            self.ref_namespace[ref_token] = new_ns
+            self._remap_reference_namespace(ref_token, new_ns)
 
     def undoInfo(self, **kwargs: Any) -> None:
         self.undo_calls.append(dict(kwargs))
@@ -23,21 +96,96 @@ class FakeCmds:
         prefix = f"{node_name}."
         return any(plug.startswith(prefix) for plug in self.attrs)
 
-    def ls(self, node_name: str, shortNames: bool = False) -> list[str]:
+    def ls(self, node_name: str, **kwargs: Any) -> list[str]:
+        long_names = bool(kwargs.get("long") or kwargs.get("longNames"))
         if node_name in self.nodes:
-            return [self.nodes[node_name]]
+            value = self.nodes[node_name]
+            return [value if long_names else node_name]
         if self.objExists(node_name):
-            return [node_name]
+            stored = self.nodes.get(node_name, node_name)
+            return [stored if long_names else node_name]
         return []
 
     def rename(self, node_name: str, new_name: str) -> str:
+        if node_name in self.read_only_nodes:
+            raise RuntimeError("Cannot rename a read only node.")
+        if node_name in self.referenced_nodes:
+            ref_rn = "pipeline_inspector_reference_sceneRN"
+            if ref_rn not in self.ref_fully_loaded:
+                raise RuntimeError("Cannot rename a read only node.")
+            ns = self.ref_namespace.get(ref_rn, ":")
+            if ns in (":", ""):
+                raise RuntimeError("Cannot rename a read only node.")
         self.rename_calls.append((node_name, new_name))
         current = self.nodes.get(node_name, node_name)
         parent = "|".join(current.split("|")[:-1])
         renamed = f"{parent}|{new_name}" if parent else new_name
-        self.nodes[node_name] = renamed
+        if not self.persist_renames:
+            return renamed
+        if node_name in self.nodes:
+            del self.nodes[node_name]
+        short_old = node_name.split("|")[-1].split(":")[-1]
+        if short_old in self.nodes and self.nodes.get(short_old) == current:
+            del self.nodes[short_old]
         self.nodes[renamed] = renamed
+        short_new = renamed.split("|")[-1].split(":")[-1]
+        if short_new:
+            self.nodes[short_new] = renamed
+        if node_name in self.referenced_nodes:
+            self.referenced_nodes.discard(node_name)
+            self.referenced_nodes.add(renamed)
         return renamed
+
+    def lockNode(self, node_name: str, **kwargs: Any) -> Any:
+        if kwargs.get("q") and kwargs.get("lockUnpublished"):
+            return [node_name in self.locked_unpublished_nodes]
+        if kwargs.get("q") and kwargs.get("lockName"):
+            return [node_name in self.locked_name_nodes]
+        if kwargs.get("q") and kwargs.get("lock"):
+            return [node_name in self.locked_nodes]
+        if kwargs.get("lockName") is False:
+            self.locked_name_nodes.discard(node_name)
+        if kwargs.get("lock") is False:
+            self.locked_nodes.discard(node_name)
+            self.read_only_nodes.discard(node_name)
+        return False
+
+    def referenceEdit(self, ref_node: str, **kwargs: Any) -> Any:
+        ref_token = str(ref_node)
+        if kwargs.get("query") and kwargs.get("failedEdits"):
+            return list(self.failed_rename_edits.get(ref_token, []))
+        if kwargs.get("removeEdits") and kwargs.get("failedEdits"):
+            self.failed_rename_edits[ref_token] = []
+        return None
+
+    def referenceQuery(self, node_name: str, **kwargs: Any) -> Any:
+        if kwargs.get("nodes"):
+            return sorted(self.referenced_nodes)
+        if kwargs.get("referenceNode"):
+            return (
+                "pipeline_inspector_reference_sceneRN"
+                if node_name in self.referenced_nodes
+                else None
+            )
+        if kwargs.get("isNodeReferenced"):
+            return node_name in self.referenced_nodes
+        if kwargs.get("namespace"):
+            return self.ref_namespace.get(node_name, ":")
+        if kwargs.get("isTopLevelReference"):
+            return self.ref_is_top_level.get(node_name, True)
+        if kwargs.get("parent"):
+            return None
+        if kwargs.get("isReadOnly"):
+            if node_name in self.sticky_read_only_nodes:
+                return True
+            if node_name in self.referenced_nodes:
+                ref_rn = "pipeline_inspector_reference_sceneRN"
+                if ref_rn not in self.ref_fully_loaded:
+                    return True
+                if ref_rn in self.unlocked_refs:
+                    return False
+            return node_name in self.read_only_nodes
+        return False
 
     def getAttr(self, plug: str) -> Any:
         return self.attrs[plug]
@@ -45,6 +193,19 @@ class FakeCmds:
     def setAttr(self, plug: str, value: Any, **kwargs: Any) -> None:
         self.set_calls.append((plug, value, dict(kwargs)))
         self.attrs[plug] = value
+
+    def nodeType(self, node_name: str) -> str:
+        return self.node_types.get(node_name, "transform")
+
+    def listRelatives(
+        self,
+        node_name: str,
+        **kwargs: Any,
+    ) -> list[str]:
+        parent = self.nodes.get(f"{node_name}.__parent__")
+        if parent and kwargs.get("parent"):
+            return [parent]
+        return []
 
 
 def test_apply_rename_texture_file_renames_disk_file_and_updates_path(tmp_path):
@@ -103,6 +264,336 @@ def test_apply_rename_node_updates_short_name_inside_undo_chunk():
     record = report.records[0]
     assert record.before_value == "body_bad"
     assert record.after_value == "geo_body_bad"
+
+
+def test_apply_rename_node_resolves_mesh_shape_target_to_parent_transform():
+    cmds = FakeCmds()
+    cmds.nodes["|world|mesh_foo_GEO"] = "|world|mesh_foo_GEO"
+    cmds.nodes["|world|mesh_foo_GEO|mesh_foo_GEOShape"] = (
+        "|world|mesh_foo_GEO|mesh_foo_GEOShape"
+    )
+    cmds.nodes["|world|mesh_foo_GEO|mesh_foo_GEOShape.__parent__"] = "|world|mesh_foo_GEO"
+    cmds.node_types["|world|mesh_foo_GEO|mesh_foo_GEOShape"] = "mesh"
+    cmds.node_types["|world|mesh_foo_GEO"] = "transform"
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:mesh_foo_GEOShape:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:mesh_foo_GEOShape",
+        target_node="|world|mesh_foo_GEO|mesh_foo_GEOShape",
+        before_value="mesh_foo_GEO",
+        after_value="geo_mesh_foo_GEO",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == [("|world|mesh_foo_GEO", "geo_mesh_foo_GEO")]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_allows_unlocked_node_when_lock_query_returns_list_false():
+    cmds = FakeCmds()
+    cmds.nodes["|world|mesh_foo_GEO"] = "|world|mesh_foo_GEO"
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:mesh_foo_GEO:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:mesh_foo_GEO",
+        target_node="|world|mesh_foo_GEO",
+        before_value="mesh_foo_GEO",
+        after_value="geo_mesh_foo_GEO",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == [("|world|mesh_foo_GEO", "geo_mesh_foo_GEO")]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_blocks_locked_target_without_crashing():
+    cmds = FakeCmds()
+    cmds.nodes["|world|body_bad"] = "|world|body_bad"
+    cmds.locked_nodes.add("|world|body_bad")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:body_bad:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:body_bad",
+        target_node="|world|body_bad",
+        before_value="body_bad",
+        after_value="geo_body_bad",
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert cmds.rename_calls == []
+    assert report.applied_count == 0
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["target_read_only"]
+
+
+def test_apply_rename_node_allows_referenced_mesh_when_reference_edits_enabled():
+    cmds = FakeCmds()
+    cmds.ref_namespace["pipeline_inspector_reference_sceneRN"] = "ref"
+    cmds.nodes["|world|ref:body_bad"] = "|world|ref:body_bad"
+    cmds.referenced_nodes.add("|world|ref:body_bad")
+    cmds.locked_nodes.add("|world|ref:body_bad")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:body_bad:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:body_bad",
+        target_node="|world|ref:body_bad",
+        before_value="body_bad",
+        after_value="geo_body_bad",
+        referenced=True,
+        requires_reference_edit=True,
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [("|world|ref:body_bad", "geo_body_bad")]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_resolves_referenced_transform_without_leading_pipe():
+    cmds = FakeCmds()
+    cmds.nodes["pHelix1"] = "|pHelix1"
+    cmds.referenced_nodes.add("|pHelix1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pHelixShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        target_node="|pHelix1",
+        before_value="pHelix1",
+        after_value="geo_pHelix1",
+        referenced=True,
+        requires_reference_edit=True,
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [
+        ("|pipeline_inspector_reference_scene:pHelix1", "geo_pHelix1")
+    ]
+    assert "pipeline_inspector_reference_sceneRN" in cmds.unlocked_refs
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_allows_locked_referenced_mesh_without_allow_locked_flag():
+    cmds = FakeCmds()
+    cmds.nodes["|pHelix1"] = "|pHelix1"
+    cmds.referenced_nodes.add("|pHelix1")
+    cmds.locked_nodes.add("|pHelix1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pHelixShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        target_node="|pHelix1",
+        before_value="pHelix1",
+        after_value="geo_pHelix1",
+        referenced=True,
+        locked=True,
+        requires_reference_edit=True,
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [
+        ("|pipeline_inspector_reference_scene:pHelix1", "geo_pHelix1")
+    ]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_uses_runtime_referenced_detection_when_action_flag_missing():
+    cmds = FakeCmds()
+    cmds.nodes["pHelix1"] = "|pHelix1"
+    cmds.nodes["|pHelix1"] = "|pHelix1"
+    cmds.referenced_nodes.add("|pHelix1")
+    cmds.locked_nodes.add("|pHelix1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pHelixShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        target_node="pHelix1",
+        before_value="pHelix1",
+        after_value="geo_pHelix1",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [
+        ("|pipeline_inspector_reference_scene:pHelix1", "geo_pHelix1")
+    ]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_unlocks_referenced_name_lock_before_rename():
+    cmds = FakeCmds()
+    cmds.nodes["pHelix1"] = "|pHelix1"
+    cmds.nodes["|pHelix1"] = "|pHelix1"
+    cmds.referenced_nodes.add("|pHelix1")
+    cmds.locked_name_nodes.add("|pHelix1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pHelixShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        target_node="pHelix1",
+        before_value="pHelix1",
+        after_value="geo_pHelix1",
+        referenced=True,
+        requires_reference_edit=True,
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert "|pipeline_inspector_reference_scene:pHelix1" not in cmds.locked_name_nodes
+    assert cmds.rename_calls == [
+        ("|pipeline_inspector_reference_scene:pHelix1", "geo_pHelix1")
+    ]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_attempts_reference_rename_after_prepare():
+    cmds = FakeCmds()
+    cmds.nodes["|pHelix1"] = "|pHelix1"
+    cmds.referenced_nodes.add("|pHelix1")
+    cmds.locked_nodes.add("|pHelix1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pHelixShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        target_node="|pHelix1",
+        before_value="pHelix1",
+        after_value="geo_pHelix1",
+        referenced=True,
+        requires_reference_edit=True,
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [
+        ("|pipeline_inspector_reference_scene:pHelix1", "geo_pHelix1")
+    ]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_blocks_when_reference_rename_does_not_persist():
+    cmds = FakeCmds()
+    cmds.persist_renames = False
+    cmds.nodes["|pHelix1"] = "|pHelix1"
+    cmds.referenced_nodes.add("|pHelix1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pHelixShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pHelixShape1",
+        target_node="|pHelix1",
+        before_value="pHelix1",
+        after_value="geo_pHelix1",
+        referenced=True,
+        requires_reference_edit=True,
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [
+        ("|pipeline_inspector_reference_scene:pHelix1", "geo_pHelix1")
+    ]
+    assert report.blocked_count == 1
+    assert report.records[0].block_reasons == ["reference_rename_not_persisted"]
+
+
+def test_apply_rename_node_unlocks_runtime_locked_node_when_allow_locked():
+    cmds = FakeCmds()
+    cmds.nodes["|mesh_displacement_risk_GEO"] = "|mesh_displacement_risk_GEO"
+    cmds.locked_nodes.add("|mesh_displacement_risk_GEO")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:mesh_displacement_risk_GEOShape:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:mesh_displacement_risk_GEOShape",
+        target_node="|mesh_displacement_risk_GEO",
+        before_value="mesh_displacement_risk_GEO",
+        after_value="geo_mesh_displacement_risk_GEO",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_locked=True)
+
+    assert cmds.rename_calls == [("|mesh_displacement_risk_GEO", "geo_mesh_displacement_risk_GEO")]
+    assert report.applied_count == 1
+
+
+def test_apply_rename_node_unlocks_locked_name_before_rename():
+    cmds = FakeCmds()
+    cmds.nodes["|pPlatonic1"] = "|pPlatonic1"
+    cmds.locked_name_nodes.add("|pPlatonic1")
+    action = FixAction(
+        fix_id="studio.naming.mesh.pattern:mesh:pPlatonicShape1:rename_node",
+        rule_id="studio.naming.mesh.pattern",
+        title="Mesh name must match studio naming template: rename",
+        fix_type="rename_node",
+        risk="low",
+        target_kind="shape",
+        target_id="mesh:pPlatonicShape1",
+        target_node="|pPlatonic1",
+        before_value="pPlatonic1",
+        after_value="geo_pPlatonic1",
+        params={"object_type": "mesh"},
+    )
+
+    report = apply_fix_actions([action], cmds=cmds, allow_referenced=True)
+
+    assert cmds.rename_calls == [("|pPlatonic1", "geo_pPlatonic1")]
+    assert report.applied_count == 1
 
 
 def test_apply_fix_actions_uses_undo_chunk_and_records_before_after_values():

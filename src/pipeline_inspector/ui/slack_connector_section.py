@@ -6,10 +6,16 @@ from dataclasses import replace
 from typing import Any, Optional
 
 from pipeline_inspector.studio_config import (
-    SLACK_NOTIFY_EVENTS,
     ConnectorSettings,
     SlackConnectorSettings,
     StudioConfig,
+)
+from pipeline_inspector.ui.notify_trigger_widgets import (
+    build_notify_trigger_controls,
+    notify_checkbox_object_name,
+    read_notify_on_from_view,
+    read_notify_score_below_from_view,
+    update_notify_trigger_view,
 )
 from pipeline_inspector.ui.settings_widgets import (
     apply_password_echo_mode,
@@ -34,11 +40,13 @@ SETTINGS_SLACK_PUBLISH_WEBHOOK_INPUT_OBJECT_NAME = (
 SETTINGS_SLACK_DEADLINE_WEBHOOK_INPUT_OBJECT_NAME = (
     "pipelineInspectorSettingsSlackDeadlineWebhookInput"
 )
-SETTINGS_SLACK_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME = (
-    "pipelineInspectorSettingsSlackNotifyBlockPublishCheckbox"
+SETTINGS_SLACK_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME = notify_checkbox_object_name(
+    "Slack",
+    "block_publish",
 )
-SETTINGS_SLACK_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME = (
-    "pipelineInspectorSettingsSlackNotifyBlockDeadlineCheckbox"
+SETTINGS_SLACK_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME = notify_checkbox_object_name(
+    "Slack",
+    "block_deadline",
 )
 SETTINGS_SLACK_INCLUDE_REPORT_LINK_CHECKBOX_OBJECT_NAME = (
     "pipelineInspectorSettingsSlackIncludeReportLinkCheckbox"
@@ -46,19 +54,6 @@ SETTINGS_SLACK_INCLUDE_REPORT_LINK_CHECKBOX_OBJECT_NAME = (
 
 _SLACK_LABEL_WIDTH = 108
 _SLACK_FIELD_WIDTH = 292
-_SLACK_NOTIFY_CHECKBOX_OBJECT_NAMES = {
-    event_id: object_name
-    for event_id, object_name in (
-        (
-            SLACK_NOTIFY_EVENTS[0][0],
-            SETTINGS_SLACK_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME,
-        ),
-        (
-            SLACK_NOTIFY_EVENTS[1][0],
-            SETTINGS_SLACK_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME,
-        ),
-    )
-}
 
 def build_slack_connector_section(
     qt_widgets: Any,
@@ -139,31 +134,16 @@ def build_slack_connector_section(
         )
     )
 
-    notify_row = qt_widgets.QHBoxLayout()
-    set_notify_margins = getattr(notify_row, "setContentsMargins", None)
-    if set_notify_margins is not None:
-        set_notify_margins(0, 0, 0, 0)
-    set_notify_spacing = getattr(notify_row, "setSpacing", None)
-    if set_notify_spacing is not None:
-        set_notify_spacing(8)
-    notify_caption = qt_widgets.QLabel("Notify on")
-    set_fixed_horizontal_size_policy(qt_widgets, notify_caption)
-    set_caption_width = getattr(notify_caption, "setFixedWidth", None)
-    if set_caption_width is not None:
-        set_caption_width(_SLACK_LABEL_WIDTH)
-    notify_row.addWidget(notify_caption)
-    for event_id, label in SLACK_NOTIFY_EVENTS:
-        checkbox = qt_widgets.QCheckBox(label)
-        checkbox.setObjectName(_SLACK_NOTIFY_CHECKBOX_OBJECT_NAMES[event_id])
-        set_checked = getattr(checkbox, "setChecked", None)
-        if set_checked is not None:
-            set_checked(event_id in slack.notify_on)
-        wire_checkbox_changed(checkbox, on_settings_changed)
-        notify_row.addWidget(checkbox)
-    notify_row.addStretch(1)
-    add_notify_layout = getattr(details_layout, "addLayout", None)
-    if add_notify_layout is not None:
-        add_notify_layout(notify_row)
+    details_layout.addWidget(
+        build_notify_trigger_controls(
+            qt_widgets,
+            connector_prefix="Slack",
+            notify_on=slack.notify_on,
+            notify_score_below=slack.notify_score_below,
+            label_width=_SLACK_LABEL_WIDTH,
+            on_settings_changed=on_settings_changed,
+        )[0]
+    )
 
     report_row = qt_widgets.QHBoxLayout()
     set_report_margins = getattr(report_row, "setContentsMargins", None)
@@ -204,8 +184,10 @@ def build_slack_connector_section(
     _set_slack_details_visible(details_row, config.connectors.slack.enabled)
 
     hint = qt_widgets.QLabel(
-        "Route publish and Deadline block events to separate Slack incoming webhooks. "
-        "Optional report links use studio_environment.render_root when enabled."
+        "Route Slack notifications by event. Publish block uses the publish webhook; "
+        "Deadline block and farm job complete use the deadline webhook; "
+        "other triggers fall back to the publish webhook. Use notify_targets in studio JSON "
+        "for per-target routing."
     )
     hint.setWordWrap(True)
     section_layout.addWidget(hint)
@@ -214,11 +196,7 @@ def build_slack_connector_section(
 def read_slack_connector_from_view(view: Any, qt_widgets: Any) -> SlackConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_SLACK_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
-    notify_on = tuple(
-        event_id
-        for event_id, _label in SLACK_NOTIFY_EVENTS
-        if checkbox_checked(view, qt_widgets, _SLACK_NOTIFY_CHECKBOX_OBJECT_NAMES[event_id])
-    )
+    notify_on = read_notify_on_from_view(view, qt_widgets, connector_prefix="Slack")
     return SlackConnectorSettings(
         enabled=enabled,
         publish_webhook_url=line_edit_text(
@@ -232,6 +210,11 @@ def read_slack_connector_from_view(view: Any, qt_widgets: Any) -> SlackConnector
             SETTINGS_SLACK_DEADLINE_WEBHOOK_INPUT_OBJECT_NAME,
         ),
         notify_on=notify_on,
+        notify_score_below=read_notify_score_below_from_view(
+            view,
+            qt_widgets,
+            connector_prefix="Slack",
+        ),
         include_report_link=checkbox_checked(
             view,
             qt_widgets,
@@ -270,13 +253,13 @@ def update_slack_connector_view(
         SETTINGS_SLACK_DEADLINE_WEBHOOK_INPUT_OBJECT_NAME,
         slack.deadline_webhook_url,
     )
-    for event_id, _label in SLACK_NOTIFY_EVENTS:
-        set_checkbox_checked(
-            view,
-            qt_widgets,
-            _SLACK_NOTIFY_CHECKBOX_OBJECT_NAMES[event_id],
-            event_id in slack.notify_on,
-        )
+    update_notify_trigger_view(
+        view,
+        qt_widgets,
+        connector_prefix="Slack",
+        notify_on=slack.notify_on,
+        notify_score_below=slack.notify_score_below,
+    )
     set_checkbox_checked(
         view,
         qt_widgets,

@@ -81,6 +81,7 @@ def build_command_script_job(
         scene_path=scene_path,
         report_path=report_path,
         profile_path=config.resolved_profile_path(),
+        studio_config_path=config.studio_config_path,
         extra_args=extra_args,
     )
     _ = command  # command line is written to command_script_path by the caller
@@ -169,6 +170,7 @@ def submit_pipeline_inspector_validation_job(
             profile_path=effective_config.resolved_profile_path(),
             mayapy=effective_config.mayapy,
             repo_root=effective_config.repo_root,
+            studio_config_path=effective_config.studio_config_path,
             extra_args=extra_args,
             runner=runner,
         )
@@ -189,6 +191,7 @@ def submit_pipeline_inspector_validation_job(
             scene_path=scene_path,
             report_path=report_path,
             profile_path=effective_config.resolved_profile_path(),
+            studio_config_path=effective_config.studio_config_path,
             extra_args=extra_args,
         )
         if write_command_script:

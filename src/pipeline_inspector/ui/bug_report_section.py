@@ -4,23 +4,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Optional
 
-from pipeline_inspector.integrations.bug_report.config import DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL
-from pipeline_inspector.studio_config import (
-    DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY,
-    BugReportSettings,
-    StudioConfig,
+from pipeline_inspector.integrations.bug_report.config import (
+    BUG_REPORT_MAX_REPORTS_PER_DAY,
+    DEFAULT_PUBLIC_BUG_REPORT_RELAY_URL,
 )
+from pipeline_inspector.studio_config import BugReportSettings, StudioConfig
 from pipeline_inspector.ui.settings_widgets import (
     apply_password_echo_mode,
     apply_toggle_style,
     build_settings_toggle,
-    checkbox_checked,
     find_child,
     line_edit_text,
-    set_checkbox_checked,
     set_line_edit_text,
     toggle_label,
-    wire_checkbox_changed,
     wire_line_edit_finished,
 )
 
@@ -35,12 +31,6 @@ SETTINGS_BUG_REPORT_RELAY_URL_INPUT_OBJECT_NAME = (
 SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME = (
     "pipelineInspectorSettingsBugReportApiKeyInput"
 )
-SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME = (
-    "pipelineInspectorSettingsBugReportAllowScreenshotCheckbox"
-)
-SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME = (
-    "pipelineInspectorSettingsBugReportMaxReportsInput"
-)
 SETTINGS_BUG_REPORT_PRIVACY_NOTICE_OBJECT_NAME = (
     "pipelineInspectorSettingsBugReportPrivacyNotice"
 )
@@ -52,7 +42,9 @@ BUG_REPORT_PRIVACY_NOTICE = (
     "Artists report bugs in Pipeline Inspector itself — not general scene shading issues. "
     "Reports route through your studio HTTPS relay to plugin maintainers on GitHub. "
     "Submissions include validation summary, plugin version, and scene basename only. "
-    "Optional screenshots are controlled by the allow-screenshot policy below. "
+    f"Optional screenshots can be attached in the report form. "
+    f"Daily limit: {BUG_REPORT_MAX_REPORTS_PER_DAY} reports per machine/user "
+    "(enforced in plugin and relay). "
     "Full scene paths and environment dumps are not sent."
 )
 
@@ -137,33 +129,6 @@ def build_bug_report_section(
         )
     )
 
-    screenshot_row = qt_widgets.QHBoxLayout()
-    set_screenshot_margins = getattr(screenshot_row, "setContentsMargins", None)
-    if set_screenshot_margins is not None:
-        set_screenshot_margins(0, 0, 0, 0)
-    screenshot_checkbox = qt_widgets.QCheckBox("Allow screenshot attachment")
-    screenshot_checkbox.setObjectName(SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME)
-    set_checked = getattr(screenshot_checkbox, "setChecked", None)
-    if set_checked is not None:
-        set_checked(bug_report.allow_screenshot)
-    wire_checkbox_changed(screenshot_checkbox, on_settings_changed)
-    screenshot_row.addWidget(screenshot_checkbox)
-    screenshot_row.addStretch(1)
-    add_screenshot_layout = getattr(details_layout, "addLayout", None)
-    if add_screenshot_layout is not None:
-        add_screenshot_layout(screenshot_row)
-
-    details_layout.addWidget(
-        _build_bug_report_field_row(
-            qt_widgets,
-            label="Max reports / day",
-            object_name=SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME,
-            value=str(bug_report.max_reports_per_day),
-            placeholder=str(DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY),
-            on_changed=on_settings_changed,
-        )
-    )
-
     privacy_notice = qt_widgets.QLabel(BUG_REPORT_PRIVACY_NOTICE)
     privacy_notice.setObjectName(SETTINGS_BUG_REPORT_PRIVACY_NOTICE_OBJECT_NAME)
     privacy_notice.setWordWrap(True)
@@ -198,19 +163,6 @@ def read_bug_report_from_view(
                 view,
                 qt_widgets,
                 SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME,
-            ),
-            allow_screenshot=checkbox_checked(
-                view,
-                qt_widgets,
-                SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
-            ),
-            max_reports_per_day=_positive_int(
-                line_edit_text(
-                    view,
-                    qt_widgets,
-                    SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME,
-                ),
-                base.bug_report.max_reports_per_day,
             ),
         )
     )
@@ -249,18 +201,6 @@ def update_bug_report_view(
         qt_widgets,
         SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME,
         bug_report.api_key,
-    )
-    set_checkbox_checked(
-        view,
-        qt_widgets,
-        SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
-        bug_report.allow_screenshot,
-    )
-    set_line_edit_text(
-        view,
-        qt_widgets,
-        SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME,
-        str(bug_report.max_reports_per_day),
     )
 
 def _on_bug_report_enabled_changed(
@@ -336,13 +276,3 @@ def _toggle_checked(
     if is_checked is None:
         return default
     return bool(is_checked())
-
-def _positive_int(text: str, default: int) -> int:
-    normalized = str(text or "").strip()
-    if not normalized:
-        return default
-    try:
-        value = int(normalized)
-    except ValueError:
-        return default
-    return value if value > 0 else default

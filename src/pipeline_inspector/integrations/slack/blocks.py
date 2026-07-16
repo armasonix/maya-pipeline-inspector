@@ -5,16 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pipeline_inspector.integrations.notification_triggers import NOTIFY_EVENT_LABELS
 from pipeline_inspector.studio_config import (
     SLACK_NOTIFY_EVENT_BLOCK_DEADLINE,
     SLACK_NOTIFY_EVENT_BLOCK_PUBLISH,
     SlackConnectorSettings,
 )
 
-_EVENT_LABELS = {
-    SLACK_NOTIFY_EVENT_BLOCK_PUBLISH: "Publish block",
-    SLACK_NOTIFY_EVENT_BLOCK_DEADLINE: "Deadline block",
-}
+_EVENT_LABELS = NOTIFY_EVENT_LABELS
 
 
 @dataclass(frozen=True)

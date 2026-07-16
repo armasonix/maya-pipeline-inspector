@@ -12,6 +12,11 @@ from urllib.parse import urlparse
 from pipeline_inspector.core.manifest_gate import ManifestGatePolicy
 from pipeline_inspector.core.naming_conventions import normalize_naming_templates
 from pipeline_inspector.core.rule_loader import RuleOverride
+from pipeline_inspector.integrations.notification_triggers import (
+    CONNECTOR_NOTIFY_EVENTS,
+    NOTIFY_EVENT_BLOCK_DEADLINE,
+    NOTIFY_EVENT_BLOCK_PUBLISH,
+)
 
 STUDIO_CONFIG_SCHEMA_VERSION = "2.0"
 LEGACY_STUDIO_CONFIG_SCHEMA_VERSION = "1.0"
@@ -28,7 +33,6 @@ DEFAULT_DEADLINE_WEB_SERVICE_PORT = 8081
 DEFAULT_DEADLINE_PROFILE_ID = "deadline_critical"
 DEFAULT_DEADLINE_TIMEOUT_SECONDS = 30.0
 DEFAULT_DEADLINE_API_URL = "http://localhost:8081"
-DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY = 5
 
 TX_DERIVATIVE_RULE_IDS = (
     "common.texture.optimized.exists",
@@ -371,22 +375,19 @@ class BugReportSettings:
     enabled: bool = False
     relay_url: str = ""
     api_key: str = ""
-    allow_screenshot: bool = True
-    max_reports_per_day: int = DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
             "relay_url": self.relay_url,
             "api_key": self.api_key,
-            "allow_screenshot": self.allow_screenshot,
-            "max_reports_per_day": int(self.max_reports_per_day),
         }
 
     def to_bug_report_config(self) -> Any | None:
         """Convert connector settings into a bug report relay runtime config object."""
 
         from pipeline_inspector.integrations.bug_report.config import (
+            BUG_REPORT_MAX_REPORTS_PER_DAY,
             BugReportRelayConfig,
             effective_bug_report_relay_url,
         )
@@ -398,8 +399,7 @@ class BugReportSettings:
         return BugReportRelayConfig(
             relay_url=relay_url,
             api_key=api_key,
-            allow_screenshot=self.allow_screenshot,
-            max_reports_per_day=int(self.max_reports_per_day),
+            max_reports_per_day=BUG_REPORT_MAX_REPORTS_PER_DAY,
         )
 
     @classmethod
@@ -410,10 +410,6 @@ class BugReportSettings:
             enabled=bool(data.get("enabled", False)),
             relay_url=str(data.get("relay_url", "") or ""),
             api_key=str(data.get("api_key", "") or ""),
-            allow_screenshot=bool(data.get("allow_screenshot", True)),
-            max_reports_per_day=int(
-                data.get("max_reports_per_day", DEFAULT_BUG_REPORT_MAX_REPORTS_PER_DAY)
-            ),
         )
 
 
@@ -556,12 +552,84 @@ class DeadlineConnectorSettings:
         )
 
 
-SLACK_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
-SLACK_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
-SLACK_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
-    (SLACK_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
-    (SLACK_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
-)
+SLACK_NOTIFY_EVENT_BLOCK_PUBLISH = NOTIFY_EVENT_BLOCK_PUBLISH
+SLACK_NOTIFY_EVENT_BLOCK_DEADLINE = NOTIFY_EVENT_BLOCK_DEADLINE
+SLACK_NOTIFY_EVENTS = CONNECTOR_NOTIFY_EVENTS
+
+
+@dataclass(frozen=True)
+class NotifyTarget:
+    """Per-destination notification routing entry stored in connector settings."""
+
+    role: str = ""
+    chat_id: str = ""
+    webhook_url: str = ""
+    events: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"events": list(self.events)}
+        if self.role.strip():
+            payload["role"] = self.role
+        if self.chat_id.strip():
+            payload["chat_id"] = self.chat_id
+        if self.webhook_url.strip():
+            payload["webhook_url"] = self.webhook_url
+        return payload
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> NotifyTarget:
+        if not data:
+            return cls()
+        events_raw = data.get("events")
+        events: tuple[str, ...] = ()
+        if isinstance(events_raw, (list, tuple)):
+            events = tuple(
+                str(event).strip()
+                for event in events_raw
+                if str(event).strip()
+            )
+        return cls(
+            role=str(data.get("role", "") or ""),
+            chat_id=str(data.get("chat_id", "") or ""),
+            webhook_url=str(data.get("webhook_url", "") or ""),
+            events=events,
+        )
+
+
+def _parse_notify_on(data: Mapping[str, Any]) -> tuple[str, ...]:
+    notify_raw = data.get("notify_on")
+    if not isinstance(notify_raw, (list, tuple)):
+        return ()
+    return tuple(
+        str(event).strip()
+        for event in notify_raw
+        if str(event).strip()
+    )
+
+
+def _parse_notify_targets(data: Mapping[str, Any]) -> tuple[NotifyTarget, ...]:
+    targets_raw = data.get("notify_targets")
+    if not isinstance(targets_raw, (list, tuple)):
+        return ()
+    targets: list[NotifyTarget] = []
+    for entry in targets_raw:
+        if not isinstance(entry, Mapping):
+            continue
+        target = NotifyTarget.from_mapping(entry)
+        if target.events:
+            targets.append(target)
+    return tuple(targets)
+
+
+def _parse_notify_score_below(data: Mapping[str, Any]) -> int | None:
+    raw = data.get("notify_score_below")
+    if raw is None or raw == "":
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
 
 
 @dataclass(frozen=True)
@@ -572,6 +640,8 @@ class SlackConnectorSettings:
     publish_webhook_url: str = ""
     deadline_webhook_url: str = ""
     notify_on: tuple[str, ...] = ()
+    notify_targets: tuple[NotifyTarget, ...] = ()
+    notify_score_below: int | None = None
     include_report_link: bool = True
 
     def to_slack_config(self) -> Any | None:
@@ -594,6 +664,8 @@ class SlackConnectorSettings:
             "publish_webhook_url": self.publish_webhook_url,
             "deadline_webhook_url": self.deadline_webhook_url,
             "notify_on": list(self.notify_on),
+            "notify_targets": [target.to_dict() for target in self.notify_targets],
+            "notify_score_below": self.notify_score_below,
             "include_report_link": self.include_report_link,
         }
 
@@ -601,19 +673,13 @@ class SlackConnectorSettings:
     def from_mapping(cls, data: Mapping[str, Any] | None) -> SlackConnectorSettings:
         if not data:
             return cls()
-        notify_raw = data.get("notify_on")
-        notify_on: tuple[str, ...] = ()
-        if isinstance(notify_raw, (list, tuple)):
-            notify_on = tuple(
-                str(event).strip()
-                for event in notify_raw
-                if str(event).strip()
-            )
         return cls(
             enabled=bool(data.get("enabled", False)),
             publish_webhook_url=str(data.get("publish_webhook_url", "") or ""),
             deadline_webhook_url=str(data.get("deadline_webhook_url", "") or ""),
-            notify_on=notify_on,
+            notify_on=_parse_notify_on(data),
+            notify_targets=_parse_notify_targets(data),
+            notify_score_below=_parse_notify_score_below(data),
             include_report_link=bool(data.get("include_report_link", True)),
         )
 
@@ -799,12 +865,9 @@ class CerebroConnectorSettings:
         )
 
 
-DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
-DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
-DISCORD_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
-    (DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
-    (DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
-)
+DISCORD_NOTIFY_EVENT_BLOCK_PUBLISH = NOTIFY_EVENT_BLOCK_PUBLISH
+DISCORD_NOTIFY_EVENT_BLOCK_DEADLINE = NOTIFY_EVENT_BLOCK_DEADLINE
+DISCORD_NOTIFY_EVENTS = CONNECTOR_NOTIFY_EVENTS
 
 
 @dataclass(frozen=True)
@@ -814,6 +877,8 @@ class DiscordConnectorSettings:
     enabled: bool = False
     webhook_url: str = ""
     notify_on: tuple[str, ...] = ()
+    notify_targets: tuple[NotifyTarget, ...] = ()
+    notify_score_below: int | None = None
 
     def to_discord_config(self) -> Any | None:
         """Convert connector settings into a Discord runtime config object."""
@@ -830,33 +895,26 @@ class DiscordConnectorSettings:
             "enabled": self.enabled,
             "webhook_url": self.webhook_url,
             "notify_on": list(self.notify_on),
+            "notify_targets": [target.to_dict() for target in self.notify_targets],
+            "notify_score_below": self.notify_score_below,
         }
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> DiscordConnectorSettings:
         if not data:
             return cls()
-        notify_raw = data.get("notify_on")
-        notify_on: tuple[str, ...] = ()
-        if isinstance(notify_raw, (list, tuple)):
-            notify_on = tuple(
-                str(event).strip()
-                for event in notify_raw
-                if str(event).strip()
-            )
         return cls(
             enabled=bool(data.get("enabled", False)),
             webhook_url=str(data.get("webhook_url", "") or ""),
-            notify_on=notify_on,
+            notify_on=_parse_notify_on(data),
+            notify_targets=_parse_notify_targets(data),
+            notify_score_below=_parse_notify_score_below(data),
         )
 
 
-TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH = "block_publish"
-TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE = "block_deadline"
-TELEGRAM_NOTIFY_EVENTS: tuple[tuple[str, str], ...] = (
-    (TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH, "Publish block"),
-    (TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE, "Deadline block"),
-)
+TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH = NOTIFY_EVENT_BLOCK_PUBLISH
+TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE = NOTIFY_EVENT_BLOCK_DEADLINE
+TELEGRAM_NOTIFY_EVENTS = CONNECTOR_NOTIFY_EVENTS
 
 
 @dataclass(frozen=True)
@@ -867,6 +925,8 @@ class TelegramConnectorSettings:
     bot_token: str = ""
     chat_id: str = ""
     notify_on: tuple[str, ...] = ()
+    notify_targets: tuple[NotifyTarget, ...] = ()
+    notify_score_below: int | None = None
 
     def to_telegram_config(self) -> Any | None:
         """Convert connector settings into a Telegram runtime config object."""
@@ -885,25 +945,21 @@ class TelegramConnectorSettings:
             "bot_token": self.bot_token,
             "chat_id": self.chat_id,
             "notify_on": list(self.notify_on),
+            "notify_targets": [target.to_dict() for target in self.notify_targets],
+            "notify_score_below": self.notify_score_below,
         }
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> TelegramConnectorSettings:
         if not data:
             return cls()
-        notify_raw = data.get("notify_on")
-        notify_on: tuple[str, ...] = ()
-        if isinstance(notify_raw, (list, tuple)):
-            notify_on = tuple(
-                str(event).strip()
-                for event in notify_raw
-                if str(event).strip()
-            )
         return cls(
             enabled=bool(data.get("enabled", False)),
             bot_token=str(data.get("bot_token", "") or ""),
             chat_id=str(data.get("chat_id", "") or ""),
-            notify_on=notify_on,
+            notify_on=_parse_notify_on(data),
+            notify_targets=_parse_notify_targets(data),
+            notify_score_below=_parse_notify_score_below(data),
         )
 
 
@@ -1294,7 +1350,30 @@ def resolve_deadline_config(config: StudioConfig | None) -> Any:
     deadline = config.connectors.deadline
     if not deadline.enabled:
         return None
-    return deadline.to_deadline_config()
+    runtime = deadline.to_deadline_config()
+    if config.config_path is not None:
+        runtime = runtime.with_overrides(studio_config_path=config.config_path)
+        # region agent log
+        try:
+            import json
+            import time
+            from pathlib import Path as _Path
+
+            payload = {
+                "sessionId": "618f4f",
+                "timestamp": int(time.time() * 1000),
+                "location": "studio_config.py:resolve_deadline_config",
+                "message": "merged studio config path into deadline runtime config",
+                "data": {"studio_config_path": str(config.config_path)},
+                "hypothesisId": "H2",
+            }
+            log_path = _Path(__file__).resolve().parents[1] / "debug-618f4f.log"
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        except OSError:
+            pass
+        # endregion
+    return runtime
 
 
 def resolve_telegram_config(config: StudioConfig | None) -> Any | None:

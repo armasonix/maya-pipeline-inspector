@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pipeline_inspector.ui import main_window
 from pipeline_inspector.ui.theme_loader import (
     DEFAULT_THEME,
@@ -71,3 +73,41 @@ def test_apply_panel_theme_normalizes_unknown_theme_ids():
     assert applied == DEFAULT_THEME
     assert widget._pipeline_inspector_theme == DEFAULT_THEME
     assert "#cccccc" in widget.style_sheet
+
+
+class _QtSignalLike:
+    def __call__(self) -> None:
+        raise TypeError("native Qt signal is not callable")
+
+
+class _FakeThemeChild:
+    def __init__(self) -> None:
+        self.update = _QtSignalLike()
+        self._children: list[Any] = []
+
+    def children(self) -> list[Any]:
+        return self._children
+
+
+class _FakeThemeRoot:
+    def __init__(self) -> None:
+        self._children = [_FakeThemeChild()]
+        self.style_sheet = ""
+        self._pipeline_inspector_theme = ""
+
+    def setStyleSheet(self, stylesheet: str) -> None:
+        self.style_sheet = stylesheet
+
+    def children(self) -> list[Any]:
+        return self._children
+
+    def style(self) -> Any:
+        return None
+
+
+def test_repolish_widget_tree_ignores_non_callable_update_attributes():
+    from pipeline_inspector.ui.theme_loader import _repolish_widget_tree
+
+    root = _FakeThemeRoot()
+
+    _repolish_widget_tree(root)

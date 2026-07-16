@@ -144,7 +144,7 @@ def test_send_discord_validation_notification_skips_without_matching_block_event
     )
 
     assert result.sent is False
-    assert result.skipped_reason == "no_matching_events"
+    assert result.skipped_reason.startswith("no_matching_events")
 
 
 def test_send_discord_validation_notification_posts_embed_on_publish_block():

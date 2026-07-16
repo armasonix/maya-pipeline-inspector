@@ -93,10 +93,7 @@ class BugReportRelayClient:
                 skipped_reason="incomplete_config",
             )
 
-        attachment = _validated_screenshot(
-            screenshot_jpeg,
-            allow_screenshot=self._config.allow_screenshot,
-        )
+        attachment = _validated_screenshot(screenshot_jpeg)
         body, content_type = build_multipart_body(
             fields={PAYLOAD_FIELD_NAME: payload.to_json()},
             files=(
@@ -264,14 +261,8 @@ def default_http_transport(request: HttpRequest, timeout: float) -> RelayRespons
             json_data=_parse_json_body(body),
         )
 
-def _validated_screenshot(
-    screenshot_jpeg: bytes | None,
-    *,
-    allow_screenshot: bool,
-) -> bytes | None:
+def _validated_screenshot(screenshot_jpeg: bytes | None) -> bytes | None:
     if not screenshot_jpeg:
-        return None
-    if not allow_screenshot:
         return None
     if not is_jpeg_bytes(screenshot_jpeg):
         return None

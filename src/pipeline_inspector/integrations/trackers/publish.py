@@ -153,3 +153,22 @@ def format_validation_publish_summary(payload: ValidationPublishPayload) -> str:
     )
 
     return render_validation_summary_from_payload(payload, platform="ftrack")
+
+
+def format_tracker_note_content(
+    payload: ValidationPublishPayload,
+    *,
+    markdown_note: str = "",
+    include_report_path_reference: bool = False,
+) -> str:
+    """Return enriched Markdown note text with plain-summary fallback."""
+
+    normalized_markdown = str(markdown_note or "").strip()
+    if normalized_markdown:
+        if include_report_path_reference and payload.report_path:
+            return (
+                f"{normalized_markdown}\n\n"
+                f"**Attached report path:** `{payload.report_path}`"
+            )
+        return normalized_markdown
+    return format_validation_publish_summary(payload)

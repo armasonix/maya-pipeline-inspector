@@ -192,8 +192,6 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
             enabled=True,
             relay_url="https://pipeline.studio.internal/shader-health/bug-report",
             api_key="studio-secret",
-            allow_screenshot=False,
-            max_reports_per_day=3,
         ),
         updates=StudioUpdatesSettings(allow_check=False, pinned_version="0.4.0"),
         connectors=ConnectorSettings(
@@ -202,7 +200,17 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
                 enabled=True,
                 bot_token="token",
                 chat_id="12345",
-                notify_on=("block_publish",),
+                notify_on=("block_publish", "on_critical"),
+                notify_targets=(
+                    __import__(
+                        "pipeline_inspector.studio_config",
+                        fromlist=["NotifyTarget"],
+                    ).NotifyTarget(
+                        chat_id="99999",
+                        events=("on_critical",),
+                    ),
+                ),
+                notify_score_below=60,
             ),
             discord=DiscordConnectorSettings(
                 enabled=True,
@@ -229,14 +237,17 @@ def test_studio_config_schema_2_0_round_trips_new_sections(tmp_path: Path):
     assert loaded.bug_report.enabled is True
     assert loaded.bug_report.relay_url.endswith("/bug-report")
     assert loaded.bug_report.api_key == "studio-secret"
-    assert loaded.bug_report.allow_screenshot is False
-    assert loaded.bug_report.max_reports_per_day == 3
+    resolved_bug_report = loaded.bug_report.to_bug_report_config()
+    assert resolved_bug_report is not None
+    assert resolved_bug_report.max_reports_per_day == 3
     assert loaded.updates.allow_check is False
     assert loaded.updates.pinned_version == "0.4.0"
     assert loaded.connectors.telegram.enabled is True
     assert loaded.connectors.telegram.chat_id == "12345"
     assert loaded.connectors.telegram.bot_token == "token"
-    assert loaded.connectors.telegram.notify_on == ("block_publish",)
+    assert loaded.connectors.telegram.notify_on == ("block_publish", "on_critical")
+    assert loaded.connectors.telegram.notify_score_below == 60
+    assert loaded.connectors.telegram.notify_targets[0].chat_id == "99999"
     assert loaded.connectors.discord.enabled is True
     assert loaded.connectors.discord.webhook_url == "https://discord.com/api/webhooks/1/secret"
     assert loaded.connectors.discord.notify_on == ("block_deadline",)
@@ -424,6 +435,7 @@ def test_resolve_deadline_config_uses_connector_when_enabled():
 
     assert resolved is not None
     assert resolved.api_url == "http://deadline-host:9090"
+    assert resolved.studio_config_path == Path("C:/studio/pipeline_inspector_studio.json")
 
 
 def test_resolve_deadline_config_returns_none_when_disabled_in_saved_file():

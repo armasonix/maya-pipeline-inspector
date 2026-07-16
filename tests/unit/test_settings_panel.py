@@ -771,8 +771,6 @@ def test_bug_report_tab_exposes_relay_settings_and_privacy_notice():
                 enabled=True,
                 relay_url="https://pipeline.studio.internal/shader-health/bug-report",
                 api_key="studio-secret",
-                allow_screenshot=False,
-                max_reports_per_day=3,
             )
         ),
     )
@@ -781,14 +779,6 @@ def test_bug_report_tab_exposes_relay_settings_and_privacy_notice():
     section = bug_report_tab.layout.widgets[0]
     relay_url = _find(section, bug_report_section.SETTINGS_BUG_REPORT_RELAY_URL_INPUT_OBJECT_NAME)
     api_key = _find(section, bug_report_section.SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME)
-    allow_screenshot = _find(
-        section,
-        bug_report_section.SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
-    )
-    max_reports = _find(
-        section,
-        bug_report_section.SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME,
-    )
     privacy_notice = _find(
         section,
         bug_report_section.SETTINGS_BUG_REPORT_PRIVACY_NOTICE_OBJECT_NAME,
@@ -796,9 +786,8 @@ def test_bug_report_tab_exposes_relay_settings_and_privacy_notice():
 
     assert relay_url.text() == "https://pipeline.studio.internal/shader-health/bug-report"
     assert api_key.text() == "studio-secret"
-    assert allow_screenshot.checked is False
-    assert max_reports.text() == "3"
     assert "scene basename" in privacy_notice.text
+    assert "Daily limit: 3" in privacy_notice.text
 
 
 def test_studio_config_from_settings_view_reads_bug_report_fields():
@@ -814,13 +803,6 @@ def test_studio_config_from_settings_view_reads_bug_report_fields():
     _find(section, bug_report_section.SETTINGS_BUG_REPORT_API_KEY_INPUT_OBJECT_NAME).setText(
         "relay-key"
     )
-    _find(
-        section,
-        bug_report_section.SETTINGS_BUG_REPORT_ALLOW_SCREENSHOT_CHECKBOX_OBJECT_NAME,
-    ).setChecked(False)
-    _find(section, bug_report_section.SETTINGS_BUG_REPORT_MAX_REPORTS_INPUT_OBJECT_NAME).setText(
-        "4"
-    )
 
     studio = studio_config_from_settings_view(
         view,
@@ -832,8 +814,6 @@ def test_studio_config_from_settings_view_reads_bug_report_fields():
         enabled=True,
         relay_url="https://relay.studio/bug-report",
         api_key="relay-key",
-        allow_screenshot=False,
-        max_reports_per_day=4,
     )
 
 

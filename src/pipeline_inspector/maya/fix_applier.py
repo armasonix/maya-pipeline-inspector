@@ -1,6 +1,7 @@
 """Maya-side execution for planned safe actions."""
 from __future__ import annotations
 
+import contextlib
 import glob
 import importlib
 import os
@@ -12,7 +13,11 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from pipeline_inspector.core.fix_plan import FixAction
 
-from pipeline_inspector.core.fix_plan import HIGH_RISK_BLOCK_REASON, resolve_normalize_path_value
+from pipeline_inspector.core.fix_plan import (
+    HIGH_RISK_BLOCK_REASON,
+    NAMING_FIX_TYPE,
+    resolve_normalize_path_value,
+)
 from pipeline_inspector.core.naming_fix import texture_tile_filename_from_paths
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
@@ -30,12 +35,15 @@ DEFAULT_UNDO_CHUNK_NAME = "Pipeline Inspector Apply Fixes"
 DEFAULT_TEXTURE_PATH_ATTR = "fileTextureName"
 REFERENCED_BLOCK_REASON = "target_referenced"
 LOCKED_BLOCK_REASON = "target_locked"
+READ_ONLY_NODE_REASON = "target_read_only"
 UNSUPPORTED_FIX_REASON = "unsupported_fix_type"
 MISSING_TARGET_REASON = "target_node_missing"
 MISSING_ATTR_REASON = "target_attr_missing"
 INVALID_RELINK_PATH_REASON = "invalid_relink_path"
 INVALID_NORMALIZE_PATH_REASON = "invalid_normalize_path"
 INVALID_RENAME_NAME_REASON = "invalid_rename_name"
+RENAME_FAILED_REASON = "rename_failed"
+REFERENCE_RENAME_NOT_PERSISTED_REASON = "reference_rename_not_persisted"
 INVALID_TEXTURE_FILE_RENAME_REASON = "invalid_texture_file_rename"
 TEXTURE_FILE_MISSING_REASON = "texture_file_missing"
 METADATA_PLUG_NAMES = frozenset({"version"})
@@ -144,7 +152,14 @@ def _apply_one(
         return _blocked(action, reasons)
     if action.fix_type not in SUPPORTED_FIX_TYPES:
         return _blocked(action, [UNSUPPORTED_FIX_REASON])
-    if not cmds.objExists(action.target_node):
+    exists_target = action.target_node
+    if action.fix_type == "rename_node":
+        exists_target = _resolve_existing_dag_path(
+            cmds,
+            action.target_node,
+            prefer_referenced=bool(action.referenced or action.requires_reference_edit),
+        )
+    if not exists_target or not _node_exists(cmds, exists_target):
         return _blocked(action, [MISSING_TARGET_REASON])
     if action.fix_type == "set_attr":
         return _apply_set_attr(action, cmds)
@@ -155,7 +170,12 @@ def _apply_one(
     if action.fix_type == "disable_feature":
         return _apply_disable_feature(action, cmds)
     if action.fix_type == "rename_node":
-        return _apply_rename_node(action, cmds)
+        return _apply_rename_node(
+            action,
+            cmds,
+            allow_referenced=allow_referenced,
+            allow_locked=allow_locked,
+        )
     if action.fix_type == "rename_texture_file":
         return _apply_rename_texture_file(action, cmds)
     return _blocked(action, [UNSUPPORTED_FIX_REASON])
@@ -193,33 +213,15 @@ def _apply_rename_texture_file(action: FixAction, cmds: Any) -> AppliedFixRecord
 
     node_after = action.params.get("node_name_after")
     if isinstance(node_after, str) and node_after.strip() and cmds.objExists(action.target_node):
-        cmds.rename(action.target_node, node_after.strip())
+        if _is_read_only_node(cmds, action.target_node):
+            return _blocked(action, [READ_ONLY_NODE_REASON])
+        try:
+            cmds.rename(action.target_node, node_after.strip())
+        except RuntimeError as exc:
+            if _is_read_only_rename_error(exc):
+                return _blocked(action, [READ_ONLY_NODE_REASON])
+            raise
 
-    # region agent log
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "618f4f",
-            "runId": "texture-file-fix-apply",
-            "hypothesisId": "H2",
-            "location": "fix_applier.py:_apply_rename_texture_file",
-            "message": "texture file rename applied",
-            "data": {
-                "target_node": action.target_node,
-                "file_before": raw_before,
-                "file_after": raw_after,
-                "node_after": node_after,
-            },
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
 
     return path_record
 
@@ -292,27 +294,796 @@ def _resolved_destination_path(
     return source.with_name(after_name)
 
 
-def _apply_rename_node(action: FixAction, cmds: Any) -> AppliedFixRecord:
+def _apply_rename_node(
+    action: FixAction,
+    cmds: Any,
+    *,
+    allow_referenced: bool = False,
+    allow_locked: bool = False,
+) -> AppliedFixRecord:
     proposed_name = action.after_value
     if not isinstance(proposed_name, str) or not proposed_name.strip():
         return _blocked(action, [INVALID_RENAME_NAME_REASON])
 
-    before_name = _node_short_name(cmds, action.target_node)
+    rename_target = _resolve_rename_target_node(cmds, action)
+    before_name = _node_short_name(cmds, rename_target)
     if before_name is None:
         return _blocked(action, [MISSING_TARGET_REASON])
 
-    renamed_node = cmds.rename(action.target_node, proposed_name.strip())
-    after_name = _node_short_name(cmds, renamed_node) or str(proposed_name).strip()
+    runtime_referenced = _node_is_referenced(cmds, rename_target)
+    allow_reference_edit = allow_referenced and (
+        action.requires_reference_edit
+        or action.referenced
+        or runtime_referenced
+    )
+    rename_target = _canonical_dag_node(cmds, rename_target) or rename_target
+    target_node_locked = _query_lock_node(cmds, rename_target)
+    target_name_locked = _query_lock_node_name(cmds, rename_target)
+
+    if allow_reference_edit:
+        prep = _prepare_reference_edit(cmds, rename_target)
+        updated_target = prep.get("node_name")
+        if isinstance(updated_target, str) and updated_target.strip():
+            rename_target = updated_target
+    elif not allow_locked and target_node_locked:
+        return _blocked(action, [READ_ONLY_NODE_REASON])
+
+    renamed_node, rename_error = _rename_dag_node(
+        cmds,
+        rename_target,
+        str(proposed_name).strip(),
+        allow_reference_edit=allow_reference_edit,
+        allow_unlock=target_node_locked or target_name_locked,
+    )
+    if renamed_node is None:
+        if rename_error and _is_read_only_rename_error(RuntimeError(rename_error)):
+            return _blocked(action, [READ_ONLY_NODE_REASON])
+        return _blocked(action, [RENAME_FAILED_REASON])
+
+    if runtime_referenced:
+        after_name = _resolved_transform_short_name_after_rename(
+            cmds,
+            rename_target,
+            str(proposed_name).strip(),
+            before_name,
+            str(renamed_node),
+        )
+        persisted = (
+            after_name == str(proposed_name).strip() and after_name != before_name
+        )
+        if not persisted:
+            return _blocked(action, [REFERENCE_RENAME_NOT_PERSISTED_REASON])
+    else:
+        after_name = _node_short_name(cmds, renamed_node) or str(proposed_name).strip()
     return _applied(action, None, before_name, after_name)
 
 
+def _resolve_rename_target_node(cmds: Any, action: FixAction) -> str:
+    """Resolve the DAG node that should be renamed for Outliner-visible naming."""
+
+    target_node = str(action.target_node or "").strip()
+    if not target_node:
+        return target_node
+
+    prefer_referenced = bool(
+        action.referenced or action.requires_reference_edit
+    )
+    target_node = _resolve_existing_dag_path(
+        cmds,
+        target_node,
+        prefer_referenced=prefer_referenced,
+    )
+    if not target_node or not _node_exists(cmds, target_node):
+        return str(action.target_node or "").strip()
+
+    object_type = str(action.params.get("object_type") or "").strip()
+    if object_type != "mesh":
+        return target_node
+
+    try:
+        node_type = str(cmds.nodeType(target_node))
+    except RuntimeError:
+        return target_node
+
+    if node_type == "transform":
+        return target_node
+
+    parents = cmds.listRelatives(target_node, parent=True, fullPath=True) or []
+    if parents:
+        return str(parents[0])
+    return target_node
+
+
+def _dag_path_candidates(node_hint: str) -> list[str]:
+    normalized = str(node_hint or "").strip()
+    if not normalized:
+        return []
+
+    candidates: list[str] = []
+    for token in (
+        normalized,
+        normalized.lstrip("|"),
+        f"|{normalized.lstrip('|')}",
+    ):
+        short = token.split("|")[-1].split(":")[-1]
+        for value in (token, short):
+            if value and value not in candidates:
+                candidates.append(value)
+    return candidates
+
+
+def _resolve_existing_dag_path(
+    cmds: Any,
+    node_hint: str,
+    *,
+    prefer_referenced: bool = False,
+) -> str:
+    candidates = _dag_path_candidates(node_hint)
+    if not candidates:
+        return node_hint
+
+    resolved: list[str] = []
+    for candidate in candidates:
+        if not cmds.objExists(candidate):
+            continue
+        long_names = cmds.ls(candidate, long=True) or []
+        if long_names:
+            resolved.extend(str(name) for name in long_names)
+        else:
+            resolved.append(candidate)
+
+    if not resolved:
+        return node_hint
+
+    unique: list[str] = []
+    for path in resolved:
+        if path not in unique:
+            unique.append(path)
+
+    if len(unique) == 1:
+        chosen = unique[0]
+    elif prefer_referenced:
+        chosen = unique[0]
+        for name in unique:
+            if _node_is_referenced(cmds, name):
+                chosen = name
+                break
+    else:
+        chosen = unique[0]
+
+    if prefer_referenced:
+        for path in unique:
+            if _node_is_referenced(cmds, path):
+                return path
+        for candidate in candidates:
+            if not cmds.objExists(candidate):
+                continue
+            long_names = cmds.ls(candidate, long=True) or []
+            for path in long_names:
+                token = str(path)
+                if _node_is_referenced(cmds, token):
+                    return token
+
+    if cmds.objExists(chosen):
+        long_names = cmds.ls(chosen, long=True) or []
+        if long_names:
+            return str(long_names[0])
+        return chosen
+    for candidate in _dag_path_candidates(node_hint):
+        if cmds.objExists(candidate):
+            long_names = cmds.ls(candidate, long=True) or []
+            if long_names:
+                return str(long_names[0])
+            return candidate
+    return chosen
+
+
+def _node_exists(cmds: Any, node_hint: str) -> bool:
+    return any(cmds.objExists(candidate) for candidate in _dag_path_candidates(node_hint))
+
+
+def _node_is_referenced(cmds: Any, node_name: str) -> bool:
+    try:
+        return bool(cmds.referenceQuery(node_name, isNodeReferenced=True))
+    except (RuntimeError, TypeError):
+        return False
+
+
 def _node_short_name(cmds: Any, node_name: str) -> Optional[str]:
-    if not cmds.objExists(node_name):
+    resolved = _resolve_existing_dag_path(cmds, node_name)
+    if not resolved or not _node_exists(cmds, resolved):
         return None
-    short_names = cmds.ls(node_name, shortNames=True) or []
-    if not short_names:
+    short_names = cmds.ls(resolved, shortNames=True) or cmds.ls(resolved) or []
+    token = str(short_names[0]) if short_names else resolved
+    short = token.split("|")[-1].split(":")[-1].strip()
+    return short or None
+
+
+def _is_read_only_node(cmds: Any, node_name: str) -> bool:
+    return _query_lock_node(cmds, node_name)
+
+
+def _query_lock_node(cmds: Any, node_name: str) -> bool:
+    try:
+        value = cmds.lockNode(node_name, q=True, lock=True)
+    except RuntimeError:
+        return False
+    if isinstance(value, list):
+        return bool(value[0]) if value else False
+    return bool(value)
+
+
+def _query_lock_node_name(cmds: Any, node_name: str) -> bool:
+    try:
+        value = cmds.lockNode(node_name, q=True, lockName=True)
+    except RuntimeError:
+        return False
+    if isinstance(value, list):
+        return bool(value[0]) if value else False
+    return bool(value)
+
+
+def _canonical_dag_node(cmds: Any, node_hint: str) -> str:
+    normalized = str(node_hint or "").strip()
+    if not normalized:
+        return normalized
+    try:
+        long_names = cmds.ls(normalized, long=True) or []
+        if long_names:
+            return str(long_names[0])
+        short_names = cmds.ls(normalized) or []
+        if short_names:
+            return str(short_names[0])
+    except (RuntimeError, TypeError):
+        pass
+    return normalized
+
+
+def _rename_unlock_targets(cmds: Any, node_hint: str) -> list[str]:
+    """Return DAG nodes that may need unlock before rename (transform only)."""
+    resolved = _canonical_dag_node(cmds, node_hint)
+    if not resolved or not _node_exists(cmds, resolved):
+        return []
+    return [resolved]
+
+
+def _node_has_rename_lock(cmds: Any, node_name: str) -> bool:
+    return _query_lock_node(cmds, node_name) or _query_lock_node_name(cmds, node_name)
+
+
+def _mel_unlock_node(mel_module: Any, node_name: str) -> None:
+    """MEL unlock without -lp (invalid on reference nodes in Maya 2024)."""
+    for script in (
+        f'lockNode -l 0 -ln 0 "{node_name}";',
+        f'lockNode -lock 0 -lockName 0 "{node_name}";',
+    ):
+        with contextlib.suppress(RuntimeError, TypeError):
+            mel_module.eval(script)
+
+
+def _reference_namespace(cmds: Any, ref_node: str) -> Optional[str]:
+    try:
+        return str(cmds.referenceQuery(ref_node, namespace=True))
+    except (RuntimeError, TypeError):
         return None
-    return str(short_names[0]).split("|")[-1].split(":")[-1]
+
+
+def _is_root_reference_namespace(namespace: Optional[str]) -> bool:
+    if namespace is None:
+        return False
+    token = str(namespace).strip()
+    return token in ("", ":")
+
+
+def _sanitize_reference_namespace(token: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in token)
+    if not cleaned or cleaned[0].isdigit():
+        cleaned = f"ref_{cleaned}"
+    return cleaned
+
+
+def _reference_allows_namespace_edit(cmds: Any, ref_node: str) -> bool:
+    try:
+        return bool(cmds.referenceQuery(ref_node, isTopLevelReference=True))
+    except (RuntimeError, TypeError):
+        try:
+            parent = cmds.referenceQuery(ref_node, parent=True)
+        except (RuntimeError, TypeError):
+            return False
+        return parent in (None, "")
+
+
+def _ensure_reference_namespace_for_edit(cmds: Any, ref_node: str) -> tuple[str, Optional[str]]:
+    """Root-ns references block DAG rename; assign a named namespace when allowed."""
+    current = _reference_namespace(cmds, ref_node)
+    if not _is_root_reference_namespace(current):
+        return "skipped", current
+    if not _reference_allows_namespace_edit(cmds, ref_node):
+        return "skipped:not_top_level", current
+
+    base = ref_node[:-2] if ref_node.endswith("RN") else ref_node
+    temp_ns = _sanitize_reference_namespace(base)
+    try:
+        cmds.file(edit=True, namespace=temp_ns, referenceNode=ref_node)
+        return "ok", temp_ns
+    except (RuntimeError, TypeError) as exc:
+        return f"failed:{exc}", current
+
+
+def _resolve_namespaced_dag_path(
+    cmds: Any,
+    ref_node: str,
+    node_name: str,
+) -> str:
+    namespace = _reference_namespace(cmds, ref_node)
+    if _is_root_reference_namespace(namespace):
+        return node_name
+
+    short = node_name.split("|")[-1].split(":")[-1]
+    ns_token = str(namespace or "").strip().strip(":")
+    if not ns_token:
+        return node_name
+
+    for candidate in (f"{ns_token}:{short}", f"|{ns_token}:{short}"):
+        if not cmds.objExists(candidate):
+            continue
+        long_names = cmds.ls(candidate, long=True) or []
+        if long_names:
+            return str(long_names[0])
+        return candidate
+    return node_name
+
+
+def _force_unlock_node(cmds: Any, target: str) -> dict[str, Any]:
+    before = {
+        "lock": _query_lock_node(cmds, target),
+        "lockName": _query_lock_node_name(cmds, target),
+    }
+    if not before["lock"] and not before["lockName"]:
+        return {"before": before, "after": before, "skipped": True}
+
+    for kwargs in (
+        {"lock": False, "lockName": False},
+        {"lock": False, "lockName": False, "ignoreComponents": True},
+        {"lock": False, "lockName": False, "lockUnpublished": False},
+    ):
+        with contextlib.suppress(RuntimeError, TypeError):
+            cmds.lockNode(target, **kwargs)
+        after_lock = _query_lock_node(cmds, target)
+        after_name = _query_lock_node_name(cmds, target)
+        if not after_lock and not after_name:
+            return {
+                "before": before,
+                "after": {"lock": after_lock, "lockName": after_name},
+                "skipped": False,
+            }
+
+    mel = getattr(cmds, "mel", None)
+    if mel is not None:
+        _mel_unlock_node(mel, target)
+    else:
+        try:
+            import maya.mel as mel_module
+
+            _mel_unlock_node(mel_module, target)
+        except (ImportError, RuntimeError, TypeError):
+            pass
+
+    after = {
+        "lock": _query_lock_node(cmds, target),
+        "lockName": _query_lock_node_name(cmds, target),
+    }
+    return {"before": before, "after": after, "skipped": False}
+
+
+def _unlock_rename_name_lock(cmds: Any, node_name: str) -> dict[str, Any]:
+    """Unlock transform name locks only when Maya reports the node is locked."""
+    results: dict[str, Any] = {}
+    for target in _rename_unlock_targets(cmds, node_name):
+        results[target] = _force_unlock_node(cmds, target)
+    return results
+
+
+def _rename_dag_node(
+    cmds: Any,
+    rename_target: str,
+    proposed_name: str,
+    *,
+    allow_reference_edit: bool,
+    allow_unlock: bool,
+) -> tuple[Optional[str], Optional[str]]:
+    canonical_target = _canonical_dag_node(cmds, rename_target) or rename_target
+    if allow_unlock and _node_has_rename_lock(cmds, canonical_target):
+        _unlock_rename_name_lock(cmds, canonical_target)
+    if allow_reference_edit:
+        ref_node = _reference_node_for_dag(cmds, canonical_target)
+        if ref_node:
+            ref_locked = _query_reference_locked(cmds, ref_node)
+            ref_node_locked = _query_lock_node(cmds, ref_node)
+            if ref_locked or ref_node_locked:
+                with contextlib.suppress(RuntimeError, TypeError):
+                    cmds.file(lockReference=False, referenceNode=ref_node)
+                _force_unlock_reference_node(cmds, ref_node)
+            _unlock_referenced_shape_nodes(cmds, canonical_target)
+            _clear_failed_rename_reference_edits(cmds, ref_node)
+
+    ref_namespace = None
+    if allow_reference_edit:
+        ref_node = _reference_node_for_dag(cmds, canonical_target)
+        if ref_node:
+            ref_namespace = _reference_namespace(cmds, ref_node)
+
+    last_error: Optional[str] = None
+    rename_targets = (
+        _dag_rename_candidates(cmds, canonical_target)
+        if allow_reference_edit
+        else [canonical_target]
+    )
+    for attempt in range(2):
+        renamed_node, rename_error = _attempt_rename(
+            cmds,
+            rename_targets,
+            proposed_name,
+            namespace=ref_namespace,
+            allow_api_fallback=allow_reference_edit,
+        )
+        if renamed_node is not None:
+            return renamed_node, None
+        last_error = rename_error
+        if attempt == 0 and rename_error and (
+            _is_rename_lock_error(RuntimeError(rename_error))
+            or _is_read_only_rename_error(RuntimeError(rename_error))
+        ):
+            if allow_reference_edit:
+                ref_node = _reference_node_for_dag(cmds, canonical_target)
+                if ref_node:
+                    _reload_reference_for_edit(cmds, ref_node)
+                prep = _prepare_reference_edit(cmds, canonical_target)
+                updated_target = prep.get("node_name")
+                if isinstance(updated_target, str) and updated_target.strip():
+                    canonical_target = updated_target
+            if _is_rename_lock_error(RuntimeError(rename_error)) or _node_has_rename_lock(
+                cmds, canonical_target
+            ):
+                _unlock_rename_name_lock(cmds, canonical_target)
+            canonical_target = _canonical_dag_node(cmds, canonical_target) or canonical_target
+            rename_targets = (
+                _dag_rename_candidates(cmds, canonical_target)
+                if allow_reference_edit
+                else [canonical_target]
+            )
+            continue
+        return None, last_error
+
+    return None, last_error
+
+
+def _reference_node_for_dag(cmds: Any, node_name: str) -> Optional[str]:
+    try:
+        ref_node = cmds.referenceQuery(node_name, referenceNode=True)
+    except (RuntimeError, TypeError):
+        return None
+    return str(ref_node) if ref_node else None
+
+
+def _query_reference_locked(cmds: Any, ref_node: str) -> Optional[bool]:
+    try:
+        return bool(cmds.file(referenceNode=ref_node, query=True, lockReference=True))
+    except (RuntimeError, TypeError):
+        return None
+
+
+def _query_node_read_only(cmds: Any, node_name: str) -> Optional[bool]:
+    try:
+        return bool(cmds.referenceQuery(node_name, isReadOnly=True))
+    except (RuntimeError, TypeError):
+        return None
+
+
+def _reference_is_deferred(cmds: Any, ref_node: str) -> Optional[bool]:
+    try:
+        return bool(cmds.file(referenceNode=ref_node, query=True, deferReference=True))
+    except (RuntimeError, TypeError):
+        return None
+
+
+def _force_unlock_reference_node(cmds: Any, ref_node: str) -> dict[str, Any]:
+    """Fully unlock a reference container node (safe; never touches DAG meshes)."""
+    before = {
+        "lock": _query_lock_node(cmds, ref_node),
+        "lockName": _query_lock_node_name(cmds, ref_node),
+    }
+    for kwargs in (
+        {"lock": False, "lockName": False},
+        {"lock": False, "lockName": False, "lockUnpublished": False},
+        {"lock": False, "lockName": False, "ignoreComponents": True},
+    ):
+        with contextlib.suppress(RuntimeError, TypeError):
+            cmds.lockNode(ref_node, **kwargs)
+    try:
+        import maya.mel as mel_module
+
+        _mel_unlock_node(mel_module, ref_node)
+    except (ImportError, RuntimeError, TypeError):
+        pass
+    after = {
+        "lock": _query_lock_node(cmds, ref_node),
+        "lockName": _query_lock_node_name(cmds, ref_node),
+    }
+    return {"before": before, "after": after}
+
+
+def _reload_reference_for_edit(cmds: Any, ref_node: str) -> str:
+    try:
+        cmds.file(unloadReference=True, referenceNode=ref_node)
+        cmds.file(
+            loadReference=True,
+            loadReferenceDepth="all",
+            referenceNode=ref_node,
+        )
+        cmds.file(lockReference=False, referenceNode=ref_node)
+        _force_unlock_reference_node(cmds, ref_node)
+        return "ok"
+    except (RuntimeError, TypeError) as exc:
+        return f"failed:{exc}"
+
+
+def _dag_rename_candidates(cmds: Any, node_hint: str) -> list[str]:
+    candidates: list[str] = []
+    canonical = _canonical_dag_node(cmds, node_hint) or node_hint
+    short = canonical.split("|")[-1].split(":")[-1]
+    for token in (
+        canonical,
+        canonical.lstrip("|"),
+        f"|{canonical.lstrip('|')}",
+        short,
+        f":{short}",
+    ):
+        normalized = str(token or "").strip()
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+    if short:
+        try:
+            for path in cmds.ls(short, long=True) or []:
+                token = str(path)
+                if token not in candidates:
+                    candidates.append(token)
+        except (RuntimeError, TypeError):
+            pass
+    return candidates
+
+
+def _proposed_rename_variants(proposed_name: str, namespace: Optional[str]) -> list[str]:
+    short = str(proposed_name or "").strip().split("|")[-1].split(":")[-1]
+    if not short:
+        return []
+    variants = [short]
+    if _is_root_reference_namespace(namespace):
+        colon_name = f":{short}"
+        if colon_name not in variants:
+            variants.append(colon_name)
+    return variants
+
+
+def _unlock_referenced_shape_nodes(cmds: Any, transform: str) -> dict[str, Any]:
+    results: dict[str, Any] = {}
+    try:
+        shapes = cmds.listRelatives(transform, shapes=True, fullPath=True) or []
+    except (RuntimeError, TypeError):
+        return results
+    for shape in shapes:
+        shape_name = str(shape)
+        if _node_has_rename_lock(cmds, shape_name):
+            results[shape_name] = _force_unlock_node(cmds, shape_name)
+    return results
+
+
+def _clear_failed_rename_reference_edits(cmds: Any, ref_node: str) -> str:
+    try:
+        failed = cmds.referenceEdit(
+            ref_node,
+            query=True,
+            failedEdits=True,
+            editCommand="rename",
+        )
+        if failed:
+            cmds.referenceEdit(
+                ref_node,
+                removeEdits=True,
+                failedEdits=True,
+                editCommand="rename",
+            )
+            return "cleared"
+        return "none"
+    except (RuntimeError, TypeError) as exc:
+        return f"failed:{exc}"
+
+
+def _rename_via_dag_modifier(
+    target: str,
+    proposed_name: str,
+) -> tuple[Optional[str], Optional[str]]:
+    try:
+        import maya.api.OpenMaya as om
+    except ImportError:
+        return None, "openmaya_unavailable"
+
+    short_new = str(proposed_name or "").strip().split("|")[-1].split(":")[-1]
+    if not short_new:
+        return None, "invalid_proposed_name"
+    try:
+        selection = om.MSelectionList()
+        selection.add(target)
+        dag_path = selection.getDagPath(0)
+        modifier = om.MDagModifier()
+        modifier.renameNode(dag_path.node(), short_new)
+        modifier.doIt()
+        renamed_path = dag_path.fullPathName()
+        return str(renamed_path), None
+    except (RuntimeError, TypeError, ValueError) as exc:
+        return None, str(exc)
+
+
+def _resolve_renamed_dag_path(cmds: Any, proposed_name: str) -> Optional[str]:
+    short = str(proposed_name or "").strip().split("|")[-1].split(":")[-1]
+    for candidate in _dag_path_candidates(short):
+        if not candidate or not cmds.objExists(candidate):
+            continue
+        long_names = cmds.ls(candidate, long=True) or []
+        if long_names:
+            return str(long_names[0])
+        return candidate
+    return None
+
+
+def _attempt_rename(
+    cmds: Any,
+    targets: list[str],
+    proposed_name: str,
+    *,
+    namespace: Optional[str] = None,
+    allow_api_fallback: bool = False,
+) -> tuple[Optional[str], Optional[str]]:
+    last_error: Optional[str] = None
+    proposed_variants = _proposed_rename_variants(proposed_name, namespace)
+    for target in targets:
+        for variant in proposed_variants:
+            try:
+                renamed_node = cmds.rename(target, variant)
+                return str(renamed_node), None
+            except RuntimeError as exc:
+                last_error = str(exc)
+        if allow_api_fallback:
+            for variant in proposed_variants:
+                renamed_node, api_error = _rename_via_dag_modifier(target, variant)
+                if renamed_node:
+                    resolved = _resolve_renamed_dag_path(cmds, renamed_node) or renamed_node
+                    return resolved, None
+                last_error = api_error
+    return None, last_error
+
+
+def _ensure_reference_loaded_for_edit(cmds: Any, ref_node: str) -> str:
+    try:
+        cmds.file(
+            loadReference=True,
+            loadReferenceDepth="all",
+            referenceNode=ref_node,
+        )
+        return "ok"
+    except (RuntimeError, TypeError) as exc:
+        return f"failed:{exc}"
+
+
+def _unlock_reference_file(cmds: Any, ref_node: str) -> str:
+    try:
+        cmds.file(lockReference=False, referenceNode=ref_node)
+        return "ok"
+    except (RuntimeError, TypeError) as exc:
+        return f"failed:{exc}"
+
+
+def _unlock_reference_node_after_load(cmds: Any, ref_node: str) -> tuple[str, dict[str, Any]]:
+    """Unlock reference RN after loadReference; load can re-apply lockNode -l 1."""
+    unlock_result = _force_unlock_reference_node(cmds, ref_node)
+    status = (
+        "ok"
+        if not unlock_result.get("after", {}).get("lock")
+        and not unlock_result.get("after", {}).get("lockName")
+        else "partial"
+    )
+    return status, unlock_result
+
+
+def _resolved_transform_short_name_after_rename(
+    cmds: Any,
+    rename_target: str,
+    proposed_name: str,
+    before_name: str,
+    renamed_node: str,
+) -> str:
+    if rename_target and cmds.objExists(rename_target):
+        current = _node_short_name(cmds, rename_target)
+        if current:
+            return current
+
+    for candidate in _dag_path_candidates(proposed_name):
+        if cmds.objExists(candidate):
+            current = _node_short_name(cmds, candidate)
+            if current:
+                return current
+
+    for candidate in _dag_path_candidates(renamed_node):
+        if cmds.objExists(candidate):
+            current = _node_short_name(cmds, candidate)
+            if current:
+                return current
+
+    return before_name
+
+
+def _reference_is_loaded(cmds: Any, ref_node: str) -> bool:
+    try:
+        return bool(cmds.referenceQuery(ref_node, isLoaded=True))
+    except (RuntimeError, TypeError):
+        return True
+
+
+def _prepare_reference_edit(cmds: Any, node_name: str) -> dict[str, Any]:
+    """Prepare a referenced DAG node for rename per Maya file/lockNode API."""
+    canonical = _canonical_dag_node(cmds, node_name) or node_name
+    ref_node = _reference_node_for_dag(cmds, canonical)
+    if not ref_node:
+        return {"ref_node": None, "node_name": canonical}
+
+    lock_before = _query_reference_locked(cmds, ref_node)
+    ref_loaded_before = _reference_is_loaded(cmds, ref_node)
+    ref_deferred_before = _reference_is_deferred(cmds, ref_node)
+    target_read_only_before = _query_node_read_only(cmds, canonical)
+    ref_node_lock_before = _query_lock_node(cmds, ref_node)
+
+    steps: dict[str, str] = {}
+    steps["unlock_reference"] = _unlock_reference_file(cmds, ref_node)
+    steps["load_reference_depth"] = _ensure_reference_loaded_for_edit(cmds, ref_node)
+    unlock_status, unlock_result = _unlock_reference_node_after_load(cmds, ref_node)
+    steps["unlock_reference_node_force"] = unlock_status
+    ns_status, assigned_ns = _ensure_reference_namespace_for_edit(cmds, ref_node)
+    steps["assign_reference_namespace"] = ns_status
+    canonical = _resolve_namespaced_dag_path(cmds, ref_node, canonical)
+    shape_unlock_targets = _unlock_referenced_shape_nodes(cmds, canonical)
+    steps["clear_failed_rename_edits"] = _clear_failed_rename_reference_edits(cmds, ref_node)
+
+    unlock_targets = {}
+    if _node_has_rename_lock(cmds, canonical):
+        unlock_targets = _unlock_rename_name_lock(cmds, canonical)
+    state = {
+        "node_name": canonical,
+        "ref_node": ref_node,
+        "steps": steps,
+        "ref_loaded_before": ref_loaded_before,
+        "ref_deferred_before": ref_deferred_before,
+        "ref_locked_before": lock_before,
+        "ref_node_lock_before": ref_node_lock_before,
+        "ref_node_lock_after": _query_lock_node(cmds, ref_node),
+        "ref_locked_after": _query_reference_locked(cmds, ref_node),
+        "target_read_only_before": target_read_only_before,
+        "target_read_only_after": _query_node_read_only(cmds, canonical),
+        "target_lock_after": _query_lock_node(cmds, canonical),
+        "target_lock_name_after": _query_lock_node_name(cmds, canonical),
+        "unlock_targets": unlock_targets,
+        "shape_unlock_targets": shape_unlock_targets,
+    }
+    return state
+
+
+def _is_rename_lock_error(exc: RuntimeError) -> bool:
+    message = str(exc).casefold()
+    return "locked name" in message or "locked node" in message
+
+
+def _is_read_only_rename_error(exc: RuntimeError) -> bool:
+    message = str(exc).casefold()
+    return "read only" in message or "read-only" in message
 
 
 def _apply_disable_feature(action: FixAction, cmds: Any) -> AppliedFixRecord:
@@ -427,19 +1198,26 @@ def _reasons(
     allow_high_risk: bool,
 ) -> list[str]:
     reasons: list[str] = []
+    skip_locked = _allows_reference_naming_edit(action)
     for reason in action.block_reasons:
         if reason == REFERENCED_BLOCK_REASON and allow_referenced:
             continue
-        if reason == LOCKED_BLOCK_REASON and allow_locked:
+        if reason == LOCKED_BLOCK_REASON and (allow_locked or skip_locked):
             continue
         if reason == HIGH_RISK_BLOCK_REASON and allow_high_risk:
             continue
         _append_unique(reasons, reason)
     if action.referenced and not allow_referenced:
         _append_unique(reasons, REFERENCED_BLOCK_REASON)
-    if action.locked and not allow_locked:
+    if action.locked and not allow_locked and not skip_locked:
         _append_unique(reasons, LOCKED_BLOCK_REASON)
     return reasons
+
+
+def _allows_reference_naming_edit(action: FixAction) -> bool:
+    return action.fix_type == NAMING_FIX_TYPE and (
+        action.referenced or action.requires_reference_edit
+    )
 
 def _studio_environment_from_params(
     params: Mapping[str, Any],

@@ -4,13 +4,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from pipeline_inspector.integrations.shotgrid.attachments import attach_html_report_to_note
 from pipeline_inspector.integrations.shotgrid.client import ShotGridClient
 from pipeline_inspector.integrations.shotgrid.config import ShotGridConfig
 from pipeline_inspector.integrations.trackers.base import TrackerPublishResult
 from pipeline_inspector.integrations.trackers.publish import (
     ValidationPublishPayload,
+    format_tracker_note_content,
     format_validation_publish_summary,
 )
+from pipeline_inspector.integrations.trackers.report_bundle import TrackerReportBundle
 from pipeline_inspector.studio_config import StudioConfig, resolve_shotgrid_config
 
 ShotGridClientFactory = Callable[[ShotGridConfig], ShotGridClient]
@@ -62,6 +65,7 @@ def publish_validation_summary(
     studio_config: StudioConfig | None,
     payload: ValidationPublishPayload,
     *,
+    report_bundle: TrackerReportBundle | None = None,
     client_factory: ShotGridClientFactory | None = None,
 ) -> TrackerPublishResult:
     """Publish a validation summary as a ShotGrid note on an Asset or Shot."""
@@ -82,7 +86,7 @@ def publish_validation_summary(
         return TrackerPublishResult(published=False, skipped_reason="project_not_found")
 
     note = client.create_entity_note(
-        content=format_validation_publish_summary(payload),
+        content=_tracker_note_content(payload, report_bundle),
         project_id=project_id,
         entity_type=entity_type,
         entity_id=entity_id,
@@ -92,6 +96,19 @@ def publish_validation_summary(
 
     note_id = str(note.get("id", "") or "").strip()
     metadata = {"note_id": note_id} if note_id else {}
+
+    if report_bundle is not None and report_bundle.html_report_path and note_id.isdigit():
+        attachment_id, attach_error = attach_html_report_to_note(
+            client,
+            note_id=int(note_id),
+            file_path=report_bundle.html_report_path,
+            filename=report_bundle.attachment_filename,
+        )
+        if attachment_id:
+            metadata["attachment_id"] = attachment_id
+        elif attach_error:
+            metadata["attachment_error"] = attach_error
+
     return TrackerPublishResult(
         published=True,
         external_url=note_id,
@@ -108,10 +125,27 @@ def maybe_publish_validation_summary(
     """Build a publish payload from a validation run and send it to ShotGrid."""
 
     from pipeline_inspector.integrations.trackers.publish import validation_publish_payload_from_run
+    from pipeline_inspector.integrations.trackers.report_bundle import (
+        build_tracker_report_bundle_from_run,
+    )
 
-    payload = validation_publish_payload_from_run(result, report_path=report_path)
+    report_bundle = build_tracker_report_bundle_from_run(result, report_path=report_path)
+    payload = validation_publish_payload_from_run(result, report_path="")
     return publish_validation_summary(
         studio_config,
         payload,
+        report_bundle=report_bundle,
         client_factory=client_factory,
     )
+
+
+def _tracker_note_content(
+    payload: ValidationPublishPayload,
+    report_bundle: TrackerReportBundle | None,
+) -> str:
+    if report_bundle is not None:
+        return format_tracker_note_content(
+            payload,
+            markdown_note=report_bundle.markdown_note,
+        )
+    return format_validation_publish_summary(payload)

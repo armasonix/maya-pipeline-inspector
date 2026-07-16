@@ -12,6 +12,7 @@ from pipeline_inspector.studio_config import (
 )
 from pipeline_inspector.ui.settings_widgets import (
     find_child,
+    set_fixed_horizontal_size_policy,
     widget_has_focus,
     wire_plain_text_changed,
 )
@@ -19,6 +20,8 @@ from pipeline_inspector.ui.settings_widgets import (
 SETTINGS_GOVERNANCE_SECTION_OBJECT_NAME = "pipelineInspectorSettingsGovernanceSection"
 SETTINGS_TRACKER_ROLE_MAP_INPUT_OBJECT_NAME = "pipelineInspectorSettingsTrackerRoleMapInput"
 SETTINGS_SUPERVISOR_ROUTES_INPUT_OBJECT_NAME = "pipelineInspectorSettingsSupervisorRoutesInput"
+
+_GOVERNANCE_PLAIN_TEXT_WIDTH = 292
 
 
 def build_governance_section(
@@ -53,6 +56,7 @@ def build_governance_section(
         "Used with Ftrack security roles and Cerebro groups."
     )
     _set_plain_text_height(tracker_map_input, 72)
+    _configure_compact_plain_text(qt_widgets, tracker_map_input, _GOVERNANCE_PLAIN_TEXT_WIDTH)
     wire_plain_text_changed(tracker_map_input, on_settings_changed)
     layout.addWidget(tracker_map_input)
 
@@ -68,6 +72,7 @@ def build_governance_section(
         "discord_webhook_url|slack_webhook_url"
     )
     _set_plain_text_height(routes_input, 96)
+    _configure_compact_plain_text(qt_widgets, routes_input, _GOVERNANCE_PLAIN_TEXT_WIDTH)
     wire_plain_text_changed(routes_input, on_settings_changed)
     layout.addWidget(routes_input)
 
@@ -241,3 +246,10 @@ def _set_plain_text_height(widget: Any, height: int) -> None:
     set_fixed_height = getattr(widget, "setFixedHeight", None)
     if set_fixed_height is not None:
         set_fixed_height(height)
+
+
+def _configure_compact_plain_text(qt_widgets: Any, field: Any, width: int) -> None:
+    set_fixed_width = getattr(field, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(width)
+    set_fixed_horizontal_size_policy(qt_widgets, field)

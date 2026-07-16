@@ -185,17 +185,14 @@ def test_close_panel_deletes_workspace_control(monkeypatch: Any):
 def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
     content = SimpleNamespace(_pipeline_inspector_validate_running=False)
     calls: list[str] = []
+    scheduled: list[Any] = []
 
-    class FakeCmds:
-        def __init__(self) -> None:
-            self.deferred: list[Any] = []
+    class FakeQtWidgets:
+        class QTimer:
+            @staticmethod
+            def singleShot(_delay_ms: int, callback: Any) -> None:
+                scheduled.append(callback)
 
-        def evalDeferred(self, fn: Any, lowestPriority: bool = True) -> None:
-            _ = lowestPriority
-            self.deferred.append(fn)
-
-    cmds = FakeCmds()
-    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(
         ui_launcher,
         "_set_validate_busy_state",
@@ -207,11 +204,40 @@ def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
         lambda *_args, **_kwargs: calls.append("run"),
     )
 
-    ui_launcher._schedule_ui_validation(content, object(), scan_scope="scene")
+    ui_launcher._schedule_ui_validation(content, FakeQtWidgets(), scan_scope="scene")
 
-    assert len(cmds.deferred) == 1
-    cmds.deferred[0]()
+    assert len(scheduled) == 1
+    scheduled[0]()
     assert calls == ["busy", "run", "busy"]
+    assert content._pipeline_inspector_validate_running is False
+
+
+def test_schedule_ui_validation_falls_back_to_main_thread_schedule(monkeypatch: Any):
+    content = SimpleNamespace(_pipeline_inspector_validate_running=False)
+    runs: list[str] = []
+    scheduled: list[Any] = []
+
+    monkeypatch.setattr(
+        ui_launcher,
+        "_set_validate_busy_state",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_run_validation_job",
+        lambda *_args, **_kwargs: runs.append("run"),
+    )
+    monkeypatch.setattr(
+        ui_launcher,
+        "_schedule_on_main_thread",
+        lambda callback: scheduled.append(callback),
+    )
+
+    ui_launcher._schedule_ui_validation(content, object(), scan_scope="selection")
+
+    assert len(scheduled) == 1
+    scheduled[0]()
+    assert runs == ["run"]
     assert content._pipeline_inspector_validate_running is False
 
 

@@ -15,10 +15,12 @@ from pipeline_inspector.integrations.cerebro.config import CerebroConfig
 from pipeline_inspector.integrations.trackers.base import TrackerPublishResult
 from pipeline_inspector.integrations.trackers.publish import (
     ValidationPublishPayload,
+    format_tracker_note_content,
     format_validation_publish_summary,
     scene_task_lookup_candidates,
     scene_task_lookup_name,
 )
+from pipeline_inspector.integrations.trackers.report_bundle import TrackerReportBundle
 from pipeline_inspector.studio_config import StudioConfig, resolve_cerebro_config
 
 CerebroClientFactory = Callable[[CerebroConfig], CerebroClient]
@@ -101,10 +103,34 @@ def resolve_task_id(
     return None
 
 
+def resolve_task_id_for_publish(
+    client: CerebroClient,
+    config: CerebroConfig,
+    payload: ValidationPublishPayload,
+) -> int | None:
+    """Resolve a Cerebro task id using fast URL lookups only.
+
+    Publish avoids ``resolve_task_in_project`` because it can walk large task
+    trees and block the Maya UI for a long time.
+    """
+
+    explicit_task_id = _task_id_from_payload(payload)
+    if explicit_task_id is not None:
+        return explicit_task_id
+
+    for task_url in task_url_candidates(config, payload):
+        task_id = client.resolve_task_id(task_url)
+        if task_id is not None:
+            return task_id
+
+    return None
+
+
 def publish_validation_summary(
     studio_config: StudioConfig | None,
     payload: ValidationPublishPayload,
     *,
+    report_bundle: TrackerReportBundle | None = None,
     client_factory: CerebroClientFactory | None = None,
 ) -> TrackerPublishResult:
     """Publish a validation summary as a Cerebro task note."""
@@ -146,24 +172,10 @@ def publish_validation_summary(
             error_message=f"cerebro_connect_error: {client.last_error or 'connect_failed'}",
         )
 
-    task_id = resolve_task_id(client, config, payload)
+
+    task_id = resolve_task_id_for_publish(client, config, payload)
     if task_id is None:
         tried = ", ".join(task_url_candidates(config, payload)) or "(none)"
-        root_tasks = client.list_root_task_names()
-        visible_projects = client.list_visible_project_names()
-        root_hint = ""
-        if visible_projects:
-            preview = ", ".join(visible_projects[:8])
-            root_hint = f" Visible Cerebro projects: {preview}."
-        elif root_tasks:
-            preview = ", ".join(root_tasks[:8])
-            root_hint = f" Visible Cerebro root tasks: {preview}."
-        else:
-            root_hint = (
-                " API user sees no projects/tasks — in Cerebro admin grant "
-                f"'{config.normalized_api_user}' visibility on project "
-                f"'{config.project}'."
-            )
         if client.last_error and client.last_error not in ("", "task_not_found"):
             return TrackerPublishResult(
                 published=False,
@@ -175,13 +187,14 @@ def publish_validation_summary(
             error_message=(
                 "Create a Cerebro task named like the scene stem "
                 f"('{scene_task_lookup_name(payload.scene_name)}') under project "
-                f"'{config.project}'. Tried: {tried}.{root_hint}"
+                f"'{config.project}'. Tried: {tried}."
             ),
         )
 
+    note_content = _tracker_note_content(payload, report_bundle)
     note = client.create_task_note(
         task_id=task_id,
-        content=format_validation_publish_summary(payload),
+        content=note_content,
     )
     if note is None:
         if client.last_error == "task_definition_missing":
@@ -223,10 +236,35 @@ def maybe_publish_validation_summary(
     """Build a publish payload from a validation run and send it to Cerebro."""
 
     from pipeline_inspector.integrations.trackers.publish import validation_publish_payload_from_run
+    from pipeline_inspector.integrations.trackers.report_bundle import (
+        build_tracker_report_bundle_from_run,
+    )
 
-    payload = validation_publish_payload_from_run(result, report_path=report_path)
+    report_bundle = build_tracker_report_bundle_from_run(
+        result,
+        report_path=report_path,
+        include_html=False,
+    )
+    payload = validation_publish_payload_from_run(
+        result,
+        report_path=report_bundle.html_report_path or report_path,
+    )
     return publish_validation_summary(
         studio_config,
         payload,
+        report_bundle=report_bundle,
         client_factory=client_factory,
     )
+
+
+def _tracker_note_content(
+    payload: ValidationPublishPayload,
+    report_bundle: TrackerReportBundle | None,
+) -> str:
+    if report_bundle is not None:
+        return format_tracker_note_content(
+            payload,
+            markdown_note=report_bundle.markdown_note,
+            include_report_path_reference=bool(payload.report_path),
+        )
+    return format_validation_publish_summary(payload)

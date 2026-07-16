@@ -21,6 +21,17 @@ class TrackerPublishOutcome:
     result: TrackerPublishResult
 
 
+def preload_tracker_publish_modules(studio_config: StudioConfig | None) -> str:
+    """Import the enabled tracker publish module on the UI thread."""
+
+    config = studio_config or StudioConfig.default()
+    tracker = first_enabled_tracker(config)
+    if tracker is None:
+        return ""
+    _tracker_publish_fn(tracker.id)
+    return tracker.id
+
+
 def publish_validation_to_first_tracker(
     studio_config: StudioConfig | None,
     result: Any,
@@ -28,6 +39,7 @@ def publish_validation_to_first_tracker(
     report_path: str = "",
 ) -> TrackerPublishOutcome | None:
     """Publish a validation summary using the first enabled tracker connector."""
+
 
     config = studio_config or StudioConfig.default()
     tracker = first_enabled_tracker(config)
@@ -59,8 +71,25 @@ def format_tracker_publish_status(outcome: TrackerPublishOutcome | None) -> str:
     publish_result = outcome.result
     if publish_result.published:
         note_ref = publish_result.external_url or publish_result.metadata.get("note_id", "")
+        attachment_ref = (
+            publish_result.metadata.get("component_id")
+            or publish_result.metadata.get("attachment_id")
+        )
+        attachment_error = (publish_result.metadata.get("attachment_error") or "").strip()
+        if note_ref and attachment_ref:
+            return (
+                f"{display_name}: validation summary published "
+                f"(ref {note_ref}, HTML report attached)."
+            )
         if note_ref:
+            if attachment_error:
+                return (
+                    f"{display_name}: validation summary published "
+                    f"(ref {note_ref}; HTML attachment failed: {attachment_error})."
+                )
             return f"{display_name}: validation summary published (ref {note_ref})."
+        if attachment_ref:
+            return f"{display_name}: validation summary published with HTML report attached."
         return f"{display_name}: validation summary published."
 
     if publish_result.skipped_reason:

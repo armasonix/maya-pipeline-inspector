@@ -6,24 +6,25 @@ from dataclasses import replace
 from typing import Any, Optional
 
 from pipeline_inspector.studio_config import (
-    TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE,
-    TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH,
-    TELEGRAM_NOTIFY_EVENTS,
     ConnectorSettings,
     StudioConfig,
     TelegramConnectorSettings,
 )
+from pipeline_inspector.ui.notify_trigger_widgets import (
+    build_notify_trigger_controls,
+    notify_checkbox_object_name,
+    read_notify_on_from_view,
+    read_notify_score_below_from_view,
+    update_notify_trigger_view,
+)
 from pipeline_inspector.ui.settings_widgets import (
     apply_password_echo_mode,
     build_settings_toggle,
-    checkbox_checked,
     find_child,
     line_edit_text,
     qt_align_left,
-    set_checkbox_checked,
     set_fixed_horizontal_size_policy,
     set_line_edit_text,
-    wire_checkbox_changed,
     wire_line_edit_finished,
 )
 
@@ -32,23 +33,17 @@ SETTINGS_TELEGRAM_ENABLED_TOGGLE_OBJECT_NAME = "pipelineInspectorSettingsTelegra
 SETTINGS_TELEGRAM_DETAILS_OBJECT_NAME = "pipelineInspectorSettingsTelegramDetails"
 SETTINGS_TELEGRAM_BOT_TOKEN_INPUT_OBJECT_NAME = "pipelineInspectorSettingsTelegramBotTokenInput"
 SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME = "pipelineInspectorSettingsTelegramChatIdInput"
-SETTINGS_TELEGRAM_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME = (
-    "pipelineInspectorSettingsTelegramNotifyBlockPublishCheckbox"
+SETTINGS_TELEGRAM_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME = notify_checkbox_object_name(
+    "Telegram",
+    "block_publish",
 )
-SETTINGS_TELEGRAM_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME = (
-    "pipelineInspectorSettingsTelegramNotifyBlockDeadlineCheckbox"
+SETTINGS_TELEGRAM_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME = notify_checkbox_object_name(
+    "Telegram",
+    "block_deadline",
 )
 
 _TELEGRAM_LABEL_WIDTH = 72
 _TELEGRAM_FIELD_WIDTH = 292
-_TELEGRAM_NOTIFY_CHECKBOX_OBJECT_NAMES = {
-    TELEGRAM_NOTIFY_EVENT_BLOCK_PUBLISH: (
-        SETTINGS_TELEGRAM_NOTIFY_BLOCK_PUBLISH_CHECKBOX_OBJECT_NAME
-    ),
-    TELEGRAM_NOTIFY_EVENT_BLOCK_DEADLINE: (
-        SETTINGS_TELEGRAM_NOTIFY_BLOCK_DEADLINE_CHECKBOX_OBJECT_NAME
-    ),
-}
 
 def build_telegram_connector_section(
     qt_widgets: Any,
@@ -128,31 +123,16 @@ def build_telegram_connector_section(
         )
     )
 
-    notify_row = qt_widgets.QHBoxLayout()
-    set_notify_margins = getattr(notify_row, "setContentsMargins", None)
-    if set_notify_margins is not None:
-        set_notify_margins(0, 0, 0, 0)
-    set_notify_spacing = getattr(notify_row, "setSpacing", None)
-    if set_notify_spacing is not None:
-        set_notify_spacing(8)
-    notify_caption = qt_widgets.QLabel("Notify on")
-    set_fixed_horizontal_size_policy(qt_widgets, notify_caption)
-    set_caption_width = getattr(notify_caption, "setFixedWidth", None)
-    if set_caption_width is not None:
-        set_caption_width(_TELEGRAM_LABEL_WIDTH)
-    notify_row.addWidget(notify_caption)
-    for event_id, label in TELEGRAM_NOTIFY_EVENTS:
-        checkbox = qt_widgets.QCheckBox(label)
-        checkbox.setObjectName(_TELEGRAM_NOTIFY_CHECKBOX_OBJECT_NAMES[event_id])
-        set_checked = getattr(checkbox, "setChecked", None)
-        if set_checked is not None:
-            set_checked(event_id in telegram.notify_on)
-        wire_checkbox_changed(checkbox, on_settings_changed)
-        notify_row.addWidget(checkbox)
-    notify_row.addStretch(1)
-    add_notify_layout = getattr(details_layout, "addLayout", None)
-    if add_notify_layout is not None:
-        add_notify_layout(notify_row)
+    details_layout.addWidget(
+        build_notify_trigger_controls(
+            qt_widgets,
+            connector_prefix="Telegram",
+            notify_on=telegram.notify_on,
+            notify_score_below=telegram.notify_score_below,
+            label_width=_TELEGRAM_LABEL_WIDTH,
+            on_settings_changed=on_settings_changed,
+        )[0]
+    )
 
     details_row = qt_widgets.QWidget()
     details_row.setObjectName(SETTINGS_TELEGRAM_DETAILS_OBJECT_NAME)
@@ -177,8 +157,8 @@ def build_telegram_connector_section(
     _set_telegram_details_visible(details_row, config.connectors.telegram.enabled)
 
     hint = qt_widgets.QLabel(
-        "When enabled, Pipeline Inspector can send validation summaries to Telegram on "
-        "configured block events. Bot token and chat ID are stored in the studio config."
+        "When enabled, Pipeline Inspector can send validation, readiness, and farm "
+        "notifications to Telegram. Use notify_targets in studio JSON for per-target routing."
     )
     hint.setWordWrap(True)
     section_layout.addWidget(hint)
@@ -187,16 +167,16 @@ def build_telegram_connector_section(
 def read_telegram_connector_from_view(view: Any, qt_widgets: Any) -> TelegramConnectorSettings:
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_TELEGRAM_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
-    notify_on = tuple(
-        event_id
-        for event_id, _label in TELEGRAM_NOTIFY_EVENTS
-        if checkbox_checked(view, qt_widgets, _TELEGRAM_NOTIFY_CHECKBOX_OBJECT_NAMES[event_id])
-    )
     return TelegramConnectorSettings(
         enabled=enabled,
         bot_token=line_edit_text(view, qt_widgets, SETTINGS_TELEGRAM_BOT_TOKEN_INPUT_OBJECT_NAME),
         chat_id=line_edit_text(view, qt_widgets, SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME),
-        notify_on=notify_on,
+        notify_on=read_notify_on_from_view(view, qt_widgets, connector_prefix="Telegram"),
+        notify_score_below=read_notify_score_below_from_view(
+            view,
+            qt_widgets,
+            connector_prefix="Telegram",
+        ),
     )
 
 def update_telegram_connector_view(
@@ -230,13 +210,13 @@ def update_telegram_connector_view(
         SETTINGS_TELEGRAM_CHAT_ID_INPUT_OBJECT_NAME,
         telegram.chat_id,
     )
-    for event_id, _label in TELEGRAM_NOTIFY_EVENTS:
-        set_checkbox_checked(
-            view,
-            qt_widgets,
-            _TELEGRAM_NOTIFY_CHECKBOX_OBJECT_NAMES[event_id],
-            event_id in telegram.notify_on,
-        )
+    update_notify_trigger_view(
+        view,
+        qt_widgets,
+        connector_prefix="Telegram",
+        notify_on=telegram.notify_on,
+        notify_score_below=telegram.notify_score_below,
+    )
 
 def get_telegram_settings(connectors: ConnectorSettings) -> TelegramConnectorSettings:
     return connectors.telegram

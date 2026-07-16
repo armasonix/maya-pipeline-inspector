@@ -1,10 +1,7 @@
 """Support and Roles settings plus readiness requirements for the Studio tab."""
 from __future__ import annotations
 
-import json as _json
-import time as _time
 from collections.abc import Callable
-from pathlib import Path as _Path
 from typing import Any, Optional
 
 from pipeline_inspector.studio_config import (
@@ -59,33 +56,6 @@ _PLAIN_TEXT_WIDTH = 146
 _READINESS_PLAIN_TEXT_WIDTH = _READINESS_FIELD_WIDTH
 _PLAIN_TEXT_HEIGHT = 56
 
-_READINESS_TRACE_LOG = _Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-
-
-def _write_readiness_trace(
-    *,
-    location: str,
-    message: str,
-    data: dict[str, object],
-    hypothesis_id: str,
-    run_id: str = "pre-fix",
-) -> None:
-    #region agent log
-    payload = {
-        "sessionId": "618f4f",
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(_time.time() * 1000),
-        "hypothesisId": hypothesis_id,
-        "runId": run_id,
-    }
-    try:
-        with _READINESS_TRACE_LOG.open("a", encoding="utf-8") as handle:
-            handle.write(_json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    #endregion
 
 
 def build_support_and_roles_section(
@@ -382,15 +352,6 @@ def _build_readiness_checks_row(
     if add_stretch is not None:
         add_stretch(1)
 
-    #region agent log
-    _write_readiness_trace(
-        location="support_section.py:_build_readiness_checks_row",
-        message="readiness checks row built",
-        data={"column_count": len(field_specs), "layout": "horizontal"},
-        hypothesis_id="C",
-        run_id="post-fix",
-    )
-    #endregion
     return row_host
 
 
@@ -455,25 +416,6 @@ def _build_plain_text_input(
         value=value,
         placeholder=placeholder,
     )
-    placeholder_text_fn = getattr(widget, "placeholderText", None)
-    applied_placeholder = (
-        str(placeholder_text_fn() or "") if placeholder_text_fn is not None else ""
-    )
-    #region agent log
-    _write_readiness_trace(
-        location="support_section.py:_build_plain_text_input",
-        message="readiness field built",
-        data={
-            "object_name": object_name,
-            "value_empty": not bool(value),
-            "placeholder": placeholder,
-            "applied_placeholder": applied_placeholder,
-            "uses_local_plain_text_style": True,
-        },
-        hypothesis_id="B",
-        run_id="placeholder-fix",
-    )
-    #endregion
     set_fixed_width = getattr(widget, "setFixedWidth", None)
     if set_fixed_width is not None:
         set_fixed_width(width)
@@ -483,19 +425,6 @@ def _build_plain_text_input(
     set_fixed_horizontal_size_policy(qt_widgets, widget)
 
     def _on_plain_text_changed() -> None:
-        #region agent log
-        _write_readiness_trace(
-            location="support_section.py:_on_plain_text_changed",
-            message="readiness plain text changed",
-            data={
-                "object_name": object_name,
-                "text": _plain_text(widget),
-                "cursor_pos": _plain_text_cursor_position(widget),
-            },
-            hypothesis_id="B",
-            run_id="post-fix",
-        )
-        #endregion
         if on_settings_changed is not None:
             on_settings_changed()
 
@@ -533,64 +462,13 @@ def _set_plain_text_if_unfocused(
 
     has_focus = widget_has_focus(widget) if widget is not None else False
     current_text = _plain_text(widget)
-    cursor_pos = _plain_text_cursor_position(widget)
-    layout_direction = _widget_layout_direction(widget)
     skip_focus = has_focus
     skip_unchanged = current_text == text
-    #region agent log
-    _write_readiness_trace(
-        location="support_section.py:_set_plain_text_if_unfocused",
-        message="update_support_and_roles_view plain text apply",
-        data={
-            "field_name": field_name,
-            "has_focus": has_focus,
-            "current_text": current_text,
-            "incoming_text": text,
-            "cursor_pos": cursor_pos,
-            "layout_direction": layout_direction,
-            "will_rewrite": not skip_unchanged,
-            "skipped": skip_focus or skip_unchanged,
-        },
-        hypothesis_id="A",
-        run_id="placeholder-fix",
-    )
-    #endregion
     if skip_focus or skip_unchanged:
         return
     _set_plain_text(widget, text)
     if not text and qt_widgets is not None:
         refresh_plain_text_placeholder(qt_widgets, widget)
-
-
-def _plain_text_cursor_position(widget: Any | None) -> int | None:
-    if widget is None:
-        return None
-    cursor = getattr(widget, "textCursor", None)
-    if cursor is None:
-        return None
-    try:
-        cursor_obj = cursor()
-    except TypeError:
-        return None
-    position = getattr(cursor_obj, "position", None)
-    if position is None:
-        return None
-    try:
-        return int(position())
-    except TypeError:
-        return int(position) if isinstance(position, int) else None
-
-
-def _widget_layout_direction(widget: Any | None) -> str | None:
-    if widget is None:
-        return None
-    layout_direction = getattr(widget, "layoutDirection", None)
-    if layout_direction is None:
-        return None
-    try:
-        return str(layout_direction())
-    except TypeError:
-        return str(layout_direction)
 
 
 def _set_plain_text(widget: Any | None, text: str) -> None:

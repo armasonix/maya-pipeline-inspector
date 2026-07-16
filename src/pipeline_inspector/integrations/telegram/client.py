@@ -2,13 +2,18 @@
 from __future__ import annotations
 
 import json
+import socket
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from pipeline_inspector.integrations.telegram.config import TelegramConfig
+from pipeline_inspector.integrations.telegram.config import (
+    TELEGRAM_REQUEST_RETRIES,
+    TelegramConfig,
+)
 
 HttpTransport = Callable[["HttpRequest", float], "TelegramResponse"]
 
@@ -102,21 +107,32 @@ def default_http_transport(request: HttpRequest, timeout: float) -> TelegramResp
         headers=dict(request.headers),
         method=request.method,
     )
-    try:
-        with urllib.request.urlopen(urllib_request, timeout=timeout) as response:
-            body = response.read().decode("utf-8", errors="replace")
+    retries = max(1, int(TELEGRAM_REQUEST_RETRIES))
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(urllib_request, timeout=timeout) as response:
+                body = response.read().decode("utf-8", errors="replace")
+                return TelegramResponse(
+                    status_code=response.status,
+                    body=body,
+                    json_data=_parse_json_body(body),
+                )
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
             return TelegramResponse(
-                status_code=response.status,
+                status_code=exc.code,
                 body=body,
                 json_data=_parse_json_body(body),
             )
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        return TelegramResponse(
-            status_code=exc.code,
-            body=body,
-            json_data=_parse_json_body(body),
-        )
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            last_error = exc
+            if attempt + 1 >= retries:
+                raise TelegramClientError(str(exc)) from exc
+            time.sleep(min(2.0, 0.5 * (attempt + 1)))
+    if last_error is not None:
+        raise TelegramClientError(str(last_error)) from last_error
+    raise TelegramClientError("Telegram request failed without response")
 
 def _parse_json_body(body: str) -> dict[str, Any] | list[Any] | None:
     text = body.strip()

@@ -11,6 +11,7 @@ from pipeline_inspector.integrations.cerebro.publish import (
     maybe_publish_validation_summary,
     publish_validation_summary,
     resolve_task_id,
+    resolve_task_id_for_publish,
     task_url_candidates,
 )
 from pipeline_inspector.integrations.trackers.publish import ValidationPublishPayload
@@ -187,6 +188,31 @@ def test_resolve_task_id_falls_back_to_scene_stem():
     )
 
     task_id = resolve_task_id(client, client.config, _payload(scene_name="hero.ma"))
+
+    assert task_id == 42
+    assert database.connected is True
+
+
+def test_resolve_task_id_for_publish_skips_project_tree_search():
+    database = FakeCerebroDatabase(
+        task_urls={"/Demo Project/hero": 42},
+        project_children={10: {"hero": 99}},
+    )
+    client = CerebroClient(
+        CerebroConfig(
+            server_url="cerebrohq.com",
+            api_user="pipeline.bot",
+            api_password="secret",
+            project="Demo Project",
+        ),
+        database_port=database,
+    )
+
+    task_id = resolve_task_id_for_publish(
+        client,
+        client.config,
+        _payload(scene_name="hero.ma"),
+    )
 
     assert task_id == 42
     assert database.connected is True
