@@ -36,6 +36,8 @@ PANEL_HEADER_OBJECT_NAME = "pipelineInspectorPanelHeader"
 PANEL_HEADER_TITLE_OBJECT_NAME = "pipelineInspectorPanelHeaderTitle"
 PANEL_HEADER_UNSAVED_OBJECT_NAME = "pipelineInspectorPanelHeaderUnsaved"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsGearButton"
+DETACH_PANEL_BUTTON_OBJECT_NAME = "pipelineInspectorDetachPanelButton"
+DOCK_PANEL_BUTTON_OBJECT_NAME = "pipelineInspectorDockPanelButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "pipelineInspectorDocumentationButton"
 REPORT_BUG_BUTTON_OBJECT_NAME = "pipelineInspectorReportBugButton"
 CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "pipelineInspectorCheckForUpdatesButton"
@@ -45,6 +47,12 @@ SUMMARY_PROFILE_ROW_OBJECT_NAME = "pipelineInspectorSummaryProfileRow"
 VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME = "pipelineInspectorValidateActionOverflowButton"
 VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME = "pipelineInspectorValidateActionBarSeparator"
 SETTINGS_GEAR_TOOLTIP = "Open settings"
+DETACH_PANEL_BUTTON_TOOLTIP = (
+    "Detach the panel into a floating window that you can move freely."
+)
+DOCK_PANEL_BUTTON_TOOLTIP = (
+    "Dock the panel back to the default position on the right of the Maya window."
+)
 DOCUMENTATION_BUTTON_TOOLTIP = "Open Pipeline Inspector documentation in your browser."
 REPORT_BUG_BUTTON_TOOLTIP = (
     "Report a bug in Pipeline Inspector to the plugin maintainers. "
@@ -267,6 +275,8 @@ class PanelNavigationCallbacks:
     on_open_documentation: Optional[Callable[[], None]] = None
     on_report_bug: Optional[Callable[[], None]] = None
     on_check_for_updates: Optional[Callable[[], None]] = None
+    on_detach_panel: Optional[Callable[[], None]] = None
+    on_dock_panel: Optional[Callable[[], None]] = None
 
 
 @dataclass(frozen=True)
@@ -421,6 +431,24 @@ def build_panel_header(
     if connect is not None and navigation_callbacks.on_open_settings is not None:
         connect(navigation_callbacks.on_open_settings)
     row_layout.addWidget(gear_button)
+
+    dock_button = _compact_button(
+        qt_widgets,
+        "Dock",
+        DOCK_PANEL_BUTTON_OBJECT_NAME,
+        DOCK_PANEL_BUTTON_TOOLTIP,
+        navigation_callbacks.on_dock_panel,
+    )
+    row_layout.addWidget(dock_button)
+
+    detach_button = _compact_button(
+        qt_widgets,
+        "Detach",
+        DETACH_PANEL_BUTTON_OBJECT_NAME,
+        DETACH_PANEL_BUTTON_TOOLTIP,
+        navigation_callbacks.on_detach_panel,
+    )
+    row_layout.addWidget(detach_button)
 
     title_label = qt_widgets.QLabel(f"{PANEL_TITLE}  v{version}")
     title_label.setObjectName(PANEL_HEADER_TITLE_OBJECT_NAME)
@@ -2622,10 +2650,10 @@ def _apply_widget_width_constraint(
     if set_max_width is not None:
         set_max_width(max_width)
     if size_policy is not None and set_policy is not None:
-        maximum = getattr(size_policy, "Maximum", None)
+        preferred = getattr(size_policy, "Preferred", None)
         expanding = getattr(size_policy, "Expanding", None)
-        if maximum is not None and expanding is not None:
-            set_policy(maximum, expanding)
+        if preferred is not None and expanding is not None:
+            set_policy(preferred, expanding)
 
 
 def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2649,12 +2677,7 @@ def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None
     for target in targets:
         _apply_widget_width_constraint(target, tokens.panel_max_width, size_policy)
 
-    dock = getattr(content, "_pipeline_inspector_dock", None)
-    if dock is not None:
-        _apply_widget_width_constraint(dock, tokens.panel_max_width, size_policy)
-        adjust_size = getattr(dock, "adjustSize", None)
-        if adjust_size is not None and tokens.panel_max_width is not None:
-            adjust_size()
+    # Keep the Maya dock shell QWidget flexible so users can undock and move it.
 
 
 

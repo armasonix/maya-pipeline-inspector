@@ -101,6 +101,7 @@ OBSOLETE_WORKSPACE_CONTROL_NAMES = (
     f"{main_window.PANEL_OBJECT_NAME}DockRightWorkspaceControl",
 )
 DEFAULT_DOCK_AREA = "right"
+WORKSPACE_RETAIN = True
 
 VALIDATE_SPLITTER_SIZES_ATTR = "_pipeline_inspector_validate_splitter_sizes"
 STUDIO_CONFIG_ATTR = "_pipeline_inspector_studio_config"
@@ -124,8 +125,12 @@ def show_panel() -> Any:
 
     if _workspace_control_exists(cmds):
         if _PANEL is not None:
+            _configure_workspace_control_mobility(cmds)
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
-            _PANEL.show()
+            raise_panel = getattr(_PANEL, "raise_", None)
+            if raise_panel is not None:
+                raise_panel()
+            _debug_workspace_dock_log(cmds, "show_panel.restore", hypothesis_id="H12")
             remember_plugin_version(__version__)
             remember_panel_visible(True)
             return _PANEL
@@ -135,12 +140,16 @@ def show_panel() -> Any:
     _PANEL = panel
     if _workspace_control_exists(cmds):
         cmds.deleteUI(WORKSPACE_CONTROL_NAME, control=True)
+    initial_width = _preferred_docked_panel_width(panel)
     panel.show(
         dockable=True,
         area=DEFAULT_DOCK_AREA,
         floating=False,
-        retain=False,
+        retain=WORKSPACE_RETAIN,
+        width=initial_width,
     )
+    _configure_workspace_control_mobility(cmds)
+    _debug_workspace_dock_log(cmds, "show_panel.create", hypothesis_id="H12")
     remember_plugin_version(__version__)
     remember_panel_visible(True)
     return panel
@@ -261,6 +270,8 @@ def _create_dockable_panel() -> Any:
         super(type(self), self).__init__()
         self.setObjectName(main_window.PANEL_OBJECT_NAME)
         self.setWindowTitle(main_window.PANEL_TITLE)
+        size_policy = qt_widgets.QSizePolicy
+        self.setSizePolicy(size_policy.Preferred, size_policy.Expanding)
 
         layout = qt_widgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -331,7 +342,7 @@ def _create_dockable_panel() -> Any:
 
 
 def _sync_workspace_control_width(content: Any) -> None:
-    """Resize the Maya dock to the compact panel width token."""
+    """Suggest a compact dock width without locking the workspace control."""
 
     from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
 
@@ -345,14 +356,251 @@ def _sync_workspace_control_width(content: Any) -> None:
     cmds = _maya_cmds()
     if not _workspace_control_exists(cmds):
         return
+    if _workspace_control_is_floating(cmds):
+        return
     try:
         cmds.workspaceControl(
             WORKSPACE_CONTROL_NAME,
             edit=True,
-            width=tokens.panel_max_width,
+            resizeWidth=tokens.panel_max_width,
+            widthProperty="free",
+            heightProperty="free",
         )
     except (RuntimeError, TypeError, ValueError):
         return
+
+
+def detach_panel() -> bool:
+    """Float the panel so it can be moved independently of the Maya dock."""
+
+    global _PANEL
+    cmds = _maya_cmds()
+    if _PANEL is None and not _workspace_control_exists(cmds):
+        _debug_workspace_dock_log(cmds, "detach_panel.missing_panel", hypothesis_id="H13")
+        return False
+
+    _configure_workspace_control_mobility(cmds)
+
+    set_params = getattr(_PANEL, "setDockableParameters", None) if _PANEL is not None else None
+    if callable(set_params):
+        try:
+            set_params(dockable=True, floating=True)
+        except (RuntimeError, TypeError, ValueError):
+            pass
+        if _workspace_control_is_floating(cmds):
+            _debug_workspace_dock_log(cmds, "detach_panel.mixin_float", hypothesis_id="H13")
+            return True
+
+    if _workspace_control_exists(cmds):
+        try:
+            cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, floating=True)
+        except (RuntimeError, TypeError, ValueError):
+            pass
+        if _workspace_control_is_floating(cmds):
+            _debug_workspace_dock_log(cmds, "detach_panel.workspace_float", hypothesis_id="H13")
+            return True
+
+    if _PANEL is not None:
+        show_panel_widget = getattr(_PANEL, "show", None)
+        if callable(show_panel_widget):
+            try:
+                show_panel_widget(dockable=False, floating=True)
+                _debug_workspace_dock_log(cmds, "detach_panel.standalone_window", hypothesis_id="H14")
+                return True
+            except (RuntimeError, TypeError, ValueError):
+                pass
+
+    _debug_workspace_dock_log(cmds, "detach_panel.failed", hypothesis_id="H13")
+    return False
+
+
+def _sync_docked_panel_layout(cmds: Any) -> None:
+    """Reapply mobility and compact width after returning to the default dock."""
+
+    _configure_workspace_control_mobility(cmds)
+    content = _panel_content_from_panel(_PANEL) if _PANEL is not None else None
+    if content is not None:
+        _sync_workspace_control_width(content)
+
+
+def dock_panel() -> bool:
+    """Return the panel to the default right dock."""
+
+    global _PANEL
+    cmds = _maya_cmds()
+    if _PANEL is None and not _workspace_control_exists(cmds):
+        _debug_workspace_dock_log(cmds, "dock_panel.missing_panel", hypothesis_id="H15")
+        return False
+
+    initial_width = _preferred_docked_panel_width(_PANEL) if _PANEL is not None else 420
+
+    if _PANEL is not None and not _workspace_control_exists(cmds):
+        show_panel_widget = getattr(_PANEL, "show", None)
+        if callable(show_panel_widget):
+            try:
+                show_panel_widget(
+                    dockable=True,
+                    area=DEFAULT_DOCK_AREA,
+                    floating=False,
+                    retain=WORKSPACE_RETAIN,
+                    width=initial_width,
+                )
+                _sync_docked_panel_layout(cmds)
+                if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
+                    _debug_workspace_dock_log(cmds, "dock_panel.recreate_dock", hypothesis_id="H15")
+                    return True
+            except (RuntimeError, TypeError, ValueError):
+                pass
+
+    _configure_workspace_control_mobility(cmds)
+
+    set_params = getattr(_PANEL, "setDockableParameters", None) if _PANEL is not None else None
+    if callable(set_params):
+        try:
+            set_params(
+                dockable=True,
+                floating=False,
+                area=DEFAULT_DOCK_AREA,
+                width=initial_width,
+            )
+        except (RuntimeError, TypeError, ValueError):
+            pass
+        if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
+            _sync_docked_panel_layout(cmds)
+            _debug_workspace_dock_log(cmds, "dock_panel.mixin_dock", hypothesis_id="H15")
+            return True
+
+    if _workspace_control_exists(cmds):
+        try:
+            cmds.workspaceControl(
+                WORKSPACE_CONTROL_NAME,
+                edit=True,
+                floating=False,
+                dockToMainWindow=(DEFAULT_DOCK_AREA, True),
+            )
+        except (RuntimeError, TypeError, ValueError):
+            pass
+        try:
+            cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
+        except (RuntimeError, TypeError, ValueError):
+            pass
+        if not _workspace_control_is_floating(cmds):
+            _sync_docked_panel_layout(cmds)
+            _debug_workspace_dock_log(cmds, "dock_panel.workspace_dock", hypothesis_id="H15")
+            return True
+
+    if _PANEL is not None:
+        show_panel_widget = getattr(_PANEL, "show", None)
+        if callable(show_panel_widget):
+            try:
+                show_panel_widget(
+                    dockable=True,
+                    area=DEFAULT_DOCK_AREA,
+                    floating=False,
+                    retain=WORKSPACE_RETAIN,
+                    width=initial_width,
+                )
+                _sync_docked_panel_layout(cmds)
+                if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
+                    _debug_workspace_dock_log(cmds, "dock_panel.show_dock", hypothesis_id="H15")
+                    return True
+            except (RuntimeError, TypeError, ValueError):
+                pass
+
+    _debug_workspace_dock_log(cmds, "dock_panel.failed", hypothesis_id="H15")
+    return False
+
+
+def _preferred_docked_panel_width(panel: Any) -> int:
+    content = _panel_content_from_panel(panel)
+    if content is None:
+        return 420
+    from pipeline_inspector.ui.ui_density_tokens import density_tokens, normalize_density
+
+    density = str(
+        getattr(content, "_pipeline_inspector_ui_density", "comfortable") or "comfortable"
+    )
+    tokens = density_tokens(normalize_density(density))
+    if tokens.panel_max_width is not None:
+        return int(tokens.panel_max_width)
+    return 420
+
+
+def _workspace_control_is_floating(cmds: Any) -> bool:
+    if not _workspace_control_exists(cmds):
+        return False
+    try:
+        return bool(cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, floating=True))
+    except (RuntimeError, TypeError, ValueError):
+        return False
+
+
+def _configure_workspace_control_mobility(cmds: Any) -> None:
+    """Allow undocking to a floating window while keeping the default right dock."""
+
+    if not _workspace_control_exists(cmds):
+        return
+    try:
+        cmds.workspaceControl(
+            WORKSPACE_CONTROL_NAME,
+            edit=True,
+            retain=WORKSPACE_RETAIN,
+            widthProperty="free",
+            heightProperty="free",
+            minimumWidth=1,
+            minimumHeight=1,
+            maximumWidth=5000,
+            maximumHeight=5000,
+            actLikeMayaUIElement=True,
+        )
+    except TypeError:
+        try:
+            cmds.workspaceControl(
+                WORKSPACE_CONTROL_NAME,
+                edit=True,
+                retain=WORKSPACE_RETAIN,
+            )
+        except (RuntimeError, TypeError, ValueError):
+            return
+    except (RuntimeError, ValueError):
+        return
+
+
+def _debug_workspace_dock_log(cmds: Any, location: str, *, hypothesis_id: str) -> None:
+    # #region agent log
+    try:
+        import json
+        import time
+        from pathlib import Path
+
+        data: dict[str, str] = {"location": location}
+        for key, flag in (
+            ("floating", "floating"),
+            ("width_property", "widthProperty"),
+            ("height_property", "heightProperty"),
+            ("width", "width"),
+            ("minimum_width", "minimumWidth"),
+            ("maximum_width", "maximumWidth"),
+        ):
+            try:
+                value = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, **{flag: True})
+            except (RuntimeError, TypeError, ValueError):
+                value = ""
+            data[key] = str(value)
+        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": f"ui_launcher.{location}",
+            "message": "Workspace control dock state",
+            "data": data,
+            "hypothesisId": hypothesis_id,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
+    # #endregion
 
 
 def _panel_navigation_callbacks(
@@ -373,6 +621,8 @@ def _panel_navigation_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_detach_panel=detach_panel,
+        on_dock_panel=dock_panel,
         on_report_bug=lambda: _report_bug_from_ui(
             _panel_content(panel_state),
             qt_widgets,
