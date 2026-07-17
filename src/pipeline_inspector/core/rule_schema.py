@@ -1091,9 +1091,13 @@ class ValidationEngine:
             return None
         obj = target.obj
         if isinstance(obj, (NodeSnapshot, MaterialSnapshot, ShadingEngineSnapshot, ShapeSnapshot)):
+            if isinstance(obj, NodeSnapshot) and str(obj.id).startswith("prim:"):
+                return obj.full_name or obj.id.removeprefix("prim:")
+            if isinstance(obj, MaterialSnapshot) and str(obj.node_id).startswith("prim:"):
+                return obj.full_name or obj.node_id.removeprefix("prim:")
             return obj.name
         if isinstance(obj, FileDependencySnapshot):
-            return obj.node_id
+            return obj.node_id.removeprefix("prim:") or obj.node_id
         if isinstance(obj, ConnectionSnapshot):
             return obj.dst_node
         return None

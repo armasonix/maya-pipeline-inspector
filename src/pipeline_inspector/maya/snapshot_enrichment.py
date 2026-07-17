@@ -52,6 +52,17 @@ def prepare_snapshot_for_validation(
 ) -> GraphSnapshot:
     """Return a validation-ready snapshot with runtime semantics and UDIM metadata."""
 
+    from pipeline_inspector.usd.enrichment import (
+        is_usd_snapshot,
+        prepare_usd_snapshot_for_validation,
+    )
+
+    if is_usd_snapshot(snapshot):
+        return prepare_usd_snapshot_for_validation(
+            snapshot,
+            studio_environment=studio_environment,
+        )
+
     enriched = enrich_snapshot(snapshot, studio_environment=studio_environment)
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
     resolved = resolver.apply_to_snapshot(enriched)

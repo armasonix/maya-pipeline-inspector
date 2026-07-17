@@ -382,6 +382,62 @@ class ArnoldSceneMetadata:
         )
 
 @dataclass(frozen=True)
+class UsdStageMetadata:
+    """USD stage-level metadata derived from an OpenUSD asset scan."""
+
+    root_layer: str = ""
+    default_prim: str = ""
+    has_default_prim: bool = False
+    suggested_default_prim: str = ""
+    prim_count: int = 0
+    mesh_count: int = 0
+    material_count: int = 0
+    unbound_mesh_count: int = 0
+    unbound_mesh_paths: list[str] = field(default_factory=list)
+    missing_reference_count: int = 0
+    missing_reference_paths: list[str] = field(default_factory=list)
+    payload_count: int = 0
+    opening_error_count: int = 0
+    opening_errors: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "root_layer": self.root_layer,
+            "default_prim": self.default_prim,
+            "has_default_prim": self.has_default_prim,
+            "suggested_default_prim": self.suggested_default_prim,
+            "prim_count": self.prim_count,
+            "mesh_count": self.mesh_count,
+            "material_count": self.material_count,
+            "unbound_mesh_count": self.unbound_mesh_count,
+            "unbound_mesh_paths": list(self.unbound_mesh_paths),
+            "missing_reference_count": self.missing_reference_count,
+            "missing_reference_paths": list(self.missing_reference_paths),
+            "payload_count": self.payload_count,
+            "opening_error_count": self.opening_error_count,
+            "opening_errors": list(self.opening_errors),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> UsdStageMetadata:
+        return cls(
+            root_layer=str(data.get("root_layer", "") or ""),
+            default_prim=str(data.get("default_prim", "") or ""),
+            has_default_prim=bool(data.get("has_default_prim", False)),
+            suggested_default_prim=str(data.get("suggested_default_prim", "") or ""),
+            prim_count=int(data.get("prim_count", 0)),
+            mesh_count=int(data.get("mesh_count", 0)),
+            material_count=int(data.get("material_count", 0)),
+            unbound_mesh_count=int(data.get("unbound_mesh_count", 0)),
+            unbound_mesh_paths=_as_str_list(data.get("unbound_mesh_paths")),
+            missing_reference_count=int(data.get("missing_reference_count", 0)),
+            missing_reference_paths=_as_str_list(data.get("missing_reference_paths")),
+            payload_count=int(data.get("payload_count", 0)),
+            opening_error_count=int(data.get("opening_error_count", 0)),
+            opening_errors=_as_str_list(data.get("opening_errors")),
+        )
+
+@dataclass(frozen=True)
 class ShaderComplexityMetadata:
     """Shader graph complexity metrics computed during snapshot enrichment."""
 
@@ -482,6 +538,7 @@ class MaterialSnapshot:
     node_id: str
     name: str
     type_name: str
+    full_name: str = ""
     renderer_family: Optional[str] = None
     shading_engines: list[str] = field(default_factory=list)
     assigned_shapes: list[str] = field(default_factory=list)
@@ -501,6 +558,7 @@ class MaterialSnapshot:
             "node_id": self.node_id,
             "name": self.name,
             "type_name": self.type_name,
+            "full_name": self.full_name,
             "renderer_family": self.renderer_family,
             "shading_engines": list(self.shading_engines),
             "assigned_shapes": list(self.assigned_shapes),
@@ -543,6 +601,7 @@ class MaterialSnapshot:
             node_id=str(data.get("node_id", "")),
             name=str(data.get("name", "")),
             type_name=str(data.get("type_name", "")),
+            full_name=str(data.get("full_name", "")),
             renderer_family=data.get("renderer_family"),
             shading_engines=_as_str_list(data.get("shading_engines")),
             assigned_shapes=_as_str_list(data.get("assigned_shapes")),
@@ -742,6 +801,7 @@ class GraphSnapshot:
     shapes: list[ShapeSnapshot] = field(default_factory=list)
     vray_scene_metadata: Optional[VraySceneMetadata] = None
     arnold_scene_metadata: Optional[ArnoldSceneMetadata] = None
+    usd_stage_metadata: Optional[UsdStageMetadata] = None
 
     def to_dict(self) -> JsonDict:
         payload: JsonDict = {
@@ -763,6 +823,8 @@ class GraphSnapshot:
             payload["vray_scene_metadata"] = self.vray_scene_metadata.to_dict()
         if self.arnold_scene_metadata is not None:
             payload["arnold_scene_metadata"] = self.arnold_scene_metadata.to_dict()
+        if self.usd_stage_metadata is not None:
+            payload["usd_stage_metadata"] = self.usd_stage_metadata.to_dict()
         return payload
 
     @classmethod
@@ -775,6 +837,10 @@ class GraphSnapshot:
         arnold_scene_metadata = None
         if isinstance(raw_arnold_scene_metadata, Mapping):
             arnold_scene_metadata = ArnoldSceneMetadata.from_dict(raw_arnold_scene_metadata)
+        raw_usd_stage_metadata = data.get("usd_stage_metadata")
+        usd_stage_metadata = None
+        if isinstance(raw_usd_stage_metadata, Mapping):
+            usd_stage_metadata = UsdStageMetadata.from_dict(raw_usd_stage_metadata)
         return cls(
             schema_version=str(data.get("schema_version", SNAPSHOT_SCHEMA_VERSION)),
             scene_path=str(data.get("scene_path", "")),
@@ -812,6 +878,7 @@ class GraphSnapshot:
             ],
             vray_scene_metadata=vray_scene_metadata,
             arnold_scene_metadata=arnold_scene_metadata,
+            usd_stage_metadata=usd_stage_metadata,
         )
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:

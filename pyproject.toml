@@ -44,6 +44,9 @@ dev = [
     "ruff>=0.5.0",
     "mypy>=1.10,<2.0",
 ]
+usd = [
+    "usd-core>=24.11",
+]
 
 [project.urls]
 Homepage = "https://github.com/armasonix/maya-pipeline-inspector"

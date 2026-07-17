@@ -2840,13 +2840,45 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
             "Make Waive: select an issue in the table first.",
         )
         return
+    snapshot = getattr(content, "_pipeline_inspector_snapshot", None)
+    target_id = str(getattr(issue, "target_id", "") or "")
+    node_name = str(getattr(issue, "node", "") or "")
+    material_name = str(getattr(issue, "material", "") or "") or None
+    # #region agent log
+    _debug_nav_log_ui(
+        "ui_launcher._run_navigation_action",
+        "Navigation requested",
+        {
+            "action": action,
+            "target_id": target_id,
+            "node_name": node_name,
+            "material_name": material_name or "",
+            "has_snapshot": snapshot is not None,
+            "prim_nodes": sum(
+                1
+                for node in getattr(snapshot, "nodes", ()) or ()
+                if str(getattr(node, "id", "")).startswith("prim:")
+            )
+            if snapshot is not None
+            else 0,
+        },
+        hypothesis_id="H6",
+    )
+    # #endregion
     try:
         if action == "select_node":
-            result = commands.select_node_action(str(issue.node or ""))
+            result = commands.select_node_action(
+                node_name,
+                target_id=target_id,
+                material_name=material_name,
+                snapshot=snapshot,
+            )
         elif action == "open_in_hypershade":
             result = commands.open_in_hypershade_action(
-                str(issue.node or ""),
-                material_name=str(getattr(issue, "material", "") or "") or None,
+                node_name,
+                material_name=material_name,
+                target_id=target_id,
+                snapshot=snapshot,
             )
         elif action == "copy_path":
             result = commands.copy_path_action(_issue_path(issue))
@@ -2868,6 +2900,29 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         result.message,
     )
+    # #region agent log
+    _debug_nav_log_ui(
+        "ui_launcher._run_navigation_action",
+        "Navigation result",
+        {
+            "action": action,
+            "succeeded": result.succeeded,
+            "message": result.message,
+            "target": result.target,
+        },
+        hypothesis_id="H6",
+    )
+    # #endregion
+
+
+def _debug_nav_log_ui(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _issue_path(issue: Any) -> str:
@@ -3180,6 +3235,25 @@ def _store_validation_state(
 def _populate_fix_queue(content: Any, result: Any) -> None:
     fix_plan = getattr(result, "fix_plan", None)
     actions = getattr(fix_plan, "actions", ())
+    # #region agent log
+    _debug_fix_queue_log(
+        "ui_launcher._populate_fix_queue",
+        "Fix queue populated",
+        {
+            "action_count": len(actions),
+            "usd_actions": sum(1 for action in actions if str(action.target_id).startswith("prim:")),
+            "scene_usd_actions": sum(
+                1
+                for action in actions
+                if action.fix_type in {"set_default_prim", "set_attr", "normalize_path", "relink_path"}
+                and action.target_kind in {"scene", "graph"}
+            ),
+            "unblocked": sum(1 for action in actions if not action.blocked),
+            "fix_types": "|".join(sorted({action.fix_type for action in actions})),
+        },
+        hypothesis_id="H4",
+    )
+    # #endregion
     fix_rows = tuple(
         FixQueueRow(
             selected=False,
@@ -3479,7 +3553,7 @@ def _sync_fix_queue_selection(content: Any, qt_widgets: Any) -> None:
 
 
 def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
-    from pipeline_inspector.maya.fix_applier import apply_fix_actions
+    from pipeline_inspector.maya.fix_router import apply_fix_actions
 
     fix_plan = getattr(content, "_pipeline_inspector_fix_plan", None)
     table = _fix_queue_table(content, qt_widgets)
@@ -3540,6 +3614,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         allow_high_risk=allow_high_risk,
         allow_referenced=True,
         allow_locked=True,
+        studio_environment=_studio_environment_from_content(content),
     )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
@@ -3553,7 +3628,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
 
 def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     from pipeline_inspector.core.fix_plan import NAMING_FIX_TYPE
-    from pipeline_inspector.maya.fix_applier import apply_fix_actions
+    from pipeline_inspector.maya.fix_router import apply_fix_actions
     from pipeline_inspector.ui.fix_queue import HIGH_RISK, MEDIUM_RISK
 
     fix_plan = getattr(content, "_pipeline_inspector_fix_plan", None)
@@ -3590,6 +3665,7 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         actions,
         allow_referenced=True,
         allow_locked=True,
+        studio_environment=_studio_environment_from_content(content),
     )
     _persist_fix_apply_audit(content, report)
     _set_label_text(
@@ -4168,6 +4244,26 @@ def _format_fix_apply_message(report: Any, *, selected_count: int) -> str:
 
 def _yes_no(value: bool) -> str:
     return "YES" if value else "NO"
+
+
+def _studio_environment_from_content(content: Any) -> Any:
+    user_config = getattr(content, "_pipeline_inspector_user_config", None)
+    studio_config = getattr(user_config, "studio_config", None) if user_config else None
+    if studio_config is None:
+        return None
+    from pipeline_inspector.maya.validation_pipeline import _studio_environment_for_validation
+
+    return _studio_environment_for_validation(studio_config)
+
+
+def _debug_fix_queue_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _debug_health_log(

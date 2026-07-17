@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from pipeline_inspector.core.models import GraphSnapshot, NodeSnapshot
+from pipeline_inspector.maya import commands
+from pipeline_inspector.maya.navigation import NavigationActionResult
+from pipeline_inspector.maya.usd_navigation import (
+    find_usd_prim_for_issue,
+    is_usd_prim_target,
+    open_usd_shader_view,
+    resolve_usd_prim_path,
+    select_usd_prim,
+)
+from pipeline_inspector.usd.scanner import _read_opening_errors
+
+
+def test_is_usd_prim_target_detects_prim_prefix() -> None:
+    assert is_usd_prim_target(target_id="prim:/Base/mtl/albedo")
+    assert is_usd_prim_target(node_name="prim:/Base/mtl/albedo")
+    assert is_usd_prim_target(node_name="/Base/mtl/albedo")
+    assert not is_usd_prim_target(target_id="file1", node_name="file1")
+
+
+def test_resolve_usd_prim_path_from_target_id() -> None:
+    assert (
+        resolve_usd_prim_path(target_id="prim:/Base/mtl/albedo")
+        == "/Base/mtl/albedo"
+    )
+
+
+def test_resolve_usd_prim_path_from_snapshot_node_name() -> None:
+    snapshot = GraphSnapshot(
+        scene_path="shot.ma",
+        renderer="vray",
+        nodes=[
+            NodeSnapshot(
+                id="prim:/Base/mtl/albedo",
+                name="demo_albedo_v002_1",
+                full_name="/Base/mtl/albedo",
+                type_name="Shader",
+            )
+        ],
+    )
+    assert (
+        resolve_usd_prim_path(node_name="demo_albedo_v002_1", snapshot=snapshot)
+        == "/Base/mtl/albedo"
+    )
+
+
+def test_select_usd_prim_uses_cmds_select_with_ufe_path() -> None:
+    cmds = MagicMock()
+    stage = MagicMock()
+    stage.GetPrimAtPath.return_value.IsValid.return_value = True
+
+    def ls_side_effect(*_args: object, **kwargs: object) -> list[str]:
+        if kwargs.get("type") == "mayaUsdProxyShape":
+            return ["|hero|heroShape"]
+        if kwargs.get("ufe"):
+            return ["|hero|heroShape,/Base/mtl/albedo"]
+        return []
+
+    cmds.ls.side_effect = ls_side_effect
+
+    with patch(
+        "pipeline_inspector.maya.usd_navigation._get_proxy_stage",
+        return_value=stage,
+    ):
+        result = select_usd_prim("/Base/mtl/albedo", cmds=cmds)
+
+    assert result.succeeded is True
+    cmds.select.assert_called_once_with("|hero|heroShape,/Base/mtl/albedo", replace=True)
+
+
+def test_is_usd_prim_target_detects_maya_usd_reference_node_id() -> None:
+    assert is_usd_prim_target(target_id="node:char_usd_asset:SphereMTLSG")
+
+
+def test_find_usd_prim_for_issue_matches_material_name_on_proxy_stage() -> None:
+    stage = MagicMock()
+    material_prim = MagicMock()
+    material_prim.GetPath.return_value = "/Sphere/mtl/SphereMTLSG"
+    material_prim.GetName.return_value = "SphereMTLSG"
+    stage.Traverse.return_value = [material_prim]
+
+    cmds = MagicMock()
+    cmds.ls.return_value = ["|hero|heroShape"]
+
+    with patch(
+        "pipeline_inspector.maya.usd_navigation._get_proxy_stage",
+        return_value=stage,
+    ):
+        prim_path = find_usd_prim_for_issue(
+            target_id="node:char_usd_asset:SphereMTLSG",
+            node_name="SphereMTLSG",
+            material_name="SphereMTLSG",
+            cmds=cmds,
+        )
+
+    assert prim_path == "/Sphere/mtl/SphereMTLSG"
+
+
+def test_read_opening_errors_returns_empty_when_api_missing() -> None:
+    class _Stage:
+        pass
+
+    assert _read_opening_errors(_Stage()) == []
+
+
+def test_select_node_action_routes_maya_usd_reference_target() -> None:
+    with patch(
+        "pipeline_inspector.maya.commands._maya_cmds",
+        return_value=MagicMock(objExists=lambda *_a, **_k: False),
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation.resolve_usd_prim_path",
+        return_value="/Sphere/mtl/SphereMTLSG",
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation.select_usd_prim",
+        return_value=NavigationActionResult(
+            action="select_node",
+            target="/Sphere/mtl/SphereMTLSG",
+            succeeded=True,
+            message="ok",
+        ),
+    ) as select_usd:
+        result = commands.select_node_action(
+            "SphereMTLSG",
+            target_id="node:char_usd_asset:SphereMTLSG",
+            material_name="SphereMTLSG",
+        )
+
+    assert result.succeeded is True
+    select_usd.assert_called_once()
+
+
+def test_select_node_action_routes_prim_target() -> None:
+    with patch(
+        "pipeline_inspector.maya.commands._maya_cmds",
+        return_value=MagicMock(objExists=lambda *_a, **_k: False),
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation.resolve_usd_prim_path",
+        return_value="/Base/mtl/albedo",
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation.select_usd_prim",
+        return_value=NavigationActionResult(
+            action="select_node",
+            target="/Base/mtl/albedo",
+            succeeded=True,
+            message="ok",
+        ),
+    ) as select_usd:
+        result = commands.select_node_action(
+            "demo_albedo_v002_1",
+            target_id="prim:/Base/mtl/albedo",
+        )
+
+    assert result.succeeded is True
+    select_usd.assert_called_once()
+
+
+def test_open_in_hypershade_action_routes_prim_target() -> None:
+    with patch(
+        "pipeline_inspector.maya.commands._maya_cmds",
+        return_value=MagicMock(objExists=lambda *_a, **_k: False),
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation.resolve_usd_prim_path",
+        return_value="/Base/mtl/albedo",
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation.open_usd_shader_view",
+        return_value=NavigationActionResult(
+            action="open_in_hypershade",
+            target="/Base/mtl/albedo",
+            succeeded=True,
+            message="ok",
+        ),
+    ) as open_usd:
+        result = commands.open_in_hypershade_action(
+            "demo_albedo_v002_1",
+            target_id="prim:/Base/mtl/albedo",
+        )
+
+    assert result.succeeded is True
+    open_usd.assert_called_once()
+    assert open_usd.call_args.args[0] == "/Base/mtl/albedo"
+
+
+def test_open_usd_shader_view_opens_attribute_editor() -> None:
+    mel = MagicMock()
+    with patch(
+        "pipeline_inspector.maya.usd_navigation.select_usd_prim",
+        return_value=NavigationActionResult(
+            action="select_node",
+            target="/Base/mtl/albedo",
+            succeeded=True,
+            message="ok",
+        ),
+    ), patch(
+        "pipeline_inspector.maya.usd_navigation._focus_usd_material_editor",
+    ) as focus_editor:
+        result = open_usd_shader_view("/Base/mtl/albedo", cmds=MagicMock(), mel=mel)
+
+    assert result.succeeded is True
+    mel.eval.assert_called_once_with("openAEWindow")
+    focus_editor.assert_called_once()

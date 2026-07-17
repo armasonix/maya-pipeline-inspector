@@ -22,6 +22,7 @@ from pipeline_inspector.core.models import (
     ShaderComplexityMetadata,
     ShadingEngineSnapshot,
     ShapeSnapshot,
+    UsdStageMetadata,
     VrayMaterialMetadata,
     VraySceneMetadata,
 )
@@ -101,6 +102,7 @@ __all__ = [
     "ShaderComplexityMetadata",
     "ArnoldMaterialMetadata",
     "ArnoldSceneMetadata",
+    "UsdStageMetadata",
     "ValidationEngine",
     "ValidationSummary",
     "VrayMaterialMetadata",

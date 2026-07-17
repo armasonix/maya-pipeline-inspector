@@ -50,6 +50,7 @@ UNDO_SUPPORTED_FIX_TYPES = frozenset(
         "normalize_path",
         "disable_feature",
         "rename_node",
+        "set_default_prim",
     }
 )
 NAMING_FIX_TYPE = "rename_node"
@@ -581,6 +582,12 @@ def _after_value(
         if "value" in fix_params:
             return fix_params["value"]
         return False
+    if fix_type == "set_default_prim":
+        value_from = fix_params.get("value_from")
+        if isinstance(value_from, str) and node_index is not None:
+            nested = _read_snapshot_value(node_index.snapshot, value_from)
+            if nested:
+                return nested
     if "value" in fix_params:
         return fix_params["value"]
     if "path" in fix_params:
@@ -750,6 +757,7 @@ class _NodeIndex:
         studio_environment: Optional[StudioEnvironmentSettings] = None,
     ) -> None:
         self.scene_path = snapshot.scene_path or ""
+        self.snapshot = snapshot
         self.studio_environment = studio_environment
         self._by_key: dict[str, NodeSnapshot] = {}
         self._shapes_by_id: dict[str, ShapeSnapshot] = {}
@@ -838,3 +846,9 @@ class _NodeIndex:
         node = self._by_key.get(material.node_id)
         if node is not None:
             self._add(material.name, node)
+
+
+def _read_snapshot_value(snapshot: GraphSnapshot, dotted_path: str) -> Any:
+    from pipeline_inspector.core.rule_schema import _read_nested_value
+
+    return _read_nested_value(snapshot, dotted_path)

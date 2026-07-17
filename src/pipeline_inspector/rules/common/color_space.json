@@ -5,7 +5,7 @@
       "id": "common.texture.colorspace.data_raw",
       "name": "Data textures must use Raw color space",
       "enabled": true,
-      "renderer": ["common", "vray", "arnold"],
+      "renderer": ["common", "vray", "arnold", "usd"],
       "scope": "texture_node",
       "severity": "critical",
       "owner": "shader_td",
@@ -21,7 +21,7 @@
           "mask",
           "opacity"
         ],
-        "node_type": ["file", "VRayBitmap", "aiImage"]
+        "node_type": ["file", "VRayBitmap", "aiImage", "Shader"]
       },
       "check": {
         "type": "attribute_equals",
@@ -46,7 +46,7 @@
       "id": "common.texture.colorspace.color_managed",
       "name": "Color textures must use a color-managed color space",
       "enabled": true,
-      "renderer": ["common", "vray", "arnold"],
+      "renderer": ["common", "vray", "arnold", "usd"],
       "scope": "texture_node",
       "severity": "error",
       "owner": "shader_td",
@@ -54,7 +54,7 @@
       "why": "Base color, specular color, and emission maps represent color information. They should remain color-managed so viewport, lookdev, and final renders interpret them consistently.",
       "match": {
         "semantic_slot": ["base_color", "specular_color", "emission"],
-        "node_type": ["file", "VRayBitmap", "aiImage"]
+        "node_type": ["file", "VRayBitmap", "aiImage", "Shader"]
       },
       "check": {
         "type": "attribute_in",
@@ -65,7 +65,13 @@
         "block_publish": true,
         "block_deadline": false,
         "waiver_allowed": true,
-        "auto_fix_allowed": false
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "set_attr",
+        "attribute": "colorSpace",
+        "value": "sRGB",
+        "risk": "low"
       }
     }
   ]

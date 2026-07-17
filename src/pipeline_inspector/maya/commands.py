@@ -298,27 +298,85 @@ def revoke_waiver_action(waiver_id: str, scene_path: Optional[str] = None) -> An
     )
 
 
-def select_node_action(node_name: str) -> NavigationActionResult:
-    """Select a Maya node from a UI action."""
+def select_node_action(
+    node_name: str,
+    *,
+    target_id: str = "",
+    material_name: Optional[str] = None,
+    snapshot: Optional[Any] = None,
+) -> NavigationActionResult:
+    """Select a Maya node or USD prim from a UI action."""
 
-    return select_node(_maya_node_name(node_name))
+    from pipeline_inspector.maya.usd_navigation import (
+        is_usd_prim_target,
+        resolve_usd_prim_path,
+        select_usd_prim,
+    )
+
+    maya_cmds = _maya_cmds()
+    maya_target = _resolve_maya_target_name(node_name, target_id)
+    should_try_usd = is_usd_prim_target(target_id=target_id, node_name=node_name) or _looks_like_usd_prim_issue(
+        target_id=target_id,
+        node_name=node_name,
+        snapshot=snapshot,
+    )
+    if should_try_usd:
+        prim_path = resolve_usd_prim_path(
+            target_id=target_id,
+            node_name=node_name,
+            material_name=material_name or "",
+            snapshot=snapshot,
+            cmds=maya_cmds,
+        )
+        if prim_path:
+            return select_usd_prim(prim_path, cmds=maya_cmds)
+
+    if maya_target and maya_cmds.objExists(maya_target):
+        return select_node(maya_target)
+
+    return select_node(maya_target or _maya_node_name(node_name))
 
 
 def open_in_hypershade_action(
     node_name: str,
     *,
     material_name: Optional[str] = None,
+    target_id: str = "",
+    snapshot: Optional[Any] = None,
 ) -> NavigationActionResult:
-    """Open Hypershade focused on the issue material from a UI action."""
+    """Open Hypershade or the USD shader editor for an issue target."""
+
+    from pipeline_inspector.maya.usd_navigation import (
+        is_usd_prim_target,
+        open_usd_shader_view,
+        resolve_usd_prim_path,
+    )
 
     maya_cmds = _maya_cmds()
+    should_try_usd = is_usd_prim_target(target_id=target_id, node_name=node_name) or _looks_like_usd_prim_issue(
+        target_id=target_id,
+        node_name=node_name,
+        snapshot=snapshot,
+    )
+    if should_try_usd:
+        prim_path = resolve_usd_prim_path(
+            target_id=target_id,
+            node_name=node_name,
+            material_name=material_name or "",
+            snapshot=snapshot,
+            cmds=maya_cmds,
+        )
+        if prim_path:
+            return open_usd_shader_view(prim_path, cmds=maya_cmds)
+
+    maya_target = _resolve_maya_target_name(node_name, target_id)
     candidates: list[str] = []
     if material_name:
         candidates.append(_maya_node_name(material_name))
-    if node_name:
-        node = _maya_node_name(node_name)
-        if node not in candidates:
-            candidates.append(node)
+    if maya_target:
+        candidates.append(maya_target)
+    elif node_name:
+        candidates.append(_maya_node_name(node_name))
     target = next((name for name in candidates if maya_cmds.objExists(name)), None)
     if target is None:
         label = material_name or node_name or "node"
@@ -329,6 +387,39 @@ def open_in_hypershade_action(
             message="Material or node does not exist.",
         )
     return open_in_hypershade(target)
+
+
+def _resolve_maya_target_name(node_name: str, target_id: str) -> str:
+    if str(target_id).startswith("node:"):
+        return str(target_id).removeprefix("node:")
+    if str(node_name).startswith("node:"):
+        return str(node_name).removeprefix("node:")
+    if node_name:
+        return _maya_node_name(node_name)
+    return ""
+
+
+def _looks_like_usd_prim_issue(
+    *,
+    target_id: str = "",
+    node_name: str = "",
+    snapshot: Optional[Any],
+) -> bool:
+    from pipeline_inspector.maya.usd_navigation import is_usd_prim_target
+
+    if is_usd_prim_target(target_id=target_id, node_name=node_name):
+        return True
+    if snapshot is None:
+        return False
+    nodes = getattr(snapshot, "nodes", ()) or ()
+    if not any(str(node.id).startswith("prim:") for node in nodes):
+        return False
+    for node in nodes:
+        if not str(node.id).startswith("prim:"):
+            continue
+        if node.name == node_name or node.full_name == node_name:
+            return True
+    return False
 
 
 def open_attribute_editor_action(node_name: str) -> NavigationActionResult:
@@ -584,6 +675,28 @@ def _validate(
             extra_rule_paths=extra_rule_paths,
             session_rule_overrides=session_rule_overrides,
         )
+    # #region agent log
+    _debug_health_log_command(
+        "commands._validate",
+        "Maya validation finished",
+        {
+            "scan_scope": scan_scope,
+            "snapshot_renderer": getattr(run.snapshot, "renderer", ""),
+            "usd_metadata": getattr(run.snapshot, "usd_stage_metadata", None) is not None,
+            "prim_nodes": sum(
+                1 for node in getattr(run.snapshot, "nodes", []) if str(node.id).startswith("prim:")
+            ),
+            "failed_count": sum(1 for item in run.results if item.status == "failed"),
+            "failed_rules": "|".join(
+                sorted({item.rule_id for item in run.results if item.status == "failed"})[:12]
+            ),
+            "fix_unblocked": sum(
+                1 for action in (run.fix_plan.actions if run.fix_plan else ()) if not action.blocked
+            ),
+        },
+        hypothesis_id="H1",
+    )
+    # #endregion
     return _validation_result(run, action=f"validate_{scan_scope}")
 
 

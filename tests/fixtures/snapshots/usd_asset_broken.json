@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0",
+  "scene_path": "usd_asset_broken.usda",
+  "renderer": "usd",
+  "scan_scope": "asset",
+  "scanned_at_utc": "2026-07-17T10:00:00Z",
+  "nodes": [
+    {
+      "id": "prim:/Hero",
+      "name": "Hero",
+      "full_name": "/Hero",
+      "type_name": "Xform",
+      "renderer_family": "usd",
+      "attrs": {
+        "prim_path": "/Hero"
+      }
+    },
+    {
+      "id": "prim:/Hero/Body",
+      "name": "Body",
+      "full_name": "/Hero/Body",
+      "type_name": "Mesh",
+      "renderer_family": "usd",
+      "attrs": {
+        "prim_path": "/Hero/Body"
+      }
+    },
+    {
+      "id": "prim:/Hero/Looks/albedo",
+      "name": "albedo",
+      "full_name": "/Hero/Looks/albedo",
+      "type_name": "Shader",
+      "renderer_family": "usd",
+      "attrs": {
+        "prim_path": "/Hero/Looks/albedo"
+      }
+    },
+    {
+      "id": "prim:/Hero/Looks/roughness",
+      "name": "roughness",
+      "full_name": "/Hero/Looks/roughness",
+      "type_name": "Shader",
+      "renderer_family": "usd",
+      "attrs": {
+        "prim_path": "/Hero/Looks/roughness"
+      }
+    }
+  ],
+  "connections": [],
+  "materials": [],
+  "shapes": [
+    {
+      "node_id": "prim:/Hero/Body",
+      "name": "Body",
+      "full_name": "/Hero/Body",
+      "type_name": "Mesh",
+      "polygon_count": 12
+    }
+  ],
+  "file_dependencies": [
+    {
+      "node_id": "prim:/Hero/Looks/albedo",
+      "attr": "file",
+      "raw_path": "D:/local/missing_albedo.exr",
+      "resolved_path": "D:/local/missing_albedo.exr",
+      "exists": false,
+      "extension": ".exr"
+    },
+    {
+      "node_id": "prim:/Hero/Looks/roughness",
+      "attr": "file",
+      "raw_path": "textures/demo_roughness_v001.exr",
+      "resolved_path": "textures/demo_roughness_v001.exr",
+      "exists": false,
+      "extension": ".exr"
+    }
+  ],
+  "usd_stage_metadata": {
+    "root_layer": "usd_asset_broken.usda",
+    "default_prim": "",
+    "has_default_prim": false,
+    "suggested_default_prim": "/Hero",
+    "prim_count": 4,
+    "mesh_count": 1,
+    "material_count": 0,
+    "unbound_mesh_count": 1,
+    "unbound_mesh_paths": [
+      "/Hero/Body"
+    ],
+    "missing_reference_count": 1,
+    "missing_reference_paths": [
+      "missing_ref.usda"
+    ],
+    "payload_count": 1,
+    "opening_error_count": 0,
+    "opening_errors": []
+  }
+}

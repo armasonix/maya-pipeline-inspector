@@ -1,0 +1,439 @@
+"""Navigate to USD prims inside a Maya scene via UFE."""
+from __future__ import annotations
+
+import importlib
+import json
+import time
+from pathlib import Path
+from typing import Any, Optional
+
+from pipeline_inspector.core.models import GraphSnapshot
+from pipeline_inspector.maya.navigation import NavigationActionResult, _result
+
+_DEBUG_LOG = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+
+
+def is_usd_prim_target(*, target_id: str = "", node_name: str = "") -> bool:
+    """Return whether the navigation target refers to a USD stage prim."""
+
+    if str(target_id).startswith("prim:") or str(node_name).startswith("prim:"):
+        return True
+    if _looks_like_usd_prim_path(str(node_name)) or _looks_like_usd_prim_path(
+        str(target_id).removeprefix("prim:")
+    ):
+        return True
+    return _looks_like_maya_usd_reference_target(target_id=target_id, node_name=node_name)
+
+
+def _looks_like_maya_usd_reference_target(*, target_id: str = "", node_name: str = "") -> bool:
+    token = str(target_id or node_name or "").strip()
+    if not token.startswith("node:"):
+        return False
+    body = token.removeprefix("node:")
+    return ":" in body and not body.startswith("/")
+
+
+def resolve_usd_prim_path(
+    *,
+    target_id: str = "",
+    node_name: str = "",
+    material_name: str = "",
+    snapshot: Optional[GraphSnapshot] = None,
+    cmds: Optional[Any] = None,
+) -> str:
+    """Resolve a USD prim path from issue navigation fields."""
+
+    for candidate in (target_id, node_name, material_name):
+        prim_path = _prim_path_from_token(candidate)
+        if prim_path:
+            return prim_path
+
+    if snapshot is not None:
+        if material_name:
+            for material in snapshot.materials:
+                if material.name == material_name or material.full_name == material_name:
+                    resolved = _prim_path_from_token(material.node_id) or str(
+                        material.full_name or ""
+                    )
+                    if resolved:
+                        return resolved
+
+        if node_name:
+            for node in snapshot.nodes:
+                if not str(node.id).startswith("prim:"):
+                    continue
+                prim_path = _prim_path_from_token(node.id)
+                if node.name == node_name or node.full_name == node_name or prim_path == node_name:
+                    return prim_path or str(node.full_name or "")
+
+    if cmds is not None:
+        discovered = find_usd_prim_for_issue(
+            target_id=target_id,
+            node_name=node_name,
+            material_name=material_name,
+            cmds=cmds,
+        )
+        if discovered:
+            return discovered
+
+    return ""
+
+
+def find_usd_prim_for_issue(
+    *,
+    target_id: str = "",
+    node_name: str = "",
+    material_name: str = "",
+    cmds: Optional[Any] = None,
+) -> str:
+    """Locate a USD prim path on proxy stages using Maya-style node identifiers."""
+
+    maya_cmds = cmds or _maya_cmds()
+    proxy_shapes = maya_cmds.ls(type="mayaUsdProxyShape", long=True) or []
+    if not proxy_shapes:
+        return ""
+
+    search_tokens = _usd_search_tokens(target_id, node_name, material_name)
+    if not search_tokens:
+        return ""
+
+    for shape in proxy_shapes:
+        stage = _get_proxy_stage(shape, maya_cmds)
+        if stage is None:
+            continue
+        match = _match_prim_on_stage(stage, search_tokens)
+        if match:
+            _debug_nav_log(
+                "usd_navigation.find_usd_prim_for_issue",
+                "Resolved Maya-style issue to USD prim",
+                {
+                    "target_id": target_id,
+                    "node_name": node_name,
+                    "material_name": material_name,
+                    "prim_path": match,
+                    "tokens": "|".join(search_tokens[:5]),
+                },
+                hypothesis_id="H7",
+            )
+            return match
+
+    _debug_nav_log(
+        "usd_navigation.find_usd_prim_for_issue",
+        "No USD prim match for Maya-style issue",
+        {
+            "target_id": target_id,
+            "node_name": node_name,
+            "material_name": material_name,
+            "tokens": "|".join(search_tokens[:5]),
+        },
+        hypothesis_id="H7",
+    )
+    return ""
+
+
+def _usd_search_tokens(target_id: str, node_name: str, material_name: str) -> list[str]:
+    tokens: list[str] = []
+    seen: set[str] = set()
+
+    def _add(value: str) -> None:
+        normalized = str(value or "").strip()
+        if not normalized or normalized in seen:
+            return
+        seen.add(normalized)
+        tokens.append(normalized)
+
+    for raw in (material_name, node_name, target_id):
+        if not raw:
+            continue
+        if str(raw).startswith("node:"):
+            raw = str(raw).removeprefix("node:")
+        if ":" in str(raw):
+            _add(str(raw).rsplit(":", 1)[-1])
+        _add(str(raw))
+        for part in str(raw).split("_"):
+            if part:
+                _add(part)
+        parts = str(raw).split("_")
+        for index in range(len(parts)):
+            suffix = "_".join(parts[index:])
+            if suffix:
+                _add(suffix)
+
+    return tokens
+
+
+def _match_prim_on_stage(stage: Any, search_tokens: list[str]) -> str:
+    best_match = ""
+    best_score = 0
+    for prim in stage.Traverse():
+        prim_path = str(prim.GetPath())
+        prim_name = str(prim.GetName())
+        for token in search_tokens:
+            score = 0
+            if prim_name == token:
+                score = 100
+            elif prim_name.endswith(token) or token.endswith(prim_name):
+                score = 80
+            elif token in prim_path:
+                score = 60
+            elif token in prim_name:
+                score = 40
+            if score > best_score:
+                best_score = score
+                best_match = prim_path
+    return best_match if best_score >= 40 else ""
+
+
+def select_usd_prim(
+    prim_path: str,
+    *,
+    cmds: Optional[Any] = None,
+) -> NavigationActionResult:
+    """Select a USD prim through the Maya USD proxy UFE path."""
+
+    target = str(prim_path or "").strip()
+    if not target:
+        return _result("select_node", "", False, "USD prim path is empty.")
+
+    maya_cmds = cmds or _maya_cmds()
+    proxy_shapes = maya_cmds.ls(type="mayaUsdProxyShape", long=True) or []
+    if not proxy_shapes:
+        return _result(
+            "select_node",
+            target,
+            False,
+            "No mayaUsdProxyShape found in the current scene.",
+        )
+
+    normalized = _normalize_prim_path(target)
+    shape, ufe_path = _resolve_proxy_ufe_path(normalized, proxy_shapes, maya_cmds)
+    if shape is None or not ufe_path:
+        _debug_nav_log(
+            "usd_navigation.select_usd_prim",
+            "USD prim not found on proxy stages",
+            {"prim_path": normalized, "proxy_count": len(proxy_shapes)},
+            hypothesis_id="H6",
+        )
+        return _result(
+            "select_node",
+            normalized,
+            False,
+            f"Unable to locate USD prim {normalized} on any proxy stage.",
+        )
+
+    if _select_ufe_path(ufe_path, maya_cmds):
+        _debug_nav_log(
+            "usd_navigation.select_usd_prim",
+            "USD prim selected",
+            {"ufe_path": ufe_path},
+            hypothesis_id="H6",
+        )
+        return _result(
+            "select_node",
+            ufe_path,
+            True,
+            f"USD prim selected: {normalized}",
+        )
+
+    _debug_nav_log(
+        "usd_navigation.select_usd_prim",
+        "USD UFE selection failed",
+        {"ufe_path": ufe_path},
+        hypothesis_id="H6",
+    )
+    return _result(
+        "select_node",
+        ufe_path,
+        False,
+        f"Unable to select USD prim {normalized}.",
+    )
+
+
+def open_usd_shader_view(
+    prim_path: str,
+    *,
+    cmds: Optional[Any] = None,
+    mel: Optional[Any] = None,
+) -> NavigationActionResult:
+    """Select a USD shader prim and open its property editor."""
+
+    selection = select_usd_prim(prim_path, cmds=cmds)
+    if not selection.succeeded:
+        return NavigationActionResult(
+            action="open_in_hypershade",
+            target=prim_path,
+            succeeded=False,
+            message=selection.message,
+        )
+
+    maya_mel = mel or _maya_mel()
+    maya_mel.eval("openAEWindow")
+    _focus_usd_material_editor(cmds=cmds or _maya_cmds(), mel=maya_mel)
+    return _result(
+        "open_in_hypershade",
+        prim_path,
+        True,
+        f"USD shader prim selected and Attribute Editor opened: {prim_path}.",
+    )
+
+
+def _normalize_prim_path(prim_path: str) -> str:
+    normalized = str(prim_path or "").strip()
+    if not normalized:
+        return ""
+    return normalized if normalized.startswith("/") else f"/{normalized}"
+
+
+def _resolve_proxy_ufe_path(
+    prim_path: str,
+    proxy_shapes: list[str],
+    cmds: Any,
+) -> tuple[Optional[str], str]:
+    for shape in proxy_shapes:
+        if not _proxy_contains_prim(shape, prim_path, cmds):
+            continue
+        return shape, f"{shape},{prim_path}"
+    if proxy_shapes:
+        return proxy_shapes[0], f"{proxy_shapes[0]},{prim_path}"
+    return None, ""
+
+
+def _proxy_contains_prim(shape: str, prim_path: str, cmds: Any) -> bool:
+    stage = _get_proxy_stage(shape, cmds)
+    if stage is None:
+        return False
+    prim = stage.GetPrimAtPath(prim_path)
+    return bool(prim and prim.IsValid())
+
+
+def _get_proxy_stage(shape: str, cmds: Any) -> Any:
+    try:
+        maya_usd_ufe = importlib.import_module("mayaUsd.ufe")
+        get_stage = getattr(maya_usd_ufe, "getStage", None)
+        if get_stage is not None:
+            return get_stage(shape)
+    except Exception:  # noqa: BLE001
+        pass
+
+    try:
+        maya_usd_lib = importlib.import_module("mayaUsd.lib")
+        get_prim = getattr(maya_usd_lib, "GetPrim", None)
+        if get_prim is not None:
+            prim = get_prim(shape)
+            if prim is not None:
+                return prim.GetStage()
+    except Exception:  # noqa: BLE001
+        pass
+
+    return None
+
+
+def _select_ufe_path(ufe_path: str, cmds: Any) -> bool:
+    try:
+        cmds.select(ufe_path, replace=True)
+        if _selection_matches(ufe_path, cmds):
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+
+    if _replace_ufe_selection(ufe_path) and _selection_matches(ufe_path, cmds):
+        return True
+
+    return False
+
+
+def _selection_matches(ufe_path: str, cmds: Any) -> bool:
+    selected = cmds.ls(sl=True, ufe=True) or []
+    if not selected:
+        return False
+    prim_suffix = ufe_path.split(",", 1)[-1]
+    return any(
+        item == ufe_path or item.endswith(prim_suffix) or prim_suffix in item
+        for item in selected
+    )
+
+
+def _looks_like_usd_prim_path(value: str) -> bool:
+    token = str(value or "").strip()
+    return token.startswith("/") and token.count("/") >= 1
+
+
+def _prim_path_from_token(value: str) -> str:
+    token = str(value or "").strip()
+    if not token:
+        return ""
+    if token.startswith("prim:"):
+        return _normalize_prim_path(token.removeprefix("prim:"))
+    if token.startswith("/"):
+        return token
+    return ""
+
+
+def _replace_ufe_selection(ufe_path: str) -> bool:
+    try:
+        ufe = importlib.import_module("ufe")
+        path = ufe.Path(ufe.PathString(ufe_path))
+        ufe.GlobalSelection.get().replaceWith(ufe.PathSelection([path]))
+        return True
+    except Exception:  # noqa: BLE001 - UFE import/selection varies by Maya build
+        pass
+
+    try:
+        maya_usd_ufe = importlib.import_module("mayaUsd.ufe")
+        select = getattr(maya_usd_ufe, "select", None)
+        if select is not None:
+            select(ufe_path)
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+
+    return False
+
+
+def _focus_usd_material_editor(*, cmds: Any, mel: Any) -> None:
+    for command_name in ("mayaUsdMaterialEdit", "mayaUsdOpenStageEditor"):
+        runtime_command = getattr(cmds, "runTimeCommand", None)
+        if runtime_command is not None:
+            try:
+                if runtime_command(exists=command_name):
+                    getattr(cmds, command_name)()
+                    return
+            except Exception:  # noqa: BLE001
+                continue
+
+    for mel_command in ("mayaUsdMaterialEdit", "UsdStageEditor"):
+        try:
+            mel.eval(mel_command)
+            return
+        except Exception:  # noqa: BLE001
+            continue
+
+
+def _debug_nav_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": {key: str(value) for key, value in data.items()},
+            "hypothesisId": hypothesis_id,
+        }
+        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
+
+
+def _maya_cmds() -> Any:
+    return importlib.import_module("maya.cmds")
+
+
+def _maya_mel() -> Any:
+    return importlib.import_module("maya.mel")

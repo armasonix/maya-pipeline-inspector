@@ -271,6 +271,16 @@ def persist_fix_apply_audit(
     return written_path, session_dict
 
 
+def _renderer_ids_for_validation(snapshot: GraphSnapshot) -> tuple[str, ...]:
+    renderer_ids: list[str] = []
+    if snapshot.renderer:
+        renderer_ids.append(snapshot.renderer.strip().lower())
+    has_usd_prims = any(node.id.startswith("prim:") for node in snapshot.nodes)
+    if (snapshot.usd_stage_metadata is not None or has_usd_prims) and "usd" not in renderer_ids:
+        renderer_ids.append("usd")
+    return tuple(renderer_ids)
+
+
 def run_validation(
     snapshot: GraphSnapshot,
     *,
@@ -321,26 +331,7 @@ def run_validation(
                 normalized_overrides,
             ),
         )
-    if session_rule_overrides:
-        from pipeline_inspector.core.rule_browser import merge_session_rule_overrides
-        from pipeline_inspector.core.rule_loader import RuleOverride
-
-        normalized_overrides = {
-            str(rule_id): (
-                override
-                if isinstance(override, RuleOverride)
-                else RuleOverride.from_dict(str(rule_id), override)
-            )
-            for rule_id, override in session_rule_overrides.items()
-        }
-        profile = replace(
-            profile,
-            rule_overrides=merge_session_rule_overrides(
-                profile.rule_overrides,
-                normalized_overrides,
-            ),
-        )
-    renderer_ids = (enriched.renderer,) if enriched.renderer else ()
+    renderer_ids = _renderer_ids_for_validation(enriched)
     rules = load_rule_stack(
         rule_root=rule_root or DEFAULT_RULE_ROOT,
         renderer_ids=renderer_ids,
@@ -366,6 +357,37 @@ def run_validation(
     summary = summarize_results(results)
     health_score = compute_health_score(results)
     failed_count = sum(1 for item in results if item.status == "failed")
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "Validation summary",
+        {
+            "renderer_ids": ",".join(renderer_ids),
+            "snapshot_renderer": enriched.renderer,
+            "usd_metadata": enriched.usd_stage_metadata is not None,
+            "file_deps": len(enriched.file_dependencies),
+            "shader_colorspace_nodes": sum(
+                1
+                for node in enriched.nodes
+                if node.type_name == "Shader" and node.attrs.get("colorSpace")
+            ),
+            "failed_count": failed_count,
+            "failed_texture_rules": "|".join(
+                sorted(
+                    {
+                        item.rule_id
+                        for item in results
+                        if item.status == "failed"
+                        and ("texture" in item.rule_id or "colorspace" in item.rule_id)
+                    }
+                )
+            ),
+            "fix_actions": len(fix_plan.actions),
+            "fix_unblocked": sum(1 for action in fix_plan.actions if not action.blocked),
+        },
+        hypothesis_id="H2",
+    )
+    # #endregion
     scope_label = "selection" if scan_scope == "selection" else "scene"
     profile_label = effective_profile_id
     if normalized_asset_class:
@@ -386,6 +408,32 @@ def run_validation(
         profile_id=effective_profile_id,
         asset_class_id=normalized_asset_class,
     )
+
+
+def _debug_validation_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    import json
+    import time
+
+    try:
+        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": {key: str(value) for key, value in data.items()},
+            "hypothesisId": hypothesis_id,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 
 def run_validation_for_user(

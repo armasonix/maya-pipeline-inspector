@@ -418,6 +418,51 @@ class ArnoldAdapter(BaseRendererAdapter):
     def default_rule_packs(self) -> list[str]:
         return ["common", "arnold"]
 
+_USD_NODE_TYPES = {
+    "Material",
+    "Shader",
+    "Mesh",
+    "Xform",
+    "Scope",
+}
+
+_USD_TEXTURE_SLOTS = {
+    "Shader.inputs:diffuseColor": "base_color",
+    "Shader.inputs:baseColor": "base_color",
+    "Shader.inputs:roughness": "roughness",
+    "Shader.inputs:metallic": "metalness",
+    "Shader.inputs:normal": "normal",
+    "Shader.inputs:opacity": "opacity",
+    "Shader.inputs:file": "texture_file",
+    "Shader.inputs:varname": "utility",
+}
+
+@dataclass(frozen=True)
+class UsdAdapter(BaseRendererAdapter):
+    """Adapter for OpenUSD shading and geometry prims."""
+
+    id: str = "usd"
+    display_name: str = "OpenUSD"
+
+    def supported_node_types(self) -> set[str]:
+        return set(_USD_NODE_TYPES)
+
+    def classify_node(self, node: NodeSnapshot) -> list[str]:
+        type_name = node.type_name
+        if type_name == "Material":
+            return ["material"]
+        if type_name == "Shader":
+            return ["shader", "utility"]
+        if type_name == "Mesh":
+            return ["geometry"]
+        return ["utility"]
+
+    def texture_slot_semantics(self) -> TextureSlotSemantics:
+        return dict(_USD_TEXTURE_SLOTS)
+
+    def default_rule_packs(self) -> list[str]:
+        return ["common", "usd"]
+
 class RendererAdapterRegistry:
     """Deterministic in-memory registry for renderer adapters."""
 
