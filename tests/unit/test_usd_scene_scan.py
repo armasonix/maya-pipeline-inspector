@@ -22,6 +22,26 @@ def test_normalize_colorspace_maps_raw_and_srgb() -> None:
     assert _normalize_colorspace("sRGB") == "sRGB"
 
 
+def test_merge_snapshots_preserves_usd_proxy_root_layer() -> None:
+    from pipeline_inspector.core.models import GraphSnapshot, UsdStageMetadata
+    from pipeline_inspector.maya.usd_scene_scan import _merge_snapshots
+
+    usd_path = Path("D:/assets/hero.usda")
+    base = GraphSnapshot(
+        scene_path="shot.ma",
+        usd_stage_metadata=UsdStageMetadata(root_layer="shot.ma"),
+    )
+    usd = GraphSnapshot(
+        scene_path=str(usd_path),
+        usd_stage_metadata=UsdStageMetadata(root_layer=str(usd_path)),
+    )
+
+    merged = _merge_snapshots(base, usd, proxy_usd_path=usd_path)
+
+    assert merged.usd_stage_metadata is not None
+    assert merged.usd_stage_metadata.root_layer == str(usd_path)
+
+
 def test_merge_usd_proxy_snapshots_appends_usd_scan(monkeypatch: pytest.MonkeyPatch) -> None:
     base = GraphSnapshot(scene_path="shot.ma", renderer="vray", nodes=[], file_dependencies=[])
     usd_node = NodeSnapshot(

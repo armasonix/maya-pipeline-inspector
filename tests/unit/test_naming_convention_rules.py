@@ -73,6 +73,17 @@ def test_parse_and_format_naming_templates_round_trip():
     assert format_naming_templates_text(parsed) == text
 
 
+    assert resolve_object_type(
+        NodeSnapshot(
+            id="prim:/Materials/albedo",
+            name="albedo",
+            type_name="Shader",
+            renderer_family="usd",
+            attrs={"semantic_slot": "base_color", "file": "albedo.exr"},
+        )
+    ) == "texture"
+
+
 def test_resolve_object_type_maps_snapshot_targets():
     assert resolve_object_type(ShapeSnapshot(node_id="mesh:geo_body", name="geo_body")) == "mesh"
     assert (

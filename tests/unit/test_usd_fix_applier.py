@@ -92,7 +92,49 @@ def test_apply_rename_node_resolves_nested_prim_by_short_name(tmp_path: Path) ->
     assert 'def Shader "demo_albedo_v002_1"' not in updated
 
 
-def test_apply_rename_texture_file_updates_asset_path_and_prim(tmp_path: Path) -> None:
+def test_apply_set_attr_syncs_all_usd_shader_colorspace_sources(tmp_path: Path) -> None:
+    usd_path = tmp_path / "asset.usda"
+    usd_path.write_text(
+        "\n".join(
+            [
+                "#usda 1.0",
+                "(",
+                ")",
+                'def Shader "demo_albedo_v002_1"',
+                "{",
+                '    uniform token info:id = "UsdUVTexture"',
+                '    asset inputs:file = @demo_albedo_v002_1.exr@',
+                '    token inputs:sourceColorSpace = "raw"',
+                '    int inputs:color_space = 0',
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    action = FixAction(
+        fix_id="common.texture.colorspace.color_managed:prim:/demo_albedo_v002_1:set_attr",
+        rule_id="common.texture.colorspace.color_managed",
+        title="fix colorspace",
+        fix_type="set_attr",
+        risk="low",
+        target_kind="node",
+        target_id="prim:/demo_albedo_v002_1",
+        target_node="/demo_albedo_v002_1",
+        target_attr="colorSpace",
+        before_value="Raw",
+        after_value="sRGB",
+        params={"resolved_prim_path": "/demo_albedo_v002_1", "attribute": "colorSpace", "value": "sRGB"},
+    )
+
+    records = apply_usd_fix_actions(usd_path, [action])
+
+    assert records[0].succeeded is True
+    from pipeline_inspector.usd.scanner import scan_usd_stage
+
+    snapshot = scan_usd_stage(usd_path)
+    shader = next(node for node in snapshot.nodes if node.type_name == "Shader")
+    assert shader.attrs.get("colorSpace") == "sRGB"
     texture_path = tmp_path / "demo_albedo_v002_1.exr"
     texture_path.write_bytes(b"pixels")
     usd_path = tmp_path / "asset.usda"

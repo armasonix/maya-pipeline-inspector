@@ -211,11 +211,21 @@ def apply_fix_availability(
 ) -> list[RuleResult]:
     """Mark validation results auto-fixable when the fix planner produced an action."""
 
-    available_keys = {
-        (action.rule_id, action.target_id)
-        for action in fix_plan.actions
-        if not action.blocked
-    }
+    available_keys: set[tuple[str, str]] = set()
+    for action in fix_plan.actions:
+        if action.blocked:
+            continue
+        available_keys.add((action.rule_id, action.target_id))
+        target_id = str(action.target_id or "")
+        if target_id.startswith("prim:"):
+            prim_path = target_id.removeprefix("prim:")
+            available_keys.add((action.rule_id, prim_path))
+            available_keys.add((action.rule_id, f"prim:{prim_path.lstrip('/')}"))
+        resolved = action.params.get("resolved_prim_path")
+        if isinstance(resolved, str) and resolved.strip():
+            normalized = resolved if resolved.startswith("/") else f"/{resolved.lstrip('/')}"
+            available_keys.add((action.rule_id, f"prim:{normalized}"))
+            available_keys.add((action.rule_id, normalized))
     enriched: list[RuleResult] = []
     for result in results:
         key = (result.rule_id, result.target_id)
@@ -431,10 +441,16 @@ def _build_texture_file_naming_action(
     node = node_index.find(result)
     target_node = _target_node_name(result, node)
     block_reasons = _block_reasons(node, "low")
+    resolved_before = node_index.resolved_texture_path(result.target_id)
+    if resolved_before is None and dependency is not None:
+        resolved_before = dependency.resolved_path or raw_path
     if dependency is not None and not dependency.exists:
-        block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
-    if dependency is not None and dependency.is_udim and not dependency.exists:
-        block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+        if not str(result.target_id).startswith("prim:"):
+            block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+        elif not (dependency.raw_path or dependency.resolved_path):
+            block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+        elif not resolved_before or not Path(resolved_before).is_file():
+            block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
 
     target_id, target_node, action_params = _usd_prim_fix_fields(
         result,
@@ -444,7 +460,7 @@ def _build_texture_file_naming_action(
             "pattern": pattern,
             "node_name_before": result.node or texture_filename_stem(raw_path),
             "node_name_after": proposed_node,
-            "resolved_before": dependency.resolved_path if dependency else raw_path,
+            "resolved_before": resolved_before or raw_path,
             "is_udim": bool(dependency.is_udim) if dependency else False,
         },
     )
@@ -487,6 +503,11 @@ def _build_action(
     target_node = _target_node_name(result, node)
     target_attr = _target_attr(result, rule.fix.params)
     fix_type = rule.fix.type
+    if fix_type == "set_attr" and target_attr == "colorSpace":
+        usd_node = node_index.find_usd_shader_for_result(result)
+        if usd_node is not None:
+            node = usd_node
+            target_node = _target_node_name(result, usd_node)
     before_value = _before_value(result, node_index, fix_type)
     after_value = _after_value(
         result,
@@ -512,6 +533,13 @@ def _build_action(
     ):
         params["studio_environment"] = node_index.studio_environment.to_dict()
 
+    target_id, target_node, params = _usd_prim_fix_fields(
+        result,
+        node,
+        target_node=target_node,
+        base_params=params,
+    )
+
     return FixAction(
         fix_id=_fix_id(result, rule.fix.type),
         rule_id=rule.id,
@@ -519,7 +547,7 @@ def _build_action(
         fix_type=rule.fix.type,
         risk=rule.fix.risk,
         target_kind=result.target_kind,
-        target_id=result.target_id,
+        target_id=target_id,
         target_node=target_node,
         target_attr=target_attr,
         before_value=before_value,
@@ -796,6 +824,7 @@ class _NodeIndex:
         self.scene_path = snapshot.scene_path or ""
         self.snapshot = snapshot
         self.studio_environment = studio_environment
+        self.usd_anchor_dir = _usd_anchor_dir(snapshot)
         self._by_key: dict[str, NodeSnapshot] = {}
         self._shapes_by_id: dict[str, ShapeSnapshot] = {}
         self._file_dependencies: dict[str, _FileDependencyRef] = {}
@@ -859,12 +888,70 @@ class _NodeIndex:
         path = dependency.raw_path.strip()
         return path or None
 
+    def resolved_texture_path(self, target_id: str) -> Optional[str]:
+        dependency = self.file_dependency(target_id)
+        if dependency is None:
+            return None
+        candidate = (dependency.resolved_path or dependency.raw_path or "").strip()
+        if not candidate:
+            return None
+        path = Path(candidate)
+        if path.is_file():
+            return str(path).replace("\\", "/")
+        if str(target_id).startswith("prim:") and self.usd_anchor_dir is not None:
+            anchored = (self.usd_anchor_dir / candidate).resolve()
+            if anchored.is_file():
+                return str(anchored).replace("\\", "/")
+        if path.is_absolute():
+            return str(path).replace("\\", "/")
+        scene_dir = Path(self.scene_path).parent if self.scene_path else Path.cwd()
+        resolved = (scene_dir / candidate).resolve()
+        return str(resolved).replace("\\", "/")
+
     def find(self, result: RuleResult) -> Optional[NodeSnapshot]:
         for key in (result.target_id, result.node):
             node = self._by_key.get(str(key or ""))
             if node is not None:
                 return node
         return None
+
+    def find_usd_shader_for_result(self, result: RuleResult) -> Optional[NodeSnapshot]:
+        if str(result.target_id).startswith("prim:"):
+            return self.find(result)
+
+        search_names = {
+            _short_dag_name(str(result.node or "")),
+            _short_dag_name(str(result.target_id or "")),
+        }
+        search_names.discard("")
+
+        prim_candidates: list[NodeSnapshot] = []
+        for node in self.snapshot.nodes:
+            if not str(node.id).startswith("prim:"):
+                continue
+            if node.type_name != "Shader":
+                continue
+            names = {
+                _short_dag_name(str(node.name or "")),
+                _short_dag_name(str(node.full_name or "")),
+            }
+            if search_names.intersection(names):
+                prim_candidates.append(node)
+                continue
+            if result.material and result.material in str(node.full_name or ""):
+                prim_candidates.append(node)
+
+        if not prim_candidates:
+            return None
+        if len(prim_candidates) == 1:
+            return prim_candidates[0]
+        return max(
+            prim_candidates,
+            key=lambda item: (
+                1 if item.attrs.get("colorSpace") else 0,
+                len(str(item.full_name or "")),
+            ),
+        )
 
     def find_shape(self, result: RuleResult) -> Optional[ShapeSnapshot]:
         return self._shapes_by_id.get(str(result.target_id or ""))
@@ -889,3 +976,23 @@ def _read_snapshot_value(snapshot: GraphSnapshot, dotted_path: str) -> Any:
     from pipeline_inspector.core.rule_schema import _read_nested_value
 
     return _read_nested_value(snapshot, dotted_path)
+
+
+def _usd_anchor_dir(snapshot: GraphSnapshot) -> Optional[Path]:
+    metadata = snapshot.usd_stage_metadata
+    if metadata is not None and metadata.root_layer:
+        root = Path(str(metadata.root_layer))
+        if root.suffix.casefold() in {".usd", ".usda", ".usdc"} and root.is_file():
+            return root.parent
+    for dependency in snapshot.file_dependencies:
+        if not str(dependency.node_id).startswith("prim:"):
+            continue
+        for candidate in (dependency.resolved_path, dependency.raw_path):
+            if not candidate:
+                continue
+            path = Path(str(candidate))
+            if path.is_absolute() and path.is_file():
+                return path.parent
+            if path.is_absolute() and path.parent.is_dir():
+                return path.parent
+    return None

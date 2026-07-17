@@ -201,23 +201,62 @@ def test_open_usd_shader_view_opens_hypershade_and_attribute_editor() -> None:
     mel = MagicMock()
     cmds = MagicMock()
     cmds.HypershadeWindow = MagicMock()
+    cmds.evalDeferred = MagicMock(side_effect=lambda callback: callback())
+    shader_prim = "/Base/mtl/Base_MTLSG/UsdPreviewSurface/demo_albedo_v002_1"
     with patch(
         "pipeline_inspector.maya.usd_navigation.select_usd_prim",
         return_value=NavigationActionResult(
             action="select_node",
-            target="/Base/mtl/Base_MTLSG",
+            target=shader_prim,
             succeeded=True,
             message="ok",
         ),
+    ) as select_usd, patch(
+        "pipeline_inspector.maya.usd_navigation._hypershade_panel_name",
+        return_value="hyperShadePanel1",
     ):
         result = open_usd_shader_view(
-            "/Base/mtl/Base_MTLSG/UsdPreviewSurface/demo_albedo_v002_1",
+            shader_prim,
             material_name="Base_MTLSG",
             cmds=cmds,
             mel=mel,
         )
 
     assert result.succeeded is True
-    assert result.target == "/Base/mtl/Base_MTLSG"
+    assert result.target == shader_prim
+    select_usd.assert_called_once_with(shader_prim, cmds=cmds)
     cmds.HypershadeWindow.assert_called_once()
     mel.eval.assert_any_call("openAEWindow")
+    mel.eval.assert_any_call(
+        'hyperShadePanelGraphCommand("hyperShadePanel1", "showUpAndDownstream")'
+    )
+    assert not any(
+        call.args == ("updateAE",) for call in mel.eval.call_args_list
+    )
+
+
+def test_open_in_hypershade_action_prefers_maya_node_from_prim_path() -> None:
+    maya_cmds = MagicMock()
+    maya_cmds.objExists.side_effect = lambda name: name == "demo_albedo_v002_1"
+    with patch(
+        "pipeline_inspector.maya.commands._maya_cmds",
+        return_value=maya_cmds,
+    ), patch(
+        "pipeline_inspector.maya.commands.open_in_hypershade",
+        return_value=NavigationActionResult(
+            action="open_in_hypershade",
+            target="demo_albedo_v002_1",
+            succeeded=True,
+            message="ok",
+        ),
+    ) as open_maya, patch(
+        "pipeline_inspector.maya.usd_navigation.open_usd_shader_view",
+    ) as open_usd:
+        result = commands.open_in_hypershade_action(
+            "/Base/mtl/Base_MTLSG/demo_albedo_v002_1",
+            target_id="prim:/Base/mtl/Base_MTLSG/demo_albedo_v002_1",
+        )
+
+    assert result.succeeded is True
+    open_maya.assert_called_once_with("demo_albedo_v002_1", cmds=maya_cmds)
+    open_usd.assert_not_called()

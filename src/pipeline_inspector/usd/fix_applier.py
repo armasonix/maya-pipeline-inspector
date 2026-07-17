@@ -134,7 +134,9 @@ def _apply_usd_fix_actions_to_stage(
             records.append(_apply_set_default_prim(stage, action, Usd=Usd))
             continue
         if action.fix_type == SET_ATTR_FIX_TYPE:
-            records.append(_apply_set_attr(stage, action, UsdShade=UsdShade))
+            record = _apply_set_attr(stage, action, UsdShade=UsdShade)
+            records.append(record)
+            _debug_usd_fix_log(record, hypothesis_id="H16")
             continue
         if action.fix_type == RENAME_NODE_FIX_TYPE:
             record = _apply_rename_node(stage, action)
@@ -196,7 +198,7 @@ def _apply_set_default_prim(stage: Any, action: FixAction, *, Usd: Any) -> Appli
 def _apply_set_attr(stage: Any, action: FixAction, *, UsdShade: Any) -> AppliedUsdFixRecord:
     prim_path = _resolve_usd_prim_path(stage, action)
     prim = stage.GetPrimAtPath(prim_path)
-    if not prim or not prim.IsA(UsdShade.Shader):
+    if not prim or not prim.IsValid() or not _prim_supports_shader_edits(prim, UsdShade=UsdShade):
         return AppliedUsdFixRecord(
             fix_id=action.fix_id,
             fix_type=action.fix_type,
@@ -234,28 +236,62 @@ def _apply_set_attr(stage: Any, action: FixAction, *, UsdShade: Any) -> AppliedU
 
 
 def _set_shader_colorspace(shader: Any, value: str) -> bool:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return False
+
+    applied = False
     file_input = shader.GetInput("file")
     if file_input:
         attr = file_input.GetAttr()
         if attr is not None and hasattr(attr, "SetColorSpace"):
-            attr.SetColorSpace(value)
-            return True
-    for input_name, normalized in (
-        ("sourceColorSpace", value.casefold()),
-        ("rgb_color_space", value.casefold()),
-    ):
+            attr.SetColorSpace(normalized)
+            applied = True
+
+    source_token, enum_value = _colorspace_shader_tokens(normalized)
+    for input_name in ("sourceColorSpace", "rgb_color_space"):
         input_attr = shader.GetInput(input_name)
         if input_attr:
-            input_attr.Set(normalized)
-            return True
+            input_attr.Set(source_token)
+            applied = True
+
     color_space = shader.GetInput("color_space")
-    if color_space and value == "Raw":
-        color_space.Set(0)
+    if color_space:
+        attr = color_space.GetAttr()
+        type_name = str(attr.GetTypeName() if attr is not None else "").casefold()
+        try:
+            if "int" in type_name and enum_value is not None:
+                color_space.Set(enum_value)
+            else:
+                color_space.Set(source_token)
+            applied = True
+        except (RuntimeError, TypeError, ValueError):
+            pass
+
+    color_space_input = shader.GetInput("colorSpace")
+    if color_space_input:
+        color_space_input.Set(normalized)
+        applied = True
+    return applied
+
+
+def _colorspace_shader_tokens(value: str) -> tuple[str, int | None]:
+    normalized = value.strip()
+    if normalized == "Raw":
+        return "raw", 0
+    if normalized == "sRGB":
+        return "srgb", 1
+    if normalized == "ACEScg":
+        return "acescg", 1
+    return normalized.casefold(), None
+
+
+def _prim_supports_shader_edits(prim: Any, *, UsdShade: Any) -> bool:
+    if prim.IsA(UsdShade.Shader):
         return True
-    if color_space and value == "sRGB":
-        color_space.Set(1)
+    if hasattr(prim, "HasAPI") and prim.HasAPI(UsdShade.Tokens.Shader):
         return True
-    return False
+    return bool(UsdShade.ConnectableAPI(prim))
 
 
 def _apply_shader_asset_path(
@@ -269,7 +305,7 @@ def _apply_shader_asset_path(
 ) -> AppliedUsdFixRecord:
     prim_path = _resolve_usd_prim_path(stage, action)
     prim = stage.GetPrimAtPath(prim_path)
-    if not prim or not prim.IsA(UsdShade.Shader):
+    if not prim or not prim.IsValid() or not _prim_supports_shader_edits(prim, UsdShade=UsdShade):
         return _failed_record(action, message=INVALID_TARGET_REASON)
     shader = UsdShade.Shader(prim)
     input_name = _resolve_shader_input_name(shader, str(action.target_attr or "file"))
@@ -590,7 +626,7 @@ def _debug_resolve_log(
     source: str,
     match_count: int = 0,
 ) -> None:
-    if action.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE}:
+    if action.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE, SET_ATTR_FIX_TYPE}:
         return
     try:
         log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"

@@ -106,6 +106,11 @@ def _is_usd_stage_action(action: FixAction, *, has_usd_proxy: bool) -> bool:
         return has_usd_proxy and action.fix_type in USD_PRIM_FIX_TYPES
     if not has_usd_proxy:
         return False
+    if (
+        action.fix_type == "set_attr"
+        and str(action.target_attr or action.params.get("attribute") or "") == "colorSpace"
+    ):
+        return True
     if action.fix_type not in USD_STAGE_FIX_TYPES:
         return False
     return action.target_kind in {"scene", "graph"}
@@ -121,10 +126,36 @@ def _resolve_usd_prim_fix_actions(
 
     resolved: list[FixAction] = []
     for action in actions:
-        if not str(action.target_id).startswith("prim:"):
-            resolved.append(action)
-            continue
         prim_path = str(action.params.get("resolved_prim_path") or "").strip()
+        if not prim_path and (
+            action.fix_type == "set_attr"
+            and str(action.target_attr or action.params.get("attribute") or "") == "colorSpace"
+        ):
+            prim_path = find_usd_prim_for_issue(
+                target_id=action.target_id,
+                node_name=str(action.target_node or ""),
+                material_name=str(action.params.get("material_name") or ""),
+                cmds=cmds,
+            )
+        if not str(action.target_id).startswith("prim:"):
+            if prim_path:
+                normalized = (
+                    prim_path if prim_path.startswith("/") else f"/{prim_path.lstrip('/')}"
+                )
+                resolved.append(
+                    replace(
+                        action,
+                        target_id=f"prim:{normalized}",
+                        target_node=normalized,
+                        params={
+                            **action.params,
+                            "resolved_prim_path": normalized,
+                        },
+                    )
+                )
+            else:
+                resolved.append(action)
+            continue
         if not prim_path:
             prim_path = find_usd_prim_for_issue(
                 target_id=action.target_id,

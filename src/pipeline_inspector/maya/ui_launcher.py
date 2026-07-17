@@ -3877,7 +3877,7 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
 
 
 def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
-    from pipeline_inspector.core.fix_plan import NAMING_FIX_TYPE
+    from pipeline_inspector.core.fix_plan import NAMING_FIX_TYPE, TEXTURE_FILE_FIX_TYPE
     from pipeline_inspector.maya.fix_router import apply_fix_actions
     from pipeline_inspector.ui.fix_queue import HIGH_RISK, MEDIUM_RISK
 
@@ -3888,7 +3888,12 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     def _include_apply_safe_action(action: Any) -> bool:
         if action.requires_supervisor:
             return False
-        if action.risk in (HIGH_RISK, MEDIUM_RISK):
+        if action.risk == HIGH_RISK:
+            return False
+        if action.risk == MEDIUM_RISK and not (
+            action.fix_type == TEXTURE_FILE_FIX_TYPE
+            and str(action.target_id).startswith("prim:")
+        ):
             return False
         if action.blocked:
             return bool(

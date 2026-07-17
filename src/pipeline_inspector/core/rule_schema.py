@@ -36,6 +36,7 @@ _TEXTURE_PATH_ATTRS = {
     "file": "fileTextureName",
     "VRayBitmap": "file",
     "aiImage": "filename",
+    "Shader": "file",
 }
 
 SEVERITIES = frozenset({"info", "warning", "error", "critical"})

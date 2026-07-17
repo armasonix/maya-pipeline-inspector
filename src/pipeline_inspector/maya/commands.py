@@ -373,6 +373,21 @@ def open_in_hypershade_action(
             snapshot=snapshot,
             cmds=maya_cmds,
         )
+        # #region agent log
+        _debug_hypershade_route_log(
+            "commands.open_in_hypershade_action",
+            "USD hypershade routing",
+            {
+                "node_name": node_name,
+                "target_id": target_id,
+                "material_name": material_name or "",
+                "prim_path": prim_path,
+                "maya_material": maya_material,
+                "route": "maya" if maya_material else ("usd" if prim_path else "fallback"),
+            },
+            hypothesis_id="H17",
+        )
+        # #endregion
         if maya_material:
             return open_in_hypershade(maya_material, cmds=maya_cmds)
         if prim_path:
@@ -416,9 +431,15 @@ def _resolve_maya_hypershade_target(
     if material_name:
         candidates.append(material_name.strip())
         candidates.append(material_name.strip().rsplit("/", 1)[-1])
-    if node_name and not str(node_name).startswith("/"):
+    if node_name:
         candidates.append(_maya_node_name(node_name))
-    if target_id and not str(target_id).startswith("prim:"):
+        if "/" in str(node_name):
+            candidates.append(str(node_name).rsplit("/", 1)[-1])
+    if str(target_id).startswith("prim:"):
+        prim_body = str(target_id).removeprefix("prim:")
+        if "/" in prim_body:
+            candidates.append(prim_body.rsplit("/", 1)[-1])
+    elif target_id:
         candidates.append(_resolve_maya_target_name(node_name, target_id))
 
     seen: set[str] = set()
@@ -1166,6 +1187,16 @@ def _maya_mel() -> Any:
         return importlib.import_module("maya.mel")
     except ImportError as exc:
         raise RuntimeError("Maya MEL is available only inside Autodesk Maya.") from exc
+
+
+def _debug_hypershade_route_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    _debug_health_log_command(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _debug_health_log_command(

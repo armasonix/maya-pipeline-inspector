@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import GraphSnapshot
-from pipeline_inspector.maya.navigation import NavigationActionResult, _result
+from pipeline_inspector.maya.navigation import NavigationActionResult, _hypershade_panel_name, _result
 from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 
-_DEBUG_LOG = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+_DEBUG_LOG = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
 
 
 def is_usd_prim_target(*, target_id: str = "", node_name: str = "") -> bool:
@@ -292,19 +292,20 @@ def open_usd_shader_view(
     cmds: Optional[Any] = None,
     mel: Optional[Any] = None,
 ) -> NavigationActionResult:
-    """Select a USD material prim and open Hypershade plus Attribute Editor."""
+    """Select a USD shader prim and open Hypershade plus Attribute Editor."""
 
     maya_cmds = cmds or _maya_cmds()
+    requested_prim = _normalize_prim_path(prim_path)
     material_prim = resolve_usd_material_scope_prim(
         prim_path,
         material_name=material_name,
-    ) or _normalize_prim_path(prim_path)
+    )
 
-    selection = select_usd_prim(material_prim, cmds=maya_cmds)
-    selected_prim = material_prim
-    if not selection.succeeded and material_prim != _normalize_prim_path(prim_path):
-        selection = select_usd_prim(prim_path, cmds=maya_cmds)
-        selected_prim = _normalize_prim_path(prim_path)
+    selection = select_usd_prim(requested_prim, cmds=maya_cmds)
+    selected_prim = requested_prim
+    if not selection.succeeded and material_prim and material_prim != requested_prim:
+        selection = select_usd_prim(material_prim, cmds=maya_cmds)
+        selected_prim = material_prim
 
     if not selection.succeeded:
         return NavigationActionResult(
@@ -316,6 +317,7 @@ def open_usd_shader_view(
 
     maya_mel = mel or _maya_mel()
     opened_panels = _open_usd_material_panels(maya_cmds, maya_mel)
+    graph_focused = _focus_usd_hypershade_graph(maya_cmds, maya_mel)
     _debug_nav_log(
         "usd_navigation.open_usd_shader_view",
         "USD material view opened",
@@ -324,6 +326,7 @@ def open_usd_shader_view(
             "material_prim": selected_prim,
             "material_name": material_name,
             "opened_panels": "|".join(opened_panels),
+            "graph_focused": graph_focused,
         },
         hypothesis_id="H9",
     )
@@ -344,14 +347,42 @@ def _open_usd_material_panels(cmds: Any, mel: Any) -> list[str]:
     opened: list[str] = []
     if _open_hypershade_window(cmds, mel):
         opened.append("Hypershade")
-    for mel_command in ("updateAE", "openAEWindow"):
-        try:
-            mel.eval(mel_command)
-        except Exception:  # noqa: BLE001
-            continue
-    if "Attribute Editor" not in opened:
+    if _open_attribute_editor_window(cmds, mel):
         opened.append("Attribute Editor")
     return opened
+
+
+def _focus_usd_hypershade_graph(cmds: Any, mel: Any) -> bool:
+    """Refresh Hypershade graph layout for the current UFE USD selection."""
+
+    panel_name = _hypershade_panel_name(cmds) or "hyperShadePanel1"
+    graph_command = f'hyperShadePanelGraphCommand("{panel_name}", "showUpAndDownstream")'
+
+    def _apply_io_connections_view() -> None:
+        mel.eval(graph_command)
+
+    eval_deferred = getattr(cmds, "evalDeferred", None)
+    if eval_deferred is not None:
+        eval_deferred(_apply_io_connections_view)
+    else:
+        _apply_io_connections_view()
+    return True
+
+
+def _open_attribute_editor_window(cmds: Any, mel: Any) -> bool:
+    try:
+        mel.eval("openAEWindow")
+        return True
+    except Exception:  # noqa: BLE001
+        pass
+    attribute_editor = getattr(cmds, "AttributeEditor", None)
+    if attribute_editor is not None:
+        try:
+            attribute_editor()
+            return True
+        except Exception:  # noqa: BLE001
+            pass
+    return False
 
 
 def _open_hypershade_window(cmds: Any, mel: Any) -> bool:

@@ -187,11 +187,12 @@ def enrich_snapshot(
     nodes = tuple(_apply_node_semantic(node, node_semantics.get(node.id)) for node in base_nodes)
     nodes_by_id = {node.id: node for node in nodes}
     scene_dir = Path(snapshot.scene_path).parent if snapshot.scene_path else Path.cwd()
+    usd_anchor = _usd_anchor_dir(snapshot)
     file_dependencies = tuple(
         _enrich_file_dependency(
             dependency,
             nodes_by_id.get(dependency.node_id),
-            scene_dir,
+            usd_anchor if str(dependency.node_id).startswith("prim:") and usd_anchor else scene_dir,
             studio_environment,
         )
         for dependency in snapshot.file_dependencies
@@ -519,3 +520,23 @@ def _short_node_id(node_id: str) -> str:
     if node_id.startswith("node:"):
         return node_id.split(":", 1)[1]
     return node_id
+
+
+def _usd_anchor_dir(snapshot: GraphSnapshot) -> Optional[Path]:
+    metadata = snapshot.usd_stage_metadata
+    if metadata is not None and metadata.root_layer:
+        root = Path(str(metadata.root_layer))
+        if root.suffix.casefold() in {".usd", ".usda", ".usdc"} and root.is_file():
+            return root.parent
+    for dependency in snapshot.file_dependencies:
+        if not str(dependency.node_id).startswith("prim:"):
+            continue
+        for candidate in (dependency.resolved_path, dependency.raw_path):
+            if not candidate:
+                continue
+            path = Path(str(candidate))
+            if path.is_absolute() and path.is_file():
+                return path.parent
+            if path.is_absolute() and path.parent.is_dir():
+                return path.parent
+    return None

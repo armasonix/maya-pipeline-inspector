@@ -170,6 +170,7 @@ def _shader_node_attrs(*, shader: Any, prim_name: str, Sdf: Any) -> dict[str, An
             info_id = str(value)
     semantic_slot = _infer_semantic_slot(prim_name, info_id)
     color_space = _read_shader_colorspace(shader, Sdf=Sdf)
+    file_path = _read_shader_file_path(shader, Sdf=Sdf)
     attrs: dict[str, Any] = {}
     if info_id:
         attrs["info_id"] = info_id
@@ -177,7 +178,21 @@ def _shader_node_attrs(*, shader: Any, prim_name: str, Sdf: Any) -> dict[str, An
         attrs["semantic_slot"] = semantic_slot
     if color_space:
         attrs["colorSpace"] = color_space
+    if file_path:
+        attrs["file"] = file_path
     return attrs
+
+
+def _read_shader_file_path(shader: Any, *, Sdf: Any) -> str:
+    file_input = shader.GetInput("file")
+    if not file_input:
+        return ""
+    value = file_input.Get()
+    if value is None:
+        return ""
+    if isinstance(value, Sdf.AssetPath):
+        return str(value.path or "")
+    return str(value).strip()
 
 
 def _infer_semantic_slot(prim_name: str, info_id: str) -> str:

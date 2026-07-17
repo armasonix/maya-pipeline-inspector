@@ -53,7 +53,7 @@ def merge_usd_proxy_snapshots(
             )
             # #endregion
             continue
-        merged = _merge_snapshots(merged, usd_snapshot)
+        merged = _merge_snapshots(merged, usd_snapshot, proxy_usd_path=path)
         merged_paths.append(str(path))
 
     # #region agent log
@@ -97,7 +97,12 @@ def _collect_usd_proxy_paths(cmds: Any) -> list[Path]:
     return paths
 
 
-def _merge_snapshots(base: GraphSnapshot, usd: GraphSnapshot) -> GraphSnapshot:
+def _merge_snapshots(
+    base: GraphSnapshot,
+    usd: GraphSnapshot,
+    *,
+    proxy_usd_path: Path | None = None,
+) -> GraphSnapshot:
     node_ids = {node.id for node in base.nodes}
     nodes = list(base.nodes)
     for node in usd.nodes:
@@ -129,12 +134,20 @@ def _merge_snapshots(base: GraphSnapshot, usd: GraphSnapshot) -> GraphSnapshot:
             material_ids.add(material.node_id)
 
     metadata = base.usd_stage_metadata
+    usd_root_layer = str(
+        proxy_usd_path
+        or (usd.usd_stage_metadata.root_layer if usd.usd_stage_metadata is not None else "")
+        or ""
+    )
     if usd.usd_stage_metadata is not None:
         if metadata is None:
             metadata = usd.usd_stage_metadata
+            if usd_root_layer:
+                metadata = replace(metadata, root_layer=usd_root_layer)
         else:
             metadata = replace(
                 metadata,
+                root_layer=usd_root_layer or metadata.root_layer,
                 unbound_mesh_count=metadata.unbound_mesh_count
                 + usd.usd_stage_metadata.unbound_mesh_count,
                 missing_reference_count=metadata.missing_reference_count

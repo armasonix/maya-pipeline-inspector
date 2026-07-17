@@ -871,3 +871,138 @@ def _failed_result(
 
 def _snapshot(node: NodeSnapshot) -> GraphSnapshot:
     return GraphSnapshot(nodes=(node,))
+
+
+def test_fix_planner_keeps_usd_texture_rename_unblocked_when_file_exists_at_usd_anchor(
+    tmp_path: Path,
+):
+    usd_root = tmp_path / "assets"
+    usd_root.mkdir()
+    texture_path = usd_root / "demo_albedo_v002_1.exr"
+    texture_path.write_bytes(b"pixels")
+    usda = usd_root / "hero.usda"
+    usda.write_text("#usda 1.0\n", encoding="utf-8")
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "shot.ma"),
+        renderer="arnold",
+        nodes=(
+            NodeSnapshot(
+                id="prim:/Materials/demo_albedo_v002_1",
+                name="demo_albedo_v002_1",
+                full_name="/Materials/demo_albedo_v002_1",
+                type_name="Shader",
+                renderer_family="usd",
+                attrs={
+                    "semantic_slot": "base_color",
+                    "file": texture_path.name,
+                },
+            ),
+        ),
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id="prim:/Materials/demo_albedo_v002_1",
+                attr="file",
+                raw_path=texture_path.name,
+                resolved_path=texture_path.name,
+                exists=False,
+            ),
+        ),
+        usd_stage_metadata=__import__(
+            "pipeline_inspector.core.models", fromlist=["UsdStageMetadata"]
+        ).UsdStageMetadata(root_layer=str(usda)),
+    )
+    rule = RuleDefinition(
+        id="studio.naming.texture.pattern",
+        name="Texture file name must match studio naming template",
+        enabled=True,
+        renderer=["common", "vray", "arnold", "usd"],
+        scope="node",
+        severity="warning",
+        owner="shader_td",
+        message="Texture file name does not match the studio naming template.",
+        why="Texture file naming keeps published assets searchable on disk.",
+        match=RuleMatch(criteria={"object_type": "texture"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "texture"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="node",
+        target_id="prim:/Materials/demo_albedo_v002_1",
+        node="demo_albedo_v002_1",
+        plug="file",
+        current_value="demo_albedo_v002_1",
+        expected_value=r"^tex_[A-Za-z0-9_]+$",
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.fix_type == "rename_texture_file"
+    assert action.blocked is False
+    assert str(action.params["resolved_before"]).replace("\\", "/") == str(texture_path).replace(
+        "\\", "/"
+    )
+
+
+def test_fix_planner_builds_usd_colorspace_action_with_resolved_prim_path():
+    rule = _rule_with_fix()
+    result = _failed_result(
+        target_id="prim:/Materials/demo_roughness_v001",
+        node="demo_roughness_v001",
+    )
+    snapshot = GraphSnapshot(
+        nodes=(
+            NodeSnapshot(
+                id="prim:/Materials/demo_roughness_v001",
+                name="demo_roughness_v001",
+                full_name="/Materials/demo_roughness_v001",
+                type_name="Shader",
+                renderer_family="usd",
+                attrs={"colorSpace": "sRGB", "semantic_slot": "roughness"},
+            ),
+        ),
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.fix_type == "set_attr"
+    assert action.target_id == "prim:/Materials/demo_roughness_v001"
+    assert action.params["resolved_prim_path"] == "/Materials/demo_roughness_v001"
+    assert action.blocked is False
+
+
+def test_apply_fix_availability_matches_usd_prim_aliases():
+    result = _failed_result(
+        target_id="prim:/Materials/demo_roughness_v001",
+        node="demo_roughness_v001",
+        auto_fix_available=False,
+    )
+    plan = FixPlan(
+        actions=(
+            FixAction(
+                fix_id="common.texture.colorspace.data_raw:prim:/Materials/demo_roughness_v001:set_attr",
+                rule_id=result.rule_id,
+                title="fix",
+                fix_type="set_attr",
+                risk="low",
+                target_kind="node",
+                target_id="prim:/Materials/demo_roughness_v001",
+                target_node="/Materials/demo_roughness_v001",
+                params={"resolved_prim_path": "/Materials/demo_roughness_v001"},
+            ),
+        )
+    )
+
+    enriched = apply_fix_availability([result], plan)
+
+    assert enriched[0].auto_fix_available is True

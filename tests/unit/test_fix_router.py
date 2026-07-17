@@ -45,6 +45,24 @@ def test_is_usd_stage_action_detects_prim_rename_fix() -> None:
     assert _is_usd_stage_action(action, has_usd_proxy=False) is False
 
 
+def test_is_usd_stage_action_routes_colorspace_set_attr_to_usd() -> None:
+    action = FixAction(
+        fix_id="common.texture.colorspace.color_managed:node:aiImage1:set_attr",
+        rule_id="common.texture.colorspace.color_managed",
+        title="colorspace",
+        fix_type="set_attr",
+        risk="low",
+        target_kind="node",
+        target_id="node:demo_albedo_v002_1",
+        target_node="demo_albedo_v002_1",
+        target_attr="colorSpace",
+        before_value="Raw",
+        after_value="sRGB",
+    )
+    assert _is_usd_stage_action(action, has_usd_proxy=True) is True
+    assert _is_usd_stage_action(action, has_usd_proxy=False) is False
+
+
 def test_apply_fix_actions_routes_scene_usd_fix_to_usd_applier() -> None:
     action = FixAction(
         fix_id="usd.stage.default_prim.required:scene:set_default_prim",

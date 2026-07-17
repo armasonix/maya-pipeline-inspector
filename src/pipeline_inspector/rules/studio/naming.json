@@ -105,7 +105,7 @@
       "id": "studio.naming.texture.pattern",
       "name": "Texture node name must match studio naming template",
       "enabled": true,
-      "renderer": ["common", "vray", "arnold"],
+      "renderer": ["common", "vray", "arnold", "usd"],
       "scope": "node",
       "severity": "warning",
       "owner": "shader_td",

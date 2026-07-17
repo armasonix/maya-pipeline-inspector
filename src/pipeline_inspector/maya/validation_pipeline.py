@@ -387,8 +387,37 @@ def run_validation(
             ),
             "fix_actions": len(fix_plan.actions),
             "fix_unblocked": sum(1 for action in fix_plan.actions if not action.blocked),
+            "blocked_actions": "|".join(
+                sorted(
+                    f"{action.fix_type}:{action.target_id}:{','.join(action.block_reasons) or 'policy'}"
+                    for action in fix_plan.actions
+                    if action.blocked
+                )[:12]
+            ),
+            "colorspace_fix_targets": "|".join(
+                sorted(
+                    f"{action.target_id}:{action.blocked}"
+                    for action in fix_plan.actions
+                    if "colorspace" in action.rule_id
+                )
+            ),
         },
         hypothesis_id="H2",
+    )
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "Fix plan USD colorspace actions",
+        {
+            "usd_root_layer": str(
+                (enriched.usd_stage_metadata.root_layer if enriched.usd_stage_metadata else "")
+            ),
+            "colorspace_actions": "|".join(
+                f"{action.target_id}->{action.after_value}:blocked={action.blocked}"
+                for action in fix_plan.actions
+                if "colorspace" in action.rule_id
+            ),
+        },
+        hypothesis_id="H16",
     )
     # #endregion
     scope_label = "selection" if scan_scope == "selection" else "scene"
