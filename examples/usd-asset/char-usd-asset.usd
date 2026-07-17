@@ -9,7 +9,7 @@
     upAxis = "Y"
 )
 
-def Mesh "Base" (
+def Mesh "geo_Base" (
     prepend apiSchemas = ["MaterialBindingAPI"]
     kind = "component"
 )
@@ -300,7 +300,7 @@ def Mesh "Base" (
     }
 }
 
-def Mesh "Sphere" (
+def Mesh "geo_Sphere" (
     prepend apiSchemas = ["MaterialBindingAPI"]
     kind = "component"
 )

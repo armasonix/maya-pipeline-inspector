@@ -295,6 +295,12 @@ def _build_naming_action(
         "low",
         fix_type=NAMING_FIX_TYPE,
     )
+    target_id, target_node, action_params = _usd_prim_fix_fields(
+        result,
+        node,
+        target_node=target_node,
+        base_params={"pattern": pattern, "object_type": object_type},
+    )
 
     return FixAction(
         fix_id=_fix_id(result, NAMING_FIX_TYPE),
@@ -303,7 +309,7 @@ def _build_naming_action(
         fix_type=NAMING_FIX_TYPE,
         risk="low",
         target_kind=result.target_kind,
-        target_id=result.target_id,
+        target_id=target_id,
         target_node=target_node,
         before_value=rename_before,
         after_value=proposed_name,
@@ -316,7 +322,7 @@ def _build_naming_action(
         undo_supported=True,
         blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
-        params={"pattern": pattern, "object_type": object_type},
+        params=action_params,
     )
 
 
@@ -430,6 +436,18 @@ def _build_texture_file_naming_action(
     if dependency is not None and dependency.is_udim and not dependency.exists:
         block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
 
+    target_id, target_node, action_params = _usd_prim_fix_fields(
+        result,
+        node,
+        target_node=target_node,
+        base_params={
+            "pattern": pattern,
+            "node_name_before": result.node or texture_filename_stem(raw_path),
+            "node_name_after": proposed_node,
+            "resolved_before": dependency.resolved_path if dependency else raw_path,
+            "is_udim": bool(dependency.is_udim) if dependency else False,
+        },
+    )
 
     return FixAction(
         fix_id=_fix_id(result, TEXTURE_FILE_FIX_TYPE),
@@ -438,7 +456,7 @@ def _build_texture_file_naming_action(
         fix_type=TEXTURE_FILE_FIX_TYPE,
         risk="medium",
         target_kind=result.target_kind,
-        target_id=result.target_id,
+        target_id=target_id,
         target_node=target_node,
         target_attr=dependency.attr if dependency else "fileTextureName",
         before_value=raw_path,
@@ -455,13 +473,7 @@ def _build_texture_file_naming_action(
         undo_supported=False,
         blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
-        params={
-            "pattern": pattern,
-            "node_name_before": result.node or texture_filename_stem(raw_path),
-            "node_name_after": proposed_node,
-            "resolved_before": dependency.resolved_path if dependency else raw_path,
-            "is_udim": bool(dependency.is_udim) if dependency else False,
-        },
+        params=action_params,
     )
 
 
@@ -639,6 +651,31 @@ def _target_node_name(result: RuleResult, node: Optional[NodeSnapshot]) -> str:
     if node is not None:
         return node.full_name or node.name or node.id
     return result.node or result.target_id
+
+
+def _usd_prim_fix_fields(
+    result: RuleResult,
+    node: Optional[NodeSnapshot],
+    *,
+    target_node: str,
+    base_params: dict[str, Any],
+) -> tuple[str, str, dict[str, Any]]:
+    """Prefer full USD prim paths in fix actions when the snapshot provides them."""
+
+    params = dict(base_params)
+    target_id = result.target_id
+    resolved_target_node = target_node
+    if node is None or not str(node.id).startswith("prim:"):
+        return target_id, resolved_target_node, params
+
+    prim_path = str(node.full_name or node.id.removeprefix("prim:")).strip()
+    if prim_path and not prim_path.startswith("/"):
+        prim_path = f"/{prim_path.lstrip('/')}"
+    if prim_path:
+        params["resolved_prim_path"] = prim_path
+        target_id = f"prim:{prim_path}"
+        resolved_target_node = prim_path
+    return target_id, resolved_target_node, params
 
 def _fix_id(result: RuleResult, fix_type: str) -> str:
     target = result.target_id or result.node or "scene"
