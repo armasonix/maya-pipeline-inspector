@@ -366,8 +366,21 @@ def open_in_hypershade_action(
             snapshot=snapshot,
             cmds=maya_cmds,
         )
+        maya_material = _resolve_maya_hypershade_target(
+            material_name=material_name or "",
+            node_name=node_name,
+            target_id=target_id,
+            snapshot=snapshot,
+            cmds=maya_cmds,
+        )
+        if maya_material:
+            return open_in_hypershade(maya_material, cmds=maya_cmds)
         if prim_path:
-            return open_usd_shader_view(prim_path, cmds=maya_cmds)
+            return open_usd_shader_view(
+                prim_path,
+                material_name=material_name or "",
+                cmds=maya_cmds,
+            )
 
     maya_target = _resolve_maya_target_name(node_name, target_id)
     candidates: list[str] = []
@@ -387,6 +400,48 @@ def open_in_hypershade_action(
             message="Material or node does not exist.",
         )
     return open_in_hypershade(target)
+
+
+def _resolve_maya_hypershade_target(
+    *,
+    material_name: str,
+    node_name: str,
+    target_id: str,
+    snapshot: Optional[Any],
+    cmds: Any,
+) -> str:
+    """Return a Maya DAG material node when one exists for the issue target."""
+
+    candidates: list[str] = []
+    if material_name:
+        candidates.append(material_name.strip())
+        candidates.append(material_name.strip().rsplit("/", 1)[-1])
+    if node_name and not str(node_name).startswith("/"):
+        candidates.append(_maya_node_name(node_name))
+    if target_id and not str(target_id).startswith("prim:"):
+        candidates.append(_resolve_maya_target_name(node_name, target_id))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = _maya_node_name(candidate)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        if cmds.objExists(normalized):
+            return normalized
+
+    if snapshot is not None and material_name:
+        material_key = material_name.strip().rsplit("/", 1)[-1]
+        for material in getattr(snapshot, "materials", ()) or ():
+            if material.name != material_key and material.full_name != material_name:
+                continue
+            node_id = str(material.node_id or "")
+            if node_id.startswith("prim:"):
+                continue
+            maya_target = node_id.removeprefix("node:")
+            if cmds.objExists(maya_target):
+                return maya_target
+    return ""
 
 
 def _resolve_maya_target_name(node_name: str, target_id: str) -> str:

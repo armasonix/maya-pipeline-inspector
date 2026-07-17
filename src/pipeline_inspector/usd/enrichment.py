@@ -20,6 +20,19 @@ _USD_RENDERER_ID = "usd"
 _USD_EXTENSIONS = {".usd", ".usda", ".usdc"}
 
 
+def usd_material_name_from_prim_path(prim_path: str) -> str:
+    """Return the USD material name embedded in a prim path, when present."""
+
+    normalized = str(prim_path or "").strip().strip("/")
+    if not normalized:
+        return ""
+    parts = normalized.split("/")
+    for index, part in enumerate(parts):
+        if part == "mtl" and index + 1 < len(parts):
+            return parts[index + 1]
+    return ""
+
+
 def is_usd_snapshot(snapshot: GraphSnapshot) -> bool:
     if snapshot.renderer == _USD_RENDERER_ID:
         return True

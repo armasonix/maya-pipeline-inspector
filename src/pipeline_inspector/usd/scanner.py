@@ -94,6 +94,8 @@ def scan_usd_stage(
                 )
             )
 
+    file_dependencies = _dedupe_texture_file_dependencies(file_dependencies)
+
     default_prim_path = ""
     has_default_prim = stage.HasDefaultPrim()
     if has_default_prim:
@@ -280,6 +282,53 @@ def _shader_file_dependencies(
             )
         )
     return dependencies
+
+
+def _dedupe_texture_file_dependencies(
+    dependencies: list[FileDependencySnapshot],
+) -> list[FileDependencySnapshot]:
+    grouped: dict[tuple[str, str], FileDependencySnapshot] = {}
+    for dependency in dependencies:
+        prim_path = dependency.node_id.removeprefix("prim:")
+        material_key = _material_key_from_prim_path(prim_path)
+        path_key = _normalize_texture_path_key(dependency.raw_path)
+        key = (material_key, path_key)
+        current = grouped.get(key)
+        if current is None or _prefer_texture_dependency(dependency, current):
+            grouped[key] = dependency
+    return list(grouped.values())
+
+
+def _material_key_from_prim_path(prim_path: str) -> str:
+    parts = str(prim_path or "").strip("/").split("/")
+    for index, part in enumerate(parts):
+        if part == "mtl" and index + 1 < len(parts):
+            return parts[index + 1]
+    return prim_path
+
+
+def _normalize_texture_path_key(raw_path: str) -> str:
+    return str(raw_path or "").strip().replace("\\", "/").casefold()
+
+
+def _prefer_texture_dependency(
+    candidate: FileDependencySnapshot,
+    incumbent: FileDependencySnapshot,
+) -> bool:
+    return _texture_dependency_score(candidate.node_id) > _texture_dependency_score(
+        incumbent.node_id
+    )
+
+
+def _texture_dependency_score(node_id: str) -> int:
+    prim_path = str(node_id).removeprefix("prim:").casefold()
+    if "bitmap" in prim_path:
+        return 100
+    if "/vray/" in prim_path:
+        return 80
+    if "usdpreviewsurface" in prim_path or "usduvtexture" in prim_path:
+        return 20
+    return 50
 
 
 def _resolve_asset_path(raw_path: str, anchor_dir: Path) -> Path | None:

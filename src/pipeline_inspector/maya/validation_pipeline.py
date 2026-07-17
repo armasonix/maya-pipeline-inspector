@@ -346,6 +346,9 @@ def run_validation(
     sidecar_path = waiver_sidecar_path or resolve_waiver_sidecar_path(enriched.scene_path)
     if sidecar_path is not None and sidecar_path.is_file():
         results = list(apply_waivers(results, load_waiver_sidecar(sidecar_path)))
+    from pipeline_inspector.maya.usd_validation_dedupe import dedupe_validation_results
+
+    results = dedupe_validation_results(enriched, results)
     results = enrich_rule_results(enriched, results)
     fix_plan = build_fix_plan(
         results,

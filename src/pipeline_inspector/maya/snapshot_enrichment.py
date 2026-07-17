@@ -39,6 +39,7 @@ from pipeline_inspector.maya.displacement_enrichment import enrich_displacement_
 from pipeline_inspector.maya.optimized_texture_enrichment import enrich_optimized_texture_metadata
 from pipeline_inspector.maya.vray_enrichment import enrich_vray_metadata
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
+from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 from pipeline_inspector.util.paths import resolve_studio_path
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
@@ -104,6 +105,11 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
     for material in snapshot.materials:
         index[material.node_id] = material.name
         index[material.name] = material.name
+        if str(material.node_id).startswith("prim:"):
+            prim_path = material.full_name or material.node_id.removeprefix("prim:")
+            if prim_path:
+                index[prim_path] = material.name
+                index[f"prim:{prim_path}"] = material.name
         for node_id in material.texture_nodes:
             index[node_id] = material.name
             index[_short_node_id(node_id)] = material.name
@@ -118,6 +124,29 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
             ):
                 index[texture_id] = material.name
                 index[_short_node_id(texture_id)] = material.name
+
+    for node in snapshot.nodes:
+        if not str(node.id).startswith("prim:"):
+            continue
+        prim_path = node.full_name or node.id.removeprefix("prim:")
+        material_name = usd_material_name_from_prim_path(prim_path)
+        if not material_name:
+            continue
+        index[node.id] = material_name
+        index[prim_path] = material_name
+        index[f"prim:{prim_path}"] = material_name
+
+    for dependency in snapshot.file_dependencies:
+        if not str(dependency.node_id).startswith("prim:"):
+            continue
+        prim_path = dependency.node_id.removeprefix("prim:")
+        material_name = usd_material_name_from_prim_path(prim_path)
+        if not material_name:
+            continue
+        index[dependency.node_id] = material_name
+        index[prim_path] = material_name
+        index[f"prim:{prim_path}"] = material_name
+
     return index
 
 def _upstream_texture_nodes(
@@ -475,6 +504,15 @@ def _resolve_result_material(
         material = material_index.get(prefixed)
         if material:
             return material
+        prim_path = str(key)
+        if prim_path.startswith("prim:"):
+            prim_path = prim_path.removeprefix("prim:")
+        if prim_path.startswith("/"):
+            material = material_index.get(prim_path) or usd_material_name_from_prim_path(
+                prim_path
+            )
+            if material:
+                return material
     return None
 
 def _short_node_id(node_id: str) -> str:

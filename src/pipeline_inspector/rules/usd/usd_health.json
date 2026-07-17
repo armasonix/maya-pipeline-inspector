@@ -83,14 +83,15 @@
       "id": "usd.texture.missing",
       "name": "USD texture asset path must exist",
       "enabled": true,
-      "renderer": ["usd", "common"],
+      "renderer": ["usd"],
       "scope": "file_dependency",
       "severity": "critical",
       "owner": "shader_td",
       "message": "USD shader input points to a missing texture file.",
       "why": "Missing textures break lookdev and waste farm time on incomplete assets.",
       "match": {
-        "dependency_kind": "texture"
+        "dependency_kind": "texture",
+        "usd_prim": true
       },
       "check": {
         "type": "path_exists"
@@ -107,14 +108,15 @@
       "id": "usd.texture.path.local_drive",
       "name": "USD texture path must not use a local drive root",
       "enabled": true,
-      "renderer": ["usd", "common"],
+      "renderer": ["usd"],
       "scope": "file_dependency",
       "severity": "critical",
       "owner": "pipeline_td",
       "message": "USD texture path points to a local drive and may not resolve on the farm.",
       "why": "Local drive paths are machine-specific and commonly fail on render workers.",
       "match": {
-        "dependency_kind": "texture"
+        "dependency_kind": "texture",
+        "usd_prim": true
       },
       "check": {
         "type": "path_policy",

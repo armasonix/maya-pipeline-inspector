@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from pipeline_inspector.core.models import GraphSnapshot
 from pipeline_inspector.maya.navigation import NavigationActionResult, _result
+from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 
 _DEBUG_LOG = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
 
@@ -249,15 +250,62 @@ def select_usd_prim(
     )
 
 
+def resolve_usd_material_scope_prim(
+    prim_path: str,
+    *,
+    material_name: str = "",
+) -> str:
+    """Return the USD Material scope prim for a shader/texture prim path."""
+
+    normalized = _normalize_prim_path(prim_path)
+    if not normalized:
+        return ""
+
+    parts = [part for part in normalized.strip("/").split("/") if part]
+    expected_material = str(material_name or "").strip().strip("/").split("/")[-1]
+    for index, part in enumerate(parts):
+        if part != "mtl" or index + 1 >= len(parts):
+            continue
+        material_part = parts[index + 1]
+        if expected_material and material_part != expected_material:
+            continue
+        return f"/{'/'.join(parts[: index + 2])}"
+
+    if expected_material:
+        for index, part in enumerate(parts):
+            if part == "mtl" and index + 1 < len(parts):
+                return f"/{'/'.join(parts[: index + 2])}"
+
+    material_from_path = usd_material_name_from_prim_path(normalized)
+    if material_from_path:
+        for index, part in enumerate(parts):
+            if part == "mtl" and index + 1 < len(parts) and parts[index + 1] == material_from_path:
+                return f"/{'/'.join(parts[: index + 2])}"
+
+    return normalized
+
+
 def open_usd_shader_view(
     prim_path: str,
     *,
+    material_name: str = "",
     cmds: Optional[Any] = None,
     mel: Optional[Any] = None,
 ) -> NavigationActionResult:
-    """Select a USD shader prim and open its property editor."""
+    """Select a USD material prim and open Hypershade plus Attribute Editor."""
 
-    selection = select_usd_prim(prim_path, cmds=cmds)
+    maya_cmds = cmds or _maya_cmds()
+    material_prim = resolve_usd_material_scope_prim(
+        prim_path,
+        material_name=material_name,
+    ) or _normalize_prim_path(prim_path)
+
+    selection = select_usd_prim(material_prim, cmds=maya_cmds)
+    selected_prim = material_prim
+    if not selection.succeeded and material_prim != _normalize_prim_path(prim_path):
+        selection = select_usd_prim(prim_path, cmds=maya_cmds)
+        selected_prim = _normalize_prim_path(prim_path)
+
     if not selection.succeeded:
         return NavigationActionResult(
             action="open_in_hypershade",
@@ -267,14 +315,58 @@ def open_usd_shader_view(
         )
 
     maya_mel = mel or _maya_mel()
-    maya_mel.eval("openAEWindow")
-    _focus_usd_material_editor(cmds=cmds or _maya_cmds(), mel=maya_mel)
+    opened_panels = _open_usd_material_panels(maya_cmds, maya_mel)
+    _debug_nav_log(
+        "usd_navigation.open_usd_shader_view",
+        "USD material view opened",
+        {
+            "requested_prim": prim_path,
+            "material_prim": selected_prim,
+            "material_name": material_name,
+            "opened_panels": "|".join(opened_panels),
+        },
+        hypothesis_id="H9",
+    )
+    panels_label = ", ".join(opened_panels) if opened_panels else "selection"
     return _result(
         "open_in_hypershade",
-        prim_path,
+        selected_prim,
         True,
-        f"USD shader prim selected and Attribute Editor opened: {prim_path}.",
+        (
+            f"USD material selected: {selected_prim}. "
+            f"Opened {panels_label}. "
+            "Use Attribute Editor for USD material properties."
+        ),
     )
+
+
+def _open_usd_material_panels(cmds: Any, mel: Any) -> list[str]:
+    opened: list[str] = []
+    if _open_hypershade_window(cmds, mel):
+        opened.append("Hypershade")
+    for mel_command in ("updateAE", "openAEWindow"):
+        try:
+            mel.eval(mel_command)
+        except Exception:  # noqa: BLE001
+            continue
+    if "Attribute Editor" not in opened:
+        opened.append("Attribute Editor")
+    return opened
+
+
+def _open_hypershade_window(cmds: Any, mel: Any) -> bool:
+    hypershade_window = getattr(cmds, "HypershadeWindow", None)
+    if hypershade_window is not None:
+        try:
+            hypershade_window()
+            return True
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        mel.eval("HypershadeWindow")
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _normalize_prim_path(prim_path: str) -> str:
@@ -388,25 +480,6 @@ def _replace_ufe_selection(ufe_path: str) -> bool:
         pass
 
     return False
-
-
-def _focus_usd_material_editor(*, cmds: Any, mel: Any) -> None:
-    for command_name in ("mayaUsdMaterialEdit", "mayaUsdOpenStageEditor"):
-        runtime_command = getattr(cmds, "runTimeCommand", None)
-        if runtime_command is not None:
-            try:
-                if runtime_command(exists=command_name):
-                    getattr(cmds, command_name)()
-                    return
-            except Exception:  # noqa: BLE001
-                continue
-
-    for mel_command in ("mayaUsdMaterialEdit", "UsdStageEditor"):
-        try:
-            mel.eval(mel_command)
-            return
-        except Exception:  # noqa: BLE001
-            continue
 
 
 def _debug_nav_log(

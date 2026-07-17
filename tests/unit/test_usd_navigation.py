@@ -11,6 +11,7 @@ from pipeline_inspector.maya.usd_navigation import (
     find_usd_prim_for_issue,
     is_usd_prim_target,
     open_usd_shader_view,
+    resolve_usd_material_scope_prim,
     resolve_usd_prim_path,
     select_usd_prim,
 )
@@ -186,21 +187,37 @@ def test_open_in_hypershade_action_routes_prim_target() -> None:
     assert open_usd.call_args.args[0] == "/Base/mtl/albedo"
 
 
-def test_open_usd_shader_view_opens_attribute_editor() -> None:
+def test_resolve_usd_material_scope_prim_from_texture_path() -> None:
+    assert (
+        resolve_usd_material_scope_prim(
+            "/Base/mtl/Base_MTLSG/VRay/Base_MTL/demo_albedo_v002_1_bitmap",
+            material_name="Base_MTLSG",
+        )
+        == "/Base/mtl/Base_MTLSG"
+    )
+
+
+def test_open_usd_shader_view_opens_hypershade_and_attribute_editor() -> None:
     mel = MagicMock()
+    cmds = MagicMock()
+    cmds.HypershadeWindow = MagicMock()
     with patch(
         "pipeline_inspector.maya.usd_navigation.select_usd_prim",
         return_value=NavigationActionResult(
             action="select_node",
-            target="/Base/mtl/albedo",
+            target="/Base/mtl/Base_MTLSG",
             succeeded=True,
             message="ok",
         ),
-    ), patch(
-        "pipeline_inspector.maya.usd_navigation._focus_usd_material_editor",
-    ) as focus_editor:
-        result = open_usd_shader_view("/Base/mtl/albedo", cmds=MagicMock(), mel=mel)
+    ):
+        result = open_usd_shader_view(
+            "/Base/mtl/Base_MTLSG/UsdPreviewSurface/demo_albedo_v002_1",
+            material_name="Base_MTLSG",
+            cmds=cmds,
+            mel=mel,
+        )
 
     assert result.succeeded is True
-    mel.eval.assert_called_once_with("openAEWindow")
-    focus_editor.assert_called_once()
+    assert result.target == "/Base/mtl/Base_MTLSG"
+    cmds.HypershadeWindow.assert_called_once()
+    mel.eval.assert_any_call("openAEWindow")

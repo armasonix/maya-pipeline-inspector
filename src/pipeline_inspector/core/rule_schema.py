@@ -1026,6 +1026,8 @@ class ValidationEngine:
             return target.semantic or self._read_value(target, "semantic_slot")
         if key == "dependency_kind" and isinstance(target.obj, FileDependencySnapshot):
             return "texture"
+        if key == "usd_prim" and isinstance(target.obj, FileDependencySnapshot):
+            return str(target.obj.node_id).startswith("prim:")
         return self._read_value(target, key)
 
     def _read_value(self, target: _TargetContext, key: str) -> Any:
