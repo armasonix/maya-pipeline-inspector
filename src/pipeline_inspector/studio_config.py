@@ -175,15 +175,20 @@ class StudioEnvironmentSettings:
     def from_mapping(cls, data: Mapping[str, Any] | None) -> StudioEnvironmentSettings:
         if not data:
             return cls()
+        from pipeline_inspector.util.paths import sanitize_studio_path_value
+
         aliases_raw = data.get("variable_aliases")
         aliases: dict[str, str] = {}
         if isinstance(aliases_raw, Mapping):
-            aliases = {str(key): str(value) for key, value in aliases_raw.items()}
+            aliases = {
+                str(key): sanitize_studio_path_value(str(value))
+                for key, value in aliases_raw.items()
+            }
         return cls(
-            texture_root=str(data.get("texture_root", "") or ""),
-            asset_root=str(data.get("asset_root", "") or ""),
-            cache_root=str(data.get("cache_root", "") or ""),
-            render_root=str(data.get("render_root", "") or ""),
+            texture_root=sanitize_studio_path_value(str(data.get("texture_root", "") or "")),
+            asset_root=sanitize_studio_path_value(str(data.get("asset_root", "") or "")),
+            cache_root=sanitize_studio_path_value(str(data.get("cache_root", "") or "")),
+            render_root=sanitize_studio_path_value(str(data.get("render_root", "") or "")),
             variable_aliases=aliases,
         )
 
@@ -1396,24 +1401,14 @@ def resolve_deadline_config(config: StudioConfig | None) -> Any:
     if config.config_path is not None:
         runtime = runtime.with_overrides(studio_config_path=config.config_path)
         # region agent log
-        try:
-            import json
-            import time
-            from pathlib import Path as _Path
+        from pipeline_inspector.util.debug_log import write_debug_log
 
-            payload = {
-                "sessionId": "618f4f",
-                "timestamp": int(time.time() * 1000),
-                "location": "studio_config.py:resolve_deadline_config",
-                "message": "merged studio config path into deadline runtime config",
-                "data": {"studio_config_path": str(config.config_path)},
-                "hypothesisId": "H2",
-            }
-            log_path = _Path(__file__).resolve().parents[1] / "debug-618f4f.log"
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-        except OSError:
-            pass
+        write_debug_log(
+            "studio_config.py:resolve_deadline_config",
+            "merged studio config path into deadline runtime config",
+            {"studio_config_path": str(config.config_path)},
+            hypothesis_id="H2",
+        )
         # endregion
     return runtime
 

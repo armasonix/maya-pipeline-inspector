@@ -297,10 +297,36 @@ def run_validation(
     """Validate an enriched snapshot using packaged rules, profile, and waivers."""
 
     studio_environment = _studio_environment_for_validation(studio_config)
+    if studio_environment is not None:
+        from pipeline_inspector.util.paths import sync_studio_environment_to_os
+
+        sync_studio_environment_to_os(studio_environment)
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "phase prepare_snapshot_start",
+        {
+            "file_deps_in": len(snapshot.file_dependencies),
+            "nodes_in": len(snapshot.nodes),
+        },
+        hypothesis_id="H-HANG2",
+    )
+    # #endregion
     enriched = prepare_snapshot_for_validation(
         snapshot,
         studio_environment=studio_environment,
     )
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "phase prepare_snapshot_done",
+        {
+            "file_deps_out": len(enriched.file_dependencies),
+            "nodes_out": len(enriched.nodes),
+        },
+        hypothesis_id="H-HANG2",
+    )
+    # #endregion
     normalized_asset_class = (asset_class_id or "").strip()
     if profile_path is not None:
         profile = load_profile(profile_path)
@@ -339,12 +365,28 @@ def run_validation(
         profile=profile,
         extra_rule_paths=extra_rule_paths,
     )
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "phase engine_validate_start",
+        {"rule_count": len(rules)},
+        hypothesis_id="H-HANG3",
+    )
+    # #endregion
     results = list(
         ValidationEngine(
             naming_templates=_naming_templates_for_validation(studio_config),
             studio_environment=studio_environment,
         ).validate(enriched, rules)
     )
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "phase engine_validate_done",
+        {"result_count": len(results)},
+        hypothesis_id="H-HANG3",
+    )
+    # #endregion
     sidecar_path = waiver_sidecar_path or resolve_waiver_sidecar_path(enriched.scene_path)
     if sidecar_path is not None and sidecar_path.is_file():
         results = list(apply_waivers(results, load_waiver_sidecar(sidecar_path)))
@@ -352,12 +394,28 @@ def run_validation(
 
     results = dedupe_validation_results(enriched, results)
     results = enrich_rule_results(enriched, results)
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "phase build_fix_plan_start",
+        {},
+        hypothesis_id="H-HANG4",
+    )
+    # #endregion
     fix_plan = build_fix_plan(
         results,
         rules,
         enriched,
         studio_environment=studio_environment,
     )
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "phase build_fix_plan_done",
+        {"fix_actions": len(fix_plan.actions)},
+        hypothesis_id="H-HANG4",
+    )
+    # #endregion
     results = apply_fix_availability(results, fix_plan)
     # #region agent log
     _debug_validation_log(
@@ -485,23 +543,9 @@ def _debug_validation_log(
     *,
     hypothesis_id: str,
 ) -> None:
-    import json
-    import time
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-    try:
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": {key: str(value) for key, value in data.items()},
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def run_validation_for_user(

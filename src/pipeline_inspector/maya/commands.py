@@ -710,7 +710,38 @@ def _validate(
     user_config: Optional[UserPreferences] = None,
     session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> Any:
+    captured = capture_validation_snapshot(scan_scope=scan_scope, profile_id=profile_id)
+    if not getattr(captured, "succeeded", False):
+        return captured
+    return execute_validation_on_snapshot(
+        captured.snapshot,
+        scan_scope=scan_scope,
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+        studio_config=studio_config,
+        extra_rule_paths=extra_rule_paths,
+        user_config=user_config,
+        session_rule_overrides=session_rule_overrides,
+    )
+
+
+def capture_validation_snapshot(
+    *,
+    scan_scope: str,
+    profile_id: str = "",
+) -> Any:
+    """Scan the Maya scene or selection for validation. Must run on the Maya main thread."""
+
     from pipeline_inspector.maya.scanner import scan_scene, scan_selection, selection_node_names
+
+    # #region agent log
+    _debug_health_log_command(
+        "commands.capture_validation_snapshot",
+        "phase validate_start",
+        {"scan_scope": scan_scope, "profile_id": profile_id},
+        hypothesis_id="H-HANG1",
+    )
+    # #endregion
 
     if scan_scope == "selection":
         selected = selection_node_names()
@@ -731,6 +762,36 @@ def _validate(
             )
     else:
         raw_snapshot = scan_scene()
+
+    # #region agent log
+    _debug_health_log_command(
+        "commands.capture_validation_snapshot",
+        "phase scan_done",
+        {
+            "scan_scope": scan_scope,
+            "file_deps": len(getattr(raw_snapshot, "file_dependencies", []) or []),
+            "nodes": len(getattr(raw_snapshot, "nodes", []) or []),
+            "materials": len(getattr(raw_snapshot, "materials", []) or []),
+        },
+        hypothesis_id="H-HANG2",
+    )
+    # #endregion
+    return SimpleNamespace(succeeded=True, snapshot=raw_snapshot, scan_scope=scan_scope)
+
+
+def execute_validation_on_snapshot(
+    raw_snapshot: Any,
+    *,
+    scan_scope: str,
+    profile_id: str,
+    asset_class_id: str = "",
+    studio_config: Optional[Any] = None,
+    extra_rule_paths: tuple[Path, ...] = (),
+    user_config: Optional[UserPreferences] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
+) -> Any:
+    """Run the validation pipeline on a pre-scanned snapshot."""
+
     if user_config is not None:
         run = run_validation_for_user(
             raw_snapshot,
@@ -753,7 +814,7 @@ def _validate(
         )
     # #region agent log
     _debug_health_log_command(
-        "commands._validate",
+        "commands.execute_validation_on_snapshot",
         "Maya validation finished",
         {
             "scan_scope": scan_scope,
@@ -1206,17 +1267,6 @@ def _debug_health_log_command(
     *,
     hypothesis_id: str,
 ) -> None:
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": {key: str(value) for key, value in data.items()},
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

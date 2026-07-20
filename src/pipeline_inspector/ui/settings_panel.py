@@ -503,28 +503,18 @@ def _build_connectors_tab(
 
 
 def _debug_log_connectors_tab_layout(*, connector_count: int, has_scroll_area: bool) -> None:
-    import contextlib
-    import json
-    import time
-    from pathlib import Path
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-    payload = {
-        "sessionId": "618f4f",
-        "runId": "connectors-scroll",
-        "hypothesisId": "H1",
-        "location": "settings_panel.py:_build_connectors_tab",
-        "message": "connectors tab scroll layout built",
-        "data": {
+    write_debug_log(
+        "settings_panel.py:_build_connectors_tab",
+        "connectors tab scroll layout built",
+        {
             "connector_count": connector_count,
             "has_scroll_area": has_scroll_area,
         },
-        "timestamp": int(time.time() * 1000),
-    }
-    with (
-        contextlib.suppress(OSError),
-        Path("debug-618f4f.log").open("a", encoding="utf-8") as log_file,
-    ):
-        log_file.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        hypothesis_id="H1",
+        run_id="connectors-scroll",
+    )
 
 
 def _build_render_tab(

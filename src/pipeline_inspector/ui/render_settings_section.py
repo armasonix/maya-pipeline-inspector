@@ -93,31 +93,20 @@ def build_render_settings_section(
     _add_left_aligned_widget(layout, content, qt_widgets)
     layout.addStretch(0)
     # region agent log
-    import contextlib
-    import json
-    from pathlib import Path
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-    payload = json.dumps(
+    write_debug_log(
+        "render_settings_section.py:build",
+        "render tab layout",
         {
-            "sessionId": "618f4f",
-            "location": "render_settings_section.py:build",
-            "message": "render tab layout",
-            "data": {
-                "scroll_area": False,
-                "tab_left_margin": 0,
-                "grid_content_width": _RENDER_GRID_CONTENT_WIDTH,
-                "label_width": _RENDER_LABEL_WIDTH,
-            },
-            "timestamp": __import__("time").time() * 1000,
-            "hypothesisId": "render-layout-align",
-            "runId": "post-fix",
-        }
-    ) + "\n"
-    with (
-        contextlib.suppress(OSError),
-        Path("debug-618f4f.log").open("a", encoding="utf-8") as log_file,
-    ):
-        log_file.write(payload)
+            "scroll_area": False,
+            "tab_left_margin": 0,
+            "grid_content_width": _RENDER_GRID_CONTENT_WIDTH,
+            "label_width": _RENDER_LABEL_WIDTH,
+        },
+        hypothesis_id="render-layout-align",
+        run_id="post-fix",
+    )
     # endregion
     return section
 

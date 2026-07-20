@@ -1159,12 +1159,22 @@ def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if not isinstance(before_value, str):
         return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
 
-    normalized_path = resolve_normalize_path_value(
-        before_value,
-        action.params,
-        scene_path=str(action.params.get("scene_path") or ""),
-        studio_environment=_studio_environment_from_params(action.params),
-    )
+    before_normalized = str(before_value).replace("\\", "/")
+    planned_after = str(action.after_value or "").strip().replace("\\", "/")
+    if planned_after and planned_after != before_normalized:
+        normalized_path = planned_after
+    else:
+        resolve_source = before_normalized
+        if action.params.get("is_udim"):
+            from pipeline_inspector.util.paths import normalize_udim_tile_token_in_path
+
+            resolve_source = normalize_udim_tile_token_in_path(resolve_source)
+        normalized_path = resolve_normalize_path_value(
+            resolve_source,
+            action.params,
+            scene_path=str(action.params.get("scene_path") or ""),
+            studio_environment=_studio_environment_from_params(action.params),
+        )
     if not _is_path_string_value(normalized_path):
         return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
 
@@ -1225,31 +1235,22 @@ def _debug_maya_path_log(
     authored_path: str,
     outcome: str = "apply",
 ) -> None:
-    try:
-        import json
-        import time
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "maya.fix_applier._apply_normalize_path",
-            "message": "Maya texture path authored",
-            "data": {
-                "fix_type": action.fix_type,
-                "target_node": action.target_node,
-                "before_value": before_value,
-                "planned_after": planned_after,
-                "authored_path": authored_path,
-                "scene_path": str(action.params.get("scene_path") or ""),
-                "outcome": outcome,
-            },
-            "hypothesisId": "H35",
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    write_debug_log(
+        "maya.fix_applier._apply_normalize_path",
+        "Maya texture path authored",
+        {
+            "fix_type": action.fix_type,
+            "target_node": action.target_node,
+            "before_value": before_value,
+            "planned_after": planned_after,
+            "authored_path": authored_path,
+            "scene_path": str(action.params.get("scene_path") or ""),
+            "outcome": outcome,
+        },
+        hypothesis_id="H35",
+    )
 
 def _apply_path_value(
     action: FixAction,

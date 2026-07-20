@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import (
+    FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
@@ -580,6 +581,14 @@ def _build_action(
         target_node=target_node,
         base_params=params,
     )
+    if fix_type == "normalize_path":
+        dependency = node_index.file_dependency_for_result(result)
+        if _normalize_path_should_use_udim_token(
+            dependency,
+            node,
+            str(before_value or ""),
+        ):
+            params["is_udim"] = True
     if fix_type in {"normalize_path", "relink_path", "rename_texture_file"}:
         resolved_after = resolve_authored_absolute_path(
             str(after_value or ""),
@@ -664,8 +673,19 @@ def _after_value(
             else None
         )
         before_path = str(dependency_path or result.current_value or "")
+        dependency = (
+            node_index.file_dependency_for_result(result)
+            if node_index is not None
+            else None
+        )
+        node = node_index.find(result) if node_index is not None else None
+        normalize_source = before_path.replace("\\", "/")
+        if _normalize_path_should_use_udim_token(dependency, node, normalize_source):
+            from pipeline_inspector.util.paths import normalize_udim_tile_token_in_path
+
+            normalize_source = normalize_udim_tile_token_in_path(normalize_source)
         normalized = resolve_normalize_path_value(
-            before_path,
+            normalize_source,
             fix_params,
             scene_path=node_index.scene_path if node_index is not None else "",
             studio_environment=(
@@ -724,6 +744,24 @@ def _after_value(
     if "path" in fix_params:
         return fix_params["path"]
     return result.expected_value
+
+
+_UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
+
+
+def _normalize_path_should_use_udim_token(
+    dependency: Optional[FileDependencySnapshot],
+    node: Optional[NodeSnapshot],
+    raw_path: str,
+) -> bool:
+    if dependency is not None and dependency.is_udim:
+        return True
+    if "<UDIM>" in str(raw_path or "") or "<udim>" in str(raw_path or ""):
+        return True
+    if node is None:
+        return False
+    return node.attrs.get("uvTilingMode") in _UDIM_MODE_VALUES
+
 
 def swap_texture_version_in_path(
     path: str,
@@ -1203,18 +1241,39 @@ def _expand_texture_path_candidates(
     scene_path: str,
     is_udim: bool,
 ) -> list[str]:
-    expanded = candidate
+    expanded = candidate.replace("\\", "/")
     if studio_environment is not None:
-        expanded = resolve_studio_path(candidate, studio_environment) or candidate
+        expanded = resolve_studio_path(expanded, studio_environment) or expanded
     expanded = os.path.expanduser(os.path.expandvars(expanded.replace("\\", "/")))
     paths: list[str] = []
     if is_udim or "<UDIM>" in expanded or "<udim>" in expanded:
+        glob_source = expanded
+        if is_udim and "<UDIM>" not in glob_source and "<udim>" not in glob_source:
+            from pipeline_inspector.util.paths import normalize_udim_tile_token_in_path
+
+            glob_source = normalize_udim_tile_token_in_path(glob_source)
         glob_pattern = (
-            expanded.replace("<UDIM>", "[0-9][0-9][0-9][0-9]")
+            glob_source.replace("<UDIM>", "[0-9][0-9][0-9][0-9]")
             .replace("<udim>", "[0-9][0-9][0-9][0-9]")
         )
-        if glob.glob(glob_pattern):
-            paths.append(expanded)
+        matched = glob.glob(glob_pattern)
+        if matched:
+            paths.append(glob_source)
+        # #region agent log
+        _debug_texture_rename_log(
+            "fix_plan._expand_texture_path_candidates",
+            "UDIM texture resolve",
+            {
+                "candidate": candidate[:160],
+                "expanded": expanded[:160],
+                "glob_source": glob_source[:160],
+                "glob_pattern": glob_pattern[:160],
+                "matched_count": len(matched),
+                "is_udim": is_udim,
+            },
+            hypothesis_id="H-UDIM1",
+        )
+        # #endregion
         return paths
     path = Path(expanded.replace("/", os.sep))
     if path.is_file():
@@ -1244,16 +1303,6 @@ def _debug_texture_rename_log(
     *,
     hypothesis_id: str,
 ) -> None:
-    try:
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": {key: str(value) for key, value in data.items()},
-            "hypothesisId": hypothesis_id,
-        }
-        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

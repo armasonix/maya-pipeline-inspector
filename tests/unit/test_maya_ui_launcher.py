@@ -346,6 +346,66 @@ def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
     assert content._pipeline_inspector_validate_running is False
 
 
+def test_schedule_on_main_thread_uses_execute_deferred_from_worker(monkeypatch: Any):
+    deferred: list[Any] = []
+    scheduled: list[Any] = []
+
+    class FakeMayaUtils:
+        @staticmethod
+        def executeDeferred(callback: Any) -> None:
+            deferred.append(callback)
+
+    class FakeTimer:
+        @staticmethod
+        def singleShot(_delay_ms: int, callback: Any) -> None:
+            scheduled.append(callback)
+
+    monkeypatch.setitem(__import__("sys").modules, "maya.utils", FakeMayaUtils())
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.qt.qt_single_shot_callback",
+        lambda _qt_widgets=None: FakeTimer.singleShot,
+    )
+    monkeypatch.setattr(ui_launcher, "_debug_validate_cycle_log", lambda *_args, **_kwargs: None)
+
+    import threading
+
+    def _worker() -> None:
+        ui_launcher._schedule_on_main_thread(lambda: deferred.append("ran"))
+
+    thread = threading.Thread(target=_worker)
+    thread.start()
+    thread.join()
+
+    assert scheduled == []
+    assert len(deferred) == 1
+
+
+def test_schedule_on_main_thread_uses_qtimer_on_main_thread(monkeypatch: Any):
+    deferred: list[Any] = []
+    scheduled: list[Any] = []
+
+    class FakeMayaUtils:
+        @staticmethod
+        def executeDeferred(callback: Any) -> None:
+            deferred.append(callback)
+
+    class FakeTimer:
+        @staticmethod
+        def singleShot(_delay_ms: int, callback: Any) -> None:
+            scheduled.append(callback)
+
+    monkeypatch.setitem(__import__("sys").modules, "maya.utils", FakeMayaUtils())
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.qt.qt_single_shot_callback",
+        lambda _qt_widgets=None: FakeTimer.singleShot,
+    )
+
+    ui_launcher._schedule_on_main_thread(lambda: scheduled.append("ran"))
+
+    assert len(scheduled) == 1
+    assert deferred == []
+
+
 def test_schedule_ui_validation_falls_back_to_main_thread_schedule(monkeypatch: Any):
     content = SimpleNamespace(_pipeline_inspector_validate_running=False)
     runs: list[str] = []
@@ -364,7 +424,7 @@ def test_schedule_ui_validation_falls_back_to_main_thread_schedule(monkeypatch: 
     monkeypatch.setattr(
         ui_launcher,
         "_schedule_on_main_thread",
-        lambda callback: scheduled.append(callback),
+        lambda callback, qt_widgets=None: scheduled.append(callback),
     )
 
     ui_launcher._schedule_ui_validation(content, object(), scan_scope="selection")
@@ -497,6 +557,7 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
 
     content = SimpleNamespace(
         _pipeline_inspector_studio_config=ui_launcher.StudioConfig.default(),
+        _pipeline_inspector_validate_running=False,
     )
     result = SimpleNamespace(
         succeeded=True,
@@ -505,21 +566,47 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
         scan_scope="scene",
         profile_id="lookdev",
         asset_class_id="",
+        results=(),
         health_score=HealthScore(score=80, raw_score=80, block_publish=True),
     )
     calls: list[tuple[Any, Any]] = []
 
     monkeypatch.setattr(
-        "pipeline_inspector.maya.commands.validate_scene_action",
-        lambda **_kwargs: result,
+        "pipeline_inspector.maya.commands.capture_validation_snapshot",
+        lambda **_kwargs: SimpleNamespace(
+            succeeded=True,
+            snapshot=SimpleNamespace(scene_path="hero.ma"),
+        ),
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.maya.commands.execute_validation_on_snapshot",
+        lambda *_args, **_kwargs: result,
     )
     monkeypatch.setattr(ui_launcher, "_selected_asset_class_id", lambda *_args: "")
     monkeypatch.setattr(ui_launcher, "_populate_validation_result", lambda *_args: None)
     monkeypatch.setattr(ui_launcher, "_update_validation_chrome_labels", lambda *_args: None)
+    monkeypatch.setattr(ui_launcher, "_finish_validate_running", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         ui_launcher,
         "_maybe_notify_validation",
         lambda content_arg, _qt_widgets, result_arg: calls.append((content_arg, result_arg)),
+    )
+
+    def _immediate_submit(fn: Any, *args: Any, **kwargs: Any) -> Any:
+        class _ImmediateFuture:
+            def result(self) -> Any:
+                return fn(*args, **kwargs)
+
+            def add_done_callback(self, callback: Any) -> None:
+                callback(self)
+
+        return _ImmediateFuture()
+
+    monkeypatch.setattr(ui_launcher._VALIDATION_EXECUTOR, "submit", _immediate_submit)
+    monkeypatch.setattr(
+        ui_launcher,
+        "_schedule_on_main_thread",
+        lambda callback, qt_widgets=None: callback(),
     )
 
     ui_launcher._run_validation_job(

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
@@ -97,6 +98,16 @@ from pipeline_inspector.user_config import (
 )
 
 WORKSPACE_CONTROL_NAME = f"{main_window.PANEL_OBJECT_NAME}WorkspaceControl"
+_VALIDATION_EXECUTOR = ThreadPoolExecutor(
+    max_workers=1,
+    thread_name_prefix="pipeline-inspector-validate",
+)
+_NOTIFY_EXECUTOR = ThreadPoolExecutor(
+    max_workers=1,
+    thread_name_prefix="pipeline-inspector-notify",
+)
+_VALIDATE_CYCLE_ATTR = "_pipeline_inspector_validate_cycle"
+_PENDING_REVALIDATE_ATTR = "_pipeline_inspector_pending_revalidate"
 OBSOLETE_WORKSPACE_CONTROL_NAMES = (
     f"{main_window.PANEL_OBJECT_NAME}DockRightWorkspaceControl",
 )
@@ -328,9 +339,9 @@ def _create_dockable_panel() -> Any:
         from pipeline_inspector.ui.qt import load_qt_gui
 
         apply_panel_header_icons(content, qt_widgets, load_qt_gui())
-        _refresh_waiver_manager(content, qt_widgets)
+        _schedule_on_main_thread(lambda: _refresh_waiver_manager(content, qt_widgets))
         _refresh_readiness_tab(content, qt_widgets)
-        _refresh_farm_tab(content, qt_widgets)
+        _refresh_farm_tab(content, qt_widgets, async_connection=True)
         _maybe_run_startup_update_check(content, qt_widgets, user_config)
 
     panel_class = type(
@@ -568,38 +579,31 @@ def _configure_workspace_control_mobility(cmds: Any) -> None:
 
 def _debug_workspace_dock_log(cmds: Any, location: str, *, hypothesis_id: str) -> None:
     # #region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
+    from pipeline_inspector.util.debug_log import debug_log_enabled, write_debug_log
 
-        data: dict[str, str] = {"location": location}
-        for key, flag in (
-            ("floating", "floating"),
-            ("width_property", "widthProperty"),
-            ("height_property", "heightProperty"),
-            ("width", "width"),
-            ("minimum_width", "minimumWidth"),
-            ("maximum_width", "maximumWidth"),
-        ):
-            try:
-                value = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, **{flag: True})
-            except (RuntimeError, TypeError, ValueError):
-                value = ""
-            data[key] = str(value)
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": f"ui_launcher.{location}",
-            "message": "Workspace control dock state",
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
+    if not debug_log_enabled():
         return
+
+    data: dict[str, str] = {"location": location}
+    for key, flag in (
+        ("floating", "floating"),
+        ("width_property", "widthProperty"),
+        ("height_property", "heightProperty"),
+        ("width", "width"),
+        ("minimum_width", "minimumWidth"),
+        ("maximum_width", "maximumWidth"),
+    ):
+        try:
+            value = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, **{flag: True})
+        except (RuntimeError, TypeError, ValueError):
+            value = ""
+        data[key] = str(value)
+    write_debug_log(
+        f"ui_launcher.{location}",
+        "Workspace control dock state",
+        data,
+        hypothesis_id=hypothesis_id,
+    )
     # #endregion
 
 
@@ -1589,29 +1593,18 @@ def _sync_farm_quality_from_ui(content: Any, qt_widgets: Any) -> None:
         qt_widgets,
     )
     # region agent log
-    import contextlib
-    import json
-    from pathlib import Path
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-    payload = json.dumps(
+    write_debug_log(
+        "ui_launcher.py:_sync_farm_quality_from_ui",
+        "farm quality synced",
         {
-            "sessionId": "618f4f",
-            "location": "ui_launcher.py:_sync_farm_quality_from_ui",
-            "message": "farm quality synced",
-            "data": {
-                "allow_draft": allow_draft,
-                "allow_production": allow_production,
-            },
-            "timestamp": __import__("time").time() * 1000,
-            "hypothesisId": "farm-exclusive-quality",
-            "runId": "post-fix",
-        }
-    ) + "\n"
-    with (
-        contextlib.suppress(OSError),
-        Path("debug-618f4f.log").open("a", encoding="utf-8") as log_file,
-    ):
-        log_file.write(payload)
+            "allow_draft": allow_draft,
+            "allow_production": allow_production,
+        },
+        hypothesis_id="farm-exclusive-quality",
+        run_id="post-fix",
+    )
     # endregion
     current = _studio_config_for_content(content)
     deadline = replace(
@@ -2119,7 +2112,35 @@ def _set_send_to_tracker_button_enabled(
         set_enabled(enabled)
 
 
-def _schedule_on_main_thread(callback: Callable[[], None]) -> None:
+def _schedule_on_main_thread(
+    callback: Callable[[], None],
+    qt_widgets: Any | None = None,
+) -> None:
+    import threading
+
+    if threading.current_thread() is not threading.main_thread():
+        # #region agent log
+        _debug_validate_cycle_log(
+            "ui_launcher._schedule_on_main_thread",
+            "defer via executeDeferred from worker thread",
+            {"thread": threading.current_thread().name},
+            hypothesis_id="H-LOOP1",
+        )
+        # #endregion
+        try:
+            import maya.utils
+
+            maya.utils.executeDeferred(callback)
+        except ImportError:
+            callback()
+        return
+
+    from pipeline_inspector.ui.qt import qt_single_shot_callback
+
+    single_shot = qt_single_shot_callback(qt_widgets)
+    if single_shot is not None:
+        single_shot(0, callback)
+        return
     try:
         import maya.utils
 
@@ -2346,9 +2367,33 @@ def _schedule_ui_validation(
     post_validate: Optional[Any] = None,
 ) -> None:
     if getattr(content, "_pipeline_inspector_validate_running", False):
+        # #region agent log
+        _debug_validate_cycle_log(
+            "ui_launcher._schedule_ui_validation",
+            "validate skipped because another run is active",
+            {
+                "scan_scope": scan_scope,
+                "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+            },
+            hypothesis_id="H-LOOP1",
+        )
+        # #endregion
         return
 
+    cycle = _next_validate_cycle(content)
     content._pipeline_inspector_validate_running = True
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._schedule_ui_validation",
+        "validate scheduled",
+        {
+            "scan_scope": scan_scope,
+            "cycle": str(cycle),
+            "profile_id": profile_id or "",
+        },
+        hypothesis_id="H-LOOP1",
+    )
+    # #endregion
     busy_message = (
         "Validating selection..."
         if scan_scope == "selection"
@@ -2357,24 +2402,39 @@ def _schedule_ui_validation(
     _set_validate_busy_state(content, qt_widgets, busy=True, status_message=busy_message)
 
     def _job() -> None:
+        async_pending = False
         try:
-            _run_validation_job(
+            async_pending = _run_validation_job(
                 content,
                 qt_widgets,
                 scan_scope=scan_scope,
                 profile_id=profile_id,
                 post_validate=post_validate,
             )
+        except Exception as exc:  # noqa: BLE001
+            message = f"Validation failed: {exc}"
+            _set_label_text(
+                content,
+                qt_widgets,
+                main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                message,
+            )
+            print(message)
         finally:
-            content._pipeline_inspector_validate_running = False
-            _set_validate_busy_state(content, qt_widgets, busy=False)
+            if not async_pending:
+                _finish_validate_running(
+                    content,
+                    qt_widgets,
+                    reason="sync_validation_job",
+                )
 
-    timer_cls = getattr(qt_widgets, "QTimer", None)
-    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    from pipeline_inspector.ui.qt import qt_single_shot_callback
+
+    single_shot = qt_single_shot_callback(qt_widgets)
     if single_shot is not None:
         single_shot(0, _job)
     else:
-        _schedule_on_main_thread(_job)
+        _schedule_on_main_thread(_job, qt_widgets)
 
 
 def _run_validation_job(
@@ -2384,7 +2444,9 @@ def _run_validation_job(
     scan_scope: str,
     profile_id: Optional[str] = None,
     post_validate: Optional[Any] = None,
-) -> None:
+) -> bool:
+    """Run validation. Returns True when async work is still pending."""
+
     # #region agent log
     _debug_validate_job_log(
         "ui_launcher._run_validation_job",
@@ -2393,38 +2455,35 @@ def _run_validation_job(
         hypothesis_id="H34",
     )
     # #endregion
-    try:
-        from pipeline_inspector.maya.commands import (
-            validate_scene_action,
-            validate_selection_action,
-        )
+    from pipeline_inspector.maya.commands import (
+        capture_validation_snapshot,
+        execute_validation_on_snapshot,
+    )
 
-        selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
-        asset_class_id = _selected_asset_class_id(content, qt_widgets)
-        studio_config = _studio_config_for_content(content)
-        user_config = _user_config_for_content(content)
-        session_rule_overrides = _session_rule_overrides_for_content(content)
-        if scan_scope == "selection":
-            result = validate_selection_action(
-                profile_id=selected_profile,
-                asset_class_id=asset_class_id,
-                studio_config=studio_config,
-                user_config=user_config,
-                session_rule_overrides=session_rule_overrides,
-            )
-        else:
-            result = validate_scene_action(
-                profile_id=selected_profile,
-                asset_class_id=asset_class_id,
-                studio_config=studio_config,
-                user_config=user_config,
-                session_rule_overrides=session_rule_overrides,
-            )
+    selected_profile = profile_id or _selected_workflow_profile_id(content, qt_widgets)
+    asset_class_id = _selected_asset_class_id(content, qt_widgets)
+    studio_config = _studio_config_for_content(content)
+    user_config = _user_config_for_content(content)
+    session_rule_overrides = _session_rule_overrides_for_content(content)
+    validation_kwargs = {
+        "scan_scope": scan_scope,
+        "profile_id": selected_profile,
+        "asset_class_id": asset_class_id,
+        "studio_config": studio_config,
+        "user_config": user_config,
+        "session_rule_overrides": session_rule_overrides,
+    }
+
+    try:
+        captured = capture_validation_snapshot(
+            scan_scope=scan_scope,
+            profile_id=selected_profile,
+        )
     except Exception as exc:  # noqa: BLE001
         # #region agent log
         _debug_validate_job_log(
             "ui_launcher._run_validation_job",
-            "Validation job failed",
+            "Validation scan failed",
             {"scan_scope": scan_scope, "error": str(exc)},
             hypothesis_id="H34",
         )
@@ -2432,8 +2491,107 @@ def _run_validation_job(
         message = f"Validation failed: {exc}"
         _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
         print(message)
-        return
+        return False
 
+    if not getattr(captured, "succeeded", False):
+        _apply_validation_job_result(
+            content,
+            qt_widgets,
+            captured,
+            scan_scope=scan_scope,
+            post_validate=post_validate,
+        )
+        return False
+
+    future = _VALIDATION_EXECUTOR.submit(
+        execute_validation_on_snapshot,
+        captured.snapshot,
+        **validation_kwargs,
+    )
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._run_validation_job",
+        "async validation submitted",
+        {
+            "scan_scope": scan_scope,
+            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+        },
+        hypothesis_id="H-LOOP4",
+    )
+    # #endregion
+
+    def _dispatch_result(done_future: Any) -> None:
+        # #region agent log
+        _debug_validate_cycle_log(
+            "ui_launcher._run_validation_job",
+            "async validation worker finished",
+            {
+                "scan_scope": scan_scope,
+                "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+            },
+            hypothesis_id="H-LOOP4",
+        )
+        # #endregion
+
+        def _on_main_thread() -> None:
+            # #region agent log
+            _debug_validate_cycle_log(
+                "ui_launcher._run_validation_job",
+                "async validation main thread callback started",
+                {
+                    "scan_scope": scan_scope,
+                    "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+                },
+                hypothesis_id="H-LOOP1",
+            )
+            # #endregion
+            try:
+                result = done_future.result()
+                _apply_validation_job_result(
+                    content,
+                    qt_widgets,
+                    result,
+                    scan_scope=scan_scope,
+                    post_validate=post_validate,
+                )
+            except Exception as exc:  # noqa: BLE001
+                # #region agent log
+                _debug_validate_job_log(
+                    "ui_launcher._run_validation_job",
+                    "Validation job failed",
+                    {"scan_scope": scan_scope, "error": str(exc)},
+                    hypothesis_id="H34",
+                )
+                # #endregion
+                message = f"Validation failed: {exc}"
+                _set_label_text(
+                    content,
+                    qt_widgets,
+                    main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
+                    message,
+                )
+                print(message)
+            finally:
+                _finish_validate_running(
+                    content,
+                    qt_widgets,
+                    reason="async_validation_callback",
+                )
+
+        _schedule_on_main_thread(_on_main_thread, qt_widgets)
+
+    future.add_done_callback(_dispatch_result)
+    return True
+
+
+def _apply_validation_job_result(
+    content: Any,
+    qt_widgets: Any,
+    result: Any,
+    *,
+    scan_scope: str,
+    post_validate: Optional[Any] = None,
+) -> None:
     # #region agent log
     _debug_validate_job_log(
         "ui_launcher._run_validation_job",
@@ -2459,7 +2617,23 @@ def _run_validation_job(
         return
 
     content._pipeline_inspector_scan_scope = scan_scope
+    # #region agent log
+    _debug_validate_job_log(
+        "ui_launcher._run_validation_job",
+        "phase populate_ui_start",
+        {"scan_scope": scan_scope},
+        hypothesis_id="H-HANG5",
+    )
+    # #endregion
     _populate_validation_result(content, qt_widgets, result)
+    # #region agent log
+    _debug_validate_job_log(
+        "ui_launcher._run_validation_job",
+        "phase populate_ui_done",
+        {"scan_scope": scan_scope},
+        hypothesis_id="H-HANG5",
+    )
+    # #endregion
     _update_validation_chrome_labels(content, qt_widgets, result)
     _maybe_notify_validation(content, qt_widgets, result)
     if post_validate is not None:
@@ -2469,24 +2643,31 @@ def _run_validation_job(
 
 
 def _maybe_notify_validation(content: Any, qt_widgets: Any, result: Any) -> None:
-    """Send configured validation notifications without interrupting the Maya UI flow."""
+    """Send configured validation notifications without blocking the Maya UI."""
 
-    try:
-        from pipeline_inspector.integrations.notify.dispatcher import (
-            dispatch_validation_notifications,
-            report_validation_notification_outcomes,
-        )
+    def _dispatch_notifications() -> None:
+        try:
+            from pipeline_inspector.integrations.notify.dispatcher import (
+                dispatch_validation_notifications,
+                report_validation_notification_outcomes,
+            )
 
-        studio_config = _studio_config_for_content(content)
-        dispatch_result = dispatch_validation_notifications(
-            studio_config,
-            result,
-            force_notify=False,
-        )
-        report_validation_notification_outcomes(dispatch_result)
-        _append_validation_notification_status(content, qt_widgets, dispatch_result)
-    except Exception as exc:  # noqa: BLE001
-        print(f"Validation notification dispatch failed: {exc}")
+            studio_config = _studio_config_for_content(content)
+            dispatch_result = dispatch_validation_notifications(
+                studio_config,
+                result,
+                force_notify=False,
+            )
+            report_validation_notification_outcomes(dispatch_result)
+
+            def _on_main_thread() -> None:
+                _append_validation_notification_status(content, qt_widgets, dispatch_result)
+
+            _schedule_on_main_thread(_on_main_thread, qt_widgets)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Validation notification dispatch failed: {exc}")
+
+    _NOTIFY_EXECUTOR.submit(_dispatch_notifications)
 
 
 def _report_supervisor_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -2799,7 +2980,12 @@ def _submit_farm_from_ui(content: Any, qt_widgets: Any) -> None:
         )
 
 
-def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
+def _refresh_farm_tab(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    async_connection: bool = False,
+) -> None:
     from pipeline_inspector.maya.farm_actions import check_deadline_connection
 
     if content is None:
@@ -2808,7 +2994,39 @@ def _refresh_farm_tab(content: Any, qt_widgets: Any) -> None:
     if config is None:
         _apply_farm_tab_state(content, qt_widgets, _disabled_farm_tab_state())
         return
-    _apply_farm_tab_state(content, qt_widgets, check_deadline_connection(config))
+    if not async_connection:
+        _apply_farm_tab_state(content, qt_widgets, check_deadline_connection(config))
+        return
+
+    pending = FarmTabState(
+        integration_enabled=True,
+        api_url=config.api_url,
+        connection_status="checking",
+        connection_reachable=False,
+        status_message="Checking Deadline connection...",
+        allow_draft_submit=_studio_config_for_content(content).connectors.deadline.allow_draft_submit,
+        allow_production_submit=_studio_config_for_content(content).connectors.deadline.allow_production_submit,
+    )
+    _apply_farm_tab_state(content, qt_widgets, pending)
+
+    future = _VALIDATION_EXECUTOR.submit(check_deadline_connection, config)
+
+    def _dispatch_result(done_future: Any) -> None:
+        def _on_main_thread() -> None:
+            try:
+                tab_state = done_future.result()
+            except Exception as exc:  # noqa: BLE001
+                tab_state = FarmTabState(
+                    api_url=config.api_url,
+                    connection_status=f"error: {exc}",
+                    connection_reachable=False,
+                    status_message="Deadline connection check failed.",
+                )
+            _apply_farm_tab_state(content, qt_widgets, tab_state)
+
+        _schedule_on_main_thread(_on_main_thread)
+
+    future.add_done_callback(_dispatch_result)
 
 
 def _apply_farm_tab_state(content: Any, qt_widgets: Any, tab_state: FarmTabState) -> None:
@@ -3085,8 +3303,77 @@ def _show_information_dialog(
 
 def _revalidate_with_current_scope(content: Any, qt_widgets: Any) -> None:
     scan_scope = getattr(content, "_pipeline_inspector_scan_scope", "scene")
-    if getattr(content, "_pipeline_inspector_failed_results", ()):
-        _validate_from_ui(content, qt_widgets, scan_scope=scan_scope)
+    failed_results = getattr(content, "_pipeline_inspector_failed_results", ())
+    if not failed_results:
+        return
+    if getattr(content, "_pipeline_inspector_validate_running", False):
+        content._pipeline_inspector_pending_revalidate = True
+        # #region agent log
+        _debug_validate_cycle_log(
+            "ui_launcher._revalidate_with_current_scope",
+            "revalidate queued while validate running",
+            {
+                "scan_scope": scan_scope,
+                "failed_count": str(len(failed_results)),
+                "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+            },
+            hypothesis_id="H-LOOP2",
+        )
+        # #endregion
+        return
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._revalidate_with_current_scope",
+        "revalidate starting",
+        {
+            "scan_scope": scan_scope,
+            "failed_count": str(len(failed_results)),
+            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+        },
+        hypothesis_id="H-LOOP3",
+    )
+    # #endregion
+    _validate_from_ui(content, qt_widgets, scan_scope=scan_scope)
+
+
+def _next_validate_cycle(content: Any) -> int:
+    cycle = int(getattr(content, _VALIDATE_CYCLE_ATTR, 0) or 0) + 1
+    content._pipeline_inspector_validate_cycle = cycle
+    return cycle
+
+
+def _finish_validate_running(
+    content: Any,
+    qt_widgets: Any,
+    *,
+    reason: str,
+) -> None:
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._finish_validate_running",
+        "validate running cleared",
+        {
+            "reason": reason,
+            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+            "pending_revalidate": str(getattr(content, _PENDING_REVALIDATE_ATTR, False)),
+        },
+        hypothesis_id="H-LOOP1",
+    )
+    # #endregion
+    content._pipeline_inspector_validate_running = False
+    _set_validate_busy_state(content, qt_widgets, busy=False)
+    if not getattr(content, _PENDING_REVALIDATE_ATTR, False):
+        return
+    content._pipeline_inspector_pending_revalidate = False
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._finish_validate_running",
+        "flushing pending revalidate",
+        {"cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0))},
+        hypothesis_id="H-LOOP2",
+    )
+    # #endregion
+    _revalidate_with_current_scope(content, qt_widgets)
 
 
 def _selected_workflow_profile_id(content: Any, qt_widgets: Any) -> str:
@@ -3931,6 +4218,18 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(selected)),
     )
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._apply_selected_fixes_from_ui",
+        "fix apply finished, triggering revalidate",
+        {
+            "selected_count": str(len(selected)),
+            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+            "validate_running": str(getattr(content, "_pipeline_inspector_validate_running", False)),
+        },
+        hypothesis_id="H-LOOP3",
+    )
+    # #endregion
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -3994,6 +4293,18 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(actions)),
     )
+    # #region agent log
+    _debug_validate_cycle_log(
+        "ui_launcher._apply_safe_fixes_from_ui",
+        "fix apply finished, triggering revalidate",
+        {
+            "action_count": str(len(actions)),
+            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
+            "validate_running": str(getattr(content, "_pipeline_inspector_validate_running", False)),
+        },
+        hypothesis_id="H-LOOP3",
+    )
+    # #endregion
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -4596,6 +4907,19 @@ def _debug_validate_job_log(
     _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
+def _debug_validate_cycle_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    from pipeline_inspector.util.debug_log import write_agent_cycle_log
+
+    write_agent_cycle_log(location, message, dict(data), hypothesis_id=hypothesis_id)
+    print(f"[PI-DBG] {message} {data}")
+
+
 def _debug_health_log(
     location: str,
     message: str,
@@ -4603,23 +4927,9 @@ def _debug_health_log(
     *,
     hypothesis_id: str,
 ) -> None:
-    try:
-        import json
-        import time
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": {key: str(value) for key, value in data.items()},
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _print_export_result(result: Any) -> None:

@@ -58,3 +58,20 @@ def load_qt_gui() -> Any:
             errors.append(f"{module_name}: {exc}")
     joined_errors = "; ".join(errors)
     raise RuntimeError(f"No supported QtGui binding found for Maya UI: {joined_errors}")
+
+
+def qt_single_shot_callback(qt_widgets: Any | None = None) -> Any | None:
+    """Return ``QTimer.singleShot`` from QtCore (PySide2 keeps QTimer off QtWidgets)."""
+
+    timer_cls = getattr(qt_widgets, "QTimer", None) if qt_widgets is not None else None
+    single_shot = getattr(timer_cls, "singleShot", None) if timer_cls is not None else None
+    if single_shot is not None:
+        return single_shot
+
+    try:
+        qt_core = load_qt_core()
+    except RuntimeError:
+        return None
+
+    timer_cls = getattr(qt_core, "QTimer", None)
+    return getattr(timer_cls, "singleShot", None) if timer_cls is not None else None

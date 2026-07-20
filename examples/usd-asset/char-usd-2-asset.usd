@@ -135,9 +135,6 @@ def Mesh "Base" (
                 uniform token info:id = "arnold:image"
                 string inputs:color_space = "srgb"
                 float4 inputs:fallback = (0.5, 0.5, 0.5, 1)
-                asset inputs:file = @D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr@ (
-                    colorSpace = "Raw"
-                )
                 asset inputs:filename = @../broken_scene/textures/t_demo_albedo_v002.1001.exr@ (
                     colorSpace = "sRGB"
                 )

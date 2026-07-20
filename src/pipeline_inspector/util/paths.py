@@ -10,6 +10,7 @@ from typing import Optional
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
 _STUDIO_VARIABLE_PATTERN = re.compile(r"\$\{([^}]+)\}")
+_UDIM_TILE_IN_NAME_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
 _BUILTIN_STUDIO_VARIABLES = (
     "STUDIO_TEXTURE_ROOT",
     "STUDIO_ASSET_ROOT",
@@ -54,19 +55,28 @@ def resolve_cli_path(path: str | Path) -> str:
 
     return str(normalize_cli_path(path))
 
+def sanitize_studio_path_value(value: str) -> str:
+    """Strip trailing punctuation accidentally copied from UI text fields."""
+
+    text = str(value or "").strip()
+    while text and text[-1] in ",;":
+        text = text[:-1].rstrip()
+    return text
+
+
 def studio_variable_aliases(environment: StudioEnvironmentSettings) -> dict[str, str]:
     """Build the substitution map for studio environment path tokens."""
 
     aliases = {
-        "STUDIO_TEXTURE_ROOT": environment.texture_root.strip(),
-        "STUDIO_ASSET_ROOT": environment.asset_root.strip(),
-        "STUDIO_CACHE_ROOT": environment.cache_root.strip(),
-        "STUDIO_RENDER_ROOT": environment.render_root.strip(),
+        "STUDIO_TEXTURE_ROOT": sanitize_studio_path_value(environment.texture_root),
+        "STUDIO_ASSET_ROOT": sanitize_studio_path_value(environment.asset_root),
+        "STUDIO_CACHE_ROOT": sanitize_studio_path_value(environment.cache_root),
+        "STUDIO_RENDER_ROOT": sanitize_studio_path_value(environment.render_root),
     }
     for name, value in environment.variable_aliases.items():
         normalized_name = str(name).strip()
         if normalized_name:
-            aliases[normalized_name] = str(value or "")
+            aliases[normalized_name] = sanitize_studio_path_value(str(value or ""))
     return aliases
 
 def resolve_studio_path(
@@ -96,7 +106,8 @@ def resolve_studio_path(
         resolved = _STUDIO_VARIABLE_PATTERN.sub(_replace, resolved)
         if not changed:
             break
-    return resolved
+    return resolved.replace("textures,/", "textures/").replace("textures,\\", "textures\\")
+
 
 def studio_environment_is_configured(environment: StudioEnvironmentSettings) -> bool:
     """Return whether any studio path roots or aliases are configured."""
@@ -157,6 +168,24 @@ def is_local_drive_path(path: str) -> bool:
 
     normalized = str(path or "").replace("\\", "/").strip()
     return len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/"
+
+
+def normalize_udim_tile_token_in_path(path: str) -> str:
+    """Replace a concrete UDIM tile suffix in a filename with ``<UDIM>``."""
+
+    raw = str(path or "").strip().replace("\\", "/")
+    if not raw or "<UDIM>" in raw or "<udim>" in raw:
+        return raw
+    if "/" in raw:
+        directory, name = raw.rsplit("/", 1)
+    else:
+        directory, name = "", raw
+    matches = list(_UDIM_TILE_IN_NAME_RE.finditer(name))
+    if not matches:
+        return raw
+    match = matches[-1]
+    new_name = name[: match.start()] + "<UDIM>" + name[match.end() :]
+    return f"{directory}/{new_name}" if directory else new_name
 
 def resolve_authored_absolute_path(
     planned_path: str,
@@ -319,12 +348,12 @@ def sync_studio_environment_to_os(
     import os
 
     for env_name, value in studio_variable_aliases(environment).items():
-        normalized = str(value or "").strip()
+        normalized = sanitize_studio_path_value(value)
         if normalized:
             os.environ[env_name] = normalized.replace("\\", "/")
     for name, value in environment.variable_aliases.items():
         env_name = str(name).strip()
-        env_value = str(value or "").strip()
+        env_value = sanitize_studio_path_value(str(value or ""))
         if env_name and env_value:
             os.environ[env_name] = env_value.replace("\\", "/")
 
@@ -458,29 +487,19 @@ def texture_path_policy_compliant(
         compliant = False
     # #region agent log
     if "${" in str(raw_path or "") or str(raw_path or "").startswith("$"):
-        try:
-            import json
-            import time
-            from pathlib import Path
+        from pipeline_inspector.util.debug_log import write_debug_log
 
-            log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-            payload = {
-                "sessionId": "618f4f",
-                "timestamp": int(time.time() * 1000),
-                "location": "paths.texture_path_policy_compliant",
-                "message": "Token path policy decision",
-                "data": {
-                    "raw_path": str(raw_path or "")[:160],
-                    "configured": str(configured),
-                    "render_safe": str(render_safe),
-                    "farm_token": str(farm_token),
-                    "compliant": str(compliant),
-                },
-                "hypothesisId": "H36",
-            }
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-        except OSError:
-            pass
+        write_debug_log(
+            "paths.texture_path_policy_compliant",
+            "Token path policy decision",
+            {
+                "raw_path": str(raw_path or "")[:160],
+                "configured": str(configured),
+                "render_safe": str(render_safe),
+                "farm_token": str(farm_token),
+                "compliant": str(compliant),
+            },
+            hypothesis_id="H36",
+        )
     # #endregion
     return compliant

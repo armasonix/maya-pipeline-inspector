@@ -1491,30 +1491,20 @@ def _path_policy_violations(
     if violations or "${" in str(dependency.raw_path or "") or _is_local_drive_path(
         str(dependency.raw_path or "")
     ):
-        try:
-            import json
-            import time
-            from pathlib import Path
+        from pipeline_inspector.util.debug_log import write_debug_log
 
-            log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-            payload = {
-                "sessionId": "618f4f",
-                "timestamp": int(time.time() * 1000),
-                "location": "rule_schema._path_policy_violations",
-                "message": "File dependency path policy",
-                "data": {
-                    "target_id": str(dependency.node_id or "")[:120],
-                    "attr": str(dependency.attr or ""),
-                    "raw_path": str(dependency.raw_path or "")[:160],
-                    "violations": "|".join(violations) or "none",
-                    "usd_prim": str(str(dependency.node_id or "").startswith("prim:")),
-                },
-                "hypothesisId": "H37",
-            }
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-        except OSError:
-            pass
+        write_debug_log(
+            "rule_schema._path_policy_violations",
+            "File dependency path policy",
+            {
+                "target_id": str(dependency.node_id or "")[:120],
+                "attr": str(dependency.attr or ""),
+                "raw_path": str(dependency.raw_path or "")[:160],
+                "violations": "|".join(violations) or "none",
+                "usd_prim": str(str(dependency.node_id or "").startswith("prim:")),
+            },
+            hypothesis_id="H37",
+        )
     # #endregion
 
     return violations

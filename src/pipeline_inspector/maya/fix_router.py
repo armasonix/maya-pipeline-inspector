@@ -199,28 +199,18 @@ def _resolve_usd_prim_fix_actions(
 
 
 def _debug_usd_apply_route_log(usd_path: str, *, action_count: int, route: str) -> None:
-    try:
-        import json
-        import time
-        from pathlib import Path as LogPath
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-        log_path = LogPath(__file__).resolve().parents[2] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "maya.fix_router.apply_fix_actions",
-            "message": "Routing USD fixes",
-            "data": {
-                "usd_path": usd_path,
-                "action_count": str(action_count),
-                "route": route,
-            },
-            "hypothesisId": "H30",
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    write_debug_log(
+        "maya.fix_router.apply_fix_actions",
+        "Routing USD fixes",
+        {
+            "usd_path": usd_path,
+            "action_count": str(action_count),
+            "route": route,
+        },
+        hypothesis_id="H30",
+    )
 
 
 def _proxy_stage_for_path(cmds: Any, usd_path: Path) -> Any:

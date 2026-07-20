@@ -624,6 +624,86 @@ def test_build_fix_plan_maps_local_drive_path_to_studio_token_after_value():
     assert plan.actions[0].blocked is False
 
 
+def test_build_fix_plan_maps_udim_local_drive_path_to_studio_udim_token(tmp_path: Path):
+    textures = tmp_path / "broken_scene" / "textures"
+    textures.mkdir(parents=True)
+    tile_1001 = textures / "demo_roughness_v001.1001.exr"
+    tile_1003 = textures / "demo_roughness_v001.1003.exr"
+    tile_1001.write_bytes(b"pixels")
+    tile_1003.write_bytes(b"pixels")
+    texture_path = str(tile_1001).replace("\\", "/")
+    environment = StudioEnvironmentSettings(
+        asset_root=str(tmp_path / "broken_scene"),
+        texture_root=str(textures),
+    )
+    rule = RuleDefinition(
+        id="common.texture.path.local_drive",
+        name="local drive",
+        enabled=True,
+        renderer=["common"],
+        scope="file_dependency",
+        severity="critical",
+        owner="pipeline_td",
+        message="local",
+        why="local",
+        match=RuleMatch(criteria={"dependency_kind": "texture"}),
+        check=RuleCheck(type="path_policy", params={"disallow": ["local_drive"]}),
+        policy=RulePolicy(auto_fix_allowed=True),
+        fix=RuleFix(
+            type="normalize_path",
+            risk="medium",
+            params={"attribute": "fileTextureName", "replace_to": "${ASSET_ROOT}"},
+        ),
+    )
+    snapshot = GraphSnapshot(
+        scene_path=str((tmp_path / "arnold_policy" / "scene.ma")).replace("\\", "/"),
+        nodes=[
+            NodeSnapshot(
+                id="node:demo_roughness_v001_1",
+                name="demo_roughness_v001_1",
+                type_name="file",
+                attrs={"uvTilingMode": 3},
+            )
+        ],
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:demo_roughness_v001_1",
+                attr="fileTextureName",
+                raw_path=texture_path,
+                resolved_path=texture_path,
+            )
+        ],
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="critical",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="file_dependency",
+        target_id="node:demo_roughness_v001_1",
+        node="demo_roughness_v001_1",
+        plug="fileTextureName",
+        current_value=texture_path,
+        expected_value="path policy compliant",
+        auto_fix_available=True,
+        fix_id="normalize_path",
+    )
+
+    plan = build_fix_plan(
+        [result],
+        [rule],
+        snapshot,
+        studio_environment=environment,
+    )
+
+    assert plan.actions[0].after_value == "${STUDIO_TEXTURE_ROOT}/demo_roughness_v001.<UDIM>.exr"
+    assert plan.actions[0].params.get("is_udim") is True
+    assert plan.actions[0].blocked is False
+
+
 def test_build_fix_plan_embeds_studio_environment_in_normalize_path_params():
     environment = StudioEnvironmentSettings(texture_root="\\\\farm\\textures")
     rule = _rule(

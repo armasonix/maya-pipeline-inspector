@@ -63,29 +63,19 @@ def dedupe_validation_results(
 
 
 def _debug_dedupe_log(*, dropped: int, kept: int, groups: int, kept_targets: str = "") -> None:
-    try:
-        import json
-        import time
-        from pathlib import Path
+    from pipeline_inspector.util.debug_log import write_debug_log
 
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "usd_validation_dedupe.dedupe_validation_results",
-            "message": "Colorspace results deduped",
-            "data": {
-                "dropped": str(dropped),
-                "kept": str(kept),
-                "groups": str(groups),
-                "kept_targets": kept_targets,
-            },
-            "hypothesisId": "H8",
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    write_debug_log(
+        "usd_validation_dedupe.dedupe_validation_results",
+        "Colorspace results deduped",
+        {
+            "dropped": str(dropped),
+            "kept": str(kept),
+            "groups": str(groups),
+            "kept_targets": kept_targets,
+        },
+        hypothesis_id="H8",
+    )
 
 
 def _colorspace_group_key(

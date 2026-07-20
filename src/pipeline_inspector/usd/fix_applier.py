@@ -106,23 +106,17 @@ def _save_usd_stage(stage: Any, *, usd_path: Path) -> None:
         root_layer.Save()
         saved_paths.append(str(root_layer.realPath or root_layer.identifier))
     # #region agent log
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "usd.fix_applier._save_usd_stage",
-            "message": "USD stage layers saved",
-            "data": {
-                "usd_path": str(usd_path),
-                "saved_layers": "|".join(path for path in saved_paths if path),
-            },
-            "hypothesisId": "H30",
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(
+        "usd.fix_applier._save_usd_stage",
+        "USD stage layers saved",
+        {
+            "usd_path": str(usd_path),
+            "saved_layers": "|".join(path for path in saved_paths if path),
+        },
+        hypothesis_id="H30",
+    )
     # #endregion
 
 
@@ -787,27 +781,21 @@ def _failed_record(action: FixAction, *, message: str) -> AppliedUsdFixRecord:
 def _debug_usd_fix_log(record: AppliedUsdFixRecord, *, hypothesis_id: str) -> None:
     if record.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE}:
         return
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "usd.fix_applier.apply_usd_fix_actions",
-            "message": "USD rename fix applied",
-            "data": {
-                "fix_type": record.fix_type,
-                "target_id": record.target_id,
-                "succeeded": str(record.succeeded),
-                "message": record.message,
-                "after_value": str(record.after_value or ""),
-                "runId": "post-fix",
-            },
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(
+        "usd.fix_applier.apply_usd_fix_actions",
+        "USD rename fix applied",
+        {
+            "fix_type": record.fix_type,
+            "target_id": record.target_id,
+            "succeeded": str(record.succeeded),
+            "message": record.message,
+            "after_value": str(record.after_value or ""),
+            "runId": "post-fix",
+        },
+        hypothesis_id=hypothesis_id,
+    )
 
 
 def _debug_usd_attr_log(
@@ -819,30 +807,24 @@ def _debug_usd_attr_log(
     hypothesis_id: str,
     extra: dict[str, str] | None = None,
 ) -> None:
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        data = {
-            "fix_type": action.fix_type,
-            "target_id": action.target_id,
-            "target_attr": str(action.target_attr or ""),
-            "prim_path": prim_path,
-            "applied_inputs": "|".join(applied_inputs),
-            "after_path": after_path,
-        }
-        if extra:
-            data.update(extra)
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "usd.fix_applier._apply_shader_asset_path",
-            "message": "USD shader asset path authored",
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    data = {
+        "fix_type": action.fix_type,
+        "target_id": action.target_id,
+        "target_attr": str(action.target_attr or ""),
+        "prim_path": prim_path,
+        "applied_inputs": "|".join(applied_inputs),
+        "after_path": after_path,
+    }
+    if extra:
+        data.update(extra)
+    write_debug_log(
+        "usd.fix_applier._apply_shader_asset_path",
+        "USD shader asset path authored",
+        data,
+        hypothesis_id=hypothesis_id,
+    )
 
 
 def _prim_path_from_target(target_id: str) -> str:
@@ -936,27 +918,21 @@ def _debug_resolve_log(
 ) -> None:
     if action.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE, SET_ATTR_FIX_TYPE}:
         return
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": "usd.fix_applier._resolve_usd_prim_path",
-            "message": "Resolved USD prim path for fix",
-            "data": {
-                "fix_type": action.fix_type,
-                "target_id": action.target_id,
-                "target_node": str(action.target_node or ""),
-                "resolved_path": resolved_path,
-                "source": source,
-                "match_count": str(match_count),
-            },
-            "hypothesisId": "H11",
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(
+        "usd.fix_applier._resolve_usd_prim_path",
+        "Resolved USD prim path for fix",
+        {
+            "fix_type": action.fix_type,
+            "target_id": action.target_id,
+            "target_node": str(action.target_node or ""),
+            "resolved_path": resolved_path,
+            "source": source,
+            "match_count": str(match_count),
+        },
+        hypothesis_id="H11",
+    )
 
 
 def _import_usd_modules() -> tuple[Any, Any, Any]:

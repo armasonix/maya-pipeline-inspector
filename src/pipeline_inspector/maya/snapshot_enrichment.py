@@ -305,6 +305,23 @@ def _enrich_file_dependency(
         return _enrich_dependency_image_metadata(enriched)
 
     tiles = _existing_udim_tiles(resolved_path)
+    missing = _missing_udim_tiles(tiles)
+    # #region agent log
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(
+        "snapshot_enrichment._enrich_file_dependency",
+        "UDIM dependency enrichment",
+        {
+            "raw_path": (udim_pattern or dependency.raw_path)[:160],
+            "resolved_path": resolved_path[:160],
+            "tile_count": len(tiles),
+            "tiles": ",".join(str(tile) for tile in tiles[:8]),
+            "missing_tiles": ",".join(str(tile) for tile in missing[:8]),
+        },
+        hypothesis_id="H-UDIM2",
+    )
+    # #endregion
     enriched = replace(
         dependency,
         raw_path=udim_pattern or dependency.raw_path,
@@ -312,7 +329,7 @@ def _enrich_file_dependency(
         exists=bool(tiles),
         is_udim=True,
         udim_tiles=tiles,
-        missing_udim_tiles=_missing_udim_tiles(tiles),
+        missing_udim_tiles=missing,
     )
     return _enrich_dependency_image_metadata(enriched)
 
@@ -420,9 +437,9 @@ def _resolve_path(
     scene_dir: Path,
     studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> str:
-    path_text = raw_path
+    path_text = raw_path.replace("\\", "/")
     if studio_environment is not None:
-        path_text = resolve_studio_path(path_text, studio_environment)
+        path_text = resolve_studio_path(path_text, studio_environment).replace("\\", "/")
     expanded = os.path.expanduser(os.path.expandvars(path_text)).replace("\\", "/")
     path = Path(expanded)
     if path.is_absolute():
