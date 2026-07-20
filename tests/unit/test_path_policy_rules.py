@@ -121,7 +121,9 @@ def test_local_drive_texture_path_rule_fails_for_usd_prim_studio_root_absolute_p
     )
     usd_rules = {
         rule.id: rule
-        for rule in load_rule_file(ROOT / "src" / "pipeline_inspector" / "rules" / "usd" / "usd_health.json")
+        for rule in load_rule_file(
+            ROOT / "src" / "pipeline_inspector" / "rules" / "usd" / "usd_health.json"
+        )
     }
     snapshot = GraphSnapshot(
         scene_path="hero.usda",

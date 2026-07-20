@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from pipeline_inspector.core.models import GraphSnapshot, NodeSnapshot
 from pipeline_inspector.maya import commands
 from pipeline_inspector.maya.navigation import NavigationActionResult

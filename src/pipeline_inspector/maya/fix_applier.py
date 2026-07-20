@@ -1169,12 +1169,15 @@ def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
             from pipeline_inspector.util.paths import normalize_udim_tile_token_in_path
 
             resolve_source = normalize_udim_tile_token_in_path(resolve_source)
-        normalized_path = resolve_normalize_path_value(
+        resolved = resolve_normalize_path_value(
             resolve_source,
             action.params,
             scene_path=str(action.params.get("scene_path") or ""),
             studio_environment=_studio_environment_from_params(action.params),
         )
+        if not resolved:
+            return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
+        normalized_path = resolved
     if not _is_path_string_value(normalized_path):
         return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
 

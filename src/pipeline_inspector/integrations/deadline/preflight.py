@@ -1,9 +1,7 @@
 """Deadline submit preflight helpers for Pipeline Inspector."""
 from __future__ import annotations
 
-import json
 import subprocess
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path

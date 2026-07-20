@@ -192,7 +192,10 @@ def _build_quality_block(
     if on_apply is not None:
         apply_button = qt_widgets.QPushButton(f"Apply {title} to Scene")
         apply_button.setObjectName(f"pipelineInspectorApplyRender{title.replace(' ', '')}Button")
-        wire_button(apply_button, lambda qid=quality_id: on_apply(qid))
+        def _apply_quality(_checked: bool = False, *, selected_quality: str = quality_id) -> None:
+            on_apply(selected_quality)
+
+        wire_button(apply_button, _apply_quality)
         block_layout.addWidget(apply_button)
     return block
 

@@ -483,7 +483,10 @@ def run_validation(
             "fix_unblocked": sum(1 for action in fix_plan.actions if not action.blocked),
             "blocked_actions": "|".join(
                 sorted(
-                    f"{action.fix_type}:{action.target_id}:{','.join(action.block_reasons) or 'policy'}"
+                    (
+                        f"{action.fix_type}:{action.target_id}:"
+                        f"{','.join(action.block_reasons) or 'policy'}"
+                    )
                     for action in fix_plan.actions
                     if action.blocked
                 )[:12]
@@ -503,7 +506,7 @@ def run_validation(
         "Fix plan USD colorspace actions",
         {
             "usd_root_layer": str(
-                (enriched.usd_stage_metadata.root_layer if enriched.usd_stage_metadata else "")
+                enriched.usd_stage_metadata.root_layer if enriched.usd_stage_metadata else ""
             ),
             "colorspace_actions": "|".join(
                 f"{action.target_id}->{action.after_value}:blocked={action.blocked}"

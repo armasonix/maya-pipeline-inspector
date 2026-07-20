@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 from pipeline_inspector.core.fix_plan import (
+    TEXTURE_FILE_MISSING_BLOCK_REASON,
     FixAction,
     FixPlan,
-    TEXTURE_FILE_MISSING_BLOCK_REASON,
     apply_fix_availability,
     build_fix_plan,
     fix_plan_from_export,
@@ -656,7 +656,7 @@ def test_build_fix_plan_maps_udim_local_drive_path_to_studio_udim_token(tmp_path
         ),
     )
     snapshot = GraphSnapshot(
-        scene_path=str((tmp_path / "arnold_policy" / "scene.ma")).replace("\\", "/"),
+        scene_path=str(tmp_path / "arnold_policy" / "scene.ma").replace("\\", "/"),
         nodes=[
             NodeSnapshot(
                 id="node:demo_roughness_v001_1",

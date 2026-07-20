@@ -1,13 +1,12 @@
 """Apply safe fixes to OpenUSD assets."""
 from __future__ import annotations
 
-import json
-import time
+import contextlib
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Optional
 
-from pipeline_inspector.core.fix_plan import FixAction, resolve_normalize_path_value
+from pipeline_inspector.core.fix_plan import FixAction
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 from pipeline_inspector.util.paths import (
     author_usd_asset_path,
@@ -444,9 +443,11 @@ def _apply_shader_asset_path(
     )
     planned_relative = after_path.replace("\\", "/")
     if planned_relative and not is_local_drive_path(planned_relative):
-        if "${" in planned_relative or planned_relative.startswith("$"):
-            authored_path = planned_relative
-        elif not planned_relative.startswith("//"):
+        if (
+            "${" in planned_relative
+            or planned_relative.startswith("$")
+            or not planned_relative.startswith("//")
+        ):
             authored_path = planned_relative
         else:
             authored_path = author_usd_asset_path(
@@ -568,7 +569,6 @@ def _apply_rename_texture_file(
 
     node_after = action.params.get("node_name_after")
     if isinstance(node_after, str) and node_after.strip():
-        prim_path = path_record.after_value if isinstance(path_record.after_value, str) else ""
         resolved_path = _resolve_usd_prim_path(stage, action)
         rename_record = _apply_rename_node(
             stage,
@@ -702,10 +702,8 @@ def _clear_arnold_image_spurious_file_input(shader: Any, *, Sdf: Any) -> None:
         return
     prim = shader.GetPrim()
     if prim and prim.IsValid():
-        try:
+        with contextlib.suppress(RuntimeError, TypeError, ValueError):
             prim.RemoveProperty("inputs:file")
-        except (RuntimeError, TypeError, ValueError):
-            pass
 
 
 def _resolve_shader_input_name(shader: Any, target_attr: str) -> str:
@@ -916,7 +914,11 @@ def _debug_resolve_log(
     source: str,
     match_count: int = 0,
 ) -> None:
-    if action.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE, SET_ATTR_FIX_TYPE}:
+    if action.fix_type not in {
+        RENAME_NODE_FIX_TYPE,
+        RENAME_TEXTURE_FILE_FIX_TYPE,
+        SET_ATTR_FIX_TYPE,
+    }:
         return
     from pipeline_inspector.util.debug_log import write_debug_log
 

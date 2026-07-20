@@ -22,15 +22,31 @@ def test_panel_header_has_expected_root_object_name():
 def test_panel_header_layout_places_gear_title_docs_report_bug_and_updates_in_order():
     header = main_window.build_panel_header(FakeQtWidgets)
     gear = _find(header, main_window.SETTINGS_GEAR_BUTTON_OBJECT_NAME)
+    dock = _find(header, main_window.DOCK_PANEL_BUTTON_OBJECT_NAME)
+    detach = _find(header, main_window.DETACH_PANEL_BUTTON_OBJECT_NAME)
     title = _find(header, main_window.PANEL_HEADER_TITLE_OBJECT_NAME)
     unsaved = _find(header, main_window.PANEL_HEADER_UNSAVED_OBJECT_NAME)
+    dock_micro = _find(header, main_window.DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME)
+    detach_micro = _find(header, main_window.DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME)
     docs = _find(header, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
     report_bug = _find(header, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(header, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
     overflow = _find(header, main_window.PANEL_HEADER_OVERFLOW_BUTTON_OBJECT_NAME)
 
     widgets = _panel_header_widgets(header)
-    assert widgets == [gear, title, unsaved, docs, report_bug, updates, overflow]
+    assert widgets == [
+        gear,
+        dock,
+        detach,
+        title,
+        unsaved,
+        dock_micro,
+        detach_micro,
+        docs,
+        report_bug,
+        updates,
+        overflow,
+    ]
 
 
 def test_panel_header_title_receives_horizontal_stretch():

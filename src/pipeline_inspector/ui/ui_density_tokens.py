@@ -155,6 +155,12 @@ QWidget#pipelineInspectorPanelHeader QPushButton {
     min-height: 12px;
     max-height: 18px;
 }
+QWidget#pipelineInspectorPanelHeader QPushButton#pipelineInspectorDockPanelMicroButton,
+QWidget#pipelineInspectorPanelHeader QPushButton#pipelineInspectorDetachPanelMicroButton {
+    padding: 0px;
+    min-width: 18px;
+    max-width: 22px;
+}
 """.strip()
 
 _COMPACT_MAIN_TAB_CHROME_STYLESHEET = """

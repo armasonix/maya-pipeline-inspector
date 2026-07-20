@@ -44,7 +44,7 @@ def test_missing_texture_rule_pack_has_production_defaults():
     assert rule.scope == "file_dependency"
     assert rule.severity == "critical"
     assert rule.check.type == "path_exists"
-    assert rule.match.criteria == {"dependency_kind": "texture"}
+    assert rule.match.criteria == {"dependency_kind": "texture", "usd_prim": False}
     assert rule.policy.block_publish is True
     assert rule.policy.block_deadline is False
     assert rule.policy.auto_fix_allowed is False

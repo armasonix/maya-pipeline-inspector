@@ -247,7 +247,7 @@ def test_apply_rename_texture_file_updates_path_when_destination_already_exists(
     renamed = tmp_path / "tex_albedo_wrong.exr"
     renamed.write_bytes(b"fixture")
     missing_source = tmp_path / "albedo_wrong.exr"
-    cmds = FakeCmds({f"file1.fileTextureName": str(missing_source)})
+    cmds = FakeCmds({"file1.fileTextureName": str(missing_source)})
     cmds.nodes["file1"] = "file1"
     action = FixAction(
         fix_id="studio.naming.texture.pattern:node:file1:rename_texture_file",
@@ -822,7 +822,7 @@ def test_apply_normalize_path_uses_asset_root_basename_when_prefix_does_not_matc
     report = apply_fix_actions([action], cmds=cmds)
 
     assert cmds.set_calls == [
-        ("file1.fileTextureName", "$ASSET_ROOT/textures/albedo.exr", {"type": "string"}),
+        ("file1.fileTextureName", "$ASSET_ROOT/tex/albedo.exr", {"type": "string"}),
     ]
     assert report.applied_count == 1
 

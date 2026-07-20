@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from pipeline_inspector.core.render_presets import CommonRenderQualitySettings, RenderQualityPreset, RenderSettings
+from pipeline_inspector.core.render_presets import (
+    CommonRenderQualitySettings,
+    RenderQualityPreset,
+    RenderSettings,
+)
 from pipeline_inspector.maya import render_preset_actions
 
 

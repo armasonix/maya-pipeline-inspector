@@ -170,7 +170,9 @@ def _colorspace_node_score(
 
     prim_path = target_id.removeprefix("prim:") if target_id.startswith("prim:") else node_name
     lowered = prim_path.casefold()
-    if "/usdpreviewsurface/" in lowered and "bitmap" not in lowered and "place2dtexture" not in lowered:
+    if "/usdpreviewsurface/" in lowered and "bitmap" not in lowered and (
+        "place2dtexture" not in lowered
+    ):
         return 100
     if "place2dtexture" in lowered:
         return 25

@@ -228,10 +228,6 @@ def author_usd_asset_path(
         return raw
 
     raw_norm = raw.replace("\\", "/")
-    if "${" in raw_norm or (
-        raw_norm.startswith("$") and not is_local_drive_path(raw_norm)
-    ):
-        return raw_norm
     if (
         not is_local_drive_path(raw_norm)
         and "${" not in raw_norm
@@ -239,6 +235,9 @@ def author_usd_asset_path(
         and not raw_norm.startswith("//")
     ):
         return raw_norm.lstrip("/")
+
+    if raw_norm.startswith("$") and "${" not in raw_norm and not is_local_drive_path(raw_norm):
+        return raw_norm
 
     absolute = resolve_authored_absolute_path(
         raw,
@@ -250,8 +249,10 @@ def author_usd_asset_path(
             fallback_absolute,
             studio_environment=studio_environment,
             fallback_absolute=fallback_absolute,
-        ) or raw_norm
-    if not absolute:
+        ) or ""
+    if not absolute or "${" in absolute:
+        if "${" in raw_norm:
+            return raw_norm
         absolute = raw_norm
 
     candidate = Path(str(absolute).replace("\\", "/"))
@@ -435,7 +436,10 @@ def is_render_safe_studio_texture_path(
     return bool(raw_norm) and path_under_studio_roots(raw_norm, environment)
 
 
-def is_farm_token_texture_path(raw_path: str, allowed_prefixes: list[str] | tuple[str, ...]) -> bool:
+def is_farm_token_texture_path(
+    raw_path: str,
+    allowed_prefixes: list[str] | tuple[str, ...],
+) -> bool:
     """Return whether ``raw_path`` is a forward-slash studio token path for farm handoff."""
 
     raw = str(raw_path or "").strip()
@@ -479,9 +483,7 @@ def texture_path_policy_compliant(
             compliant = True
         else:
             compliant = render_safe
-    elif farm_token:
-        compliant = True
-    elif render_safe:
+    elif farm_token or render_safe:
         compliant = True
     else:
         compliant = False

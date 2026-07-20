@@ -6,8 +6,8 @@ import pytest
 
 pxr = pytest.importorskip("pxr")
 
-from pipeline_inspector.core.fix_plan import FixAction
-from pipeline_inspector.usd.fix_applier import apply_usd_fix_actions
+from pipeline_inspector.core.fix_plan import FixAction  # noqa: E402
+from pipeline_inspector.usd.fix_applier import apply_usd_fix_actions  # noqa: E402
 
 
 def test_apply_rename_node_updates_usd_prim_name(tmp_path: Path) -> None:
@@ -124,7 +124,11 @@ def test_apply_set_attr_syncs_all_usd_shader_colorspace_sources(tmp_path: Path) 
         target_attr="colorSpace",
         before_value="Raw",
         after_value="sRGB",
-        params={"resolved_prim_path": "/demo_albedo_v002_1", "attribute": "colorSpace", "value": "sRGB"},
+        params={
+            "resolved_prim_path": "/demo_albedo_v002_1",
+            "attribute": "colorSpace",
+            "value": "sRGB",
+        },
     )
 
     records = apply_usd_fix_actions(usd_path, [action])
@@ -169,7 +173,11 @@ def test_apply_set_attr_updates_arnold_image_colorspace_on_filename(tmp_path: Pa
         target_attr="colorSpace",
         before_value="Raw",
         after_value="sRGB",
-        params={"resolved_prim_path": "/demo_albedo_v002_1", "attribute": "colorSpace", "value": "sRGB"},
+        params={
+            "resolved_prim_path": "/demo_albedo_v002_1",
+            "attribute": "colorSpace",
+            "value": "sRGB",
+        },
     )
 
     records = apply_usd_fix_actions(usd_path, [action])
@@ -262,7 +270,8 @@ def test_apply_normalize_path_on_arnold_file_clears_spurious_file_input(tmp_path
         + "\n",
         encoding="utf-8",
     )
-    studio_environment = pytest.importorskip("pipeline_inspector.studio_config").StudioEnvironmentSettings(
+    studio_config = pytest.importorskip("pipeline_inspector.studio_config")
+    studio_environment = studio_config.StudioEnvironmentSettings(
         asset_root=str(tmp_path),
         texture_root=str(textures),
     )

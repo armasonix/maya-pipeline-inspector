@@ -70,26 +70,23 @@ def write_agent_cycle_log(
     *,
     hypothesis_id: str = "",
     run_id: str = "",
-    session_id: str = "618f4f",
+    session_id: str = "",
 ) -> None:
-    """Append NDJSON for an active Cursor debug session (always on during investigations)."""
+    """Append NDJSON when ``PIPELINE_INSPECTOR_DEBUG_SESSION`` is set."""
 
+    if not _SESSION_ID:
+        return
     if os.environ.get("PIPELINE_INSPECTOR_DISABLE_AGENT_LOG", "").strip():
         return
-    here = Path(__file__).resolve()
-    log_path = Path.cwd() / f"debug-{session_id}.log"
-    for parent in here.parents:
-        if (parent / "pyproject.toml").is_file():
-            log_path = parent / f"debug-{session_id}.log"
-            break
+    active_session_id = session_id or _SESSION_ID
     _append_debug_payload(
-        log_path,
+        _resolve_log_path(),
         location,
         message,
         data,
         hypothesis_id=hypothesis_id,
         run_id=run_id,
-        session_id=session_id,
+        session_id=active_session_id,
     )
 
 

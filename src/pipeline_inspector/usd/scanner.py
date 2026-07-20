@@ -186,10 +186,7 @@ def _read_shader_file_path(shader: Any, *, Sdf: Any) -> str:
         value = file_input.Get()
         if value is None:
             continue
-        if isinstance(value, Sdf.AssetPath):
-            path = str(value.path or "")
-        else:
-            path = str(value).strip()
+        path = str(value.path or "") if isinstance(value, Sdf.AssetPath) else str(value).strip()
         if path:
             return path
     return ""

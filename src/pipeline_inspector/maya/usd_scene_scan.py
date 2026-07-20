@@ -1,8 +1,6 @@
 """Merge OpenUSD proxy stages from the active Maya scene into a GraphSnapshot."""
 from __future__ import annotations
 
-import json
-import time
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -77,7 +75,10 @@ def merge_usd_proxy_snapshots(
 
 
 def _collect_usd_proxy_paths(cmds: Any) -> list[Path]:
-    shapes = cmds.ls(type="mayaUsdProxyShape", long=True) or []
+    list_nodes = getattr(cmds, "ls", None)
+    if not callable(list_nodes):
+        return []
+    shapes = list_nodes(type="mayaUsdProxyShape", long=True) or []
     paths: list[Path] = []
     seen: set[str] = set()
     for shape in shapes:

@@ -264,10 +264,8 @@ def parse_software_version_lines(text: str) -> tuple[SoftwareVersionRequirement,
     return parse_software_version_requirements(text)
 
 
-def _lines(values: tuple[str, ...] | tuple[SoftwareVersionRequirement, ...]) -> str:
-    if values and isinstance(values[0], SoftwareVersionRequirement):
-        return _software_version_lines(values)  # type: ignore[arg-type]
-    return "\n".join(values)  # type: ignore[arg-type]
+def _lines(values: tuple[str, ...]) -> str:
+    return "\n".join(values)
 
 
 def _software_version_lines(

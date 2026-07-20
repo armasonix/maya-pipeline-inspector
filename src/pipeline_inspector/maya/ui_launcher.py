@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from pipeline_inspector import __version__
 from pipeline_inspector.core.governance import (
@@ -394,19 +394,15 @@ def detach_panel() -> bool:
 
     set_params = getattr(_PANEL, "setDockableParameters", None) if _PANEL is not None else None
     if callable(set_params):
-        try:
+        with suppress(RuntimeError, TypeError, ValueError):
             set_params(dockable=True, floating=True)
-        except (RuntimeError, TypeError, ValueError):
-            pass
         if _workspace_control_is_floating(cmds):
             _debug_workspace_dock_log(cmds, "detach_panel.mixin_float", hypothesis_id="H13")
             return True
 
     if _workspace_control_exists(cmds):
-        try:
+        with suppress(RuntimeError, TypeError, ValueError):
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, floating=True)
-        except (RuntimeError, TypeError, ValueError):
-            pass
         if _workspace_control_is_floating(cmds):
             _debug_workspace_dock_log(cmds, "detach_panel.workspace_float", hypothesis_id="H13")
             return True
@@ -416,7 +412,11 @@ def detach_panel() -> bool:
         if callable(show_panel_widget):
             try:
                 show_panel_widget(dockable=False, floating=True)
-                _debug_workspace_dock_log(cmds, "detach_panel.standalone_window", hypothesis_id="H14")
+                _debug_workspace_dock_log(
+                    cmds,
+                    "detach_panel.standalone_window",
+                    hypothesis_id="H14",
+                )
                 return True
             except (RuntimeError, TypeError, ValueError):
                 pass
@@ -432,6 +432,14 @@ def _sync_docked_panel_layout(cmds: Any) -> None:
     content = _panel_content_from_panel(_PANEL) if _PANEL is not None else None
     if content is not None:
         _sync_workspace_control_width(content)
+
+
+def _invoke_dock_panel() -> None:
+    dock_panel()
+
+
+def _invoke_detach_panel() -> None:
+    detach_panel()
 
 
 def dock_panel() -> bool:
@@ -467,34 +475,28 @@ def dock_panel() -> bool:
 
     set_params = getattr(_PANEL, "setDockableParameters", None) if _PANEL is not None else None
     if callable(set_params):
-        try:
+        with suppress(RuntimeError, TypeError, ValueError):
             set_params(
                 dockable=True,
                 floating=False,
                 area=DEFAULT_DOCK_AREA,
                 width=initial_width,
             )
-        except (RuntimeError, TypeError, ValueError):
-            pass
         if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
             _sync_docked_panel_layout(cmds)
             _debug_workspace_dock_log(cmds, "dock_panel.mixin_dock", hypothesis_id="H15")
             return True
 
     if _workspace_control_exists(cmds):
-        try:
+        with suppress(RuntimeError, TypeError, ValueError):
             cmds.workspaceControl(
                 WORKSPACE_CONTROL_NAME,
                 edit=True,
                 floating=False,
                 dockToMainWindow=(DEFAULT_DOCK_AREA, True),
             )
-        except (RuntimeError, TypeError, ValueError):
-            pass
-        try:
+        with suppress(RuntimeError, TypeError, ValueError):
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
-        except (RuntimeError, TypeError, ValueError):
-            pass
         if not _workspace_control_is_floating(cmds):
             _sync_docked_panel_layout(cmds)
             _debug_workspace_dock_log(cmds, "dock_panel.workspace_dock", hypothesis_id="H15")
@@ -625,8 +627,8 @@ def _panel_navigation_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
-        on_detach_panel=detach_panel,
-        on_dock_panel=dock_panel,
+        on_detach_panel=_invoke_detach_panel,
+        on_dock_panel=_invoke_dock_panel,
         on_report_bug=lambda: _report_bug_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -2527,7 +2529,7 @@ def _run_validation_job(
     future = _VALIDATION_EXECUTOR.submit(
         execute_validation_on_snapshot,
         captured.snapshot,
-        **validation_kwargs,
+        **cast(Any, validation_kwargs),
     )
     # #region agent log
     _debug_validate_cycle_log(
@@ -3841,11 +3843,18 @@ def _populate_fix_queue(content: Any, result: Any) -> None:
         "Fix queue populated",
         {
             "action_count": len(actions),
-            "usd_actions": sum(1 for action in actions if str(action.target_id).startswith("prim:")),
+            "usd_actions": sum(
+                1 for action in actions if str(action.target_id).startswith("prim:")
+            ),
             "scene_usd_actions": sum(
                 1
                 for action in actions
-                if action.fix_type in {"set_default_prim", "set_attr", "normalize_path", "relink_path"}
+                if action.fix_type in {
+                    "set_default_prim",
+                    "set_attr",
+                    "normalize_path",
+                    "relink_path",
+                }
                 and action.target_kind in {"scene", "graph"}
             ),
             "unblocked": sum(1 for action in actions if not action.blocked),
@@ -4250,7 +4259,9 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         {
             "selected_count": str(len(selected)),
             "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            "validate_running": str(getattr(content, "_pipeline_inspector_validate_running", False)),
+            "validate_running": str(
+                getattr(content, "_pipeline_inspector_validate_running", False)
+            ),
         },
         hypothesis_id="H-LOOP3",
     )
@@ -4275,11 +4286,12 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         if action.risk == HIGH_RISK:
             return False
         if action.risk == MEDIUM_RISK:
-            if action.fix_type == TEXTURE_FILE_FIX_TYPE:
-                pass
-            elif action.fix_type in usd_medium_safe_fix_types and (
-                str(action.target_id).startswith("prim:")
-                or action.target_kind == "file_dependency"
+            if action.fix_type == TEXTURE_FILE_FIX_TYPE or (
+                action.fix_type in usd_medium_safe_fix_types
+                and (
+                    str(action.target_id).startswith("prim:")
+                    or action.target_kind == "file_dependency"
+                )
             ):
                 pass
             else:
@@ -4325,7 +4337,9 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         {
             "action_count": str(len(actions)),
             "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            "validate_running": str(getattr(content, "_pipeline_inspector_validate_running", False)),
+            "validate_running": str(
+                getattr(content, "_pipeline_inspector_validate_running", False)
+            ),
         },
         hypothesis_id="H-LOOP3",
     )
@@ -4942,7 +4956,6 @@ def _debug_validate_cycle_log(
     from pipeline_inspector.util.debug_log import write_agent_cycle_log
 
     write_agent_cycle_log(location, message, dict(data), hypothesis_id=hypothesis_id)
-    print(f"[PI-DBG] {message} {data}")
 
 
 def _debug_health_log(

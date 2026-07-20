@@ -12,7 +12,12 @@ from pipeline_inspector.core.render_presets import (
 
 class _FakeCmds:
     def __init__(self) -> None:
-        self.nodes = {"defaultResolution", "vraySettings", "defaultArnoldRenderOptions", "defaultRenderGlobals"}
+        self.nodes = {
+            "defaultResolution",
+            "vraySettings",
+            "defaultArnoldRenderOptions",
+            "defaultRenderGlobals",
+        }
         self.attrs: dict[str, int | float] = {}
 
     def objExists(self, node_name: str) -> bool:

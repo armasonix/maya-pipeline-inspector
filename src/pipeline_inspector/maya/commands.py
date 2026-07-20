@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -315,7 +314,10 @@ def select_node_action(
 
     maya_cmds = _maya_cmds()
     maya_target = _resolve_maya_target_name(node_name, target_id)
-    should_try_usd = is_usd_prim_target(target_id=target_id, node_name=node_name) or _looks_like_usd_prim_issue(
+    should_try_usd = is_usd_prim_target(
+        target_id=target_id,
+        node_name=node_name,
+    ) or _looks_like_usd_prim_issue(
         target_id=target_id,
         node_name=node_name,
         snapshot=snapshot,
@@ -353,7 +355,10 @@ def open_in_hypershade_action(
     )
 
     maya_cmds = _maya_cmds()
-    should_try_usd = is_usd_prim_target(target_id=target_id, node_name=node_name) or _looks_like_usd_prim_issue(
+    should_try_usd = is_usd_prim_target(
+        target_id=target_id,
+        node_name=node_name,
+    ) or _looks_like_usd_prim_issue(
         target_id=target_id,
         node_name=node_name,
         snapshot=snapshot,

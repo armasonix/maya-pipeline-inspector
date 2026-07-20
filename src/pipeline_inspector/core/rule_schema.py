@@ -1435,7 +1435,6 @@ def _path_policy_violations(
     studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> list[str]:
     authored_paths = [dependency.raw_path] if dependency.raw_path else []
-    paths = _dependency_paths(dependency)
     disallowed = params.get("disallow", [])
     if not isinstance(disallowed, list):
         disallowed = [disallowed]
@@ -1445,7 +1444,6 @@ def _path_policy_violations(
         policy_name = str(policy)
         if policy_name == "local_drive":
             local_drive_hit = False
-            resolved = str(dependency.resolved_path or dependency.raw_path or "")
             for path in authored_paths:
                 if not _is_local_drive_path(path):
                     continue

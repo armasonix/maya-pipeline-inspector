@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
-
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from pipeline_inspector.core.fix_plan import FixAction
 from pipeline_inspector.maya.fix_applier import ApplyFixReport

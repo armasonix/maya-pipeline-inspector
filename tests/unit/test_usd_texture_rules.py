@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from pipeline_inspector.core import RuleResult
 from pipeline_inspector.core.models import FileDependencySnapshot, GraphSnapshot
 from pipeline_inspector.core.rule_schema import ValidationEngine
 from pipeline_inspector.maya.snapshot_enrichment import build_material_index, enrich_rule_results
-from pipeline_inspector.core import RuleResult
 from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 from pipeline_inspector.usd.scanner import _dedupe_texture_file_dependencies
 

@@ -142,11 +142,19 @@ def test_apply_ui_density_compact_hides_secondary_panel_header_actions():
     docs = _find(widget, main_window.DOCUMENTATION_BUTTON_OBJECT_NAME)
     report_bug = _find(widget, main_window.REPORT_BUG_BUTTON_OBJECT_NAME)
     updates = _find(widget, main_window.CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME)
+    dock = _find(widget, main_window.DOCK_PANEL_BUTTON_OBJECT_NAME)
+    detach = _find(widget, main_window.DETACH_PANEL_BUTTON_OBJECT_NAME)
+    dock_micro = _find(widget, main_window.DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME)
+    detach_micro = _find(widget, main_window.DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME)
 
     assert overflow.visible is True
     assert docs.visible is False
     assert report_bug.visible is False
     assert updates.visible is False
+    assert dock.visible is False
+    assert detach.visible is False
+    assert dock_micro.visible is True
+    assert detach_micro.visible is True
     assert len(overflow.menu.actions) == 3
 
 
@@ -391,8 +399,32 @@ def test_apply_ui_density_compact_tightens_panel_header_gaps():
         DensityFakeQtWidgets.QSizePolicy.Fixed,
     )
     assert tokens.panel_header_chrome_stylesheet in header.style_sheet
-    assert tokens.main_tab_chrome_stylesheet in tabs.style_sheet
     assert tabs.document_mode is True
+    assert tokens.main_tab_chrome_stylesheet in tabs.style_sheet
+    dock = _find(widget, main_window.DOCK_PANEL_BUTTON_OBJECT_NAME)
+    dock_micro = _find(widget, main_window.DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME)
+    assert dock.visible is False
+    assert dock_micro.visible is True
+
+
+def test_apply_ui_density_comfortable_shows_full_dock_detach_buttons():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="comfortable"),
+    )
+
+    dock = _find(widget, main_window.DOCK_PANEL_BUTTON_OBJECT_NAME)
+    detach = _find(widget, main_window.DETACH_PANEL_BUTTON_OBJECT_NAME)
+    dock_micro = _find(widget, main_window.DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME)
+    detach_micro = _find(widget, main_window.DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME)
+
+    assert dock.visible is True
+    assert detach.visible is True
+    assert dock_micro.visible is False
+    assert detach_micro.visible is False
 
 
 def test_apply_ui_density_comfortable_tightens_panel_header_gaps():

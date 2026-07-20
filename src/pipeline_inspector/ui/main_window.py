@@ -38,6 +38,8 @@ PANEL_HEADER_UNSAVED_OBJECT_NAME = "pipelineInspectorPanelHeaderUnsaved"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsGearButton"
 DETACH_PANEL_BUTTON_OBJECT_NAME = "pipelineInspectorDetachPanelButton"
 DOCK_PANEL_BUTTON_OBJECT_NAME = "pipelineInspectorDockPanelButton"
+DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME = "pipelineInspectorDockPanelMicroButton"
+DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME = "pipelineInspectorDetachPanelMicroButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "pipelineInspectorDocumentationButton"
 REPORT_BUG_BUTTON_OBJECT_NAME = "pipelineInspectorReportBugButton"
 CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "pipelineInspectorCheckForUpdatesButton"
@@ -467,6 +469,25 @@ def build_panel_header(
         set_unsaved_visible(False)
     row_layout.addWidget(unsaved_label, 0)
     row_layout.addStretch(1)
+
+    row_layout.addWidget(
+        _micro_panel_header_button(
+            qt_widgets,
+            "\u229e",
+            DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME,
+            DOCK_PANEL_BUTTON_TOOLTIP,
+            navigation_callbacks.on_dock_panel,
+        )
+    )
+    row_layout.addWidget(
+        _micro_panel_header_button(
+            qt_widgets,
+            "\u2922",
+            DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME,
+            DETACH_PANEL_BUTTON_TOOLTIP,
+            navigation_callbacks.on_detach_panel,
+        )
+    )
 
     docs_button = _compact_button(
         qt_widgets,
@@ -2077,7 +2098,10 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
 
 def _log_panel_header_layout_debug(content: Any, qt_widgets: Any, tokens: Any) -> None:
     # #region agent log
-    from pipeline_inspector.util.debug_log import write_agent_cycle_log
+    from pipeline_inspector.util.debug_log import debug_log_enabled, write_agent_cycle_log
+
+    if not debug_log_enabled():
+        return
 
     header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
     if header is None:
@@ -2132,6 +2156,28 @@ def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> N
         set_visible = getattr(overflow, "setVisible", None)
         if set_visible is not None:
             set_visible(tokens.panel_header_overflow)
+
+    for full_object_name, micro_object_name in (
+        (DOCK_PANEL_BUTTON_OBJECT_NAME, DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME),
+        (DETACH_PANEL_BUTTON_OBJECT_NAME, DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME),
+    ):
+        full_button = _find_child_widget(header, qt_widgets, full_object_name)
+        micro_button = _find_child_widget(header, qt_widgets, micro_object_name)
+        if full_button is not None:
+            set_visible = getattr(full_button, "setVisible", None)
+            if set_visible is not None:
+                set_visible(not tokens.panel_header_overflow)
+        if micro_button is not None:
+            set_visible = getattr(micro_button, "setVisible", None)
+            if set_visible is not None:
+                set_visible(tokens.panel_header_overflow)
+            if tokens.panel_header_max_height is not None:
+                set_fixed_height = getattr(micro_button, "setFixedHeight", None)
+                if set_fixed_height is not None:
+                    set_fixed_height(tokens.panel_header_max_height)
+                set_fixed_width = getattr(micro_button, "setFixedWidth", None)
+                if set_fixed_width is not None:
+                    set_fixed_width(tokens.panel_header_max_height)
 
     header_layout = _widget_layout(header)
     if header_layout is not None:
@@ -2913,6 +2959,34 @@ def _walk_widget_tree(root: Any) -> list[Any]:
         discovered.append(current)
         stack.extend(_widget_children(current))
     return discovered
+
+
+def _micro_panel_header_button(
+    qt_widgets: Any,
+    label: str,
+    object_name: str,
+    tooltip: str,
+    callback: Optional[Callable[[], None]],
+) -> Any:
+    """Build a tooltip-only micro header control for compact panel width."""
+
+    button = qt_widgets.QPushButton(label)
+    button.setObjectName(object_name)
+    set_tooltip = getattr(button, "setToolTip", None)
+    if set_tooltip is not None:
+        set_tooltip(tooltip)
+    set_fixed_width = getattr(button, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(22)
+    set_visible = getattr(button, "setVisible", None)
+    if set_visible is not None:
+        set_visible(False)
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    policy = getattr(button, "setSizePolicy", None)
+    if size_policy is not None and policy is not None:
+        policy(size_policy.Preferred, size_policy.Fixed)
+    _connect_button(button, callback)
+    return button
 
 
 def _compact_button(

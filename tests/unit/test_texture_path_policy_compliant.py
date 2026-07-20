@@ -11,7 +11,9 @@ _ALLOWED = (
 )
 
 
-def test_texture_path_policy_compliant_rejects_render_safe_absolute_when_studio_configured() -> None:
+def test_texture_path_policy_compliant_rejects_render_safe_absolute_when_studio_configured() -> (
+    None
+):
     asset_root = "D:/show/assets"
     env = StudioEnvironmentSettings(
         asset_root=asset_root,
@@ -22,7 +24,9 @@ def test_texture_path_policy_compliant_rejects_render_safe_absolute_when_studio_
     assert texture_path_policy_compliant(raw, raw, _ALLOWED, env) is False
 
 
-def test_texture_path_policy_compliant_accepts_render_safe_relative_when_studio_configured() -> None:
+def test_texture_path_policy_compliant_accepts_render_safe_relative_when_studio_configured() -> (
+    None
+):
     asset_root = "D:/show/assets"
     env = StudioEnvironmentSettings(
         asset_root=asset_root,

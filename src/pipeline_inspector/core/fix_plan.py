@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import glob
-import json
 import os
 import re
-import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -26,7 +24,6 @@ from pipeline_inspector.core.naming_fix import (
 from pipeline_inspector.core.rule_schema import RuleDefinition, RuleResult
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 from pipeline_inspector.util.paths import (
-    author_maya_texture_path,
     effective_studio_normalize_target,
     normalize_path_to_studio_tokens,
     replace_path_prefix,
@@ -750,7 +747,7 @@ _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
 
 
 def _normalize_path_should_use_udim_token(
-    dependency: Optional[FileDependencySnapshot],
+    dependency: Optional[FileDependencySnapshot | _FileDependencyRef],
     node: Optional[NodeSnapshot],
     raw_path: str,
 ) -> bool:
@@ -1078,8 +1075,8 @@ class _NodeIndex:
         if path.is_absolute():
             return str(path).replace("\\", "/")
         scene_dir = Path(self.scene_path).parent if self.scene_path else Path.cwd()
-        resolved = (scene_dir / candidate).resolve()
-        return str(resolved).replace("\\", "/")
+        resolved_path = (scene_dir / candidate).resolve()
+        return str(resolved_path).replace("\\", "/")
 
     def find(self, result: RuleResult) -> Optional[NodeSnapshot]:
         for key in (result.target_id, result.node):
@@ -1201,15 +1198,16 @@ def _rename_texture_source_exists(
             scene_path=node_index.scene_path,
         ):
             return True
-    if raw_after and texture_path_resolves_on_disk(
-        raw_after,
-        is_udim=is_udim or "<UDIM>" in str(raw_after) or "<udim>" in str(raw_after),
-        studio_environment=node_index.studio_environment,
-        usd_anchor_dir=usd_anchor,
-        scene_path=node_index.scene_path,
-    ):
-        return True
-    return False
+    return bool(
+        raw_after
+        and texture_path_resolves_on_disk(
+            raw_after,
+            is_udim=is_udim or "<UDIM>" in str(raw_after) or "<udim>" in str(raw_after),
+            studio_environment=node_index.studio_environment,
+            usd_anchor_dir=usd_anchor,
+            scene_path=node_index.scene_path,
+        )
+    )
 
 
 def texture_path_resolves_on_disk(

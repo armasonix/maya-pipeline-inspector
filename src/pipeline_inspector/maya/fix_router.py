@@ -233,7 +233,7 @@ def _proxy_stage_for_path(cmds: Any, usd_path: Path) -> Any:
 
 
 def _usd_only_report(records: list[Any]) -> Any:
-    from pipeline_inspector.maya.fix_applier import ApplyFixReport, DEFAULT_UNDO_CHUNK_NAME
+    from pipeline_inspector.maya.fix_applier import DEFAULT_UNDO_CHUNK_NAME, ApplyFixReport
 
     return ApplyFixReport(
         records=tuple(_coerce_apply_records(records)),
@@ -242,7 +242,7 @@ def _usd_only_report(records: list[Any]) -> Any:
 
 
 def _merge_reports(maya_report: Any, usd_records: list[Any]) -> Any:
-    from pipeline_inspector.maya.fix_applier import ApplyFixReport, DEFAULT_UNDO_CHUNK_NAME
+    from pipeline_inspector.maya.fix_applier import DEFAULT_UNDO_CHUNK_NAME, ApplyFixReport
 
     undo_chunk_name = str(
         getattr(maya_report, "undo_chunk_name", DEFAULT_UNDO_CHUNK_NAME)

@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import importlib
-import json
-import time
 from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import GraphSnapshot
-from pipeline_inspector.maya.navigation import NavigationActionResult, _hypershade_panel_name, _result
+from pipeline_inspector.maya.navigation import (
+    NavigationActionResult,
+    _hypershade_panel_name,
+    _result,
+)
 from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 
 _DEBUG_LOG = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
@@ -459,10 +461,7 @@ def _select_ufe_path(ufe_path: str, cmds: Any) -> bool:
     except Exception:  # noqa: BLE001
         pass
 
-    if _replace_ufe_selection(ufe_path) and _selection_matches(ufe_path, cmds):
-        return True
-
-    return False
+    return bool(_replace_ufe_selection(ufe_path) and _selection_matches(ufe_path, cmds))
 
 
 def _selection_matches(ufe_path: str, cmds: Any) -> bool:

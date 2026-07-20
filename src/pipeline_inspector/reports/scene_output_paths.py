@@ -1,8 +1,6 @@
 """Organized scene-adjacent output paths for Pipeline Inspector exports."""
 from __future__ import annotations
 
-import json
-import time
 from pathlib import Path
 
 REPORTS_DIR_NAME = "reports"
