@@ -1254,6 +1254,9 @@ def _set_studio_config(content: Any, qt_widgets: Any, config: StudioConfig) -> N
         MERGED_RUNTIME_CONFIG_ATTR,
         merge_runtime_config(config, _user_config_for_content(content)),
     )
+    from pipeline_inspector.util.paths import sync_studio_environment_to_os
+
+    sync_studio_environment_to_os(config.studio_environment)
     _refresh_settings_view(content, qt_widgets)
 
 
@@ -2382,6 +2385,14 @@ def _run_validation_job(
     profile_id: Optional[str] = None,
     post_validate: Optional[Any] = None,
 ) -> None:
+    # #region agent log
+    _debug_validate_job_log(
+        "ui_launcher._run_validation_job",
+        "Validation job started",
+        {"scan_scope": scan_scope, "profile_id": profile_id or ""},
+        hypothesis_id="H34",
+    )
+    # #endregion
     try:
         from pipeline_inspector.maya.commands import (
             validate_scene_action,
@@ -2410,10 +2421,37 @@ def _run_validation_job(
                 session_rule_overrides=session_rule_overrides,
             )
     except Exception as exc:  # noqa: BLE001
+        # #region agent log
+        _debug_validate_job_log(
+            "ui_launcher._run_validation_job",
+            "Validation job failed",
+            {"scan_scope": scan_scope, "error": str(exc)},
+            hypothesis_id="H34",
+        )
+        # #endregion
         message = f"Validation failed: {exc}"
         _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
         print(message)
         return
+
+    # #region agent log
+    _debug_validate_job_log(
+        "ui_launcher._run_validation_job",
+        "Validation job finished",
+        {
+            "scan_scope": scan_scope,
+            "succeeded": str(getattr(result, "succeeded", True)),
+            "failed_count": str(
+                sum(
+                    1
+                    for item in getattr(result, "results", ()) or ()
+                    if getattr(item, "status", "") == "failed"
+                )
+            ),
+        },
+        hypothesis_id="H34",
+    )
+    # #endregion
 
     if not getattr(result, "succeeded", True):
         _reset_panel_state(content, qt_widgets, status_message=result.message)
@@ -3500,6 +3538,26 @@ def _populate_fix_queue(content: Any, result: Any) -> None:
             ),
             "unblocked": sum(1 for action in actions if not action.blocked),
             "fix_types": "|".join(sorted({action.fix_type for action in actions})),
+            "texture_rename_blocked": sum(
+                1
+                for action in actions
+                if action.fix_type == "rename_texture_file" and action.blocked
+            ),
+            "texture_rename_unblocked": sum(
+                1
+                for action in actions
+                if action.fix_type == "rename_texture_file" and not action.blocked
+            ),
+            "texture_rename_block_reasons": "|".join(
+                sorted(
+                    {
+                        reason
+                        for action in actions
+                        if action.fix_type == "rename_texture_file" and action.blocked
+                        for reason in action.block_reasons
+                    }
+                )
+            ),
         },
         hypothesis_id="H4",
     )
@@ -3885,16 +3943,23 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
     if fix_plan is None:
         return
 
+    usd_medium_safe_fix_types = frozenset({"normalize_path", "relink_path"})
+
     def _include_apply_safe_action(action: Any) -> bool:
         if action.requires_supervisor:
             return False
         if action.risk == HIGH_RISK:
             return False
-        if action.risk == MEDIUM_RISK and not (
-            action.fix_type == TEXTURE_FILE_FIX_TYPE
-            and str(action.target_id).startswith("prim:")
-        ):
-            return False
+        if action.risk == MEDIUM_RISK:
+            if action.fix_type == TEXTURE_FILE_FIX_TYPE:
+                pass
+            elif action.fix_type in usd_medium_safe_fix_types and (
+                str(action.target_id).startswith("prim:")
+                or action.target_kind == "file_dependency"
+            ):
+                pass
+            else:
+                return False
         if action.blocked:
             return bool(
                 action.fix_type == NAMING_FIX_TYPE
@@ -4512,6 +4577,16 @@ def _studio_environment_from_content(content: Any) -> Any:
 
 
 def _debug_fix_queue_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
+
+
+def _debug_validate_job_log(
     location: str,
     message: str,
     data: dict[str, object],

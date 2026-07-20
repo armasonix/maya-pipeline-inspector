@@ -162,12 +162,7 @@ def _mesh_face_count(mesh: Any) -> int:
 
 
 def _shader_node_attrs(*, shader: Any, prim_name: str, Sdf: Any) -> dict[str, Any]:
-    info_id = ""
-    info_input = shader.GetInput("info:id")
-    if info_input:
-        value = info_input.Get()
-        if value is not None:
-            info_id = str(value)
+    info_id = _shader_info_id(shader)
     semantic_slot = _infer_semantic_slot(prim_name, info_id)
     color_space = _read_shader_colorspace(shader, Sdf=Sdf)
     file_path = _read_shader_file_path(shader, Sdf=Sdf)
@@ -184,15 +179,20 @@ def _shader_node_attrs(*, shader: Any, prim_name: str, Sdf: Any) -> dict[str, An
 
 
 def _read_shader_file_path(shader: Any, *, Sdf: Any) -> str:
-    file_input = shader.GetInput("file")
-    if not file_input:
-        return ""
-    value = file_input.Get()
-    if value is None:
-        return ""
-    if isinstance(value, Sdf.AssetPath):
-        return str(value.path or "")
-    return str(value).strip()
+    for input_name in _texture_path_input_names(shader):
+        file_input = shader.GetInput(input_name)
+        if not file_input:
+            continue
+        value = file_input.Get()
+        if value is None:
+            continue
+        if isinstance(value, Sdf.AssetPath):
+            path = str(value.path or "")
+        else:
+            path = str(value).strip()
+        if path:
+            return path
+    return ""
 
 
 def _infer_semantic_slot(prim_name: str, info_id: str) -> str:
@@ -233,6 +233,32 @@ def _shader_input_scalar(shader: Any, name: str) -> Any:
     if not input_attr:
         return None
     return input_attr.Get()
+
+
+def _shader_info_id(shader: Any) -> str:
+    prim = shader.GetPrim() if hasattr(shader, "GetPrim") else None
+    if prim is not None:
+        attr = prim.GetAttribute("info:id")
+        if attr and attr.IsValid():
+            value = attr.Get()
+            if value is not None:
+                return str(value)
+    info_input = shader.GetInput("info:id")
+    if info_input:
+        value = info_input.Get()
+        if value is not None:
+            return str(value)
+    return ""
+
+
+def _is_arnold_image_shader(shader: Any) -> bool:
+    return _shader_info_id(shader).casefold() == "arnold:image"
+
+
+def _texture_path_input_names(shader: Any) -> tuple[str, ...]:
+    if _is_arnold_image_shader(shader):
+        return ("filename", "file")
+    return ("file", "filename")
 
 
 def _normalize_colorspace(value: str) -> str:
@@ -278,7 +304,21 @@ def _shader_file_dependencies(
     Sdf: Any,
 ) -> list[FileDependencySnapshot]:
     dependencies: list[FileDependencySnapshot] = []
-    for input_attr in shader.GetInputs():
+    input_names = _texture_path_input_names(shader)
+    if _is_arnold_image_shader(shader):
+        filename_input = shader.GetInput("filename")
+        if filename_input is not None:
+            filename_value = filename_input.Get()
+            if (
+                filename_value is not None
+                and isinstance(filename_value, Sdf.AssetPath)
+                and str(filename_value.path or "").strip()
+            ):
+                input_names = ("filename",)
+    for input_name in input_names:
+        input_attr = shader.GetInput(input_name)
+        if input_attr is None:
+            continue
         value = input_attr.Get()
         if value is None or not isinstance(value, Sdf.AssetPath):
             continue
@@ -330,9 +370,15 @@ def _prefer_texture_dependency(
     candidate: FileDependencySnapshot,
     incumbent: FileDependencySnapshot,
 ) -> bool:
-    return _texture_dependency_score(candidate.node_id) > _texture_dependency_score(
-        incumbent.node_id
-    )
+    candidate_score = _texture_dependency_score(candidate.node_id)
+    incumbent_score = _texture_dependency_score(incumbent.node_id)
+    if candidate_score != incumbent_score:
+        return candidate_score > incumbent_score
+    if candidate.attr == "filename" and incumbent.attr == "file":
+        return True
+    if incumbent.attr == "filename" and candidate.attr == "file":
+        return False
+    return False
 
 
 def _texture_dependency_score(node_id: str) -> int:

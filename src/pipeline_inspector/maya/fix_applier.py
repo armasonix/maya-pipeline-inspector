@@ -20,6 +20,10 @@ from pipeline_inspector.core.fix_plan import (
 )
 from pipeline_inspector.core.naming_fix import texture_tile_filename_from_paths
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
+from pipeline_inspector.util.paths import (
+    author_maya_texture_path_for_fix,
+    sync_studio_environment_to_os,
+)
 
 SUPPORTED_FIX_TYPES = frozenset(
     {
@@ -205,7 +209,7 @@ def _apply_rename_texture_file(action: FixAction, cmds: Any) -> AppliedFixRecord
         action,
         cmds,
         target_attr,
-        str(raw_after).strip(),
+        str(raw_after).strip().replace("\\", "/"),
         str(raw_before),
     )
     if path_record.blocked:
@@ -237,14 +241,19 @@ def _rename_texture_files_on_disk(
         return _rename_udim_texture_files(resolved_before, raw_before, raw_after)
 
     source = Path(os.path.expandvars(os.path.expanduser(resolved_before.replace("/", os.sep))))
-    if not source.is_file():
-        return TEXTURE_FILE_MISSING_REASON
-
     destination = _resolved_destination_path(source, raw_before, raw_after)
     if destination is None:
-        return INVALID_TEXTURE_FILE_RENAME_REASON
+        destination = Path(
+            os.path.expandvars(os.path.expanduser(str(raw_after).replace("/", os.sep)))
+        )
+
+    if not source.is_file():
+        if _texture_destination_ready(destination, raw_after, is_udim=False):
+            return None
+        return TEXTURE_FILE_MISSING_REASON
+
     if destination.exists():
-        return INVALID_TEXTURE_FILE_RENAME_REASON
+        return None
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     os.rename(source, destination)
@@ -262,6 +271,12 @@ def _rename_udim_texture_files(
     )
     matched_files = sorted(glob.glob(glob_pattern))
     if not matched_files:
+        if _texture_destination_ready(
+            Path(str(raw_after).replace("\\", "/")),
+            raw_after,
+            is_udim=True,
+        ):
+            return None
         return TEXTURE_FILE_MISSING_REASON
 
     for old_file in matched_files:
@@ -275,9 +290,18 @@ def _rename_udim_texture_files(
             return INVALID_TEXTURE_FILE_RENAME_REASON
         new_path = old_path.with_name(new_name)
         if new_path.exists():
-            return INVALID_TEXTURE_FILE_RENAME_REASON
+            continue
         os.rename(old_path, new_path)
     return None
+
+
+def _texture_destination_ready(path: Path, raw_after: str, *, is_udim: bool) -> bool:
+    from pipeline_inspector.core.fix_plan import texture_path_resolves_on_disk
+
+    return texture_path_resolves_on_disk(
+        str(raw_after or path),
+        is_udim=is_udim or "<UDIM>" in str(raw_after) or "<udim>" in str(raw_after),
+    )
 
 
 def _resolved_destination_path(
@@ -1111,7 +1135,16 @@ def _apply_relink_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
     if not _is_path_string_value(action.after_value):
         return _blocked(action, [INVALID_RELINK_PATH_REASON])
 
-    return _apply_path_value(action, cmds, target_attr, str(action.after_value).strip())
+    return _apply_path_value(
+        action,
+        cmds,
+        target_attr,
+        _author_maya_path_for_action(
+            action,
+            str(action.after_value).strip(),
+            str(action.params.get("resolved_before") or action.before_value or ""),
+        ),
+    )
 
 def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
     target_attr = _path_target_attr(action)
@@ -1132,10 +1165,91 @@ def _apply_normalize_path(action: FixAction, cmds: Any) -> AppliedFixRecord:
         scene_path=str(action.params.get("scene_path") or ""),
         studio_environment=_studio_environment_from_params(action.params),
     )
-    if not _is_path_string_value(normalized_path) or normalized_path == before_value:
+    if not _is_path_string_value(normalized_path):
         return _blocked(action, [INVALID_NORMALIZE_PATH_REASON])
 
-    return _apply_path_value(action, cmds, target_attr, str(normalized_path).strip(), before_value)
+    studio_environment = _studio_environment_from_params(action.params)
+    if studio_environment is not None:
+        sync_studio_environment_to_os(studio_environment)
+
+    authored_path = _author_maya_path_for_action(
+        action,
+        str(normalized_path).strip(),
+        str(action.params.get("resolved_before") or before_value),
+    )
+    authored_path = authored_path.replace("\\", "/")
+    before_normalized = str(before_value).replace("\\", "/")
+    authored_normalized = authored_path.replace("\\", "/")
+    planned_normalized = str(normalized_path).strip().replace("\\", "/")
+    if (
+        planned_normalized == before_normalized
+        and authored_normalized == before_normalized
+    ):
+        # #region agent log
+        _debug_maya_path_log(
+            action,
+            before_value=str(before_value),
+            planned_after=planned_normalized,
+            authored_path=authored_path,
+            outcome="idempotent_already_normalized",
+        )
+        # #endregion
+        return _applied(action, target_attr, before_value, before_value)
+    # #region agent log
+    _debug_maya_path_log(
+        action,
+        before_value=str(before_value),
+        planned_after=str(normalized_path),
+        authored_path=authored_path,
+    )
+    # #endregion
+    return _apply_path_value(action, cmds, target_attr, authored_path, before_value)
+
+def _author_maya_path_for_action(
+    action: FixAction,
+    planned_path: str,
+    fallback_absolute: str,
+) -> str:
+    return author_maya_texture_path_for_fix(
+        planned_path,
+        scene_path=str(action.params.get("scene_path") or ""),
+        studio_environment=_studio_environment_from_params(action.params),
+        fallback_absolute=fallback_absolute,
+    ).replace("\\", "/")
+
+def _debug_maya_path_log(
+    action: FixAction,
+    *,
+    before_value: str,
+    planned_after: str,
+    authored_path: str,
+    outcome: str = "apply",
+) -> None:
+    try:
+        import json
+        import time
+
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": "maya.fix_applier._apply_normalize_path",
+            "message": "Maya texture path authored",
+            "data": {
+                "fix_type": action.fix_type,
+                "target_node": action.target_node,
+                "before_value": before_value,
+                "planned_after": planned_after,
+                "authored_path": authored_path,
+                "scene_path": str(action.params.get("scene_path") or ""),
+                "outcome": outcome,
+            },
+            "hypothesisId": "H35",
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 def _apply_path_value(
     action: FixAction,
@@ -1149,7 +1263,7 @@ def _apply_path_value(
         return _blocked(action, [MISSING_ATTR_REASON])
 
     current_value = before_value if before_value is not None else cmds.getAttr(plug)
-    _set_attr(cmds, plug, path_value)
+    _set_attr(cmds, plug, str(path_value).replace("\\", "/"))
     after_value = cmds.getAttr(plug)
     return _applied(action, target_attr, current_value, after_value)
 

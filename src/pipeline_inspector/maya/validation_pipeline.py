@@ -296,9 +296,10 @@ def run_validation(
 ) -> ValidationRunResult:
     """Validate an enriched snapshot using packaged rules, profile, and waivers."""
 
+    studio_environment = _studio_environment_for_validation(studio_config)
     enriched = prepare_snapshot_for_validation(
         snapshot,
-        studio_environment=_studio_environment_for_validation(studio_config),
+        studio_environment=studio_environment,
     )
     normalized_asset_class = (asset_class_id or "").strip()
     if profile_path is not None:
@@ -341,6 +342,7 @@ def run_validation(
     results = list(
         ValidationEngine(
             naming_templates=_naming_templates_for_validation(studio_config),
+            studio_environment=studio_environment,
         ).validate(enriched, rules)
     )
     sidecar_path = waiver_sidecar_path or resolve_waiver_sidecar_path(enriched.scene_path)
@@ -354,9 +356,43 @@ def run_validation(
         results,
         rules,
         enriched,
-        studio_environment=_studio_environment_for_validation(studio_config),
+        studio_environment=studio_environment,
     )
     results = apply_fix_availability(results, fix_plan)
+    # #region agent log
+    _debug_validation_log(
+        "validation_pipeline.run_validation",
+        "Path policy fix actions",
+        {
+            "path_normalize_actions": sum(
+                1
+                for action in fix_plan.actions
+                if action.fix_type == "normalize_path"
+                and "path.project_root" in action.rule_id
+            ),
+            "path_normalize_unblocked": sum(
+                1
+                for action in fix_plan.actions
+                if action.fix_type == "normalize_path"
+                and "path.project_root" in action.rule_id
+                and not action.blocked
+            ),
+            "project_root_failures": sum(
+                1
+                for item in results
+                if item.rule_id.endswith(".texture.path.project_root")
+                and item.status == "failed"
+            ),
+            "local_drive_failures": sum(
+                1
+                for item in results
+                if item.rule_id.endswith(".texture.path.local_drive")
+                and item.status == "failed"
+            ),
+        },
+        hypothesis_id="H33",
+    )
+    # #endregion
     summary = summarize_results(results)
     health_score = compute_health_score(results)
     failed_count = sum(1 for item in results if item.status == "failed")

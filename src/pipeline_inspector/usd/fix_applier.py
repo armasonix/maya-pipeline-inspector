@@ -9,6 +9,11 @@ from typing import Any, Optional
 
 from pipeline_inspector.core.fix_plan import FixAction, resolve_normalize_path_value
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
+from pipeline_inspector.util.paths import (
+    author_usd_asset_path,
+    is_local_drive_path,
+    resolve_authored_absolute_path,
+)
 
 UNSUPPORTED_FIX_REASON = "unsupported_fix_type"
 INVALID_TARGET_REASON = "invalid_usd_target"
@@ -86,8 +91,39 @@ def apply_usd_fix_actions(
         UsdShade=UsdShade,
         Sdf=Sdf,
     )
-    opened_stage.GetRootLayer().Save()
+    _save_usd_stage(opened_stage, usd_path=path)
     return records
+
+
+def _save_usd_stage(stage: Any, *, usd_path: Path) -> None:
+    edit_layer = stage.GetEditTarget().GetLayer()
+    root_layer = stage.GetRootLayer()
+    saved_paths: list[str] = []
+    if edit_layer is not None:
+        edit_layer.Save()
+        saved_paths.append(str(edit_layer.realPath or edit_layer.identifier))
+    if root_layer is not None and root_layer is not edit_layer:
+        root_layer.Save()
+        saved_paths.append(str(root_layer.realPath or root_layer.identifier))
+    # #region agent log
+    try:
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": "usd.fix_applier._save_usd_stage",
+            "message": "USD stage layers saved",
+            "data": {
+                "usd_path": str(usd_path),
+                "saved_layers": "|".join(path for path in saved_paths if path),
+            },
+            "hypothesisId": "H30",
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
+    # #endregion
 
 
 def _apply_usd_fix_actions_to_stage(
@@ -102,6 +138,7 @@ def _apply_usd_fix_actions_to_stage(
 ) -> list[AppliedUsdFixRecord]:
     records: list[AppliedUsdFixRecord] = []
     for action in actions:
+        action_studio_environment = _studio_environment_for_action(action, studio_environment)
         if action.blocked:
             records.append(
                 AppliedUsdFixRecord(
@@ -148,7 +185,7 @@ def _apply_usd_fix_actions_to_stage(
                 stage,
                 action,
                 anchor_dir=anchor_dir,
-                studio_environment=studio_environment,
+                studio_environment=action_studio_environment,
                 UsdShade=UsdShade,
                 Sdf=Sdf,
             )
@@ -161,12 +198,24 @@ def _apply_usd_fix_actions_to_stage(
                     stage,
                     action,
                     anchor_dir=anchor_dir,
-                    studio_environment=studio_environment,
+                    studio_environment=action_studio_environment,
                     UsdShade=UsdShade,
                     Sdf=Sdf,
                 )
             )
     return records
+
+
+def _studio_environment_for_action(
+    action: FixAction,
+    studio_environment: Optional[StudioEnvironmentSettings],
+) -> Optional[StudioEnvironmentSettings]:
+    if studio_environment is not None:
+        return studio_environment
+    raw = action.params.get("studio_environment")
+    if isinstance(raw, dict):
+        return StudioEnvironmentSettings.from_mapping(raw)
+    return None
 
 
 def _apply_set_default_prim(stage: Any, action: FixAction, *, Usd: Any) -> AppliedUsdFixRecord:
@@ -213,7 +262,14 @@ def _apply_set_attr(stage: Any, action: FixAction, *, UsdShade: Any) -> AppliedU
     attribute = str(action.target_attr or action.params.get("attribute") or "")
     after_value = action.after_value
     if attribute == "colorSpace":
-        if _set_shader_colorspace(shader, str(after_value)):
+        applied_inputs = _set_shader_colorspace(shader, str(after_value))
+        if applied_inputs:
+            _debug_usd_attr_log(
+                action,
+                prim_path,
+                applied_inputs=applied_inputs,
+                hypothesis_id="H23",
+            )
             return AppliedUsdFixRecord(
                 fix_id=action.fix_id,
                 fix_type=action.fix_type,
@@ -235,25 +291,61 @@ def _apply_set_attr(stage: Any, action: FixAction, *, UsdShade: Any) -> AppliedU
     )
 
 
-def _set_shader_colorspace(shader: Any, value: str) -> bool:
+def _set_shader_colorspace(shader: Any, value: str) -> list[str]:
     normalized = str(value or "").strip()
     if not normalized:
-        return False
+        return []
 
-    applied = False
-    file_input = shader.GetInput("file")
-    if file_input:
+    if _is_arnold_image_shader(shader):
+        return _set_arnold_image_colorspace(shader, normalized)
+    return _set_generic_shader_colorspace(shader, normalized)
+
+
+def _set_arnold_image_colorspace(shader: Any, value: str) -> list[str]:
+    applied: list[str] = []
+    arnold_token = _arnold_colorspace_token(value)
+
+    source_input = shader.GetInput("sourceColorSpace")
+    if source_input:
+        source_input.Set(arnold_token)
+        applied.append("sourceColorSpace")
+
+    color_space = shader.GetInput("color_space")
+    if color_space:
+        color_space.Set(arnold_token)
+        applied.append("color_space")
+
+    filename = shader.GetInput("filename")
+    if filename:
+        attr = filename.GetAttr()
+        if attr is not None and hasattr(attr, "SetColorSpace"):
+            attr.SetColorSpace(_usd_colorspace_metadata(value))
+            applied.append("filename.colorSpace")
+    return applied
+
+
+def _set_generic_shader_colorspace(shader: Any, value: str) -> list[str]:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return []
+
+    applied: list[str] = []
+    source_token, enum_value = _colorspace_shader_tokens(normalized)
+    for input_name in ("file", "filename"):
+        file_input = shader.GetInput(input_name)
+        if not file_input:
+            continue
         attr = file_input.GetAttr()
         if attr is not None and hasattr(attr, "SetColorSpace"):
-            attr.SetColorSpace(normalized)
-            applied = True
+            attr.SetColorSpace(_usd_colorspace_metadata(normalized))
+            applied.append(f"{input_name}.colorSpace")
+            break
 
-    source_token, enum_value = _colorspace_shader_tokens(normalized)
     for input_name in ("sourceColorSpace", "rgb_color_space"):
         input_attr = shader.GetInput(input_name)
         if input_attr:
             input_attr.Set(source_token)
-            applied = True
+            applied.append(input_name)
 
     color_space = shader.GetInput("color_space")
     if color_space:
@@ -264,15 +356,40 @@ def _set_shader_colorspace(shader: Any, value: str) -> bool:
                 color_space.Set(enum_value)
             else:
                 color_space.Set(source_token)
-            applied = True
+            applied.append("color_space")
         except (RuntimeError, TypeError, ValueError):
             pass
 
     color_space_input = shader.GetInput("colorSpace")
     if color_space_input:
-        color_space_input.Set(normalized)
-        applied = True
+        attr = color_space_input.GetAttr()
+        type_name = str(attr.GetTypeName() if attr is not None else "").casefold()
+        if "token" in type_name or "string" in type_name:
+            color_space_input.Set(normalized)
+            applied.append("colorSpace")
     return applied
+
+
+def _arnold_colorspace_token(value: str) -> str:
+    normalized = value.strip()
+    if normalized == "Raw":
+        return "raw"
+    if normalized == "sRGB":
+        return "srgb"
+    if normalized == "ACEScg":
+        return "acescg"
+    return normalized.casefold()
+
+
+def _usd_colorspace_metadata(value: str) -> str:
+    normalized = value.strip()
+    if normalized == "Raw":
+        return "Raw"
+    if normalized == "sRGB":
+        return "sRGB"
+    if normalized == "ACEScg":
+        return "ACEScg"
+    return normalized
 
 
 def _colorspace_shader_tokens(value: str) -> tuple[str, int | None]:
@@ -322,23 +439,72 @@ def _apply_shader_asset_path(
             message=INVALID_TARGET_REASON,
         )
     before_path = str(action.before_value or "")
-    after_path = str(action.after_value or "")
-    if action.fix_type == "normalize_path" and studio_environment is not None:
-        normalized = resolve_normalize_path_value(
-            before_path,
-            action.params,
+    after_path = str(action.after_value or "").strip()
+    if not after_path:
+        after_path = before_path
+    fallback_absolute = str(
+        action.params.get("resolved_after")
+        or action.params.get("resolved_before")
+        or before_path
+        or ""
+    )
+    planned_relative = after_path.replace("\\", "/")
+    if planned_relative and not is_local_drive_path(planned_relative):
+        if "${" in planned_relative or planned_relative.startswith("$"):
+            authored_path = planned_relative
+        elif not planned_relative.startswith("//"):
+            authored_path = planned_relative
+        else:
+            authored_path = author_usd_asset_path(
+                after_path,
+                anchor_dir=anchor_dir,
+                studio_environment=studio_environment,
+                fallback_absolute=fallback_absolute,
+            )
+    else:
+        authored_path = author_usd_asset_path(
+            after_path,
+            anchor_dir=anchor_dir,
             studio_environment=studio_environment,
+            fallback_absolute=fallback_absolute,
         )
-        if normalized is not None:
-            after_path = normalized
-    input_attr.Set(Sdf.AssetPath(after_path))
+    if _is_arnold_image_shader(shader) and input_name == "file":
+        filename_input = shader.GetInput("filename")
+        if filename_input is not None:
+            input_name = "filename"
+            input_attr = filename_input
+    input_attr.Set(Sdf.AssetPath(authored_path))
+    if _is_arnold_image_shader(shader):
+        _clear_arnold_image_spurious_file_input(shader, Sdf=Sdf)
+    applied_inputs = [input_name]
+    expanded_absolute = resolve_authored_absolute_path(
+        authored_path,
+        studio_environment=studio_environment,
+        fallback_absolute=fallback_absolute,
+    )
+    # #region agent log
+    _debug_usd_attr_log(
+        action,
+        prim_path,
+        applied_inputs=applied_inputs or [input_name],
+        after_path=authored_path,
+        hypothesis_id="H25",
+        extra={
+            "planned_after": after_path,
+            "anchor_dir": str(anchor_dir),
+            "expanded_absolute": expanded_absolute,
+            "fallback_absolute": fallback_absolute,
+            "studio_env": str(studio_environment is not None),
+        },
+    )
+    # #endregion
     return AppliedUsdFixRecord(
         fix_id=action.fix_id,
         fix_type=action.fix_type,
         target_id=action.target_id,
         target_attr=action.target_attr,
         before_value=before_path,
-        after_value=after_path,
+        after_value=authored_path,
         succeeded=True,
     )
 
@@ -478,17 +644,124 @@ def _move_prim_path(
         return False, "", RENAME_FAILED_REASON
 
 
+def _texture_path_input_names(shader: Any) -> tuple[str, ...]:
+    if _is_arnold_image_shader(shader):
+        return ("filename", "file")
+    return ("file", "filename")
+
+
+def _set_shader_texture_paths(shader: Any, authored_path: str, *, Sdf: Any) -> list[str]:
+    asset_path = Sdf.AssetPath(authored_path)
+    if _is_arnold_image_shader(shader):
+        filename = shader.GetInput("filename")
+        if filename is not None:
+            filename.Set(asset_path)
+            _clear_arnold_image_spurious_file_input(shader, Sdf=Sdf)
+            return ["filename"]
+        file_input = shader.GetInput("file")
+        if file_input is not None:
+            file_input.Set(asset_path)
+            return ["file"]
+        return []
+
+    existing = {
+        str(input_attr.GetBaseName())
+        for input_attr in shader.GetInputs()
+        if input_attr.GetAttr() is not None and input_attr.GetAttr().IsValid()
+    }
+    applied: list[str] = []
+    for input_name in _texture_path_input_names(shader):
+        if input_name not in existing:
+            continue
+        input_attr = shader.GetInput(input_name)
+        if input_attr is None:
+            continue
+        input_attr.Set(asset_path)
+        applied.append(input_name)
+    if applied:
+        return applied
+    primary = _primary_texture_input_name(shader)
+    primary_input = shader.GetInput(primary)
+    if primary_input:
+        primary_input.Set(asset_path)
+        return [primary]
+    return []
+
+
+def _clear_arnold_image_spurious_file_input(shader: Any, *, Sdf: Any) -> None:
+    file_input = shader.GetInput("file")
+    if file_input is None:
+        return
+    attr = file_input.GetAttr()
+    if attr is None or not attr.IsValid():
+        return
+    clear_input = getattr(shader, "ClearInput", None)
+    if callable(clear_input):
+        try:
+            clear_input("file")
+            return
+        except (RuntimeError, TypeError, ValueError):
+            pass
+    try:
+        file_input.Set(Sdf.AssetPath(""))
+    except (RuntimeError, TypeError, ValueError):
+        return
+    prim = shader.GetPrim()
+    if prim and prim.IsValid():
+        try:
+            prim.RemoveProperty("inputs:file")
+        except (RuntimeError, TypeError, ValueError):
+            pass
+
+
 def _resolve_shader_input_name(shader: Any, target_attr: str) -> str:
     normalized = str(target_attr or "").strip()
-    candidates = [normalized] if normalized else []
+    primary = _primary_texture_input_name(shader)
+    if normalized in {"", "file", "fileTextureName", "filename"}:
+        return primary
+
+    candidates = [normalized]
     if normalized == "fileTextureName":
-        candidates.extend(["file", "asset:file", "inputs:file"])
+        candidates.extend(["filename", "file", "asset:file"])
     elif normalized == "file":
-        candidates.extend(["fileTextureName"])
+        candidates.extend(["filename", "fileTextureName"])
+    elif normalized == "filename":
+        candidates.extend(["file"])
     for candidate in candidates:
         if candidate and shader.GetInput(candidate):
             return candidate
-    return normalized or "file"
+    return primary or normalized or "file"
+
+
+def _primary_texture_input_name(shader: Any) -> str:
+    if _is_arnold_image_shader(shader):
+        for candidate in ("filename", "file"):
+            if shader.GetInput(candidate):
+                return candidate
+        return "filename"
+    for candidate in ("file", "filename", "asset:file"):
+        if shader.GetInput(candidate):
+            return candidate
+    return "file"
+
+
+def _shader_info_id(shader: Any) -> str:
+    prim = shader.GetPrim()
+    attr = prim.GetAttribute("info:id") if prim else None
+    if attr and attr.IsValid():
+        value = attr.Get()
+        if value is not None:
+            return str(value)
+    info_input = shader.GetInput("info:id")
+    if info_input:
+        value = info_input.Get()
+        if value is not None:
+            return str(value)
+    return ""
+
+
+def _is_arnold_image_shader(shader: Any) -> bool:
+    return _shader_info_id(shader).casefold() == "arnold:image"
 
 
 def _prim_short_name(prim_path: str) -> str:
@@ -515,7 +788,7 @@ def _debug_usd_fix_log(record: AppliedUsdFixRecord, *, hypothesis_id: str) -> No
     if record.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE}:
         return
     try:
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
         payload = {
             "sessionId": "618f4f",
             "timestamp": int(time.time() * 1000),
@@ -529,6 +802,41 @@ def _debug_usd_fix_log(record: AppliedUsdFixRecord, *, hypothesis_id: str) -> No
                 "after_value": str(record.after_value or ""),
                 "runId": "post-fix",
             },
+            "hypothesisId": hypothesis_id,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
+
+
+def _debug_usd_attr_log(
+    action: FixAction,
+    prim_path: str,
+    *,
+    applied_inputs: list[str],
+    after_path: str = "",
+    hypothesis_id: str,
+    extra: dict[str, str] | None = None,
+) -> None:
+    try:
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
+        data = {
+            "fix_type": action.fix_type,
+            "target_id": action.target_id,
+            "target_attr": str(action.target_attr or ""),
+            "prim_path": prim_path,
+            "applied_inputs": "|".join(applied_inputs),
+            "after_path": after_path,
+        }
+        if extra:
+            data.update(extra)
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": "usd.fix_applier._apply_shader_asset_path",
+            "message": "USD shader asset path authored",
+            "data": data,
             "hypothesisId": hypothesis_id,
         }
         with log_path.open("a", encoding="utf-8") as handle:
@@ -629,7 +937,7 @@ def _debug_resolve_log(
     if action.fix_type not in {RENAME_NODE_FIX_TYPE, RENAME_TEXTURE_FILE_FIX_TYPE, SET_ATTR_FIX_TYPE}:
         return
     try:
-        log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
         payload = {
             "sessionId": "618f4f",
             "timestamp": int(time.time() * 1000),

@@ -47,6 +47,17 @@ def apply_fix_actions(
 
         cmds = _maya_cmds()
 
+    from pipeline_inspector.studio_config import StudioEnvironmentSettings
+    from pipeline_inspector.util.paths import sync_studio_environment_to_os
+
+    if studio_environment is not None:
+        env = (
+            studio_environment
+            if isinstance(studio_environment, StudioEnvironmentSettings)
+            else StudioEnvironmentSettings.from_mapping(studio_environment)
+        )
+        sync_studio_environment_to_os(env)
+
     usd_actions, maya_actions = _partition_fix_actions(actions, cmds)
 
     maya_report = None
@@ -63,12 +74,18 @@ def apply_fix_actions(
     if usd_actions:
         resolved_usd_actions = _resolve_usd_prim_fix_actions(usd_actions, cmds)
         for path in _collect_usd_proxy_paths(cmds):
-            proxy_stage = _proxy_stage_for_path(cmds, path)
+            # #region agent log
+            _debug_usd_apply_route_log(
+                str(path),
+                action_count=len(resolved_usd_actions),
+                route="disk",
+            )
+            # #endregion
             usd_records.extend(
                 apply_usd_fix_actions(
                     path,
                     list(resolved_usd_actions),
-                    stage=proxy_stage,
+                    stage=None,
                     studio_environment=studio_environment,
                 )
             )
@@ -179,6 +196,31 @@ def _resolve_usd_prim_fix_actions(
             )
         )
     return resolved
+
+
+def _debug_usd_apply_route_log(usd_path: str, *, action_count: int, route: str) -> None:
+    try:
+        import json
+        import time
+        from pathlib import Path as LogPath
+
+        log_path = LogPath(__file__).resolve().parents[2] / "debug-618f4f.log"
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": "maya.fix_router.apply_fix_actions",
+            "message": "Routing USD fixes",
+            "data": {
+                "usd_path": usd_path,
+                "action_count": str(action_count),
+                "route": route,
+            },
+            "hypothesisId": "H30",
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return
 
 
 def _proxy_stage_for_path(cmds: Any, usd_path: Path) -> Any:

@@ -237,7 +237,43 @@ def test_apply_rename_texture_file_renames_disk_file_and_updates_path(tmp_path):
     assert report.applied_count == 1
     assert not texture_file.exists()
     assert (tmp_path / "tex_albedo_wrong.exr").is_file()
-    assert cmds.attrs["file1.fileTextureName"] == str(tmp_path / "tex_albedo_wrong.exr")
+    assert cmds.attrs["file1.fileTextureName"] == str(
+        tmp_path / "tex_albedo_wrong.exr"
+    ).replace("\\", "/")
+    assert cmds.rename_calls == [("file1", "tex_albedo_wrong")]
+
+
+def test_apply_rename_texture_file_updates_path_when_destination_already_exists(tmp_path):
+    renamed = tmp_path / "tex_albedo_wrong.exr"
+    renamed.write_bytes(b"fixture")
+    missing_source = tmp_path / "albedo_wrong.exr"
+    cmds = FakeCmds({f"file1.fileTextureName": str(missing_source)})
+    cmds.nodes["file1"] = "file1"
+    action = FixAction(
+        fix_id="studio.naming.texture.pattern:node:file1:rename_texture_file",
+        rule_id="studio.naming.texture.pattern",
+        title="Texture file name must match studio naming template: rename texture file",
+        fix_type="rename_texture_file",
+        risk="medium",
+        target_kind="node",
+        target_id="node:file1",
+        target_node="file1",
+        target_attr="fileTextureName",
+        before_value=str(missing_source),
+        after_value=str(renamed),
+        params={
+            "resolved_before": str(missing_source),
+            "is_udim": False,
+            "node_name_after": "tex_albedo_wrong",
+        },
+    )
+
+    report = apply_fix_actions([action], cmds=cmds)
+
+    assert report.applied_count == 1
+    assert report.blocked_count == 0
+    assert renamed.is_file()
+    assert cmds.attrs["file1.fileTextureName"] == str(renamed).replace("\\", "/")
     assert cmds.rename_calls == [("file1", "tex_albedo_wrong")]
 
 

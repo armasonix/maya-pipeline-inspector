@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pipeline_inspector.core.models import (
     BoundingBoxSnapshot,
@@ -26,6 +26,9 @@ from pipeline_inspector.core.naming_conventions import (
     resolve_object_type,
 )
 from pipeline_inspector.core.naming_fix import texture_filename_stem
+
+if TYPE_CHECKING:
+    from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
 JsonDict = dict[str, Any]
 JsonValue = Any
@@ -406,8 +409,13 @@ class _TargetContext:
 class ValidationEngine:
     """Evaluate rule definitions against a GraphSnapshot."""
 
-    def __init__(self, naming_templates: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        naming_templates: Mapping[str, str] | None = None,
+        studio_environment: Optional[StudioEnvironmentSettings] = None,
+    ) -> None:
         self._naming_templates = dict(naming_templates or {})
+        self._studio_environment = studio_environment
 
     def validate(
         self,
@@ -914,7 +922,11 @@ class ValidationEngine:
                 reason="path_policy_requires_file_dependency",
             )
 
-        violations = _path_policy_violations(target.obj, rule.check.params)
+        violations = _path_policy_violations(
+            target.obj,
+            rule.check.params,
+            studio_environment=self._studio_environment,
+        )
         status = "failed" if violations else "passed"
         evidence = {"violations": violations} if violations else {}
         return self._result(
@@ -1419,6 +1431,8 @@ def _as_optional_int(value: Any) -> Optional[int]:
 def _path_policy_violations(
     dependency: FileDependencySnapshot,
     params: Mapping[str, Any],
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> list[str]:
     authored_paths = [dependency.raw_path] if dependency.raw_path else []
     paths = _dependency_paths(dependency)
@@ -1429,10 +1443,16 @@ def _path_policy_violations(
     violations: list[str] = []
     for policy in disallowed:
         policy_name = str(policy)
-        if policy_name == "local_drive" and any(
-            _is_local_drive_path(path) for path in authored_paths
-        ):
-            violations.append("local_drive")
+        if policy_name == "local_drive":
+            local_drive_hit = False
+            resolved = str(dependency.resolved_path or dependency.raw_path or "")
+            for path in authored_paths:
+                if not _is_local_drive_path(path):
+                    continue
+                local_drive_hit = True
+                break
+            if local_drive_hit:
+                violations.append("local_drive")
         elif policy_name == "user_home" and any(
             _is_user_home_path(path) for path in authored_paths
         ):
@@ -1451,8 +1471,51 @@ def _path_policy_violations(
             violations.append("temp")
 
     allowed_prefixes = params.get("allowed_prefixes", [])
-    if allowed_prefixes and not _matches_allowed_prefix(paths, allowed_prefixes):
-        violations.append("outside_project_root")
+    if allowed_prefixes:
+        prefix_list = (
+            allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
+        )
+        raw_path = str(dependency.raw_path or "")
+        resolved_path = str(dependency.resolved_path or raw_path)
+        from pipeline_inspector.util.paths import texture_path_policy_compliant
+
+        if not texture_path_policy_compliant(
+            raw_path,
+            resolved_path,
+            prefix_list,
+            studio_environment,
+        ):
+            violations.append("outside_project_root")
+
+    # #region agent log
+    if violations or "${" in str(dependency.raw_path or "") or _is_local_drive_path(
+        str(dependency.raw_path or "")
+    ):
+        try:
+            import json
+            import time
+            from pathlib import Path
+
+            log_path = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
+            payload = {
+                "sessionId": "618f4f",
+                "timestamp": int(time.time() * 1000),
+                "location": "rule_schema._path_policy_violations",
+                "message": "File dependency path policy",
+                "data": {
+                    "target_id": str(dependency.node_id or "")[:120],
+                    "attr": str(dependency.attr or ""),
+                    "raw_path": str(dependency.raw_path or "")[:160],
+                    "violations": "|".join(violations) or "none",
+                    "usd_prim": str(str(dependency.node_id or "").startswith("prim:")),
+                },
+                "hypothesisId": "H37",
+            }
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        except OSError:
+            pass
+    # #endregion
 
     return violations
 

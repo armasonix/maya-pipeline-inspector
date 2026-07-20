@@ -130,15 +130,17 @@ def Mesh "Base" (
             token outputs:arnold:surface.connect = </Base/mtl/Base_ASG/Base_A.outputs:surface>
             token outputs:surface.connect = </Base/mtl/Base_ASG/demo_albedo_v002_1.outputs:surface>
 
-            def Shader "demo_albedo_v002_1"
+            def Shader "t_demo_albedo_v002"
             {
                 uniform token info:id = "arnold:image"
                 string inputs:color_space = "srgb"
                 float4 inputs:fallback = (0.5, 0.5, 0.5, 1)
-                asset inputs:file = @D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/NOT_EXIST/demo_albedo_v002.1001.exr@ (
+                asset inputs:file = @D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo_albedo_v002.1001.exr@ (
+                    colorSpace = "Raw"
+                )
+                asset inputs:filename = @../broken_scene/textures/t_demo_albedo_v002.1001.exr@ (
                     colorSpace = "sRGB"
                 )
-                asset inputs:filename = @D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/NOT_EXIST/demo_albedo_v002.1001.exr@
                 bool inputs:ignore_missing_textures = 1
                 color4f inputs:missing_texture_color = (0.5, 0.5, 0.5, 0)
                 token inputs:sourceColorSpace = "srgb"
@@ -339,11 +341,6 @@ def ArnoldOptions "options"
         elementSize = 1
         interpolation = "constant"
     )
-}
-
-def ArnoldDriverArv "arv_display"
-{
-    string arnold:name = "arv_display"
 }
 
 def "_renderViewDefault"

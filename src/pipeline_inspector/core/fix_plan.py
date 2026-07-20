@@ -1,7 +1,11 @@
 """Safe auto-fix planning for validation results."""
 from __future__ import annotations
 
+import glob
+import json
+import os
 import re
+import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -21,12 +25,17 @@ from pipeline_inspector.core.naming_fix import (
 from pipeline_inspector.core.rule_schema import RuleDefinition, RuleResult
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 from pipeline_inspector.util.paths import (
+    author_maya_texture_path,
     effective_studio_normalize_target,
     normalize_path_to_studio_tokens,
     replace_path_prefix,
+    resolve_authored_absolute_path,
+    resolve_studio_path,
     studio_environment_is_configured,
     studio_normalize_prefixes,
 )
+
+_DEBUG_LOG = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
 
 JsonDict = dict[str, Any]
 JsonValue = Any
@@ -423,7 +432,7 @@ def _build_texture_file_naming_action(
     node_index: _NodeIndex,
     pattern: str,
 ) -> Optional[FixAction]:
-    dependency = node_index.file_dependency(result.target_id)
+    dependency = node_index.file_dependency_for_result(result)
     raw_path = dependency.raw_path if dependency is not None else None
     if not raw_path:
         return None
@@ -441,16 +450,48 @@ def _build_texture_file_naming_action(
     node = node_index.find(result)
     target_node = _target_node_name(result, node)
     block_reasons = _block_reasons(node, "low")
-    resolved_before = node_index.resolved_texture_path(result.target_id)
+    resolved_before = node_index.resolved_texture_path(
+        result.target_id,
+        str(result.plug or "") or None,
+    )
     if resolved_before is None and dependency is not None:
         resolved_before = dependency.resolved_path or raw_path
-    if dependency is not None and not dependency.exists:
-        if not str(result.target_id).startswith("prim:"):
-            block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
-        elif not (dependency.raw_path or dependency.resolved_path):
-            block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
-        elif not resolved_before or not Path(resolved_before).is_file():
-            block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+    source_exists = _rename_texture_source_exists(
+        node_index,
+        result.target_id,
+        dependency,
+        resolved_before,
+        raw_after=proposed_path,
+    )
+    if dependency is not None and not source_exists:
+        block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+    # #region agent log
+    _debug_texture_rename_log(
+        "fix_plan._build_texture_file_naming_action",
+        "Texture rename plan decision",
+        {
+            "target_id": result.target_id,
+            "target_node": target_node,
+            "dependency_exists": dependency.exists if dependency is not None else "",
+            "raw_path": raw_path,
+            "raw_after": proposed_path,
+            "resolved_before": resolved_before or "",
+            "source_exists": source_exists,
+            "destination_exists": texture_path_resolves_on_disk(
+                proposed_path,
+                is_udim=bool(dependency.is_udim) if dependency is not None else False,
+                studio_environment=node_index.studio_environment,
+                usd_anchor_dir=node_index.usd_anchor_dir
+                if str(result.target_id).startswith("prim:")
+                else None,
+                scene_path=node_index.scene_path,
+            ),
+            "blocked": bool(hard_block_reasons(block_reasons)),
+            "block_reasons": "|".join(block_reasons),
+        },
+        hypothesis_id="H18",
+    )
+    # #endregion
 
     target_id, target_node, action_params = _usd_prim_fix_fields(
         result,
@@ -539,6 +580,14 @@ def _build_action(
         target_node=target_node,
         base_params=params,
     )
+    if fix_type in {"normalize_path", "relink_path", "rename_texture_file"}:
+        resolved_after = resolve_authored_absolute_path(
+            str(after_value or ""),
+            studio_environment=node_index.studio_environment,
+            fallback_absolute=str(before_value or ""),
+        )
+        if resolved_after:
+            params["resolved_after"] = resolved_after
 
     return FixAction(
         fix_id=_fix_id(result, rule.fix.type),
@@ -565,6 +614,9 @@ def _build_action(
     )
 
 def _target_attr(result: RuleResult, fix_params: Mapping[str, Any]) -> Optional[str]:
+    plug = str(result.plug or "").strip()
+    if plug:
+        return plug
     attr = fix_params.get("attribute")
     if attr:
         return str(attr)
@@ -576,7 +628,7 @@ def _before_value(
     fix_type: str,
 ) -> JsonValue:
     if fix_type in {"relink_path", "normalize_path"}:
-        dependency_path = node_index.file_dependency_path(result.target_id)
+        dependency_path = node_index.file_dependency_path_for_result(result)
         if dependency_path:
             return dependency_path
     return result.current_value
@@ -593,7 +645,9 @@ def _after_value(
         if isinstance(explicit_path, str) and explicit_path.strip():
             return explicit_path.strip()
         dependency_path = (
-            node_index.file_dependency_path(result.target_id) if node_index is not None else None
+            node_index.file_dependency_path_for_result(result)
+            if node_index is not None
+            else None
         )
         if dependency_path and result.current_value and result.expected_value:
             relinked = swap_texture_version_in_path(
@@ -605,7 +659,9 @@ def _after_value(
                 return relinked
     if fix_type == "normalize_path":
         dependency_path = (
-            node_index.file_dependency_path(result.target_id) if node_index is not None else None
+            node_index.file_dependency_path_for_result(result)
+            if node_index is not None
+            else None
         )
         before_path = str(dependency_path or result.current_value or "")
         normalized = resolve_normalize_path_value(
@@ -617,6 +673,41 @@ def _after_value(
             ),
         )
         if normalized is not None:
+            if node_index is not None and node_index.studio_environment is not None:
+                if str(result.target_id).startswith("prim:"):
+                    from pathlib import Path
+
+                    from pipeline_inspector.util.paths import (
+                        author_usd_asset_path,
+                        normalize_path_to_studio_tokens,
+                    )
+
+                    tokenized = normalize_path_to_studio_tokens(
+                        before_path,
+                        node_index.studio_environment,
+                    )
+                    if tokenized is not None:
+                        return tokenized.replace("\\", "/")
+                    normalized_text = str(normalized).replace("\\", "/")
+                    if "$" in normalized_text:
+                        return normalized_text
+                    anchor = node_index.usd_anchor_dir or Path(
+                        node_index.scene_path or "."
+                    ).parent
+                    return author_usd_asset_path(
+                        normalized,
+                        anchor_dir=anchor,
+                        studio_environment=node_index.studio_environment,
+                        fallback_absolute=before_path,
+                    )
+                from pipeline_inspector.util.paths import author_maya_texture_path_for_fix
+
+                return author_maya_texture_path_for_fix(
+                    normalized,
+                    scene_path=node_index.scene_path,
+                    studio_environment=node_index.studio_environment,
+                    fallback_absolute=before_path,
+                ).replace("\\", "/")
             return normalized
     if fix_type == "disable_feature":
         if "value" in fix_params:
@@ -802,7 +893,11 @@ def _is_plannable_path_value(value: JsonValue) -> bool:
 def _is_plannable_normalize(before_value: JsonValue, after_value: JsonValue) -> bool:
     if not _is_plannable_path_value(after_value):
         return False
-    return str(before_value or "").strip() != str(after_value or "").strip()
+    before = str(before_value or "").strip()
+    after = str(after_value or "").strip()
+    if before != after:
+        return True
+    return "$" in before or "$" in after
 
 
 @dataclass(frozen=True)
@@ -827,7 +922,7 @@ class _NodeIndex:
         self.usd_anchor_dir = _usd_anchor_dir(snapshot)
         self._by_key: dict[str, NodeSnapshot] = {}
         self._shapes_by_id: dict[str, ShapeSnapshot] = {}
-        self._file_dependencies: dict[str, _FileDependencyRef] = {}
+        self._file_dependencies: dict[tuple[str, str], _FileDependencyRef] = {}
         for node in snapshot.nodes:
             self._add(node.id, node)
             self._add(node.name, node)
@@ -870,7 +965,8 @@ class _NodeIndex:
         for dependency in snapshot.file_dependencies:
             raw_path = dependency.raw_path or dependency.resolved_path or ""
             resolved_path = dependency.resolved_path or dependency.raw_path or ""
-            self._file_dependencies[dependency.node_id] = _FileDependencyRef(
+            key = (dependency.node_id, str(dependency.attr or ""))
+            self._file_dependencies[key] = _FileDependencyRef(
                 raw_path=raw_path,
                 resolved_path=resolved_path,
                 attr=dependency.attr,
@@ -878,30 +974,69 @@ class _NodeIndex:
                 exists=dependency.exists,
             )
 
-    def file_dependency(self, target_id: str) -> Optional[_FileDependencyRef]:
-        return self._file_dependencies.get(str(target_id or ""))
+    def file_dependency(
+        self,
+        target_id: str,
+        attr: str | None = None,
+    ) -> Optional[_FileDependencyRef]:
+        target_id = str(target_id or "")
+        if attr:
+            return self._file_dependencies.get((target_id, str(attr)))
+        matches = [
+            ref
+            for (node_id, _attr), ref in self._file_dependencies.items()
+            if node_id == target_id
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        return None
 
-    def file_dependency_path(self, target_id: str) -> Optional[str]:
-        dependency = self.file_dependency(target_id)
+    def file_dependency_for_result(self, result: RuleResult) -> Optional[_FileDependencyRef]:
+        plug = str(result.plug or "").strip()
+        if plug:
+            dependency = self.file_dependency(result.target_id, plug)
+            if dependency is not None:
+                return dependency
+        return self.file_dependency(result.target_id)
+
+    def file_dependency_path(
+        self,
+        target_id: str,
+        attr: str | None = None,
+    ) -> Optional[str]:
+        dependency = self.file_dependency(target_id, attr)
         if dependency is None:
             return None
         path = dependency.raw_path.strip()
         return path or None
 
-    def resolved_texture_path(self, target_id: str) -> Optional[str]:
-        dependency = self.file_dependency(target_id)
+    def file_dependency_path_for_result(self, result: RuleResult) -> Optional[str]:
+        dependency = self.file_dependency_for_result(result)
+        if dependency is None:
+            return None
+        path = dependency.raw_path.strip()
+        return path or None
+
+    def resolved_texture_path(
+        self,
+        target_id: str,
+        attr: str | None = None,
+    ) -> Optional[str]:
+        dependency = self.file_dependency(target_id, attr)
         if dependency is None:
             return None
         candidate = (dependency.resolved_path or dependency.raw_path or "").strip()
         if not candidate:
             return None
+        for resolved in _expand_texture_path_candidates(
+            candidate,
+            studio_environment=self.studio_environment,
+            usd_anchor_dir=self.usd_anchor_dir if str(target_id).startswith("prim:") else None,
+            scene_path=self.scene_path,
+            is_udim=dependency.is_udim,
+        ):
+            return resolved.replace("\\", "/")
         path = Path(candidate)
-        if path.is_file():
-            return str(path).replace("\\", "/")
-        if str(target_id).startswith("prim:") and self.usd_anchor_dir is not None:
-            anchored = (self.usd_anchor_dir / candidate).resolve()
-            if anchored.is_file():
-                return str(anchored).replace("\\", "/")
         if path.is_absolute():
             return str(path).replace("\\", "/")
         scene_dir = Path(self.scene_path).parent if self.scene_path else Path.cwd()
@@ -996,3 +1131,129 @@ def _usd_anchor_dir(snapshot: GraphSnapshot) -> Optional[Path]:
             if path.is_absolute() and path.parent.is_dir():
                 return path.parent
     return None
+
+
+def _rename_texture_source_exists(
+    node_index: _NodeIndex,
+    target_id: str,
+    dependency: Optional[_FileDependencyRef],
+    resolved_before: Optional[str],
+    *,
+    raw_after: Optional[str] = None,
+) -> bool:
+    if dependency is not None and dependency.exists:
+        return True
+    is_udim = bool(dependency.is_udim) if dependency is not None else False
+    usd_anchor = node_index.usd_anchor_dir if str(target_id).startswith("prim:") else None
+    candidates: list[str] = []
+    for value in (
+        resolved_before,
+        node_index.resolved_texture_path(target_id),
+        dependency.resolved_path if dependency is not None else None,
+        dependency.raw_path if dependency is not None else None,
+    ):
+        if value and str(value).strip():
+            candidates.append(str(value).strip())
+    for candidate in candidates:
+        if texture_path_resolves_on_disk(
+            candidate,
+            is_udim=is_udim,
+            studio_environment=node_index.studio_environment,
+            usd_anchor_dir=usd_anchor,
+            scene_path=node_index.scene_path,
+        ):
+            return True
+    if raw_after and texture_path_resolves_on_disk(
+        raw_after,
+        is_udim=is_udim or "<UDIM>" in str(raw_after) or "<udim>" in str(raw_after),
+        studio_environment=node_index.studio_environment,
+        usd_anchor_dir=usd_anchor,
+        scene_path=node_index.scene_path,
+    ):
+        return True
+    return False
+
+
+def texture_path_resolves_on_disk(
+    path: str,
+    *,
+    is_udim: bool = False,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
+    usd_anchor_dir: Optional[Path] = None,
+    scene_path: str = "",
+) -> bool:
+    """Return whether a texture path (or UDIM template) resolves to files on disk."""
+
+    return bool(
+        _expand_texture_path_candidates(
+            path,
+            studio_environment=studio_environment,
+            usd_anchor_dir=usd_anchor_dir,
+            scene_path=scene_path,
+            is_udim=is_udim,
+        )
+    )
+
+
+def _expand_texture_path_candidates(
+    candidate: str,
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings],
+    usd_anchor_dir: Optional[Path],
+    scene_path: str,
+    is_udim: bool,
+) -> list[str]:
+    expanded = candidate
+    if studio_environment is not None:
+        expanded = resolve_studio_path(candidate, studio_environment) or candidate
+    expanded = os.path.expanduser(os.path.expandvars(expanded.replace("\\", "/")))
+    paths: list[str] = []
+    if is_udim or "<UDIM>" in expanded or "<udim>" in expanded:
+        glob_pattern = (
+            expanded.replace("<UDIM>", "[0-9][0-9][0-9][0-9]")
+            .replace("<udim>", "[0-9][0-9][0-9][0-9]")
+        )
+        if glob.glob(glob_pattern):
+            paths.append(expanded)
+        return paths
+    path = Path(expanded.replace("/", os.sep))
+    if path.is_file():
+        paths.append(str(path))
+        return paths
+    if usd_anchor_dir is not None:
+        anchored = (usd_anchor_dir / candidate).resolve()
+        if anchored.is_file():
+            paths.append(str(anchored))
+            return paths
+    if not path.is_absolute() and scene_path:
+        scene_relative = (Path(scene_path).parent / candidate).resolve()
+        if scene_relative.is_file():
+            paths.append(str(scene_relative))
+            return paths
+    if not path.is_absolute() and scene_path:
+        expanded_relative = (Path(scene_path).parent / expanded).resolve()
+        if expanded_relative.is_file():
+            paths.append(str(expanded_relative))
+    return paths
+
+
+def _debug_texture_rename_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    try:
+        payload = {
+            "sessionId": "618f4f",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": {key: str(value) for key, value in data.items()},
+            "hypothesisId": hypothesis_id,
+        }
+        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        return

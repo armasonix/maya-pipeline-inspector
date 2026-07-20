@@ -6,6 +6,7 @@ from typing import Optional
 from pipeline_inspector.core.fix_plan import (
     FixAction,
     FixPlan,
+    TEXTURE_FILE_MISSING_BLOCK_REASON,
     apply_fix_availability,
     build_fix_plan,
     fix_plan_from_export,
@@ -556,6 +557,73 @@ def test_resolve_normalize_path_value_uses_studio_asset_root_for_local_paths():
     ) == "${STUDIO_ASSET_ROOT}/textures/local_only_texture.exr"
 
 
+def test_build_fix_plan_maps_local_drive_path_to_studio_token_after_value():
+    environment = StudioEnvironmentSettings(
+        asset_root="D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene",
+        texture_root="D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures",
+    )
+    rule = RuleDefinition(
+        id="common.texture.path.local_drive",
+        name="local drive",
+        enabled=True,
+        renderer=["common"],
+        scope="file_dependency",
+        severity="critical",
+        owner="pipeline_td",
+        message="local",
+        why="local",
+        match=RuleMatch(criteria={"dependency_kind": "texture"}),
+        check=RuleCheck(type="path_policy", params={"disallow": ["local_drive"]}),
+        policy=RulePolicy(auto_fix_allowed=True),
+        fix=RuleFix(
+            type="normalize_path",
+            risk="medium",
+            params={"attribute": "fileTextureName", "replace_to": "${ASSET_ROOT}"},
+        ),
+    )
+    texture_path = (
+        "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/demo.exr"
+    )
+    snapshot = GraphSnapshot(
+        scene_path="D:/Workspace/portfolio/maya-pipeline-inspector/examples/arnold_policy/arnold_policy_scene.ma",
+        file_dependencies=[
+            FileDependencySnapshot(
+                node_id="node:file1",
+                attr="fileTextureName",
+                raw_path=texture_path,
+                resolved_path=texture_path,
+            )
+        ],
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="critical",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="file_dependency",
+        target_id="node:file1",
+        node="file1",
+        plug="fileTextureName",
+        current_value=texture_path,
+        expected_value="path policy compliant",
+        auto_fix_available=True,
+        fix_id="normalize_path",
+    )
+
+    plan = build_fix_plan(
+        [result],
+        [rule],
+        snapshot,
+        studio_environment=environment,
+    )
+
+    assert plan.actions[0].after_value == "${STUDIO_TEXTURE_ROOT}/demo.exr"
+    assert plan.actions[0].blocked is False
+
+
 def test_build_fix_plan_embeds_studio_environment_in_normalize_path_params():
     environment = StudioEnvironmentSettings(texture_root="\\\\farm\\textures")
     rule = _rule(
@@ -950,6 +1018,196 @@ def test_fix_planner_keeps_usd_texture_rename_unblocked_when_file_exists_at_usd_
     assert str(action.params["resolved_before"]).replace("\\", "/") == str(texture_path).replace(
         "\\", "/"
     )
+
+
+def test_fix_planner_unblocks_texture_rename_when_resolved_file_exists(tmp_path: Path) -> None:
+    texture_path = tmp_path / "demo_albedo_v002.1001.exr"
+    texture_path.write_bytes(b"tex")
+    rule = RuleDefinition(
+        id="studio.naming.texture.pattern",
+        name="Texture file name must match studio naming template",
+        enabled=True,
+        renderer=["common", "vray", "arnold", "usd"],
+        scope="node",
+        severity="warning",
+        owner="shader_td",
+        message="Texture file name does not match the studio naming template.",
+        why="Texture file naming keeps published assets searchable on disk.",
+        match=RuleMatch(criteria={"object_type": "texture"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "texture"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="node",
+        target_id="node:demo_albedo_v002_1",
+        node="demo_albedo_v002_1",
+        plug="fileTextureName",
+        current_value="demo_albedo_v002_1",
+        expected_value=r"^t_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "scene.ma"),
+        nodes=(
+            NodeSnapshot(
+                id="node:demo_albedo_v002_1",
+                name="demo_albedo_v002_1",
+                type_name="file",
+                classification=["texture", "file"],
+                attrs={"fileTextureName": str(texture_path).replace("\\", "/")},
+            ),
+        ),
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id="node:demo_albedo_v002_1",
+                attr="fileTextureName",
+                raw_path=str(texture_path).replace("\\", "/"),
+                resolved_path=str(texture_path).replace("\\", "/"),
+                exists=False,
+            ),
+        ),
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    assert plan.total == 1
+    action = plan.actions[0]
+    assert action.fix_type == "rename_texture_file"
+    assert action.blocked is False
+    assert TEXTURE_FILE_MISSING_BLOCK_REASON not in action.block_reasons
+
+
+def test_fix_planner_blocks_texture_rename_when_source_file_missing(tmp_path: Path) -> None:
+    rule = RuleDefinition(
+        id="studio.naming.texture.pattern",
+        name="Texture file name must match studio naming template",
+        enabled=True,
+        renderer=["common", "vray", "arnold", "usd"],
+        scope="node",
+        severity="warning",
+        owner="shader_td",
+        message="Texture file name does not match the studio naming template.",
+        why="Texture file naming keeps published assets searchable on disk.",
+        match=RuleMatch(criteria={"object_type": "texture"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "texture"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="node",
+        target_id="node:demo_albedo_v002_1",
+        node="demo_albedo_v002_1",
+        plug="fileTextureName",
+        current_value="demo_albedo_v002_1",
+        expected_value=r"^t_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "scene.ma"),
+        nodes=(
+            NodeSnapshot(
+                id="node:demo_albedo_v002_1",
+                name="demo_albedo_v002_1",
+                type_name="file",
+                classification=["texture", "file"],
+                attrs={"fileTextureName": "textures/missing.exr"},
+            ),
+        ),
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id="node:demo_albedo_v002_1",
+                attr="fileTextureName",
+                raw_path="textures/missing.exr",
+                resolved_path="textures/missing.exr",
+                exists=False,
+            ),
+        ),
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    action = plan.actions[0]
+    assert action.blocked is True
+    assert TEXTURE_FILE_MISSING_BLOCK_REASON in action.block_reasons
+
+
+def test_fix_planner_unblocks_texture_rename_when_destination_already_exists(
+    tmp_path: Path,
+) -> None:
+    textures_dir = tmp_path / "textures"
+    textures_dir.mkdir()
+    renamed = textures_dir / "t_demo_albedo_v002.1001.exr"
+    renamed.write_bytes(b"tex")
+    old_path = textures_dir / "demo_albedo_v002.1001.exr"
+    rule = RuleDefinition(
+        id="studio.naming.texture.pattern",
+        name="Texture file name must match studio naming template",
+        enabled=True,
+        renderer=["common", "vray", "arnold", "usd"],
+        scope="node",
+        severity="warning",
+        owner="shader_td",
+        message="Texture file name does not match the studio naming template.",
+        why="Texture file naming keeps published assets searchable on disk.",
+        match=RuleMatch(criteria={"object_type": "texture"}),
+        check=RuleCheck(type="name_matches", params={"object_type": "texture"}),
+        policy=RulePolicy(auto_fix_allowed=True),
+    )
+    before_path = str(old_path).replace("\\", "/")
+    after_path = str(renamed).replace("\\", "/")
+    result = RuleResult(
+        rule_id=rule.id,
+        severity="warning",
+        status="failed",
+        title=rule.name,
+        message=rule.message,
+        why=rule.why,
+        owner=rule.owner,
+        target_kind="node",
+        target_id="node:demo_albedo_v002_1",
+        node="demo_albedo_v002_1",
+        plug="fileTextureName",
+        current_value="demo_albedo_v002_1",
+        expected_value=r"^t_[A-Za-z0-9_]+$",
+    )
+    snapshot = GraphSnapshot(
+        scene_path=str(tmp_path / "scene.ma"),
+        nodes=(
+            NodeSnapshot(
+                id="node:demo_albedo_v002_1",
+                name="demo_albedo_v002_1",
+                type_name="file",
+                classification=["texture", "file"],
+                attrs={"fileTextureName": before_path},
+            ),
+        ),
+        file_dependencies=(
+            FileDependencySnapshot(
+                node_id="node:demo_albedo_v002_1",
+                attr="fileTextureName",
+                raw_path=before_path,
+                resolved_path=before_path,
+                exists=False,
+            ),
+        ),
+    )
+
+    plan = build_fix_plan([result], [rule], snapshot)
+
+    action = plan.actions[0]
+    assert action.blocked is False
+    assert action.after_value == after_path
 
 
 def test_fix_planner_builds_usd_colorspace_action_with_resolved_prim_path():

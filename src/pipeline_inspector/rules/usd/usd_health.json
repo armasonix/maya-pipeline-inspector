@@ -134,6 +134,47 @@
         "replace_to": "${ASSET_ROOT}",
         "risk": "medium"
       }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "usd.texture.path.project_root",
+      "name": "USD texture path must use an approved project root",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "file_dependency",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "USD texture path is outside the approved project texture roots.",
+      "why": "Project-rooted paths keep USD shader inputs portable between artists, publish tools, and render farm workers.",
+      "match": {
+        "dependency_kind": "texture",
+        "usd_prim": true
+      },
+      "check": {
+        "type": "path_policy",
+        "allowed_prefixes": [
+          "$ASSET_ROOT",
+          "${ASSET_ROOT}",
+          "$TEXTURE_ROOT",
+          "${TEXTURE_ROOT}",
+          "${STUDIO_TEXTURE_ROOT}",
+          "${STUDIO_ASSET_ROOT}",
+          "${STUDIO_CACHE_ROOT}",
+          "${STUDIO_RENDER_ROOT}"
+        ]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "normalize_path",
+        "attribute": "file",
+        "replace_to": "${ASSET_ROOT}",
+        "risk": "medium"
+      }
     }
   ]
 }

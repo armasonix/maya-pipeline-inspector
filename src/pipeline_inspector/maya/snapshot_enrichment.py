@@ -428,9 +428,10 @@ def _resolve_path(
     if path.is_absolute():
         return str(path).replace("\\", "/")
 
-    candidates = [Path(expanded), scene_dir / expanded]
+    scene_resolved = (scene_dir / expanded).resolve()
+    candidates = [scene_resolved, Path(expanded), scene_dir / expanded]
     parts = Path(expanded).parts
-    if "textures" in parts:
+    if "textures" in parts and not any(part == ".." for part in parts):
         index = parts.index("textures")
         candidates.append(scene_dir.joinpath(*parts[index:]))
 
