@@ -372,6 +372,29 @@ def test_validate_filters_row_has_single_make_waive_button():
     assert validate_buttons[0].visible is True
 
 
+def test_apply_ui_density_compact_tightens_panel_header_gaps():
+    widget = main_window.build_main_widget(DensityFakeQtWidgets)
+    tokens = density_tokens("compact")
+
+    apply_user_preferences_to_panel(
+        widget,
+        DensityFakeQtWidgets,
+        UserPreferences(ui_density="compact"),
+    )
+
+    header = _find(widget, main_window.PANEL_HEADER_OBJECT_NAME)
+    tabs = _find(widget, main_window.TAB_WIDGET_OBJECT_NAME)
+
+    assert header.maximum_height == tokens.panel_header_max_height
+    assert header.size_policy == (
+        DensityFakeQtWidgets.QSizePolicy.Preferred,
+        DensityFakeQtWidgets.QSizePolicy.Fixed,
+    )
+    assert tokens.panel_header_chrome_stylesheet in header.style_sheet
+    assert tokens.main_tab_chrome_stylesheet in tabs.style_sheet
+    assert tabs.document_mode is True
+
+
 def test_apply_ui_density_comfortable_tightens_panel_header_gaps():
     widget = main_window.build_main_widget(DensityFakeQtWidgets)
     tokens = density_tokens("comfortable")

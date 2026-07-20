@@ -12,7 +12,7 @@ from pipeline_inspector.core.render_presets import (
 
 class _FakeCmds:
     def __init__(self) -> None:
-        self.nodes = {"defaultResolution", "vraySettings", "defaultArnoldRenderOptions"}
+        self.nodes = {"defaultResolution", "vraySettings", "defaultArnoldRenderOptions", "defaultRenderGlobals"}
         self.attrs: dict[str, int | float] = {}
 
     def objExists(self, node_name: str) -> bool:
@@ -20,6 +20,14 @@ class _FakeCmds:
 
     def setAttr(self, plug: str, value: int | float) -> None:
         self.attrs[plug] = value
+
+    def playbackOptions(self, *, query: bool, min: bool = False, max: bool = False) -> float:
+        _ = query
+        if min:
+            return 1.0
+        if max:
+            return 24.0
+        return 0.0
 
 
 def test_render_settings_round_trip_dict():
@@ -76,3 +84,23 @@ def test_apply_render_quality_preset_skips_zero_values():
     applied = apply_render_quality_preset(preset, renderer="vray", cmds=cmds)
 
     assert applied == []
+
+
+def test_apply_render_quality_preset_syncs_timeline_frame_range():
+    cmds = _FakeCmds()
+    preset = RenderQualityPreset(
+        common=CommonRenderQualitySettings(width=4096, height=2305),
+    )
+
+    applied = apply_render_quality_preset(
+        preset,
+        renderer="arnold",
+        cmds=cmds,
+        apply_timeline_frame_range=True,
+    )
+
+    assert "defaultRenderGlobals.startFrame" in applied
+    assert "defaultRenderGlobals.endFrame" in applied
+    assert cmds.attrs["defaultRenderGlobals.startFrame"] == 1
+    assert cmds.attrs["defaultRenderGlobals.endFrame"] == 24
+    assert cmds.attrs["defaultResolution.width"] == 4096

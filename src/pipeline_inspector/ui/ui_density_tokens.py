@@ -141,6 +141,35 @@ _COMFORTABLE_TOKENS = UiDensityTokens(
     issues_pane_sizes=None,
 )
 
+_COMPACT_HEADER_CHROME_STYLESHEET = """
+QWidget#pipelineInspectorPanelHeader {
+    margin: 0px;
+    padding: 0px;
+}
+QWidget#pipelineInspectorPanelHeader QLabel {
+    margin: 0px;
+    padding: 0px;
+}
+QWidget#pipelineInspectorPanelHeader QPushButton {
+    padding: 0px 4px;
+    min-height: 12px;
+    max-height: 18px;
+}
+""".strip()
+
+_COMPACT_MAIN_TAB_CHROME_STYLESHEET = """
+QTabWidget::pane {
+    top: -1px;
+    padding: 0px;
+    margin: 0px;
+}
+QTabBar::tab {
+    padding: 1px 6px;
+    margin: 0px;
+    min-height: 0px;
+}
+""".strip()
+
 _COMPACT_TOKENS = UiDensityTokens(
     content_margins=(4, 4, 4, 4),
     content_spacing=2,
@@ -171,9 +200,9 @@ _COMPACT_TOKENS = UiDensityTokens(
     metrics_row_stretch=False,
     profile_row_stretch=False,
     panel_max_width=COMPACT_PANEL_MAX_WIDTH,
-    panel_header_max_height=None,
-    panel_header_chrome_stylesheet="",
-    main_tab_chrome_stylesheet="",
+    panel_header_max_height=22,
+    panel_header_chrome_stylesheet=_COMPACT_HEADER_CHROME_STYLESHEET,
+    main_tab_chrome_stylesheet=_COMPACT_MAIN_TAB_CHROME_STYLESHEET,
     severity_counts_numbers_only=True,
     secondary_tab_button_columns=1,
     issues_pane_vertical=True,

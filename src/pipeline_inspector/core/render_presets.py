@@ -176,10 +176,13 @@ def apply_render_quality_preset(
     *,
     renderer: str,
     cmds: Any,
+    apply_timeline_frame_range: bool = False,
 ) -> list[str]:
     """Apply configured preset values to the open Maya scene.
 
     Zero values are treated as unset and skipped. Returns applied attr plugs.
+    When ``apply_timeline_frame_range`` is True, ``defaultRenderGlobals.startFrame``
+    and ``endFrame`` are synced from the active playback range.
     """
 
     applied: list[str] = []
@@ -197,6 +200,9 @@ def apply_render_quality_preset(
     if preset.common.pixel_aspect > 0 and _node_exists(cmds, "defaultResolution"):
         _set_attr(cmds, "defaultResolution.pixelAspect", preset.common.pixel_aspect)
         applied.append("defaultResolution.pixelAspect")
+
+    if apply_timeline_frame_range:
+        applied.extend(_apply_timeline_frame_range(cmds))
 
     if renderer_id == "vray" and _node_exists(cmds, "vraySettings"):
         vray_attrs = (
@@ -228,6 +234,28 @@ def apply_render_quality_preset(
                 _set_attr(cmds, plug, value)
                 applied.append(plug)
 
+    return applied
+
+
+def _apply_timeline_frame_range(cmds: Any) -> list[str]:
+    if not _node_exists(cmds, "defaultRenderGlobals"):
+        return []
+
+    playback_options = getattr(cmds, "playbackOptions", None)
+    if playback_options is None:
+        return []
+
+    try:
+        start_frame = int(float(playback_options(query=True, min=True)))
+        end_frame = int(float(playback_options(query=True, max=True)))
+    except (TypeError, ValueError):
+        return []
+
+    applied: list[str] = []
+    _set_attr(cmds, "defaultRenderGlobals.startFrame", start_frame)
+    applied.append("defaultRenderGlobals.startFrame")
+    _set_attr(cmds, "defaultRenderGlobals.endFrame", end_frame)
+    applied.append("defaultRenderGlobals.endFrame")
     return applied
 
 

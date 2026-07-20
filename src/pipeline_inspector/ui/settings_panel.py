@@ -135,6 +135,7 @@ class SettingsActionCallbacks:
     on_cerebro_enabled_changed: Optional[Callable[[bool], None]] = None
     on_cerebro_settings_changed: Optional[Callable[[], None]] = None
     on_render_settings_changed: Optional[Callable[[], None]] = None
+    on_apply_render_preset: Optional[Callable[[str], None]] = None
     on_studio_environment_changed: Optional[Callable[[], None]] = None
     on_studio_policy_changed: Optional[Callable[[], None]] = None
     on_governance_changed: Optional[Callable[[], None]] = None
@@ -532,6 +533,7 @@ def _build_render_tab(
             qt_widgets,
             config,
             on_settings_changed=callbacks.on_render_settings_changed,
+            on_apply_preset=callbacks.on_apply_render_preset,
         )
     )
     return tab

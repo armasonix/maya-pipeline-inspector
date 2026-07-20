@@ -1126,25 +1126,51 @@ def update_severity_count_indicators(
             )
 
 
+def format_block_status_label(
+    *,
+    label: str,
+    blocked: bool,
+    blocker_count: int = 0,
+) -> str:
+    text = f"{label}: {_yes_no(blocked)}"
+    if blocked and blocker_count > 0:
+        text += f" ({blocker_count})"
+    return text
+
+
 def update_block_status_indicators(
     content: Any,
     qt_widgets: Any,
     *,
     block_publish: bool,
     block_deadline: bool,
+    publish_blocker_count: int = 0,
+    deadline_blocker_count: int = 0,
 ) -> None:
     """Update publish/deadline block labels and lamps after validation."""
 
     publish_label = _find_child_widget(content, qt_widgets, PUBLISH_BLOCK_LABEL_OBJECT_NAME)
     if publish_label is not None:
-        publish_label.setText(f"Publish Block: {_yes_no(block_publish)}")
+        publish_label.setText(
+            format_block_status_label(
+                label="Publish Block",
+                blocked=block_publish,
+                blocker_count=publish_blocker_count,
+            )
+        )
     publish_lamp = _find_child_widget(content, qt_widgets, PUBLISH_BLOCK_LAMP_OBJECT_NAME)
     if publish_lamp is not None:
         _apply_block_lamp_style(publish_lamp, block_publish)
 
     deadline_label = _find_child_widget(content, qt_widgets, DEADLINE_BLOCK_LABEL_OBJECT_NAME)
     if deadline_label is not None:
-        deadline_label.setText(f"Deadline Block: {_yes_no(block_deadline)}")
+        deadline_label.setText(
+            format_block_status_label(
+                label="Deadline Block",
+                blocked=block_deadline,
+                blocker_count=deadline_blocker_count,
+            )
+        )
     deadline_lamp = _find_child_widget(content, qt_widgets, DEADLINE_BLOCK_LAMP_OBJECT_NAME)
     if deadline_lamp is not None:
         _apply_block_lamp_style(deadline_lamp, block_deadline)
@@ -2046,6 +2072,32 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
     _apply_validate_issues_pane_layout(content, qt_widgets, tokens)
     _apply_validate_sticky_chrome_spacing(content, qt_widgets, tokens)
     _apply_panel_shell_width(content, qt_widgets, tokens)
+    _log_panel_header_layout_debug(content, qt_widgets, tokens)
+
+
+def _log_panel_header_layout_debug(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    # #region agent log
+    from pipeline_inspector.util.debug_log import write_agent_cycle_log
+
+    header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
+    if header is None:
+        return
+    maximum_height = getattr(header, "maximumHeight", None)
+    size_policy = getattr(header, "sizePolicy", None)
+    write_agent_cycle_log(
+        "main_window.py:apply_density_tokens",
+        "panel header layout after density apply",
+        {
+            "panel_header_max_height_token": tokens.panel_header_max_height,
+            "header_maximum_height": maximum_height() if callable(maximum_height) else "",
+            "header_size_policy": str(size_policy() if callable(size_policy) else size_policy),
+            "header_has_stylesheet": bool(tokens.panel_header_chrome_stylesheet),
+            "main_tab_has_stylesheet": bool(tokens.main_tab_chrome_stylesheet),
+        },
+        hypothesis_id="H1",
+        run_id="post-fix",
+    )
+    # #endregion
 
 
 def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2632,28 +2684,31 @@ def _apply_widget_width_constraint(
     widget: Any,
     max_width: int | None,
     size_policy: Any | None,
+    *,
+    vertical_policy: str = "expanding",
 ) -> None:
     """Clamp a widget to a compact panel width or restore the Qt default."""
 
     set_max_width = getattr(widget, "setMaximumWidth", None)
     set_policy = getattr(widget, "setSizePolicy", None)
+    preferred = getattr(size_policy, "Preferred", None) if size_policy is not None else None
+    vertical = None
+    if size_policy is not None:
+        if vertical_policy == "fixed":
+            vertical = getattr(size_policy, "Fixed", None)
+        else:
+            vertical = getattr(size_policy, "Expanding", None)
     if max_width is None:
         if set_max_width is not None:
             set_max_width(_QT_WIDGETSIZE_MAX)
-        if size_policy is not None and set_policy is not None:
-            preferred = getattr(size_policy, "Preferred", None)
-            expanding = getattr(size_policy, "Expanding", None)
-            if preferred is not None and expanding is not None:
-                set_policy(preferred, expanding)
+        if preferred is not None and vertical is not None and set_policy is not None:
+            set_policy(preferred, vertical)
         return
 
     if set_max_width is not None:
         set_max_width(max_width)
-    if size_policy is not None and set_policy is not None:
-        preferred = getattr(size_policy, "Preferred", None)
-        expanding = getattr(size_policy, "Expanding", None)
-        if preferred is not None and expanding is not None:
-            set_policy(preferred, expanding)
+    if preferred is not None and vertical is not None and set_policy is not None:
+        set_policy(preferred, vertical)
 
 
 def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2668,7 +2723,6 @@ def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None
         SUMMARY_HEADER_OBJECT_NAME,
         ISSUES_TABLE_WIDGET_OBJECT_NAME,
         DETAILS_PANEL_OBJECT_NAME,
-        PANEL_HEADER_OBJECT_NAME,
     ):
         widget = _find_child_widget(content, qt_widgets, object_name)
         if widget is not None:
@@ -2676,6 +2730,15 @@ def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None
 
     for target in targets:
         _apply_widget_width_constraint(target, tokens.panel_max_width, size_policy)
+
+    header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
+    if header is not None:
+        _apply_widget_width_constraint(
+            header,
+            tokens.panel_max_width,
+            size_policy,
+            vertical_policy="fixed",
+        )
 
     # Keep the Maya dock shell QWidget flexible so users can undock and move it.
 

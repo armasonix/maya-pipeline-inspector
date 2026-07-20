@@ -19,6 +19,7 @@ from pipeline_inspector.ui.settings_widgets import (
     qt_align_right_vcenter,
     set_fixed_horizontal_size_policy,
     set_line_edit_text,
+    wire_button,
     wire_line_edit_finished,
 )
 
@@ -44,6 +45,7 @@ def build_render_settings_section(
     config: StudioConfig,
     *,
     on_settings_changed: Optional[Callable[[], None]] = None,
+    on_apply_preset: Optional[Callable[[str], None]] = None,
 ) -> Any:
     """Build Draft/Production render-quality controls for V-Ray and Arnold."""
 
@@ -57,7 +59,8 @@ def build_render_settings_section(
         "Studio render-quality targets stored in pipeline_inspector_studio.json. "
         "Values map to Maya Render Settings: Resolution (defaultResolution), "
         "V-Ray (vraySettings), and Arnold (defaultArnoldRenderOptions). "
-        "Leave a field blank to keep the scene default."
+        "Saving settings does not change the open scene — use Apply to Scene to push "
+        "Draft/Production into Maya and sync the render frame range from the timeline."
     )
     intro.setWordWrap(True)
     _add_left_aligned_widget(layout, intro, qt_widgets)
@@ -78,6 +81,7 @@ def build_render_settings_section(
             quality_id="draft",
             preset=config.render.draft,
             on_changed=on_settings_changed,
+            on_apply=on_apply_preset,
         )
     )
     content_layout.addWidget(
@@ -87,6 +91,7 @@ def build_render_settings_section(
             quality_id="production",
             preset=config.render.production,
             on_changed=on_settings_changed,
+            on_apply=on_apply_preset,
         )
     )
 
@@ -149,6 +154,7 @@ def _build_quality_block(
     quality_id: str,
     preset: RenderQualityPreset,
     on_changed: Optional[Callable[[], None]],
+    on_apply: Optional[Callable[[str], None]] = None,
 ) -> Any:
     block = qt_widgets.QWidget()
     block_layout = qt_widgets.QVBoxLayout(block)
@@ -183,6 +189,11 @@ def _build_quality_block(
 
     _configure_render_grid(grid_layout)
     block_layout.addWidget(_wrap_left_aligned(qt_widgets, grid_host))
+    if on_apply is not None:
+        apply_button = qt_widgets.QPushButton(f"Apply {title} to Scene")
+        apply_button.setObjectName(f"pipelineInspectorApplyRender{title.replace(' ', '')}Button")
+        wire_button(apply_button, lambda qid=quality_id: on_apply(qid))
+        block_layout.addWidget(apply_button)
     return block
 
 

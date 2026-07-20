@@ -962,6 +962,11 @@ def _settings_action_callbacks(
             _panel_content(panel_state),
             qt_widgets,
         ),
+        on_apply_render_preset=lambda quality: _apply_render_preset_from_ui(
+            _panel_content(panel_state),
+            qt_widgets,
+            quality,
+        ),
         on_studio_environment_changed=lambda: _sync_studio_environment_from_ui(
             _panel_content(panel_state),
             qt_widgets,
@@ -1576,6 +1581,22 @@ def _sync_render_settings_from_ui(content: Any, qt_widgets: Any) -> None:
     updated = current.with_updates(render=render)
     setattr(content, STUDIO_CONFIG_ATTR, updated)
     _refresh_settings_view(content, qt_widgets)
+
+
+def _apply_render_preset_from_ui(content: Any, qt_widgets: Any, quality: str) -> None:
+    """Apply Draft/Production render preset values to the open Maya scene."""
+
+    _sync_render_settings_from_ui(content, qt_widgets)
+    from pipeline_inspector.maya.render_preset_actions import apply_studio_render_quality_to_scene
+
+    config = _studio_config_for_content(content)
+    try:
+        result = apply_studio_render_quality_to_scene(config.render, quality)
+    except Exception as exc:  # noqa: BLE001
+        _set_settings_status(content, qt_widgets, f"Apply render preset failed: {exc}")
+        return
+    _set_settings_status(content, qt_widgets, result.message)
+    print(result.message)
 
 
 def _sync_farm_quality_from_ui(content: Any, qt_widgets: Any) -> None:
@@ -3676,11 +3697,16 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         warning_count=int(health.warning),
         info_count=int(health.info),
     )
+    failed_results = tuple(item for item in result.results if item.status == "failed")
+    deadline_blockers = sum(1 for item in failed_results if getattr(item, "block_deadline", False))
+    publish_blockers = sum(1 for item in failed_results if getattr(item, "block_publish", False))
     main_window.update_block_status_indicators(
         content,
         qt_widgets,
         block_publish=bool(health.block_publish),
         block_deadline=bool(health.block_deadline),
+        publish_blocker_count=publish_blockers,
+        deadline_blocker_count=deadline_blockers,
     )
     description = result.message
     snapshot = (
@@ -3692,7 +3718,6 @@ def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> N
         description += _resolution_probe_hint(snapshot, asset_class_id)
     _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, description)
 
-    failed_results = tuple(item for item in result.results if item.status == "failed")
     rows = tuple(_issue_row_from_result(item) for item in failed_results)
     table = _find_child(content, qt_widgets.QTableWidget, main_window.ISSUES_TABLE_OBJECT_NAME)
     if table is not None:
