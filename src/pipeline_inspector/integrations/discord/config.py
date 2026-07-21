@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
-USER_AGENT = "PipelineInspector/0.5 (Maya; +https://github.com/ledorub/maya-pipeline-inspector)"
+USER_AGENT = "PipelineInspector/0.6 (Maya; +https://github.com/ledorub/maya-pipeline-inspector)"
 
 
 @dataclass(frozen=True)

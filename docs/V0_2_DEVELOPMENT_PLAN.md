@@ -5,6 +5,8 @@
 **Previous plan:** [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) (Milestones 0–9, Issues #1–#48)  
 **Baseline release:** [CHANGELOG.md](../CHANGELOG.md) — `[0.1.0]`
 
+> **Historical note (2026-07):** Issue bodies below reference old `DEVELOPMENT_PLAN.md` section numbers from the v0.1 era (e.g. §27 roadmap, §26 appendix, §28 testing). Those sections were consolidated in v0.6: use [§13 Release History](DEVELOPMENT_PLAN.md#13-release-history-and-cycle-plans), [§14 Roadmap](DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend), [§12 Testing Strategy](DEVELOPMENT_PLAN.md#12-testing-strategy), and [Appendix A](DEVELOPMENT_PLAN.md#appendix-a--historical-github-milestones-v01-bootstrap) instead.
+
 ---
 
 ## 1. Document Purpose
@@ -61,7 +63,7 @@ Additional gaps identified in code review:
 
 ## 3. Roadmap Realignment (v0.1 Absorbed v0.2–v0.4 Items)
 
-The original [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) roadmap assumed a slower delivery schedule. v0.1 shipped ahead of that plan:
+The original [DEVELOPMENT_PLAN.md §13](DEVELOPMENT_PLAN.md#13-release-history-and-cycle-plans) roadmap assumed a slower delivery schedule. v0.1 shipped ahead of that plan:
 
 | Original roadmap version | Planned theme | Actual status after v0.1 |
 |---|---|---|
@@ -71,7 +73,7 @@ The original [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) roadmap assumed a s
 
 **Re-scoped v0.2 theme:** **Production Hardening & Studio Readiness** — extend MVP implementations to production-grade depth rather than re-implementing already-shipped features.
 
-Issue **#069** synchronized [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) with this realignment (see master plan banner and Milestones 10–14 index).
+Issue **#069** synchronized [DEVELOPMENT_PLAN.md §13](DEVELOPMENT_PLAN.md#13-release-history-and-cycle-plans) with this realignment (see master plan banner and Milestones 10–14 index).
 
 ---
 
@@ -218,7 +220,7 @@ Milestones 10 and 11 can run in parallel. Milestone 12 depends on stable manifes
 
 ## 8. GitHub Milestones and Issues #049–#070
 
-Issue numbering continues from [DEVELOPMENT_PLAN.md §26](DEVELOPMENT_PLAN.md) (last plan issue: **#48**). Issue **titles** on GitHub use the plan ids `#049`–`#070`; the GitHub issue numbers assigned at backlog creation are **#64–#85** (see [Appendix B](#appendix-b--github-issue-mapping)).
+Issue numbering continues from [DEVELOPMENT_PLAN.md Appendix A](DEVELOPMENT_PLAN.md#appendix-a--historical-github-milestones-v01-bootstrap) (last plan issue: **#48**). Issue **titles** on GitHub use the plan ids `#049`–`#070`; the GitHub issue numbers assigned at backlog creation are **#64–#85** (see [Appendix B](#appendix-b--github-issue-mapping)).
 
 GitHub milestones (open):
 
@@ -583,7 +585,7 @@ Acceptance criteria:
 
 ---
 
-#### Issue 69 — Reconcile DEVELOPMENT_PLAN §27 roadmap with shipped v0.1 / planned v0.2
+#### Issue 69 — Reconcile DEVELOPMENT_PLAN roadmap with shipped v0.1 / planned v0.2
 
 Labels: `docs`  
 Depends on: —  
@@ -591,9 +593,9 @@ Related: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md), this document
 
 Acceptance criteria:
 
-- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) §27 updated: v0.1 = shipped MVP; v0.2 = Production Hardening (this plan); v0.3+ adjusted for remaining passport/complexity/rule-UI items.
+- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) release roadmap updated (historically §27; now [§13–§14](DEVELOPMENT_PLAN.md#13-release-history-and-cycle-plans)): v0.1 = shipped MVP; v0.2 = Production Hardening (this plan); v0.3+ adjusted for remaining passport/complexity/rule-UI items.
 - Banner at top of DEVELOPMENT_PLAN links to this document.
-- New §26 appendix or §26 continuation lists Milestones 10–14 with link here (no duplicate issue bodies).
+- Milestones 10–14 listed in [Appendix A](DEVELOPMENT_PLAN.md#appendix-a--historical-github-milestones-v01-bootstrap) with link here (no duplicate issue bodies).
 - [ARCHITECTURE.md](ARCHITECTURE.md) status line updated to reference v0.2 in progress.
 
 ---
@@ -615,9 +617,9 @@ Acceptance criteria:
 
 ---
 
-## 9. Testing Strategy (Delta from DEVELOPMENT_PLAN §28)
+## 9. Testing Strategy (Delta from DEVELOPMENT_PLAN §12)
 
-v0.2 follows the test pyramid in [DEVELOPMENT_PLAN.md §28](DEVELOPMENT_PLAN.md) with these additions:
+v0.2 follows the test pyramid in [DEVELOPMENT_PLAN.md §12 — Testing Strategy](DEVELOPMENT_PLAN.md#12-testing-strategy) with these additions:
 
 | Area | v0.2 requirement |
 |---|---|
@@ -647,7 +649,7 @@ v0.2.0 is ready when:
 - [x] Issue **#070** release checklist is complete.
 - [ ] No regression in headless exit codes (`0`, `1`, `2`, `3`, `4`).
 - [ ] Policy demo scenes [`examples/vray_policy/`](../examples/vray_policy/) and [`examples/arnold_policy/`](../examples/arnold_policy/) still produce expected issue categories.
-- [ ] [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) reflects realigned roadmap (#069).
+- [ ] [DEVELOPMENT_PLAN.md §13](DEVELOPMENT_PLAN.md#13-release-history-and-cycle-plans) reflects realigned roadmap (#069).
 - [ ] All new user-facing behavior documented in USER_GUIDE and/or integration docs.
 
 ---
@@ -672,7 +674,7 @@ v0.2.0 is ready when:
 
 ### Documents to update during v0.2 implementation
 
-- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — §27 + banner (#069)
+- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — §13–§14 + banner (#069)
 - [USER_GUIDE.md](USER_GUIDE.md) — fix types, waivers, manifest diff, install (#064, #067, #070)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — fix audit, renderer enrichment (#052, #054, #056, #069)
 - [CHANGELOG.md](../CHANGELOG.md) — `[0.2.0]` entry (#070)
@@ -704,7 +706,7 @@ v0.2.0 is ready when:
 | 66 | 13 | Optional Maya integration CI job |
 | 67 | 14 | Waiver management UI |
 | 68 | 14 | High-risk fix confirmation dialog |
-| 69 | 14 | Reconcile DEVELOPMENT_PLAN §27 |
+| 69 | 14 | Reconcile DEVELOPMENT_PLAN roadmap |
 | 70 | 14 | Prepare v0.2 public release |
 
 ---
@@ -735,5 +737,5 @@ Plan ids in issue titles map to GitHub issues as follows:
 | 066 | [#81](https://github.com/armasonix/maya-pipeline-inspector/issues/81) | Optional Maya integration CI job |
 | 067 | [#82](https://github.com/armasonix/maya-pipeline-inspector/issues/82) | Waiver management UI |
 | 068 | [#83](https://github.com/armasonix/maya-pipeline-inspector/issues/83) | High-risk fix confirmation dialog |
-| 069 | [#84](https://github.com/armasonix/maya-pipeline-inspector/issues/84) | Reconcile DEVELOPMENT_PLAN §27 |
+| 069 | [#84](https://github.com/armasonix/maya-pipeline-inspector/issues/84) | Reconcile DEVELOPMENT_PLAN roadmap |
 | 070 | [#85](https://github.com/armasonix/maya-pipeline-inspector/issues/85) | Prepare v0.2 public release |

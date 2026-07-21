@@ -261,5 +261,5 @@ Implements P0 panel items from this audit. Farm work stays in M26.
 - [ADR 0005 — GUI-first product philosophy](adr/0005-gui-first-product-philosophy.md)
 - [ARCHITECTURE.md — UX Layer](ARCHITECTURE.md)
 - [USER_GUIDE.md — GUI-first workflow](USER_GUIDE.md)
-- [DEVELOPMENT_PLAN.md §19 — UI/UX Design](DEVELOPMENT_PLAN.md)
+- [ARCHITECTURE.md — UX Layer (panel)](ARCHITECTURE.md#ux-layer-panel) · [DEVELOPMENT_PLAN.md §7 — Product Surfaces](DEVELOPMENT_PLAN.md#7-product-surfaces-and-workflows)
 - v0.4 plan issues [#108](https://github.com/armasonix/maya-pipeline-inspector/issues/136) / [#109](https://github.com/armasonix/maya-pipeline-inspector/issues/137) / [#101](https://github.com/armasonix/maya-pipeline-inspector/issues/129)

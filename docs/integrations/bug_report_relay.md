@@ -241,7 +241,7 @@ The Maya client maps **429** to `skipped_reason="rate_limited"`. Other failures 
   "schema_version": "1.0",
   "title": "Validation crash after profile switch",
   "description": "Panel freezes when switching to publish_strict.",
-  "plugin_version": "0.5.0",
+  "plugin_version": "0.6.0",
   "scene_basename": "hero.ma",
   "app_name": "Maya Pipeline Inspector",
   "maya_version": "2024.2",
@@ -348,7 +348,7 @@ paths:
                   type: string
                   description: JSON-encoded BugReportPayload (schema_version 1.0)
                   example: >-
-                    {"schema_version":"1.0","title":"Missing textures","description":"UDIM false positive","plugin_version":"0.5.0","scene_basename":"hero.ma","os_user":"artist","machine_id":"workstation-01"}
+                    {"schema_version":"1.0","title":"Missing textures","description":"UDIM false positive","plugin_version":"0.6.0","scene_basename":"hero.ma","os_user":"artist","machine_id":"workstation-01"}
                 screenshot:
                   type: string
                   format: binary

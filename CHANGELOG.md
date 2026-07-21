@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-21
+
+**Maya Pipeline Inspector v0.6 — Geometry QA, Machine Readiness, Role Governance & Farm Intelligence**
+
+Extends v0.5 with geometry snapshot validation, workstation readiness probes, role-based capability gates, supervisor report routing, Deadline farm analytics CLI, public MIT release packaging, and documentation/community refresh.
+
+### Added
+
+#### Rebrand and platform hygiene (M42)
+
+- Public **Maya Pipeline Inspector** branding across module, docs, and community surfaces.
+- MIT open-source release posture; [`COMMUNITY.md`](../COMMUNITY.md) contributor and early-adopter paths.
+
+#### Release packaging and public relay (M43)
+
+- GitHub Release zip asset selection for auto-update (`maya-pipeline-inspector-0.6.0.zip` naming contract).
+- Public bug-report relay worker documentation and studio private-relay guidance refresh.
+
+#### Geometry snapshot and UI polish (M44–M45)
+
+- `ShapeSnapshot` geometry metadata on `GraphSnapshot`; Maya scanner and enrichment populate polycount and mesh identity fields.
+- Panel header and Validate tab layout polish; Technical Artist-facing naming consistency.
+
+#### Geometry budget checks (M46)
+
+- Common rules `geometry_polycount.json` and `duplicate_geometry.json` with `scope: geometry`.
+- Asset-class profile overlays (`asset_class_hero`, `asset_class_prop`, `asset_class_background`) for polycount tiers.
+- Duplicate geometry scan budget with truncated evidence on large scenes.
+
+#### Shader performance and machine readiness (M47)
+
+- **Machine Readiness** panel tab with configurable probe engine (`integrations/readiness/`).
+- Live probes for Maya plug-ins, drives, env vars, paths, and installed software.
+- Readiness escalation hooks into notification connectors.
+
+#### Governance and supervisor routing (M48)
+
+- [ADR 0008](docs/adr/0008-role-based-governance-foundation.md) — `PermissionResolver`, capability matrix, role sources.
+- [ADR 0009](docs/adr/0009-report-to-supervisor-routing-by-role.md) — supervisor routing by reporter pipeline role.
+- Settings → Studio governance UI; gates for risky fixes, farm submit, rule management, studio config save.
+
+#### Trackers and notifications (M49)
+
+- Ftrack and Cerebro role discovery for governance mapping.
+- Validation and readiness **Send report to Supervisor** with role-based Telegram/Discord/Slack routing.
+
+#### Deadline farm intelligence (M50)
+
+- `pipeline_inspector farm-analytics` CLI — throughput, failure rate, pool utilization, tiered shot/pass analytics.
+- HTML farm summary export and optional JSONL history append.
+- [`docs/integrations/deadline_farm_analytics.md`](docs/integrations/deadline_farm_analytics.md).
+
+#### Example scenes and documentation (M51)
+
+- Renderer policy demo scenes: [`examples/vray_policy/`](examples/vray_policy/), [`examples/arnold_policy/`](examples/arnold_policy/).
+- Documentation overhaul: README community section, USER_GUIDE limitations refresh, integration guides.
+
+### Changed
+
+- Effective pipeline role resolves from studio policy, tracker mapping, user preference, or default before risky actions.
+- Producer role removed from governance matrix; legacy values normalize to `technical_artist`.
+- Debug instrumentation and local assistant tooling removed from repository runtime code.
+
+### Known limitations (v0.6)
+
+- Geometry duplicate scans may truncate on very large scenes; evidence flags truncation in reports.
+- Readiness tab is Maya-session only — no headless readiness CLI parity.
+- Governance is a capability foundation, not full studio IAM; user-assigned role is self-reported unless `governance.enforced_role` locks it.
+- Farm analytics requires read-only Deadline Web Service access; AWS Deadline Cloud is a separate integration surface.
+- Native `.mll` binaries are built locally or attached to releases; Python plug-in fallback remains available.
+- User preferences are not loaded in headless CLI — studio config only.
+
+### Install
+
+Same as v0.5 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
 ## [0.5.0] - 2026-07-12
 
 **Maya Pipeline Inspector v0.5 — Studio Settings Hub, Connectors, Rule Authoring & Incident Workflow**
@@ -96,7 +172,7 @@ Extends v0.4 with a two-layer configuration model (studio + user preferences), c
 
 Same as v0.4 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
-**Planning for v1.0+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md).
+**Planning for v1.0+:** [DEVELOPMENT_PLAN.md §14](docs/DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend).
 
 ## [0.4.0] - 2026-07-08
 
@@ -167,7 +243,7 @@ Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), nat
 
 Same as v0.3 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
-**Planning for v0.5+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md).
+**Planning for v0.5+:** [DEVELOPMENT_PLAN.md §14](docs/DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend).
 
 ## [0.3.0] - 2026-07-07
 
@@ -234,7 +310,7 @@ Extends v0.2 with manifest schema 1.1, graph fingerprinting, manifest regression
 
 Same as v0.2 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
-**Planning for v0.4+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md), [V0_3_DEVELOPMENT_PLAN.md](docs/V0_3_DEVELOPMENT_PLAN.md) (completed).
+**Planning for v0.4+:** [DEVELOPMENT_PLAN.md §14](docs/DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend), [V0_3_DEVELOPMENT_PLAN.md](docs/V0_3_DEVELOPMENT_PLAN.md) (completed).
 
 ## [0.2.0] - 2026-07-06
 
@@ -283,7 +359,7 @@ Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, superv
 
 - `normalize_path` resolves local checkout paths via detected project root (`src/pipeline_inspector/`) and maps standalone user paths to `${ASSET_ROOT}/textures/<filename>`.
 - Fix queue apply matches actions by `fix_id`; blocked selections show explicit description messages.
-- Reconciled long-term roadmap in [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md); Milestones 10–14 indexed in §26.
+- Reconciled long-term roadmap in [DEVELOPMENT_PLAN.md §13](docs/DEVELOPMENT_PLAN.md#13-release-history-and-cycle-plans); Milestones 10–14 indexed in cycle plans.
 
 ### Improved
 
@@ -300,7 +376,7 @@ Extends v0.1 with production-grade safe fixes, V-Ray/Arnold policy packs, superv
 
 Same as v0.1 — see [`docs/MAYA_INSTALL.md`](docs/MAYA_INSTALL.md) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
-**Planning for v0.3+:** [DEVELOPMENT_PLAN.md §27](docs/DEVELOPMENT_PLAN.md), [V0_2_DEVELOPMENT_PLAN.md](docs/V0_2_DEVELOPMENT_PLAN.md) (completed).
+**Planning for v0.3+:** [DEVELOPMENT_PLAN.md §14](docs/DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend), [V0_2_DEVELOPMENT_PLAN.md](docs/V0_2_DEVELOPMENT_PLAN.md) (completed).
 
 ## [0.1.0] - 2026-07-03
 
@@ -407,6 +483,7 @@ python -m pipeline_inspector validate examples/broken_scene/pipeline_inspector_d
 - Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Deadline preflight: [`docs/integrations/deadline_submit_preflight.md`](docs/integrations/deadline_submit_preflight.md)
 
+[0.6.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.6.0
 [0.5.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.5.0
 [0.4.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.4.0
 [0.3.0]: https://github.com/armasonix/maya-pipeline-inspector/releases/tag/v0.3.0

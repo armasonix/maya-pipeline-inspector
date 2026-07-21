@@ -4,12 +4,12 @@
 
 Maya Pipeline Inspector is designed as a data-driven Maya material and scene QA framework with a testable pure Python core and thin Maya integration layers.
 
-**Status:** v0.5.0 shipped (2026-07-12) · v0.6 in development on `dev`  
+**Status:** v0.6.0 shipped (2026-07-21) · v1.0+ on roadmap  
 **Related:** [USER_GUIDE.md](USER_GUIDE.md) · [MAYA_INSTALL.md](MAYA_INSTALL.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md)
 
 GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); settings and connectors hub ([ADR 0007](adr/0007-settings-and-connectors-architecture.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Role governance ([ADR 0008](adr/0008-role-based-governance-foundation.md)) gates risky actions in v0.6+. The Maya dockable panel is the primary surface; CLI, reports, Deadline, readiness checks, notifications, and tracker hooks are integration surfaces on the same validation pipeline.
 
-> **Implementation reality:** architecture describes target design. Gaps between panel and CLI, incomplete adapter coverage, and MVP connectors are documented in [USER_GUIDE.md — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps).
+> **Implementation reality:** architecture describes the shipped design. Remaining panel/CLI gaps and connector limits are documented in [USER_GUIDE.md — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps). Future work extends existing subsystems — see [DEVELOPMENT_PLAN.md §14](DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend).
 
 ## Goals
 

@@ -742,7 +742,7 @@ def test_show_check_for_updates_opens_wizard_when_update_available(monkeypatch: 
     assert info_calls == []
     assert len(wizard_calls) == 1
     assert wizard_calls[0]["parent"] == "main-window"
-    assert wizard_calls[0]["installed_version"] == "0.5.0"
+    assert wizard_calls[0]["installed_version"] == ui_launcher.__version__
 
 
 def test_maybe_run_startup_update_check_skips_when_pref_disabled(monkeypatch: Any):

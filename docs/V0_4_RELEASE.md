@@ -11,7 +11,7 @@ Manual steps for **#112** / **#138** — prepare `v0.4.0` on branch `dev`, then 
 ### Git Bash
 
 ```bash
-export REPO="/d/Workspace/portfolio/maya-pipeline-inspector"
+export REPO="/d/.../maya-pipeline-inspector"
 cd "$REPO"
 
 python -m pip install -e ".[dev]"
@@ -26,7 +26,7 @@ echo "validate exit=$?"
 ### PowerShell
 
 ```powershell
-$REPO = "D:\Workspace\portfolio\maya-pipeline-inspector"
+$REPO = "D:\...\maya-pipeline-inspector"
 Set-Location $REPO
 
 python -m pip install -e ".[dev]"

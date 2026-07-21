@@ -36,8 +36,8 @@ Built to prevent render-time failures by detecting missing textures, outdated ma
 
 Studios running a fork or internal rollout are welcome to open an issue or discussion if you want to be listed as an early adopter (optional, no commitment).
 
-**Status:** **v0.5.0 shipped** (2026-07-12) · **v0.6 in development** on `dev` (geometry QA, machine readiness, role governance)  
-**Development honesty:** actively evolving, many surfaces **MVP-quality** — not a turnkey publish/AMS/farm stack. See [Known limitations & gaps](docs/USER_GUIDE.md#known-limitations--gaps) before production rollout.  
+**Status:** **v0.6.0 shipped** (2026-07-21) · **v1.0+** on roadmap  
+**Development honesty:** actively evolving — **v0.6.0** is the current public release; `dev` carries **v0.7+** work. Many surfaces remain **MVP-quality** — not a turnkey publish/AMS/farm stack. See [Known limitations & gaps](docs/USER_GUIDE.md#known-limitations--gaps) before production rollout.  
 **Primary DCC:** Autodesk Maya · **Renderer rule packs:** Common Maya, V-Ray, Arnold · **Roadmap:** RenderMan, Redshift, USD / MaterialX
 
 ## Contents
@@ -109,7 +109,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for release-by-release detail.
 
 ## Development status & limitations
 
-Maya Pipeline Inspector is **under active development**. Releases are tagged when a milestone is stable enough to ship; `dev` routinely contains incomplete features and integration gaps.
+Maya Pipeline Inspector is **under active development** beyond each tagged release. **v0.6.0** is the current public release; the `dev` branch may contain incomplete **v0.7+** work.
 
 **What to expect today**
 
@@ -127,7 +127,7 @@ Maya Pipeline Inspector is **under active development**. Releases are tagged whe
 | **Validation accuracy** | Texture version freshness is **filesystem-only** (no publish DB / AMS). Farm cost score is a **heuristic**, not measured render time. Geometry duplicate scans may **truncate** on very large scenes. |
 | **Safe fixes** | Only a **subset** of failed rules offer auto-fix. Referenced nodes, high-risk edits, and studio-specific policy still need manual work. |
 | **Deadline** | Targets **Thinkbox Deadline 10 on-prem** via Web Service. Not a full render-manager replacement; farm submit queues **utility validation jobs**, not beauty render jobs. |
-| **v0.6 on `dev`** | Geometry QA, Machine Readiness, role governance, and farm analytics are **landing incrementally** — APIs, UI, and docs may change before the next tagged release. |
+| **Next on `dev`** | **v0.7+** — headless parity, governance audit export, readiness CLI, connector reliability ([DEVELOPMENT_PLAN §14](docs/DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend)). |
 
 Full user-facing list: [USER_GUIDE — Known limitations & gaps](docs/USER_GUIDE.md#known-limitations--gaps).
 
@@ -225,7 +225,7 @@ Per-scene notes: [`examples/vray_policy/README.md`](examples/vray_policy/README.
 
 | Milestone | State | Highlights |
 | --- | --- | --- |
-| **v0.6** | In development on `dev` | Geometry QA, Machine Readiness tab, role governance ([ADR 0008](docs/adr/0008-role-based-governance-foundation.md)), Deadline farm analytics CLI |
+| **v0.6.0** | Released 2026-07-21 | Geometry QA, Machine Readiness tab, role governance ([ADR 0008](docs/adr/0008-role-based-governance-foundation.md)), supervisor routing, farm analytics CLI |
 | **v0.5.0** | Released 2026-07-12 | Settings hub, Telegram/Discord/Slack, Ftrack/ShotGrid/Cerebro, rule authoring MVP, auto-update, bug-report relay |
 | **v0.4.0** | Released | Deadline 10 Farm tab, studio config, native `.mll` Phase 1, GUI-first UX wave |
 | **v0.3.0** | Released | Manifest gates, headless apply-fixes, asset-class texture budgets |

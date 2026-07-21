@@ -70,7 +70,7 @@ Denied actions return a human-readable reason including effective role and role 
   "governance": {
     "enforced_role": "",
     "tracker_role_map": { "Pipeline Supervisor": "pipeline_td" },
-    "capability_denials": { "producer": ["submit_farm"] }
+    "capability_denials": { "technical_artist": ["submit_farm"] }
   }
 }
 ```
@@ -86,7 +86,7 @@ Denied actions return a human-readable reason including effective role and role 
 ## Alternatives Considered
 
 1. **Maya-only OS user mapping** — rejected; not portable to headless CLI and farm hooks.
-2. **Single studio-wide capability list** — rejected; cannot express TD vs Technical Artist vs producer nuance.
+2. **Single studio-wide capability list** — rejected; cannot express TD vs Technical Artist vs pipeline-role nuance (see [ADR 0009](0009-report-to-supervisor-routing-by-role.md) for role ids).
 3. **Per-action passwords** — rejected; poor UX and no studio rollout path.
 
 ## Consequences

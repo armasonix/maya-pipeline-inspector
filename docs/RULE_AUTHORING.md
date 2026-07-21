@@ -2,7 +2,7 @@
 
 Maya Pipeline Inspector is intended to be data-driven. Most validation behavior should be defined in JSON rule packs rather than hardcoded directly into the core validator.
 
-Status: early development for the JSON schema; the Maya **incident-to-rule** UI workflow is available from v0.5 (see [Incident-to-Rule Workflow](#incident-to-rule-workflow-maya-ui)).
+Status: rule schema and check types are **stable for shipped packs** (v0.6.0); the Maya **rule browser**, **new rule wizard**, and **incident-to-rule** workflow ship from v0.5+ (see [Incident-to-Rule Workflow](#incident-to-rule-workflow-maya-ui)). Advanced checks may still require hand-edited JSON.
 
 ## Rule Authoring Goals
 
@@ -174,7 +174,7 @@ Example:
 }
 ```
 
-## Check Types for MVP
+## Check Types (shipped)
 
 Initial check types:
 
@@ -235,7 +235,7 @@ Rules should be conservative by default. Profiles may override policy for lookde
 
 Auto-fix is optional and must be safe by design.
 
-Allowed MVP fix types:
+Allowed shipped fix types:
 
 | Fix Type | Example | Risk |
 |---|---|---|
@@ -416,7 +416,7 @@ Metadata fields (`source_rule_id`, `scene_path`, `exported_at_utc`) support TD r
 
 ### Current limitations
 
-- The wizard covers MVP templates only; advanced checks still require hand-authored JSON.
+- The wizard covers shipped templates only; advanced checks still require hand-authored JSON.
 - **Create Rule Draft** prefill works best when the source rule definition was loaded during validation.
 - Session overrides from Rule Editor do not persist across Maya restarts.
 - **Export to Studio extra_rules** requires `pipeline.extra_rules_folder`; otherwise use **Save** to a path under your local extra rule roots.
