@@ -2093,35 +2093,6 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
     _apply_validate_issues_pane_layout(content, qt_widgets, tokens)
     _apply_validate_sticky_chrome_spacing(content, qt_widgets, tokens)
     _apply_panel_shell_width(content, qt_widgets, tokens)
-    _log_panel_header_layout_debug(content, qt_widgets, tokens)
-
-
-def _log_panel_header_layout_debug(content: Any, qt_widgets: Any, tokens: Any) -> None:
-    # #region agent log
-    from pipeline_inspector.util.debug_log import debug_log_enabled, write_agent_cycle_log
-
-    if not debug_log_enabled():
-        return
-
-    header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
-    if header is None:
-        return
-    maximum_height = getattr(header, "maximumHeight", None)
-    size_policy = getattr(header, "sizePolicy", None)
-    write_agent_cycle_log(
-        "main_window.py:apply_density_tokens",
-        "panel header layout after density apply",
-        {
-            "panel_header_max_height_token": tokens.panel_header_max_height,
-            "header_maximum_height": maximum_height() if callable(maximum_height) else "",
-            "header_size_policy": str(size_policy() if callable(size_policy) else size_policy),
-            "header_has_stylesheet": bool(tokens.panel_header_chrome_stylesheet),
-            "main_tab_has_stylesheet": bool(tokens.main_tab_chrome_stylesheet),
-        },
-        hypothesis_id="H1",
-        run_id="post-fix",
-    )
-    # #endregion
 
 
 def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:

@@ -1,11 +1,11 @@
 """Deadline submit preflight helpers for Pipeline Inspector."""
+
 from __future__ import annotations
 
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 VALIDATOR_OK = 0
 VALIDATOR_PUBLISH_BLOCK = 1
@@ -18,6 +18,7 @@ SUBMISSION_BLOCKED = 2
 PREFLIGHT_ERROR = 3
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
+
 
 @dataclass(frozen=True)
 class DeadlinePreflightResult:
@@ -59,18 +60,6 @@ def build_validator_command(
     if studio_config_path is not None:
         command = command + ("--studio-config", str(studio_config_path))
     command = command + tuple(extra_args)
-    # region agent log
-    _farm_debug_log(
-        "preflight.py:build_validator_command",
-        "built validator command",
-        {
-            "studio_config_path": str(studio_config_path) if studio_config_path else "",
-            "includes_studio_config_flag": studio_config_path is not None,
-            "command_tail": list(command[-6:]),
-        },
-        hypothesis_id="H1",
-    )
-    # endregion
     return command
 
 
@@ -140,15 +129,3 @@ def _result(
         stdout=completed.stdout,
         stderr=completed.stderr,
     )
-
-
-def _farm_debug_log(
-    location: str,
-    message: str,
-    data: dict[str, Any],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

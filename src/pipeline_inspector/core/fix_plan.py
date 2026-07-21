@@ -33,8 +33,6 @@ from pipeline_inspector.util.paths import (
     studio_normalize_prefixes,
 )
 
-_DEBUG_LOG = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-
 JsonDict = dict[str, Any]
 JsonValue = Any
 
@@ -463,33 +461,6 @@ def _build_texture_file_naming_action(
     )
     if dependency is not None and not source_exists:
         block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
-    # #region agent log
-    _debug_texture_rename_log(
-        "fix_plan._build_texture_file_naming_action",
-        "Texture rename plan decision",
-        {
-            "target_id": result.target_id,
-            "target_node": target_node,
-            "dependency_exists": dependency.exists if dependency is not None else "",
-            "raw_path": raw_path,
-            "raw_after": proposed_path,
-            "resolved_before": resolved_before or "",
-            "source_exists": source_exists,
-            "destination_exists": texture_path_resolves_on_disk(
-                proposed_path,
-                is_udim=bool(dependency.is_udim) if dependency is not None else False,
-                studio_environment=node_index.studio_environment,
-                usd_anchor_dir=node_index.usd_anchor_dir
-                if str(result.target_id).startswith("prim:")
-                else None,
-                scene_path=node_index.scene_path,
-            ),
-            "blocked": bool(hard_block_reasons(block_reasons)),
-            "block_reasons": "|".join(block_reasons),
-        },
-        hypothesis_id="H18",
-    )
-    # #endregion
 
     target_id, target_node, action_params = _usd_prim_fix_fields(
         result,
@@ -1257,21 +1228,6 @@ def _expand_texture_path_candidates(
         matched = glob.glob(glob_pattern)
         if matched:
             paths.append(glob_source)
-        # #region agent log
-        _debug_texture_rename_log(
-            "fix_plan._expand_texture_path_candidates",
-            "UDIM texture resolve",
-            {
-                "candidate": candidate[:160],
-                "expanded": expanded[:160],
-                "glob_source": glob_source[:160],
-                "glob_pattern": glob_pattern[:160],
-                "matched_count": len(matched),
-                "is_udim": is_udim,
-            },
-            hypothesis_id="H-UDIM1",
-        )
-        # #endregion
         return paths
     path = Path(expanded.replace("/", os.sep))
     if path.is_file():
@@ -1294,13 +1250,3 @@ def _expand_texture_path_candidates(
     return paths
 
 
-def _debug_texture_rename_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

@@ -4,6 +4,7 @@ The rule schema is intentionally Maya-independent. Rules describe what to match,
 what to check, how severe the result is, who owns the fix, whether it blocks
 production stages, and whether an optional safe fix can be planned.
 """
+
 from __future__ import annotations
 
 import re
@@ -29,19 +30,15 @@ from pipeline_inspector.core.naming_fix import texture_filename_stem
 
 if TYPE_CHECKING:
     from pipeline_inspector.studio_config import StudioEnvironmentSettings
-
 JsonDict = dict[str, Any]
 JsonValue = Any
-
 RULE_SCHEMA_VERSION = "1.0"
-
 _TEXTURE_PATH_ATTRS = {
     "file": "fileTextureName",
     "VRayBitmap": "file",
     "aiImage": "filename",
     "Shader": "file",
 }
-
 SEVERITIES = frozenset({"info", "warning", "error", "critical"})
 SCOPES = frozenset(
     {
@@ -60,8 +57,10 @@ SCOPES = frozenset(
 FIX_RISKS = frozenset({"low", "medium", "high"})
 RESULT_STATUSES = frozenset({"passed", "failed", "skipped"})
 
+
 class RuleSchemaError(ValueError):
     """Raised when a rule definition is invalid."""
+
 
 @dataclass(frozen=True)
 class RulePolicy:
@@ -96,6 +95,7 @@ class RulePolicy:
         policy.validate()
         return policy
 
+
 @dataclass(frozen=True)
 class RuleMatch:
     """Rule target selection criteria."""
@@ -114,6 +114,7 @@ class RuleMatch:
         match = cls(criteria=dict(data))
         match.validate()
         return match
+
 
 @dataclass(frozen=True)
 class RuleCheck:
@@ -141,6 +142,7 @@ class RuleCheck:
         check = cls(type=check_type, params=params)
         check.validate()
         return check
+
 
 @dataclass(frozen=True)
 class RuleFix:
@@ -176,6 +178,7 @@ class RuleFix:
         fix.validate()
         return fix
 
+
 @dataclass(frozen=True)
 class RuleDefinition:
     """Complete data-driven validation rule definition."""
@@ -208,21 +211,16 @@ class RuleDefinition:
         for field_name, value in required_text_fields.items():
             if not isinstance(value, str) or not value.strip():
                 raise RuleSchemaError(f"{field_name} is required")
-
         if not isinstance(self.enabled, bool):
             raise RuleSchemaError("enabled must be a boolean")
-
         if not self.renderer or not all(isinstance(item, str) and item for item in self.renderer):
             raise RuleSchemaError("renderer must be a non-empty list of strings")
-
         if self.scope not in SCOPES:
             allowed = ", ".join(sorted(SCOPES))
             raise RuleSchemaError(f"scope must be one of: {allowed}")
-
         if self.severity not in SEVERITIES:
             allowed = ", ".join(sorted(SEVERITIES))
             raise RuleSchemaError(f"severity must be one of: {allowed}")
-
         self.match.validate()
         self.check.validate()
         self.policy.validate()
@@ -254,12 +252,10 @@ class RuleDefinition:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RuleDefinition:
         _validate_required_rule_keys(data)
-
         fix_data = data.get("fix")
         fix = None
         if fix_data is not None:
             fix = RuleFix.from_dict(_require_mapping(fix_data, "fix"))
-
         rule = cls(
             schema_version=str(data.get("schema_version", RULE_SCHEMA_VERSION)),
             id=str(data.get("id", "")),
@@ -278,6 +274,7 @@ class RuleDefinition:
         )
         rule.validate()
         return rule
+
 
 @dataclass(frozen=True)
 class RuleResult:
@@ -328,6 +325,7 @@ class RuleResult:
             "evidence": dict(self.evidence),
         }
 
+
 @dataclass(frozen=True)
 class ValidationSummary:
     """Aggregated validation result summary.
@@ -364,16 +362,15 @@ class ValidationSummary:
             "auto_fixable": self.auto_fixable,
         }
 
+
 def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
     """Compute severity counts and explicit block status from rule results."""
-
     total = 0
     status_counts = {"passed": 0, "failed": 0, "skipped": 0}
     severity_counts = {"info": 0, "warning": 0, "error": 0, "critical": 0}
     block_publish = False
     block_deadline = False
     auto_fixable = 0
-
     for result in results:
         total += 1
         if result.status in status_counts:
@@ -384,7 +381,6 @@ def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
         block_deadline = block_deadline or result.block_deadline
         if result.auto_fix_available:
             auto_fixable += 1
-
     return ValidationSummary(
         total=total,
         passed=status_counts["passed"],
@@ -399,12 +395,14 @@ def summarize_results(results: Iterable[RuleResult]) -> ValidationSummary:
         auto_fixable=auto_fixable,
     )
 
+
 @dataclass(frozen=True)
 class _TargetContext:
     kind: str
     target_id: str
     obj: object
     semantic: Optional[str] = None
+
 
 class ValidationEngine:
     """Evaluate rule definitions against a GraphSnapshot."""
@@ -418,9 +416,7 @@ class ValidationEngine:
         self._studio_environment = studio_environment
 
     def validate(
-        self,
-        snapshot: GraphSnapshot,
-        rules: Iterable[RuleDefinition],
+        self, snapshot: GraphSnapshot, rules: Iterable[RuleDefinition]
     ) -> list[RuleResult]:
         results: list[RuleResult] = []
         for rule in rules:
@@ -430,12 +426,10 @@ class ValidationEngine:
     def _evaluate_rule(self, snapshot: GraphSnapshot, rule: RuleDefinition) -> list[RuleResult]:
         if not rule.enabled:
             return [self._skipped(rule, reason="rule_disabled")]
-
         targets = self._targets_for_scope(snapshot, rule.scope)
         matched = [target for target in targets if self._matches(rule.match.criteria, target)]
         if not matched:
             return [self._skipped(rule, reason="no_matching_targets")]
-
         return [self._evaluate_target(rule, target) for target in matched]
 
     def _evaluate_target(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
@@ -470,16 +464,10 @@ class ValidationEngine:
             return self._evaluate_path_policy(rule, target)
         if check_type == "texture_version_latest":
             return self._evaluate_texture_version_latest(rule, target)
-        return self._skipped(
-            rule,
-            target=target,
-            reason=f"unsupported_check_type:{check_type}",
-        )
+        return self._skipped(rule, target=target, reason=f"unsupported_check_type:{check_type}")
 
     def _evaluate_attribute_equals(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         attribute = str(rule.check.params.get("attribute", ""))
         expected = rule.check.params.get("expected")
@@ -494,11 +482,7 @@ class ValidationEngine:
             plug=attribute,
         )
 
-    def _evaluate_attribute_in(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
-    ) -> RuleResult:
+    def _evaluate_attribute_in(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         attribute = str(rule.check.params.get("attribute", ""))
         expected_values = rule.check.params.get("expected")
         if expected_values is None:
@@ -516,17 +500,12 @@ class ValidationEngine:
         )
 
     def _evaluate_default_material_assignment(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, GraphSnapshot):
             return self._skipped(
-                rule,
-                target=target,
-                reason="default_material_assignment_requires_graph_snapshot",
+                rule, target=target, reason="default_material_assignment_requires_graph_snapshot"
             )
-
         assignments = _default_material_assignments(target.obj, rule.check.params)
         status = "failed" if assignments else "passed"
         evidence = {"assignments": assignments} if assignments else {}
@@ -541,17 +520,12 @@ class ValidationEngine:
         )
 
     def _evaluate_duplicate_file_dependencies(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, GraphSnapshot):
             return self._skipped(
-                rule,
-                target=target,
-                reason="duplicate_file_dependencies_requires_graph_snapshot",
+                rule, target=target, reason="duplicate_file_dependencies_requires_graph_snapshot"
             )
-
         groups, scan_truncated = _duplicate_file_dependency_groups(
             target.obj,
             max_dependencies=_as_optional_int(rule.check.params.get("max_file_dependencies")),
@@ -573,9 +547,7 @@ class ValidationEngine:
         )
 
     def _evaluate_duplicate_material_fingerprints(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, GraphSnapshot):
             return self._skipped(
@@ -583,21 +555,12 @@ class ValidationEngine:
                 target=target,
                 reason="duplicate_material_fingerprints_requires_graph_snapshot",
             )
-
         groups, scan_truncated, material_count, scanned_count = (
-            _duplicate_material_fingerprint_groups(
-                target.obj,
-                rule.check.params,
-            )
+            _duplicate_material_fingerprint_groups(target.obj, rule.check.params)
         )
         status = "failed" if groups else "passed"
         evidence: JsonDict = {"duplicate_groups": groups} if groups else {}
-        evidence.update(
-            {
-                "material_count": material_count,
-                "scanned_material_count": scanned_count,
-            }
-        )
+        evidence.update({"material_count": material_count, "scanned_material_count": scanned_count})
         if scan_truncated:
             evidence["material_scan_truncated"] = True
             evidence["max_materials"] = rule.check.params.get("max_materials")
@@ -612,29 +575,18 @@ class ValidationEngine:
         )
 
     def _evaluate_duplicate_geometry(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, GraphSnapshot):
             return self._skipped(
-                rule,
-                target=target,
-                reason="duplicate_geometry_requires_graph_snapshot",
+                rule, target=target, reason="duplicate_geometry_requires_graph_snapshot"
             )
-
         groups, scan_truncated, shape_count, scanned_count = _duplicate_geometry_groups(
-            target.obj,
-            rule.check.params,
+            target.obj, rule.check.params
         )
         status = "failed" if groups else "passed"
         evidence: JsonDict = {"duplicate_groups": groups} if groups else {}
-        evidence.update(
-            {
-                "shape_count": shape_count,
-                "scanned_shape_count": scanned_count,
-            }
-        )
+        evidence.update({"shape_count": shape_count, "scanned_shape_count": scanned_count})
         if scan_truncated:
             evidence["geometry_scan_truncated"] = True
             evidence["max_shapes"] = rule.check.params.get("max_shapes")
@@ -649,25 +601,17 @@ class ValidationEngine:
         )
 
     def _evaluate_duplicate_geometry_scan_budget(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, GraphSnapshot):
             return self._skipped(
-                rule,
-                target=target,
-                reason="duplicate_geometry_scan_budget_requires_graph_snapshot",
+                rule, target=target, reason="duplicate_geometry_scan_budget_requires_graph_snapshot"
             )
-
         max_shapes = _as_optional_int(rule.check.params.get("max_shapes"))
         shape_count = len(target.obj.shapes)
-        exceeded = max_shapes is not None and max_shapes > 0 and shape_count > max_shapes
+        exceeded = max_shapes is not None and max_shapes > 0 and (shape_count > max_shapes)
         status = "failed" if exceeded else "passed"
-        evidence = {
-            "shape_count": shape_count,
-            "max_shapes": max_shapes,
-        }
+        evidence = {"shape_count": shape_count, "max_shapes": max_shapes}
         if exceeded:
             evidence["geometry_scan_truncated"] = True
         return self._result(
@@ -681,28 +625,23 @@ class ValidationEngine:
         )
 
     def _evaluate_duplicate_scan_budget(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, GraphSnapshot):
             return self._skipped(
-                rule,
-                target=target,
-                reason="duplicate_scan_budget_requires_graph_snapshot",
+                rule, target=target, reason="duplicate_scan_budget_requires_graph_snapshot"
             )
-
         max_materials = _as_optional_int(rule.check.params.get("max_materials"))
         max_file_dependencies = _as_optional_int(rule.check.params.get("max_file_dependencies"))
         material_count = len(target.obj.materials)
         file_dependency_count = len(target.obj.file_dependencies)
         material_exceeded = (
-            max_materials is not None and max_materials > 0 and material_count > max_materials
+            max_materials is not None and max_materials > 0 and (material_count > max_materials)
         )
         file_dependency_exceeded = (
             max_file_dependencies is not None
             and max_file_dependencies > 0
-            and file_dependency_count > max_file_dependencies
+            and (file_dependency_count > max_file_dependencies)
         )
         exceeded = material_exceeded or file_dependency_exceeded
         status = "failed" if exceeded else "passed"
@@ -728,22 +667,15 @@ class ValidationEngine:
             evidence=evidence,
         )
 
-    def _evaluate_list_length_max(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
-    ) -> RuleResult:
+    def _evaluate_list_length_max(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         attribute = str(rule.check.params.get("attribute", ""))
         maximum = rule.check.params.get("max")
         current = self._read_value(target, attribute)
         maximum_number = _as_float(maximum)
         if not isinstance(current, list) or maximum_number is None:
             return self._skipped(
-                rule,
-                target=target,
-                reason="list_length_max_requires_list_and_numeric_max",
+                rule, target=target, reason="list_length_max_requires_list_and_numeric_max"
             )
-
         current_length = len(current)
         status = "passed" if current_length <= maximum_number else "failed"
         return self._result(
@@ -756,22 +688,15 @@ class ValidationEngine:
             evidence={"max": maximum_number},
         )
 
-    def _evaluate_list_length_min(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
-    ) -> RuleResult:
+    def _evaluate_list_length_min(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         attribute = str(rule.check.params.get("attribute", ""))
         minimum = rule.check.params.get("min")
         current = self._read_value(target, attribute)
         minimum_number = _as_float(minimum)
         if not isinstance(current, list) or minimum_number is None:
             return self._skipped(
-                rule,
-                target=target,
-                reason="list_length_min_requires_list_and_numeric_min",
+                rule, target=target, reason="list_length_min_requires_list_and_numeric_min"
             )
-
         current_length = len(current)
         status = "passed" if current_length >= minimum_number else "failed"
         return self._result(
@@ -784,32 +709,16 @@ class ValidationEngine:
             evidence={"min": minimum_number},
         )
 
-    def _evaluate_name_matches(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
-    ) -> RuleResult:
+    def _evaluate_name_matches(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         pattern = self._resolve_naming_pattern(rule)
         if not pattern:
-            return self._skipped(
-                rule,
-                target=target,
-                reason="naming_template_not_configured",
-            )
-
+            return self._skipped(rule, target=target, reason="naming_template_not_configured")
         try:
             compiled = re.compile(pattern)
         except re.error:
-            return self._skipped(
-                rule,
-                target=target,
-                reason="invalid_naming_pattern",
-            )
-
+            return self._skipped(rule, target=target, reason="invalid_naming_pattern")
         name_field = str(rule.check.params.get("name_field", "name"))
-        object_type = rule.check.params.get("object_type") or rule.match.criteria.get(
-            "object_type"
-        )
+        object_type = rule.check.params.get("object_type") or rule.match.criteria.get("object_type")
         plug = name_field
         if object_type == "texture":
             texture_path = self._texture_file_path(target)
@@ -823,12 +732,7 @@ class ValidationEngine:
             if object_type in {"mesh", "camera"} and isinstance(target.obj, ShapeSnapshot):
                 current = mesh_transform_name_from_shape(target.obj)
         if not isinstance(current, str) or not current.strip():
-            return self._skipped(
-                rule,
-                target=target,
-                reason="missing_name",
-            )
-
+            return self._skipped(rule, target=target, reason="missing_name")
         status = "passed" if compiled.fullmatch(current) else "failed"
         return self._result(
             rule,
@@ -845,7 +749,6 @@ class ValidationEngine:
         if inline_pattern is not None:
             normalized = str(inline_pattern).strip()
             return normalized or None
-
         object_type = params.get("object_type") or params.get("template_key")
         if object_type is None:
             return None
@@ -868,23 +771,14 @@ class ValidationEngine:
             return None
         return _TEXTURE_PATH_ATTRS.get(target.obj.type_name, "fileTextureName")
 
-    def _evaluate_numeric_max(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
-    ) -> RuleResult:
+    def _evaluate_numeric_max(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         attribute = str(rule.check.params.get("attribute", ""))
         maximum = rule.check.params.get("max")
         current = self._read_value(target, attribute)
         current_number = _as_float(current)
         maximum_number = _as_float(maximum)
         if current_number is None or maximum_number is None:
-            return self._skipped(
-                rule,
-                target=target,
-                reason="numeric_max_requires_numeric_values",
-            )
-
+            return self._skipped(rule, target=target, reason="numeric_max_requires_numeric_values")
         status = "passed" if current_number <= maximum_number else "failed"
         return self._result(
             rule,
@@ -898,12 +792,7 @@ class ValidationEngine:
 
     def _evaluate_path_exists(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         if not isinstance(target.obj, FileDependencySnapshot):
-            return self._skipped(
-                rule,
-                target=target,
-                reason="path_exists_requires_file_dependency",
-            )
-
+            return self._skipped(rule, target=target, reason="path_exists_requires_file_dependency")
         status = "passed" if target.obj.exists else "failed"
         return self._result(
             rule,
@@ -916,16 +805,9 @@ class ValidationEngine:
 
     def _evaluate_path_policy(self, rule: RuleDefinition, target: _TargetContext) -> RuleResult:
         if not isinstance(target.obj, FileDependencySnapshot):
-            return self._skipped(
-                rule,
-                target=target,
-                reason="path_policy_requires_file_dependency",
-            )
-
+            return self._skipped(rule, target=target, reason="path_policy_requires_file_dependency")
         violations = _path_policy_violations(
-            target.obj,
-            rule.check.params,
-            studio_environment=self._studio_environment,
+            target.obj, rule.check.params, studio_environment=self._studio_environment
         )
         status = "failed" if violations else "passed"
         evidence = {"violations": violations} if violations else {}
@@ -940,26 +822,18 @@ class ValidationEngine:
         )
 
     def _evaluate_texture_version_latest(
-        self,
-        rule: RuleDefinition,
-        target: _TargetContext,
+        self, rule: RuleDefinition, target: _TargetContext
     ) -> RuleResult:
         if not isinstance(target.obj, FileDependencySnapshot):
             return self._skipped(
-                rule,
-                target=target,
-                reason="texture_version_latest_requires_file_dependency",
+                rule, target=target, reason="texture_version_latest_requires_file_dependency"
             )
-
         current_version = target.obj.version
         latest_version = target.obj.latest_version
         if not current_version or not latest_version:
             return self._skipped(
-                rule,
-                target=target,
-                reason="texture_version_latest_requires_version_metadata",
+                rule, target=target, reason="texture_version_latest_requires_version_metadata"
             )
-
         status = "passed" if current_version == latest_version else "failed"
         return self._result(
             rule,
@@ -975,28 +849,19 @@ class ValidationEngine:
         if scope in {"node", "texture_node"}:
             return [_TargetContext("node", node.id, node) for node in snapshot.nodes]
         if scope == "material":
-            return [
-                _TargetContext("material", item.node_id, item)
-                for item in snapshot.materials
-            ]
+            return [_TargetContext("material", item.node_id, item) for item in snapshot.materials]
         if scope == "file_dependency":
             node_semantics = _node_semantics_by_id(snapshot)
             return [
                 _TargetContext(
-                    "file_dependency",
-                    item.node_id,
-                    item,
-                    node_semantics.get(item.node_id),
+                    "file_dependency", item.node_id, item, node_semantics.get(item.node_id)
                 )
                 for item in snapshot.file_dependencies
             ]
         if scope == "connection":
             return [
                 _TargetContext(
-                    "connection",
-                    f"{item.src_node}->{item.dst_node}",
-                    item,
-                    item.semantic,
+                    "connection", f"{item.src_node}->{item.dst_node}", item, item.semantic
                 )
                 for item in snapshot.connections
             ]
@@ -1006,10 +871,7 @@ class ValidationEngine:
                 for item in snapshot.shading_engines
             ]
         if scope in {"shape", "geometry"}:
-            return [
-                _TargetContext("shape", item.node_id, item)
-                for item in snapshot.shapes
-            ]
+            return [_TargetContext("shape", item.node_id, item) for item in snapshot.shapes]
         if scope in {"scene", "graph"}:
             return [_TargetContext(scope, snapshot.scene_path, snapshot)]
         return []
@@ -1045,7 +907,7 @@ class ValidationEngine:
 
     def _read_value(self, target: _TargetContext, key: str) -> Any:
         obj = target.obj
-        if isinstance(obj, NodeSnapshot) and "." not in key and key in obj.attrs:
+        if isinstance(obj, NodeSnapshot) and "." not in key and (key in obj.attrs):
             return obj.attrs[key]
         if isinstance(obj, GraphSnapshot) and key == "renderer_family":
             return obj.renderer
@@ -1056,11 +918,7 @@ class ValidationEngine:
         return None
 
     def _skipped(
-        self,
-        rule: RuleDefinition,
-        *,
-        reason: str,
-        target: Optional[_TargetContext] = None,
+        self, rule: RuleDefinition, *, reason: str, target: Optional[_TargetContext] = None
     ) -> RuleResult:
         evidence = {"reason": reason}
         return self._result(rule, status="skipped", target=target, evidence=evidence)
@@ -1117,6 +975,7 @@ class ValidationEngine:
             return obj.dst_node
         return None
 
+
 _REQUIRED_RULE_KEYS = frozenset(
     {
         "id",
@@ -1134,6 +993,7 @@ _REQUIRED_RULE_KEYS = frozenset(
     }
 )
 
+
 def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
     semantics: dict[str, str] = {}
     for node in snapshot.nodes:
@@ -1142,9 +1002,9 @@ def _node_semantics_by_id(snapshot: GraphSnapshot) -> dict[str, str]:
             semantics[node.id] = semantic
     return semantics
 
+
 def _default_material_assignments(
-    snapshot: GraphSnapshot,
-    params: Mapping[str, Any],
+    snapshot: GraphSnapshot, params: Mapping[str, Any]
 ) -> list[JsonDict]:
     default_materials = _normalized_identifier_set(
         params.get("default_materials", ["lambert1", "node:lambert1"])
@@ -1152,7 +1012,6 @@ def _default_material_assignments(
     default_engines = _normalized_identifier_set(
         params.get("default_shading_engines", ["initialShadingGroup"])
     )
-
     assignments: list[JsonDict] = []
     for engine in snapshot.shading_engines:
         if not engine.members:
@@ -1160,8 +1019,7 @@ def _default_material_assignments(
         is_default_material = _matches_identifier(engine.surface_shader, default_materials)
         is_default_engine = _matches_identifier(engine.name, default_engines)
         is_default_engine = is_default_engine or _matches_identifier(
-            engine.node_id,
-            default_engines,
+            engine.node_id, default_engines
         )
         if is_default_material or is_default_engine:
             assignments.append(
@@ -1174,60 +1032,49 @@ def _default_material_assignments(
             )
     return assignments
 
+
 def _duplicate_file_dependency_groups(
-    snapshot: GraphSnapshot,
-    *,
-    max_dependencies: Optional[int] = None,
+    snapshot: GraphSnapshot, *, max_dependencies: Optional[int] = None
 ) -> tuple[list[JsonDict], bool]:
     dependencies = snapshot.file_dependencies
     scan_truncated = False
     if (
         max_dependencies is not None
         and max_dependencies > 0
-        and len(dependencies) > max_dependencies
+        and (len(dependencies) > max_dependencies)
     ):
         dependencies = sorted(dependencies, key=lambda item: item.node_id)[:max_dependencies]
         scan_truncated = True
-
     grouped: dict[str, list[FileDependencySnapshot]] = {}
     for dependency in dependencies:
         key = _duplicate_file_dependency_key(dependency)
         if key:
             grouped.setdefault(key, []).append(dependency)
-
     groups: list[JsonDict] = []
     for path, path_dependencies in sorted(grouped.items()):
         node_ids = sorted({dependency.node_id for dependency in path_dependencies})
         if len(node_ids) > 1:
-            groups.append(
-                {
-                    "path": path,
-                    "node_ids": node_ids,
-                    "count": len(node_ids),
-                }
-            )
-    return groups, scan_truncated
+            groups.append({"path": path, "node_ids": node_ids, "count": len(node_ids)})
+    return (groups, scan_truncated)
+
 
 def _duplicate_material_fingerprint_groups(
-    snapshot: GraphSnapshot,
-    params: Mapping[str, Any],
+    snapshot: GraphSnapshot, params: Mapping[str, Any]
 ) -> tuple[list[JsonDict], bool, int, int]:
     max_materials = _as_optional_int(params.get("max_materials"))
     min_group_size = _as_optional_int(params.get("min_group_size")) or 2
     materials = sorted(snapshot.materials, key=lambda item: item.node_id)
     material_count = len(materials)
     scan_truncated = False
-    if max_materials is not None and max_materials > 0 and material_count > max_materials:
+    if max_materials is not None and max_materials > 0 and (material_count > max_materials):
         materials = materials[:max_materials]
         scan_truncated = True
-
     grouped: dict[str, list[MaterialSnapshot]] = {}
     for material in materials:
         fingerprint = material.graph_content_fingerprint
         if not fingerprint:
             continue
         grouped.setdefault(fingerprint, []).append(material)
-
     groups: list[JsonDict] = []
     for fingerprint, duplicates in sorted(grouped.items()):
         material_ids = sorted({item.node_id for item in duplicates})
@@ -1241,29 +1088,27 @@ def _duplicate_material_fingerprint_groups(
                 "count": len(material_ids),
             }
         )
-    return groups, scan_truncated, material_count, len(materials)
+    return (groups, scan_truncated, material_count, len(materials))
+
 
 _PROXY_GEOMETRY_TYPES = frozenset({"aiStandIn", "VRayProxy"})
 _PROXY_FILE_ATTRS = ("dso", "fileName", "filename", "vrmesh")
 
 
 def _duplicate_geometry_groups(
-    snapshot: GraphSnapshot,
-    params: Mapping[str, Any],
+    snapshot: GraphSnapshot, params: Mapping[str, Any]
 ) -> tuple[list[JsonDict], bool, int, int]:
     max_shapes = _as_optional_int(params.get("max_shapes"))
     min_group_size = _as_optional_int(params.get("min_group_size")) or 2
     bbox_precision = _as_optional_int(params.get("bbox_precision")) or 3
     match_attributes = _as_string_list(params.get("match_attributes"))
     include_referenced = bool(params.get("include_referenced", False))
-
     shapes = sorted(snapshot.shapes, key=lambda item: item.node_id)
     shape_count = len(shapes)
     scan_truncated = False
-    if max_shapes is not None and max_shapes > 0 and shape_count > max_shapes:
+    if max_shapes is not None and max_shapes > 0 and (shape_count > max_shapes):
         shapes = shapes[:max_shapes]
         scan_truncated = True
-
     grouped: dict[str, list[ShapeSnapshot]] = {}
     for shape in shapes:
         if not include_referenced and shape.referenced:
@@ -1271,14 +1116,11 @@ def _duplicate_geometry_groups(
         if shape.proxy_attrs.get("intermediateObject") is True:
             continue
         geometry_key = _duplicate_geometry_key(
-            shape,
-            match_attributes=match_attributes,
-            bbox_precision=bbox_precision,
+            shape, match_attributes=match_attributes, bbox_precision=bbox_precision
         )
         if not geometry_key:
             continue
         grouped.setdefault(geometry_key, []).append(shape)
-
     groups: list[JsonDict] = []
     for geometry_key, duplicates in sorted(grouped.items()):
         if _is_intentional_geometry_instance_group(duplicates):
@@ -1298,25 +1140,20 @@ def _duplicate_geometry_groups(
                 "count": len(shape_ids),
             }
         )
-    return groups, scan_truncated, shape_count, len(shapes)
+    return (groups, scan_truncated, shape_count, len(shapes))
 
 
 def _duplicate_geometry_key(
-    shape: ShapeSnapshot,
-    *,
-    match_attributes: list[str],
-    bbox_precision: int,
+    shape: ShapeSnapshot, *, match_attributes: list[str], bbox_precision: int
 ) -> str:
     if shape.type_name in _PROXY_GEOMETRY_TYPES:
         proxy_value = _proxy_geometry_source(shape)
         if proxy_value:
             return f"proxy:{shape.type_name}:{proxy_value}"
         return f"proxy:{shape.type_name}:{shape.node_id}"
-
     topology = shape.topology_fingerprint.strip()
     if not topology:
         return ""
-
     bbox_signature = _bbox_signature(shape.world_bbox, precision=bbox_precision)
     attribute_signature = _geometry_attribute_signature(shape.proxy_attrs, match_attributes)
     return f"mesh:{topology}|{bbox_signature}|{attribute_signature}"
@@ -1331,8 +1168,7 @@ def _proxy_geometry_source(shape: ShapeSnapshot) -> str:
 
 
 def _geometry_attribute_signature(
-    proxy_attrs: Mapping[str, Any],
-    match_attributes: list[str],
+    proxy_attrs: Mapping[str, Any], match_attributes: list[str]
 ) -> str:
     if not match_attributes:
         return ""
@@ -1377,20 +1213,24 @@ def _duplicate_file_dependency_key(dependency: FileDependencySnapshot) -> str:
     path = dependency.resolved_path or dependency.raw_path
     return _normalize_path(path) if path else ""
 
+
 def _normalized_identifier_set(value: Any) -> set[str]:
     identifiers: set[str] = set()
     for item in _as_string_list(value):
         identifiers.update(_identifier_candidates(item))
     return identifiers
 
+
 def _matches_identifier(value: Optional[str], identifiers: set[str]) -> bool:
     return bool(_identifier_candidates(value).intersection(identifiers))
+
 
 def _identifier_candidates(value: Optional[str]) -> set[str]:
     normalized = str(value or "").strip().lower()
     if not normalized:
         return set()
     return {normalized, normalized.rsplit(":", 1)[-1]}
+
 
 def _read_nested_value(obj: object, key: str) -> Any:
     current: Any = obj
@@ -1405,12 +1245,14 @@ def _read_nested_value(obj: object, key: str) -> Any:
             return None
     return current
 
+
 def _as_string_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
+
 
 def _as_float(value: Any) -> Optional[float]:
     if isinstance(value, bool) or value is None:
@@ -1420,6 +1262,7 @@ def _as_float(value: Any) -> Optional[float]:
     except (TypeError, ValueError):
         return None
 
+
 def _as_optional_int(value: Any) -> Optional[int]:
     if isinstance(value, bool) or value is None:
         return None
@@ -1427,6 +1270,7 @@ def _as_optional_int(value: Any) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
+
 
 def _path_policy_violations(
     dependency: FileDependencySnapshot,
@@ -1438,7 +1282,6 @@ def _path_policy_violations(
     disallowed = params.get("disallow", [])
     if not isinstance(disallowed, list):
         disallowed = [disallowed]
-
     violations: list[str] = []
     for policy in disallowed:
         policy_name = str(policy)
@@ -1463,63 +1306,34 @@ def _path_policy_violations(
             _has_path_segment(path, "downloads") for path in authored_paths
         ):
             violations.append("downloads")
-        elif policy_name == "temp" and any(
-            _is_temp_path(path) for path in authored_paths
-        ):
+        elif policy_name == "temp" and any(_is_temp_path(path) for path in authored_paths):
             violations.append("temp")
-
     allowed_prefixes = params.get("allowed_prefixes", [])
     if allowed_prefixes:
-        prefix_list = (
-            allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
-        )
+        prefix_list = allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
         raw_path = str(dependency.raw_path or "")
         resolved_path = str(dependency.resolved_path or raw_path)
         from pipeline_inspector.util.paths import texture_path_policy_compliant
 
         if not texture_path_policy_compliant(
-            raw_path,
-            resolved_path,
-            prefix_list,
-            studio_environment,
+            raw_path, resolved_path, prefix_list, studio_environment
         ):
             violations.append("outside_project_root")
-
-    # #region agent log
-    if violations or "${" in str(dependency.raw_path or "") or _is_local_drive_path(
-        str(dependency.raw_path or "")
-    ):
-        from pipeline_inspector.util.debug_log import write_debug_log
-
-        write_debug_log(
-            "rule_schema._path_policy_violations",
-            "File dependency path policy",
-            {
-                "target_id": str(dependency.node_id or "")[:120],
-                "attr": str(dependency.attr or ""),
-                "raw_path": str(dependency.raw_path or "")[:160],
-                "violations": "|".join(violations) or "none",
-                "usd_prim": str(str(dependency.node_id or "").startswith("prim:")),
-            },
-            hypothesis_id="H37",
-        )
-    # #endregion
-
     return violations
 
+
 def _dependency_paths(dependency: FileDependencySnapshot) -> list[str]:
-    return [
-        path
-        for path in (dependency.raw_path, dependency.resolved_path or "")
-        if path
-    ]
+    return [path for path in (dependency.raw_path, dependency.resolved_path or "") if path]
+
 
 def _normalize_path(path: str) -> str:
     return path.replace("\\", "/").strip().rstrip("/").lower()
 
+
 def _is_local_drive_path(path: str) -> bool:
     normalized = path.replace("\\", "/").strip()
-    return len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/"
+    return len(normalized) >= 3 and normalized[1] == ":" and (normalized[2] == "/")
+
 
 def _is_user_home_path(path: str) -> bool:
     normalized = _normalize_path(path)
@@ -1530,12 +1344,15 @@ def _is_user_home_path(path: str) -> bool:
         or _starts_with_drive_user_path(normalized)
     )
 
+
 def _starts_with_drive_user_path(path: str) -> bool:
     return len(path) >= 9 and path[1:9] == ":/users/"
+
 
 def _has_path_segment(path: str, segment: str) -> bool:
     parts = [part for part in _normalize_path(path).split("/") if part]
     return segment.lower() in parts
+
 
 def _is_temp_path(path: str) -> bool:
     normalized = _normalize_path(path)
@@ -1545,23 +1362,25 @@ def _is_temp_path(path: str) -> bool:
         or "/appdata/local/temp/" in f"/{normalized}/"
     )
 
+
 def _matches_allowed_prefix(paths: list[str], allowed_prefixes: Any) -> bool:
     prefixes = allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
     normalized_prefixes = [_normalize_path(str(prefix)) for prefix in prefixes if str(prefix)]
     if not normalized_prefixes:
         return True
-
     normalized_paths = [_normalize_path(path) for path in paths]
     for path in normalized_paths:
         if any(path == prefix or path.startswith(f"{prefix}/") for prefix in normalized_prefixes):
             return True
     return False
 
+
 def _validate_required_rule_keys(data: Mapping[str, Any]) -> None:
     missing = sorted(key for key in _REQUIRED_RULE_KEYS if key not in data)
     if missing:
         joined = ", ".join(missing)
         raise RuleSchemaError(f"rule is missing required field(s): {joined}")
+
 
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):

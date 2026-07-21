@@ -97,22 +97,6 @@ def build_render_settings_section(
 
     _add_left_aligned_widget(layout, content, qt_widgets)
     layout.addStretch(0)
-    # region agent log
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(
-        "render_settings_section.py:build",
-        "render tab layout",
-        {
-            "scroll_area": False,
-            "tab_left_margin": 0,
-            "grid_content_width": _RENDER_GRID_CONTENT_WIDTH,
-            "label_width": _RENDER_LABEL_WIDTH,
-        },
-        hypothesis_id="render-layout-align",
-        run_id="post-fix",
-    )
-    # endregion
     return section
 
 

@@ -1,4 +1,5 @@
 """Route fix application between Maya scene edits and USD stage edits."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -8,22 +9,9 @@ from typing import Any, Optional
 
 from pipeline_inspector.core.fix_plan import FixAction
 
-USD_STAGE_FIX_TYPES = frozenset(
-    {
-        "set_default_prim",
-        "set_attr",
-        "normalize_path",
-        "relink_path",
-    }
-)
+USD_STAGE_FIX_TYPES = frozenset({"set_default_prim", "set_attr", "normalize_path", "relink_path"})
 USD_PRIM_FIX_TYPES = frozenset(
-    {
-        "set_attr",
-        "normalize_path",
-        "relink_path",
-        "rename_node",
-        "rename_texture_file",
-    }
+    {"set_attr", "normalize_path", "relink_path", "rename_node", "rename_texture_file"}
 )
 
 
@@ -37,7 +25,6 @@ def apply_fix_actions(
     studio_environment: Optional[Any] = None,
 ) -> Any:
     """Apply fixes to Maya nodes and USD proxy stages in the current scene."""
-
     from pipeline_inspector.maya import fix_applier as maya_fix_applier
     from pipeline_inspector.maya.usd_scene_scan import _collect_usd_proxy_paths
     from pipeline_inspector.usd.fix_applier import apply_usd_fix_actions
@@ -46,7 +33,6 @@ def apply_fix_actions(
         from pipeline_inspector.maya.commands import _maya_cmds
 
         cmds = _maya_cmds()
-
     from pipeline_inspector.studio_config import StudioEnvironmentSettings
     from pipeline_inspector.util.paths import sync_studio_environment_to_os
 
@@ -57,9 +43,7 @@ def apply_fix_actions(
             else StudioEnvironmentSettings.from_mapping(studio_environment)
         )
         sync_studio_environment_to_os(env)
-
     usd_actions, maya_actions = _partition_fix_actions(actions, cmds)
-
     maya_report = None
     if maya_actions:
         maya_report = maya_fix_applier.apply_fix_actions(
@@ -69,18 +53,10 @@ def apply_fix_actions(
             allow_locked=allow_locked,
             allow_high_risk=allow_high_risk,
         )
-
     usd_records = []
     if usd_actions:
         resolved_usd_actions = _resolve_usd_prim_fix_actions(usd_actions, cmds)
         for path in _collect_usd_proxy_paths(cmds):
-            # #region agent log
-            _debug_usd_apply_route_log(
-                str(path),
-                action_count=len(resolved_usd_actions),
-                route="disk",
-            )
-            # #endregion
             usd_records.extend(
                 apply_usd_fix_actions(
                     path,
@@ -89,8 +65,7 @@ def apply_fix_actions(
                     studio_environment=studio_environment,
                 )
             )
-
-    if maya_report is not None and not usd_records:
+    if maya_report is not None and (not usd_records):
         return maya_report
     if maya_report is None and usd_records:
         return _usd_only_report(usd_records)
@@ -98,11 +73,9 @@ def apply_fix_actions(
 
 
 def _partition_fix_actions(
-    actions: Sequence[FixAction],
-    cmds: Any,
+    actions: Sequence[FixAction], cmds: Any
 ) -> tuple[list[FixAction], list[FixAction]]:
     """Split planned fixes between Maya DAG edits and on-disk USD stage edits."""
-
     from pipeline_inspector.maya.usd_scene_scan import _collect_usd_proxy_paths
 
     has_usd_proxy = bool(_collect_usd_proxy_paths(cmds))
@@ -113,7 +86,7 @@ def _partition_fix_actions(
             usd_actions.append(action)
         else:
             maya_actions.append(action)
-    return usd_actions, maya_actions
+    return (usd_actions, maya_actions)
 
 
 def _is_usd_stage_action(action: FixAction, *, has_usd_proxy: bool) -> bool:
@@ -133,12 +106,8 @@ def _is_usd_stage_action(action: FixAction, *, has_usd_proxy: bool) -> bool:
     return action.target_kind in {"scene", "graph"}
 
 
-def _resolve_usd_prim_fix_actions(
-    actions: Sequence[FixAction],
-    cmds: Any,
-) -> list[FixAction]:
+def _resolve_usd_prim_fix_actions(actions: Sequence[FixAction], cmds: Any) -> list[FixAction]:
     """Resolve short Maya-style prim identifiers to full USD prim paths."""
-
     from pipeline_inspector.maya.usd_navigation import find_usd_prim_for_issue
 
     resolved: list[FixAction] = []
@@ -156,18 +125,13 @@ def _resolve_usd_prim_fix_actions(
             )
         if not str(action.target_id).startswith("prim:"):
             if prim_path:
-                normalized = (
-                    prim_path if prim_path.startswith("/") else f"/{prim_path.lstrip('/')}"
-                )
+                normalized = prim_path if prim_path.startswith("/") else f"/{prim_path.lstrip('/')}"
                 resolved.append(
                     replace(
                         action,
                         target_id=f"prim:{normalized}",
                         target_node=normalized,
-                        params={
-                            **action.params,
-                            "resolved_prim_path": normalized,
-                        },
+                        params={**action.params, "resolved_prim_path": normalized},
                     )
                 )
             else:
@@ -189,28 +153,10 @@ def _resolve_usd_prim_fix_actions(
                 action,
                 target_id=f"prim:{normalized}",
                 target_node=normalized,
-                params={
-                    **action.params,
-                    "resolved_prim_path": normalized,
-                },
+                params={**action.params, "resolved_prim_path": normalized},
             )
         )
     return resolved
-
-
-def _debug_usd_apply_route_log(usd_path: str, *, action_count: int, route: str) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(
-        "maya.fix_router.apply_fix_actions",
-        "Routing USD fixes",
-        {
-            "usd_path": usd_path,
-            "action_count": str(action_count),
-            "route": route,
-        },
-        hypothesis_id="H30",
-    )
 
 
 def _proxy_stage_for_path(cmds: Any, usd_path: Path) -> Any:
@@ -222,7 +168,7 @@ def _proxy_stage_for_path(cmds: Any, usd_path: Path) -> Any:
         for attr in ("filePath", "fp"):
             try:
                 raw_path = str(cmds.getAttr(f"{shape}.{attr}") or "").strip()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
             if not raw_path:
                 continue
@@ -236,8 +182,7 @@ def _usd_only_report(records: list[Any]) -> Any:
     from pipeline_inspector.maya.fix_applier import DEFAULT_UNDO_CHUNK_NAME, ApplyFixReport
 
     return ApplyFixReport(
-        records=tuple(_coerce_apply_records(records)),
-        undo_chunk_name=DEFAULT_UNDO_CHUNK_NAME,
+        records=tuple(_coerce_apply_records(records)), undo_chunk_name=DEFAULT_UNDO_CHUNK_NAME
     )
 
 
@@ -245,8 +190,7 @@ def _merge_reports(maya_report: Any, usd_records: list[Any]) -> Any:
     from pipeline_inspector.maya.fix_applier import DEFAULT_UNDO_CHUNK_NAME, ApplyFixReport
 
     undo_chunk_name = str(
-        getattr(maya_report, "undo_chunk_name", DEFAULT_UNDO_CHUNK_NAME)
-        or DEFAULT_UNDO_CHUNK_NAME
+        getattr(maya_report, "undo_chunk_name", DEFAULT_UNDO_CHUNK_NAME) or DEFAULT_UNDO_CHUNK_NAME
     )
     records = list(getattr(maya_report, "records", []) or ())
     records.extend(_coerce_apply_records(usd_records))
@@ -309,7 +253,6 @@ def _usd_record_as_applied(record: Any) -> Any:
             message=str(payload.get("message", "")),
             block_reasons=list(payload.get("block_reasons") or ()),
         )
-
     payload = record.to_dict()
     return AppliedFixRecord(
         fix_id=str(payload["fix_id"]),

@@ -162,8 +162,6 @@ def test_detach_panel_floats_workspace_control(monkeypatch: Any):
     monkeypatch.setattr(ui_launcher, "_PANEL", panel)
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
-    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
-
     assert ui_launcher.detach_panel() is True
     assert cmds.floating is True
     assert any(edit.get("floating") is True for edit in cmds.edited)
@@ -187,8 +185,6 @@ def test_detach_panel_falls_back_to_standalone_window(monkeypatch: Any):
     monkeypatch.setattr(ui_launcher, "_PANEL", panel)
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
-    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
-
     assert ui_launcher.detach_panel() is True
     assert panel.show_calls == [{"dockable": False, "floating": True}]
 
@@ -201,8 +197,6 @@ def test_dock_panel_redocks_workspace_control(monkeypatch: Any):
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
     monkeypatch.setattr(ui_launcher, "_sync_workspace_control_width", lambda _content: None)
-    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
-
     assert ui_launcher.dock_panel() is True
     assert cmds.floating is False
     assert any(edit.get("dockToMainWindow") == ("right", True) for edit in cmds.edited)
@@ -223,8 +217,6 @@ def test_dock_panel_redocks_via_mixin(monkeypatch: Any):
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
     monkeypatch.setattr(ui_launcher, "_sync_workspace_control_width", lambda _content: None)
-    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
-
     assert ui_launcher.dock_panel() is True
     assert cmds.floating is False
     assert panel.show_calls == []
@@ -237,8 +229,6 @@ def test_dock_panel_recreates_dock_from_standalone_window(monkeypatch: Any):
     monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
     monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
     monkeypatch.setattr(ui_launcher, "_sync_workspace_control_width", lambda _content: None)
-    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
-
     assert ui_launcher.dock_panel() is True
     assert panel.show_calls == [
         {
@@ -365,8 +355,6 @@ def test_schedule_on_main_thread_uses_execute_deferred_from_worker(monkeypatch: 
         "pipeline_inspector.ui.qt.qt_single_shot_callback",
         lambda _qt_widgets=None: FakeTimer.singleShot,
     )
-    monkeypatch.setattr(ui_launcher, "_debug_validate_cycle_log", lambda *_args, **_kwargs: None)
-
     import threading
 
     def _worker() -> None:

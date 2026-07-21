@@ -1,22 +1,17 @@
 """Settings screen for the Maya Pipeline Inspector panel."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from pipeline_inspector.connectors_registry import (
-    iter_connectors,
-    update_connector_views,
-)
+from pipeline_inspector.connectors_registry import iter_connectors, update_connector_views
 from pipeline_inspector.connectors_registry import (
     read_connectors_from_settings_view as _read_connectors_from_registry,
 )
 from pipeline_inspector.studio_config import ConnectorSettings, StudioConfig
-from pipeline_inspector.trackers_registry import (
-    iter_trackers,
-    update_tracker_views,
-)
+from pipeline_inspector.trackers_registry import iter_trackers, update_tracker_views
 from pipeline_inspector.trackers_registry import (
     read_trackers_from_settings_view as _read_trackers_from_registry,
 )
@@ -83,14 +78,9 @@ from pipeline_inspector.user_config import UserPreferences
 
 SETTINGS_VIEW_OBJECT_NAME = "pipelineInspectorSettingsView"
 SETTINGS_TAB_WIDGET_OBJECT_NAME = "pipelineInspectorSettingsTabWidget"
-_SETTINGS_TAB_PANE_STYLESHEET = """
-QTabWidget::pane {
-    top: -1px;
-    padding: 0px;
-    margin: 0px;
-}
-""".strip()
-
+_SETTINGS_TAB_PANE_STYLESHEET = (
+    "\nQTabWidget::pane {\n    top: -1px;\n    padding: 0px;\n    margin: 0px;\n}\n".strip()
+)
 SETTINGS_BACK_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsBackButton"
 SETTINGS_STATUS_LABEL_OBJECT_NAME = "pipelineInspectorSettingsStatusLabel"
 SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsSaveStudioButton"
@@ -99,19 +89,14 @@ SETTINGS_SAVE_USER_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsSaveUserButton
 SETTINGS_LOAD_USER_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsLoadUserButton"
 SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME = "pipelineInspectorSettingsStudioConfigPathLabel"
 SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME = "pipelineInspectorSettingsUserConfigPathLabel"
-
-# Backward-compatible aliases for older tests and integrations.
 SETTINGS_SAVE_BUTTON_OBJECT_NAME = SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME
 SETTINGS_LOAD_BUTTON_OBJECT_NAME = SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME
 SETTINGS_CONFIG_PATH_LABEL_OBJECT_NAME = SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME
-
 SETTINGS_PIPELINE_SECTION_OBJECT_NAME = "pipelineInspectorSettingsPipelineSection"
 SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollArea"
 SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME = "pipelineInspectorSettingsStudioScrollContent"
 SETTINGS_CONNECTORS_SCROLL_AREA_OBJECT_NAME = "pipelineInspectorSettingsConnectorsScrollArea"
-SETTINGS_CONNECTORS_SCROLL_CONTENT_OBJECT_NAME = (
-    "pipelineInspectorSettingsConnectorsScrollContent"
-)
+SETTINGS_CONNECTORS_SCROLL_CONTENT_OBJECT_NAME = "pipelineInspectorSettingsConnectorsScrollContent"
 
 
 @dataclass(frozen=True)
@@ -161,18 +146,14 @@ def build_settings_view(
     callbacks: Optional[SettingsActionCallbacks] = None,
 ) -> Any:
     """Build the settings screen with category tabs and studio pipeline controls."""
-
     studio_config = config or StudioConfig.default()
     active_user_config = user_config or UserPreferences.default()
     settings_callbacks = callbacks or SettingsActionCallbacks()
-
     view = qt_widgets.QWidget()
     view.setObjectName(SETTINGS_VIEW_OBJECT_NAME)
-
     layout = qt_widgets.QVBoxLayout(view)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(6)
-
     top_row = qt_widgets.QHBoxLayout()
     back_button = qt_widgets.QPushButton("Back")
     back_button.setObjectName(SETTINGS_BACK_BUTTON_OBJECT_NAME)
@@ -180,7 +161,6 @@ def build_settings_view(
     top_row.addWidget(back_button)
     top_row.addStretch(1)
     layout.addLayout(top_row)
-
     tabs = qt_widgets.QTabWidget()
     tabs.setObjectName(SETTINGS_TAB_WIDGET_OBJECT_NAME)
     set_tab_style = getattr(tabs, "setStyleSheet", None)
@@ -188,25 +168,18 @@ def build_settings_view(
         set_tab_style(_SETTINGS_TAB_PANE_STYLESHEET)
     for spec in SETTINGS_TAB_SPECS:
         tab_widget = _build_settings_tab(
-            qt_widgets,
-            spec.tab_id,
-            studio_config,
-            active_user_config,
-            settings_callbacks,
+            qt_widgets, spec.tab_id, studio_config, active_user_config, settings_callbacks
         )
         tabs.addTab(tab_widget, spec.title)
     layout.addWidget(tabs)
-
     studio_path_label = qt_widgets.QLabel(_studio_config_path_text(studio_config))
     studio_path_label.setObjectName(SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME)
     studio_path_label.setWordWrap(True)
     layout.addWidget(studio_path_label)
-
     user_path_label = qt_widgets.QLabel(_user_config_path_text(active_user_config))
     user_path_label.setObjectName(SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME)
     user_path_label.setWordWrap(True)
     layout.addWidget(user_path_label)
-
     dirty_banner = qt_widgets.QLabel("")
     dirty_banner.setObjectName(SETTINGS_DIRTY_BANNER_OBJECT_NAME)
     dirty_banner.setWordWrap(True)
@@ -214,38 +187,32 @@ def build_settings_view(
     if set_visible is not None:
         set_visible(False)
     layout.addWidget(dirty_banner)
-
     status_label = qt_widgets.QLabel(DEFAULT_SETTINGS_STATUS_MESSAGE)
     status_label.setObjectName(SETTINGS_STATUS_LABEL_OBJECT_NAME)
     status_label.setWordWrap(True)
     layout.addWidget(status_label)
-
     studio_actions_row = qt_widgets.QHBoxLayout()
     save_studio_button = qt_widgets.QPushButton("Save Studio Config")
     save_studio_button.setObjectName(SETTINGS_SAVE_STUDIO_BUTTON_OBJECT_NAME)
     wire_button(save_studio_button, settings_callbacks.on_save_studio_settings)
     studio_actions_row.addWidget(save_studio_button)
-
     load_studio_button = qt_widgets.QPushButton("Load Studio Config")
     load_studio_button.setObjectName(SETTINGS_LOAD_STUDIO_BUTTON_OBJECT_NAME)
     wire_button(load_studio_button, settings_callbacks.on_load_studio_settings)
     studio_actions_row.addWidget(load_studio_button)
     studio_actions_row.addStretch(1)
     layout.addLayout(studio_actions_row)
-
     user_actions_row = qt_widgets.QHBoxLayout()
     save_user_button = qt_widgets.QPushButton("Save User Preferences")
     save_user_button.setObjectName(SETTINGS_SAVE_USER_BUTTON_OBJECT_NAME)
     wire_button(save_user_button, settings_callbacks.on_save_user_preferences)
     user_actions_row.addWidget(save_user_button)
-
     load_user_button = qt_widgets.QPushButton("Load User Preferences")
     load_user_button.setObjectName(SETTINGS_LOAD_USER_BUTTON_OBJECT_NAME)
     wire_button(load_user_button, settings_callbacks.on_load_user_preferences)
     user_actions_row.addWidget(load_user_button)
     user_actions_row.addStretch(1)
     layout.addLayout(user_actions_row)
-
     return view
 
 
@@ -258,7 +225,6 @@ def prepare_settings_interactive_state(
     on_theme_changed: Optional[Callable[[], None]] = None,
 ) -> None:
     """Wire Basic settings interactions when the settings screen is opened."""
-
     prepare_basic_settings_interactions(
         view,
         qt_widgets,
@@ -269,13 +235,9 @@ def prepare_settings_interactive_state(
 
 
 def build_require_tx_toggle(
-    qt_widgets: Any,
-    *,
-    enabled: bool,
-    on_changed: Optional[Callable[[bool], None]] = None,
+    qt_widgets: Any, *, enabled: bool, on_changed: Optional[Callable[[bool], None]] = None
 ) -> Any:
     """Build a green/gray toggle button for the .tx pipeline policy."""
-
     from pipeline_inspector.ui.settings_widgets import build_settings_toggle
 
     return build_settings_toggle(
@@ -287,17 +249,11 @@ def build_require_tx_toggle(
 
 
 def read_connectors_from_settings_view(
-    view: Any,
-    qt_widgets: Any,
-    *,
-    base: ConnectorSettings | None = None,
+    view: Any, qt_widgets: Any, *, base: ConnectorSettings | None = None
 ) -> ConnectorSettings:
     """Read connector settings currently shown in the settings UI."""
-
     return _read_trackers_from_registry(
-        view,
-        qt_widgets,
-        base=_read_connectors_from_registry(view, qt_widgets, base=base),
+        view, qt_widgets, base=_read_connectors_from_registry(view, qt_widgets, base=base)
     )
 
 
@@ -311,7 +267,6 @@ def update_settings_view(
     dirty_state: SettingsDirtyState | None = None,
 ) -> None:
     """Refresh settings controls from the active studio and user config."""
-
     update_studio_policy_view(view, qt_widgets, config)
     update_governance_view(view, qt_widgets, config)
     update_support_and_roles_view(view, qt_widgets, config.readiness)
@@ -320,28 +275,20 @@ def update_settings_view(
     update_studio_environment_view(view, qt_widgets, config.studio_environment)
     update_render_settings_view(view, qt_widgets, config.render)
     update_bug_report_view(view, qt_widgets, config.bug_report)
-
     if user_config is not None:
         update_basic_settings_view(view, qt_widgets, user_config)
         update_advanced_settings_view(view, qt_widgets, user_config)
-
     studio_path_label = find_child(
-        view,
-        qt_widgets.QLabel,
-        SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME,
+        view, qt_widgets.QLabel, SETTINGS_STUDIO_CONFIG_PATH_LABEL_OBJECT_NAME
     )
     if studio_path_label is not None:
         studio_path_label.setText(_studio_config_path_text(config))
-
     if user_config is not None:
         user_path_label = find_child(
-            view,
-            qt_widgets.QLabel,
-            SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME,
+            view, qt_widgets.QLabel, SETTINGS_USER_CONFIG_PATH_LABEL_OBJECT_NAME
         )
         if user_path_label is not None:
             user_path_label.setText(_user_config_path_text(user_config))
-
     if status_message:
         status_label = find_child(view, qt_widgets.QLabel, SETTINGS_STATUS_LABEL_OBJECT_NAME)
         if status_label is not None:
@@ -350,7 +297,6 @@ def update_settings_view(
         status_label = find_child(view, qt_widgets.QLabel, SETTINGS_STATUS_LABEL_OBJECT_NAME)
         if status_label is not None:
             status_label.setText(DEFAULT_SETTINGS_STATUS_MESSAGE)
-
     if dirty_state is not None:
         dirty_banner = find_child(view, qt_widgets.QLabel, SETTINGS_DIRTY_BANNER_OBJECT_NAME)
         if dirty_banner is not None:
@@ -362,13 +308,9 @@ def update_settings_view(
 
 
 def read_user_preferences_from_settings_view(
-    view: Any,
-    qt_widgets: Any,
-    *,
-    base: UserPreferences | None = None,
+    view: Any, qt_widgets: Any, *, base: UserPreferences | None = None
 ) -> UserPreferences:
     """Read user preference fields currently shown in the settings UI."""
-
     base = base or UserPreferences.default()
     merged = read_basic_user_preferences_from_view(view, qt_widgets, base=base)
     return read_advanced_user_preferences_from_view(view, qt_widgets, base=merged)
@@ -384,7 +326,6 @@ def _build_settings_tab(
     spec = get_settings_tab_spec(tab_id)
     if spec is None:
         raise ValueError(f"Unknown settings tab id: {tab_id}")
-
     if tab_id == "basic":
         return _build_basic_tab(qt_widgets, user_config, callbacks)
     if tab_id == "advanced":
@@ -397,9 +338,7 @@ def _build_settings_tab(
         )
     if tab_id == "studio":
         return build_placeholder_tab(
-            qt_widgets,
-            spec,
-            builder=lambda widgets: _build_studio_tab(widgets, config, callbacks),
+            qt_widgets, spec, builder=lambda widgets: _build_studio_tab(widgets, config, callbacks)
         )
     if tab_id == "studio_environment":
         return _build_studio_environment_tab(qt_widgets, config, callbacks)
@@ -411,9 +350,7 @@ def _build_settings_tab(
 
 
 def _build_basic_tab(
-    qt_widgets: Any,
-    user_config: UserPreferences,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, user_config: UserPreferences, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_BASIC_TAB_OBJECT_NAME)
@@ -433,9 +370,7 @@ def _build_basic_tab(
 
 
 def _build_advanced_tab(
-    qt_widgets: Any,
-    user_config: UserPreferences,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, user_config: UserPreferences, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_ADVANCED_TAB_OBJECT_NAME)
@@ -456,37 +391,30 @@ def _build_advanced_tab(
 
 
 def _build_connectors_tab(
-    qt_widgets: Any,
-    config: StudioConfig,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, config: StudioConfig, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_CONNECTORS_TAB_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
-
     scroll_content = qt_widgets.QWidget()
     scroll_content.setObjectName(SETTINGS_CONNECTORS_SCROLL_CONTENT_OBJECT_NAME)
     content_layout = qt_widgets.QVBoxLayout(scroll_content)
     content_layout.setContentsMargins(0, 0, 0, 0)
     content_layout.setSpacing(8)
-
     connector_count = 0
     for connector in iter_connectors():
         section = connector.build_section(qt_widgets, config, callbacks)
         content_layout.addWidget(section)
         connector_count += 1
-
     for tracker in iter_trackers():
         if tracker.build_section is None:
             continue
         section = tracker.build_section(qt_widgets, config, callbacks)
         content_layout.addWidget(section)
         connector_count += 1
-
     content_layout.addStretch(1)
-
     scroll_area = build_borderless_scroll_area(
         qt_widgets,
         object_name=SETTINGS_CONNECTORS_SCROLL_AREA_OBJECT_NAME,
@@ -494,34 +422,11 @@ def _build_connectors_tab(
         allow_horizontal_scroll=True,
     )
     layout.addWidget(scroll_area)
-    # region agent log
-    _debug_log_connectors_tab_layout(
-        connector_count=connector_count,
-        has_scroll_area=scroll_area is not scroll_content,
-    )
-    # endregion
     return tab
 
 
-def _debug_log_connectors_tab_layout(*, connector_count: int, has_scroll_area: bool) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(
-        "settings_panel.py:_build_connectors_tab",
-        "connectors tab scroll layout built",
-        {
-            "connector_count": connector_count,
-            "has_scroll_area": has_scroll_area,
-        },
-        hypothesis_id="H1",
-        run_id="connectors-scroll",
-    )
-
-
 def _build_render_tab(
-    qt_widgets: Any,
-    config: StudioConfig,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, config: StudioConfig, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_RENDER_TAB_OBJECT_NAME)
@@ -540,9 +445,7 @@ def _build_render_tab(
 
 
 def _build_studio_environment_tab(
-    qt_widgets: Any,
-    config: StudioConfig,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, config: StudioConfig, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME)
@@ -551,9 +454,7 @@ def _build_studio_environment_tab(
     layout.setSpacing(8)
     layout.addWidget(
         build_studio_environment_section(
-            qt_widgets,
-            config,
-            on_settings_changed=callbacks.on_studio_environment_changed,
+            qt_widgets, config, on_settings_changed=callbacks.on_studio_environment_changed
         )
     )
     layout.addStretch(1)
@@ -561,9 +462,7 @@ def _build_studio_environment_tab(
 
 
 def _build_bug_report_tab(
-    qt_widgets: Any,
-    config: StudioConfig,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, config: StudioConfig, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_BUG_REPORT_TAB_OBJECT_NAME)
@@ -583,16 +482,13 @@ def _build_bug_report_tab(
 
 
 def _build_studio_tab(
-    qt_widgets: Any,
-    config: StudioConfig,
-    callbacks: SettingsActionCallbacks,
+    qt_widgets: Any, config: StudioConfig, callbacks: SettingsActionCallbacks
 ) -> Any:
     tab = qt_widgets.QWidget()
     tab.setObjectName(SETTINGS_STUDIO_TAB_OBJECT_NAME)
     layout = qt_widgets.QVBoxLayout(tab)
     layout.setContentsMargins(8, 8, 8, 8)
     layout.setSpacing(8)
-
     scroll_content = qt_widgets.QWidget()
     scroll_content.setObjectName(SETTINGS_STUDIO_SCROLL_CONTENT_OBJECT_NAME)
     content_layout = qt_widgets.QVBoxLayout(scroll_content)
@@ -608,20 +504,15 @@ def _build_studio_tab(
     )
     content_layout.addWidget(
         build_governance_section(
-            qt_widgets,
-            config,
-            on_settings_changed=callbacks.on_governance_changed,
+            qt_widgets, config, on_settings_changed=callbacks.on_governance_changed
         )
     )
     content_layout.addWidget(
         build_support_and_roles_section(
-            qt_widgets,
-            config,
-            on_settings_changed=callbacks.on_readiness_settings_changed,
+            qt_widgets, config, on_settings_changed=callbacks.on_readiness_settings_changed
         )
     )
     content_layout.addStretch(1)
-
     scroll_area = build_borderless_scroll_area(
         qt_widgets,
         object_name=SETTINGS_STUDIO_SCROLL_AREA_OBJECT_NAME,
@@ -636,10 +527,7 @@ def _studio_config_path_text(config: StudioConfig) -> str:
     studio_name = str(config.studio_name or "").strip()
     name_prefix = f'Studio "{studio_name}" — ' if studio_name else ""
     if config.config_path is None:
-        return (
-            f"{name_prefix}pipeline_inspector_studio.json not saved yet "
-            "(in-session defaults)."
-        )
+        return f"{name_prefix}pipeline_inspector_studio.json not saved yet (in-session defaults)."
     return f"{name_prefix}pipeline_inspector_studio.json: {config.config_path}"
 
 

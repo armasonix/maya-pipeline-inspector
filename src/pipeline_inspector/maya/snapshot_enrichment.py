@@ -4,6 +4,7 @@ The scanner records raw Maya graph data. This module normalizes common runtime
 Maya details that rule packs depend on: semantic texture slots, UDIM metadata,
 and displacement amount aliases.
 """
+
 from __future__ import annotations
 
 import glob
@@ -42,42 +43,31 @@ from pipeline_inspector.studio_config import StudioEnvironmentSettings
 from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 from pipeline_inspector.util.paths import resolve_studio_path
 
-_UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
+_UDIM_TILE_RE = re.compile("(?<!\\d)(1\\d{3}|2\\d{3})(?!\\d)")
 _UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
 _DISPLACEMENT_NODE_TYPES = {"displacementShader", "VRayDisplacement", "VRayDisplacementTex"}
 
+
 def prepare_snapshot_for_validation(
-    snapshot: GraphSnapshot,
-    *,
-    studio_environment: Optional[StudioEnvironmentSettings] = None,
+    snapshot: GraphSnapshot, *, studio_environment: Optional[StudioEnvironmentSettings] = None
 ) -> GraphSnapshot:
     """Return a validation-ready snapshot with runtime semantics and UDIM metadata."""
-
     from pipeline_inspector.usd.enrichment import (
         is_usd_snapshot,
         prepare_usd_snapshot_for_validation,
     )
 
     if is_usd_snapshot(snapshot):
-        return prepare_usd_snapshot_for_validation(
-            snapshot,
-            studio_environment=studio_environment,
-        )
-
+        return prepare_usd_snapshot_for_validation(snapshot, studio_environment=studio_environment)
     enriched = enrich_snapshot(snapshot, studio_environment=studio_environment)
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
     resolved = resolver.apply_to_snapshot(enriched)
     propagated = _with_propagated_semantic_slots(resolved)
-    return enrich_displacement_metadata(
-        enrich_arnold_metadata(enrich_vray_metadata(propagated))
-    )
+    return enrich_displacement_metadata(enrich_arnold_metadata(enrich_vray_metadata(propagated)))
 
-def enrich_rule_results(
-    snapshot: GraphSnapshot,
-    results: list[RuleResult],
-) -> list[RuleResult]:
+
+def enrich_rule_results(snapshot: GraphSnapshot, results: list[RuleResult]) -> list[RuleResult]:
     """Attach owning material names to validation results when possible."""
-
     material_index = build_material_index(snapshot)
     enriched: list[RuleResult] = []
     for result in results:
@@ -91,17 +81,15 @@ def enrich_rule_results(
             enriched.append(replace(result, material=material))
     return enriched
 
+
 def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
     """Map node ids and short names to owning material names."""
-
     index: dict[str, str] = {}
     incoming: dict[str, list[str]] = {}
     for connection in snapshot.connections:
         incoming.setdefault(connection.dst_node, []).append(connection.src_node)
-
     texture_types = {"file", "VRayBitmap", "aiImage"}
     nodes_by_id = {node.id: node for node in snapshot.nodes}
-
     for material in snapshot.materials:
         index[material.node_id] = material.name
         index[material.name] = material.name
@@ -117,14 +105,10 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
             index[node_id] = material.name
             index[_short_node_id(node_id)] = material.name
             for texture_id in _upstream_texture_nodes(
-                node_id,
-                incoming,
-                nodes_by_id,
-                texture_types,
+                node_id, incoming, nodes_by_id, texture_types
             ):
                 index[texture_id] = material.name
                 index[_short_node_id(texture_id)] = material.name
-
     for node in snapshot.nodes:
         if not str(node.id).startswith("prim:"):
             continue
@@ -135,7 +119,6 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
         index[node.id] = material_name
         index[prim_path] = material_name
         index[f"prim:{prim_path}"] = material_name
-
     for dependency in snapshot.file_dependencies:
         if not str(dependency.node_id).startswith("prim:"):
             continue
@@ -146,8 +129,8 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
         index[dependency.node_id] = material_name
         index[prim_path] = material_name
         index[f"prim:{prim_path}"] = material_name
-
     return index
+
 
 def _upstream_texture_nodes(
     start_node_id: str,
@@ -170,18 +153,15 @@ def _upstream_texture_nodes(
         stack.extend(incoming.get(node_id, ()))
     return found
 
+
 def enrich_snapshot(
-    snapshot: GraphSnapshot,
-    *,
-    studio_environment: Optional[StudioEnvironmentSettings] = None,
+    snapshot: GraphSnapshot, *, studio_environment: Optional[StudioEnvironmentSettings] = None
 ) -> GraphSnapshot:
     """Return a validation-ready snapshot enriched with runtime semantics."""
-
     base_nodes = tuple(_enrich_node(node) for node in snapshot.nodes)
     base_nodes_by_id = {node.id: node for node in base_nodes}
     connections = tuple(
-        _enrich_connection(connection, base_nodes_by_id)
-        for connection in snapshot.connections
+        _enrich_connection(connection, base_nodes_by_id) for connection in snapshot.connections
     )
     node_semantics = _node_semantics_from_connections(connections)
     nodes = tuple(_apply_node_semantic(node, node_semantics.get(node.id)) for node in base_nodes)
@@ -219,6 +199,7 @@ def enrich_snapshot(
         materials=list(materials),
     )
 
+
 def _enrich_node(node: NodeSnapshot) -> NodeSnapshot:
     attrs = dict(node.attrs)
     if _is_displacement_node(node) and "amount" not in attrs:
@@ -228,6 +209,7 @@ def _enrich_node(node: NodeSnapshot) -> NodeSnapshot:
                 break
     return replace(node, attrs=attrs)
 
+
 def _apply_node_semantic(node: NodeSnapshot, semantic: Optional[str]) -> NodeSnapshot:
     if not semantic:
         return node
@@ -235,9 +217,9 @@ def _apply_node_semantic(node: NodeSnapshot, semantic: Optional[str]) -> NodeSna
     attrs.setdefault("semantic_slot", semantic)
     return replace(node, attrs=attrs)
 
+
 def _enrich_connection(
-    connection: ConnectionSnapshot,
-    nodes_by_id: dict[str, NodeSnapshot],
+    connection: ConnectionSnapshot, nodes_by_id: dict[str, NodeSnapshot]
 ) -> ConnectionSnapshot:
     if connection.semantic:
         return connection
@@ -245,19 +227,16 @@ def _enrich_connection(
     semantic = _semantic_from_destination(connection.dst_attr, dst_node)
     return replace(connection, semantic=semantic) if semantic else connection
 
-def _node_semantics_from_connections(
-    connections: tuple[ConnectionSnapshot, ...],
-) -> dict[str, str]:
+
+def _node_semantics_from_connections(connections: tuple[ConnectionSnapshot, ...]) -> dict[str, str]:
     semantics: dict[str, str] = {}
     for connection in connections:
         if connection.semantic:
             semantics.setdefault(connection.src_node, connection.semantic)
     return semantics
 
-def _semantic_from_destination(
-    dst_attr: str,
-    dst_node: Optional[NodeSnapshot],
-) -> Optional[str]:
+
+def _semantic_from_destination(dst_attr: str, dst_node: Optional[NodeSnapshot]) -> Optional[str]:
     attr = dst_attr.lower()
     dst_type = (dst_node.type_name if dst_node else "").lower()
     if "displacement" in attr or "displacement" in dst_type:
@@ -283,6 +262,7 @@ def _semantic_from_destination(
         return "base_color"
     return None
 
+
 def _enrich_file_dependency(
     dependency: FileDependencySnapshot,
     node: Optional[NodeSnapshot],
@@ -291,37 +271,16 @@ def _enrich_file_dependency(
 ) -> FileDependencySnapshot:
     udim_pattern = _udim_pattern(dependency.raw_path, node)
     resolved_path = _resolve_path(
-        udim_pattern or dependency.raw_path,
-        scene_dir,
-        studio_environment,
+        udim_pattern or dependency.raw_path, scene_dir, studio_environment
     )
     is_udim = bool(udim_pattern) or dependency.is_udim
     if not is_udim:
         enriched = replace(
-            dependency,
-            resolved_path=resolved_path,
-            exists=Path(resolved_path).is_file(),
+            dependency, resolved_path=resolved_path, exists=Path(resolved_path).is_file()
         )
         return _enrich_dependency_image_metadata(enriched)
-
     tiles = _existing_udim_tiles(resolved_path)
     missing = _missing_udim_tiles(tiles)
-    # #region agent log
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(
-        "snapshot_enrichment._enrich_file_dependency",
-        "UDIM dependency enrichment",
-        {
-            "raw_path": (udim_pattern or dependency.raw_path)[:160],
-            "resolved_path": resolved_path[:160],
-            "tile_count": len(tiles),
-            "tiles": ",".join(str(tile) for tile in tiles[:8]),
-            "missing_tiles": ",".join(str(tile) for tile in missing[:8]),
-        },
-        hypothesis_id="H-UDIM2",
-    )
-    # #endregion
     enriched = replace(
         dependency,
         raw_path=udim_pattern or dependency.raw_path,
@@ -333,38 +292,32 @@ def _enrich_file_dependency(
     )
     return _enrich_dependency_image_metadata(enriched)
 
-def _enrich_dependency_image_metadata(
-    dependency: FileDependencySnapshot,
-) -> FileDependencySnapshot:
+
+def _enrich_dependency_image_metadata(dependency: FileDependencySnapshot) -> FileDependencySnapshot:
     if not dependency.exists or not dependency.resolved_path:
         return dependency
-
     resolved = dependency.resolved_path
     if dependency.is_udim and "<UDIM>" in resolved:
         tiles = dependency.udim_tiles or _existing_udim_tiles(resolved)
         if tiles:
-            first_tile = str(resolved).replace("<UDIM>", f"{tiles[0]:04d}").replace(
-                "<udim>",
-                f"{tiles[0]:04d}",
+            first_tile = (
+                str(resolved)
+                .replace("<UDIM>", f"{tiles[0]:04d}")
+                .replace("<udim>", f"{tiles[0]:04d}")
             )
             width, height = read_image_dimensions(first_tile)
         else:
-            width, height = None, None
+            width, height = (None, None)
     else:
         width, height = read_image_dimensions(resolved)
-
     if width is None and height is None:
         return enrich_optimized_texture_metadata(dependency)
-
     max_dimension = max(width or 0, height or 0) or None
     image_info = ImageInfo(width=width, height=height)
     return enrich_optimized_texture_metadata(
-        replace(
-            dependency,
-            image_info=image_info,
-            max_dimension=max_dimension,
-        )
+        replace(dependency, image_info=image_info, max_dimension=max_dimension)
     )
+
 
 def _enrich_material_fingerprint(
     material: MaterialSnapshot,
@@ -375,30 +328,21 @@ def _enrich_material_fingerprint(
 ) -> MaterialSnapshot:
     if material.graph_fingerprint and material.graph_content_fingerprint:
         return material
-
     nodes_by_id = {node.id: node for node in nodes}
     texture_paths = _material_texture_paths(material, file_dependencies)
     fingerprint = material.graph_fingerprint or material_graph_fingerprint(
-        material,
-        nodes_by_id=nodes_by_id,
-        connections=connections,
-        texture_paths=texture_paths,
+        material, nodes_by_id=nodes_by_id, connections=connections, texture_paths=texture_paths
     )
     content_fingerprint = material.graph_content_fingerprint or material_graph_content_fingerprint(
-        material,
-        nodes_by_id=nodes_by_id,
-        connections=connections,
-        texture_paths=texture_paths,
+        material, nodes_by_id=nodes_by_id, connections=connections, texture_paths=texture_paths
     )
     return replace(
-        material,
-        graph_fingerprint=fingerprint,
-        graph_content_fingerprint=content_fingerprint,
+        material, graph_fingerprint=fingerprint, graph_content_fingerprint=content_fingerprint
     )
 
+
 def _material_texture_paths(
-    material: MaterialSnapshot,
-    file_dependencies: tuple[FileDependencySnapshot, ...],
+    material: MaterialSnapshot, file_dependencies: tuple[FileDependencySnapshot, ...]
 ) -> tuple[str, ...]:
     deps_by_node = {dependency.node_id: dependency for dependency in file_dependencies}
     paths: list[str] = []
@@ -410,6 +354,7 @@ def _material_texture_paths(
         if path:
             paths.append(path)
     return tuple(paths)
+
 
 def _udim_pattern(raw_path: str, node: Optional[NodeSnapshot]) -> Optional[str]:
     if "<UDIM>" in raw_path or "<udim>" in raw_path:
@@ -424,18 +369,19 @@ def _udim_pattern(raw_path: str, node: Optional[NodeSnapshot]) -> Optional[str]:
     name = path.name[: match.start()] + "<UDIM>" + path.name[match.end() :]
     return str(path.with_name(name)).replace("\\", "/")
 
+
 def _uses_maya_udim_mode(node: Optional[NodeSnapshot]) -> bool:
     if node is None:
         return False
     return node.attrs.get("uvTilingMode") in _UDIM_MODE_VALUES
 
+
 def _is_displacement_node(node: NodeSnapshot) -> bool:
     return node.type_name in _DISPLACEMENT_NODE_TYPES or "displacement" in node.type_name.lower()
 
+
 def _resolve_path(
-    raw_path: str,
-    scene_dir: Path,
-    studio_environment: Optional[StudioEnvironmentSettings] = None,
+    raw_path: str, scene_dir: Path, studio_environment: Optional[StudioEnvironmentSettings] = None
 ) -> str:
     path_text = raw_path.replace("\\", "/")
     if studio_environment is not None:
@@ -444,18 +390,17 @@ def _resolve_path(
     path = Path(expanded)
     if path.is_absolute():
         return str(path).replace("\\", "/")
-
     scene_resolved = (scene_dir / expanded).resolve()
     candidates = [scene_resolved, Path(expanded), scene_dir / expanded]
     parts = Path(expanded).parts
-    if "textures" in parts and not any(part == ".." for part in parts):
+    if "textures" in parts and (not any(part == ".." for part in parts)):
         index = parts.index("textures")
         candidates.append(scene_dir.joinpath(*parts[index:]))
-
     for candidate in candidates:
         if _path_or_udim_exists(candidate):
             return str(candidate).replace("\\", "/")
     return str(candidates[-1]).replace("\\", "/")
+
 
 def _path_or_udim_exists(path: Path) -> bool:
     text = str(path).replace("\\", "/")
@@ -463,14 +408,14 @@ def _path_or_udim_exists(path: Path) -> bool:
         return bool(_udim_files(text))
     return path.exists()
 
+
 def _udim_glob_pattern(path: str) -> str:
-    return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace(
-        "<udim>",
-        "[0-9][0-9][0-9][0-9]",
-    )
+    return path.replace("<UDIM>", "[0-9][0-9][0-9][0-9]").replace("<udim>", "[0-9][0-9][0-9][0-9]")
+
 
 def _udim_files(path: str) -> list[Path]:
     return sorted(Path(item) for item in glob.glob(_udim_glob_pattern(path)))
+
 
 def _existing_udim_tiles(path: str) -> list[int]:
     tiles: set[int] = set()
@@ -480,25 +425,27 @@ def _existing_udim_tiles(path: str) -> list[int]:
             tiles.add(int(matches[-1]))
     return sorted(tiles)
 
+
 def _missing_udim_tiles(existing_tiles: list[int]) -> list[int]:
     if len(existing_tiles) < 2:
         return []
     existing = set(existing_tiles)
     return [tile for tile in range(min(existing), max(existing) + 1) if tile not in existing]
 
+
 def _default_adapter_registry() -> RendererAdapterRegistry:
     return RendererAdapterRegistry([CommonMayaAdapter(), VrayAdapter(), ArnoldAdapter()])
+
 
 def _with_propagated_semantic_slots(snapshot: GraphSnapshot) -> GraphSnapshot:
     semantics_by_src: dict[str, str] = {}
     for connection in snapshot.connections:
         if connection.semantic:
             semantics_by_src[connection.src_node] = connection.semantic
-
     nodes: list[NodeSnapshot] = []
     for node in snapshot.nodes:
         semantic = semantics_by_src.get(node.id)
-        if semantic and not node.attrs.get("semantic_slot"):
+        if semantic and (not node.attrs.get("semantic_slot")):
             attrs = dict(node.attrs)
             attrs["semantic_slot"] = semantic
             nodes.append(replace(node, attrs=attrs))
@@ -506,13 +453,10 @@ def _with_propagated_semantic_slots(snapshot: GraphSnapshot) -> GraphSnapshot:
             nodes.append(node)
     return replace(snapshot, nodes=nodes)
 
-def _resolve_result_material(
-    result: RuleResult,
-    material_index: dict[str, str],
-) -> Optional[str]:
+
+def _resolve_result_material(result: RuleResult, material_index: dict[str, str]) -> Optional[str]:
     if result.target_kind == "material":
         return result.node or material_index.get(result.target_id)
-
     for key in (result.target_id, result.node):
         if not key:
             continue
@@ -527,12 +471,11 @@ def _resolve_result_material(
         if prim_path.startswith("prim:"):
             prim_path = prim_path.removeprefix("prim:")
         if prim_path.startswith("/"):
-            material = material_index.get(prim_path) or usd_material_name_from_prim_path(
-                prim_path
-            )
+            material = material_index.get(prim_path) or usd_material_name_from_prim_path(prim_path)
             if material:
                 return material
     return None
+
 
 def _short_node_id(node_id: str) -> str:
     if node_id.startswith("node:"):

@@ -13,6 +13,13 @@ FORBIDDEN_DEBUG_MARKERS = (
     "_debug_session_trace",
     "DEBUG_SESSION_LOG",
     "DEBUG_RUN_ID",
+    "PIPELINE_INSPECTOR_DEBUG_SESSION",
+    "write_agent_cycle_log",
+    "write_debug_log",
+    "util.debug_log",
+    "region agent log",
+    "debug-618f4f",
+    "debug-618f4f.log",
 )
 
 
@@ -46,7 +53,7 @@ def test_repo_has_no_agent_debug_trace_references():
         REPO_ROOT / ".github",
     )
     allowed_suffixes = {".py", ".yml", ".yaml", ".md", ".mel", ".ps1", ".sh"}
-    forbidden_markers = ("agent_debug_log", "_debug_session_trace")
+    forbidden_markers = FORBIDDEN_DEBUG_MARKERS
 
     for root in search_roots:
         for path in root.rglob("*"):

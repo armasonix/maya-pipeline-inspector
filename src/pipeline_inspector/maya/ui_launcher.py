@@ -141,7 +141,6 @@ def show_panel() -> Any:
             raise_panel = getattr(_PANEL, "raise_", None)
             if raise_panel is not None:
                 raise_panel()
-            _debug_workspace_dock_log(cmds, "show_panel.restore", hypothesis_id="H12")
             remember_plugin_version(__version__)
             remember_panel_visible(True)
             return _PANEL
@@ -160,7 +159,6 @@ def show_panel() -> Any:
         width=initial_width,
     )
     _configure_workspace_control_mobility(cmds)
-    _debug_workspace_dock_log(cmds, "show_panel.create", hypothesis_id="H12")
     remember_plugin_version(__version__)
     remember_panel_visible(True)
     return panel
@@ -387,7 +385,6 @@ def detach_panel() -> bool:
     global _PANEL
     cmds = _maya_cmds()
     if _PANEL is None and not _workspace_control_exists(cmds):
-        _debug_workspace_dock_log(cmds, "detach_panel.missing_panel", hypothesis_id="H13")
         return False
 
     _configure_workspace_control_mobility(cmds)
@@ -397,14 +394,12 @@ def detach_panel() -> bool:
         with suppress(RuntimeError, TypeError, ValueError):
             set_params(dockable=True, floating=True)
         if _workspace_control_is_floating(cmds):
-            _debug_workspace_dock_log(cmds, "detach_panel.mixin_float", hypothesis_id="H13")
             return True
 
     if _workspace_control_exists(cmds):
         with suppress(RuntimeError, TypeError, ValueError):
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, floating=True)
         if _workspace_control_is_floating(cmds):
-            _debug_workspace_dock_log(cmds, "detach_panel.workspace_float", hypothesis_id="H13")
             return True
 
     if _PANEL is not None:
@@ -412,16 +407,10 @@ def detach_panel() -> bool:
         if callable(show_panel_widget):
             try:
                 show_panel_widget(dockable=False, floating=True)
-                _debug_workspace_dock_log(
-                    cmds,
-                    "detach_panel.standalone_window",
-                    hypothesis_id="H14",
-                )
                 return True
             except (RuntimeError, TypeError, ValueError):
                 pass
 
-    _debug_workspace_dock_log(cmds, "detach_panel.failed", hypothesis_id="H13")
     return False
 
 
@@ -448,7 +437,6 @@ def dock_panel() -> bool:
     global _PANEL
     cmds = _maya_cmds()
     if _PANEL is None and not _workspace_control_exists(cmds):
-        _debug_workspace_dock_log(cmds, "dock_panel.missing_panel", hypothesis_id="H15")
         return False
 
     initial_width = _preferred_docked_panel_width(_PANEL) if _PANEL is not None else 420
@@ -466,7 +454,6 @@ def dock_panel() -> bool:
                 )
                 _sync_docked_panel_layout(cmds)
                 if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
-                    _debug_workspace_dock_log(cmds, "dock_panel.recreate_dock", hypothesis_id="H15")
                     return True
             except (RuntimeError, TypeError, ValueError):
                 pass
@@ -484,7 +471,6 @@ def dock_panel() -> bool:
             )
         if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
             _sync_docked_panel_layout(cmds)
-            _debug_workspace_dock_log(cmds, "dock_panel.mixin_dock", hypothesis_id="H15")
             return True
 
     if _workspace_control_exists(cmds):
@@ -499,7 +485,6 @@ def dock_panel() -> bool:
             cmds.workspaceControl(WORKSPACE_CONTROL_NAME, edit=True, restore=True)
         if not _workspace_control_is_floating(cmds):
             _sync_docked_panel_layout(cmds)
-            _debug_workspace_dock_log(cmds, "dock_panel.workspace_dock", hypothesis_id="H15")
             return True
 
     if _PANEL is not None:
@@ -515,12 +500,10 @@ def dock_panel() -> bool:
                 )
                 _sync_docked_panel_layout(cmds)
                 if _workspace_control_exists(cmds) and not _workspace_control_is_floating(cmds):
-                    _debug_workspace_dock_log(cmds, "dock_panel.show_dock", hypothesis_id="H15")
                     return True
             except (RuntimeError, TypeError, ValueError):
                 pass
 
-    _debug_workspace_dock_log(cmds, "dock_panel.failed", hypothesis_id="H15")
     return False
 
 
@@ -577,36 +560,6 @@ def _configure_workspace_control_mobility(cmds: Any) -> None:
             return
     except (RuntimeError, ValueError):
         return
-
-
-def _debug_workspace_dock_log(cmds: Any, location: str, *, hypothesis_id: str) -> None:
-    # #region agent log
-    from pipeline_inspector.util.debug_log import debug_log_enabled, write_debug_log
-
-    if not debug_log_enabled():
-        return
-
-    data: dict[str, str] = {"location": location}
-    for key, flag in (
-        ("floating", "floating"),
-        ("width_property", "widthProperty"),
-        ("height_property", "heightProperty"),
-        ("width", "width"),
-        ("minimum_width", "minimumWidth"),
-        ("maximum_width", "maximumWidth"),
-    ):
-        try:
-            value = cmds.workspaceControl(WORKSPACE_CONTROL_NAME, query=True, **{flag: True})
-        except (RuntimeError, TypeError, ValueError):
-            value = ""
-        data[key] = str(value)
-    write_debug_log(
-        f"ui_launcher.{location}",
-        "Workspace control dock state",
-        data,
-        hypothesis_id=hypothesis_id,
-    )
-    # #endregion
 
 
 def _panel_navigation_callbacks(
@@ -1615,20 +1568,6 @@ def _sync_farm_quality_from_ui(content: Any, qt_widgets: Any) -> None:
         farm_tab,
         qt_widgets,
     )
-    # region agent log
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(
-        "ui_launcher.py:_sync_farm_quality_from_ui",
-        "farm quality synced",
-        {
-            "allow_draft": allow_draft,
-            "allow_production": allow_production,
-        },
-        hypothesis_id="farm-exclusive-quality",
-        run_id="post-fix",
-    )
-    # endregion
     current = _studio_config_for_content(content)
     deadline = replace(
         current.connectors.deadline,
@@ -1960,24 +1899,8 @@ def _export_html_from_ui() -> None:
     snapshot = _panel_content_attr(content, "_pipeline_inspector_snapshot")
     results = _panel_content_attr(content, "_pipeline_inspector_results")
     if snapshot is not None and results is not None:
-        from pipeline_inspector.core.scoring import compute_health_score
         from pipeline_inspector.maya import export_actions
 
-        cached_health = compute_health_score(results).score
-        # region agent log
-        _debug_health_log(
-            "ui_launcher.py:_export_html_from_ui",
-            "export html from cached validation state",
-            {
-                "path": "cached",
-                "cached_health": cached_health,
-                "profile_id": _panel_content_attr(content, "_pipeline_inspector_profile_id", ""),
-                "scan_scope": _panel_content_attr(content, "_pipeline_inspector_scan_scope", ""),
-                "failed_count": sum(1 for item in results if item.status == "failed"),
-            },
-            hypothesis_id="H1",
-        )
-        # endregion
         _print_export_result(
             export_actions.export_html_report(
                 snapshot=snapshot,
@@ -1986,14 +1909,6 @@ def _export_html_from_ui() -> None:
         )
         return
 
-    # region agent log
-    _debug_health_log(
-        "ui_launcher.py:_export_html_from_ui",
-        "export html falling back to revalidation",
-        {"path": "revalidate"},
-        hypothesis_id="H1",
-    )
-    # endregion
     from pipeline_inspector.maya.commands import export_html_report_action
 
     _print_export_result(export_html_report_action())
@@ -2142,14 +2057,6 @@ def _schedule_on_main_thread(
     import threading
 
     if threading.current_thread() is not threading.main_thread():
-        # #region agent log
-        _debug_validate_cycle_log(
-            "ui_launcher._schedule_on_main_thread",
-            "defer via executeDeferred from worker thread",
-            {"thread": threading.current_thread().name},
-            hypothesis_id="H-LOOP1",
-        )
-        # #endregion
         try:
             import maya.utils
 
@@ -2390,33 +2297,10 @@ def _schedule_ui_validation(
     post_validate: Optional[Any] = None,
 ) -> None:
     if getattr(content, "_pipeline_inspector_validate_running", False):
-        # #region agent log
-        _debug_validate_cycle_log(
-            "ui_launcher._schedule_ui_validation",
-            "validate skipped because another run is active",
-            {
-                "scan_scope": scan_scope,
-                "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            },
-            hypothesis_id="H-LOOP1",
-        )
-        # #endregion
         return
 
-    cycle = _next_validate_cycle(content)
+    _next_validate_cycle(content)
     content._pipeline_inspector_validate_running = True
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._schedule_ui_validation",
-        "validate scheduled",
-        {
-            "scan_scope": scan_scope,
-            "cycle": str(cycle),
-            "profile_id": profile_id or "",
-        },
-        hypothesis_id="H-LOOP1",
-    )
-    # #endregion
     busy_message = (
         "Validating selection..."
         if scan_scope == "selection"
@@ -2470,14 +2354,6 @@ def _run_validation_job(
 ) -> bool:
     """Run validation. Returns True when async work is still pending."""
 
-    # #region agent log
-    _debug_validate_job_log(
-        "ui_launcher._run_validation_job",
-        "Validation job started",
-        {"scan_scope": scan_scope, "profile_id": profile_id or ""},
-        hypothesis_id="H34",
-    )
-    # #endregion
     from pipeline_inspector.maya.commands import (
         capture_validation_snapshot,
         execute_validation_on_snapshot,
@@ -2503,14 +2379,6 @@ def _run_validation_job(
             profile_id=selected_profile,
         )
     except Exception as exc:  # noqa: BLE001
-        # #region agent log
-        _debug_validate_job_log(
-            "ui_launcher._run_validation_job",
-            "Validation scan failed",
-            {"scan_scope": scan_scope, "error": str(exc)},
-            hypothesis_id="H34",
-        )
-        # #endregion
         message = f"Validation failed: {exc}"
         _set_label_text(content, qt_widgets, main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME, message)
         print(message)
@@ -2531,43 +2399,10 @@ def _run_validation_job(
         captured.snapshot,
         **cast(Any, validation_kwargs),
     )
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._run_validation_job",
-        "async validation submitted",
-        {
-            "scan_scope": scan_scope,
-            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-        },
-        hypothesis_id="H-LOOP4",
-    )
-    # #endregion
 
     def _dispatch_result(done_future: Any) -> None:
-        # #region agent log
-        _debug_validate_cycle_log(
-            "ui_launcher._run_validation_job",
-            "async validation worker finished",
-            {
-                "scan_scope": scan_scope,
-                "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            },
-            hypothesis_id="H-LOOP4",
-        )
-        # #endregion
 
         def _on_main_thread() -> None:
-            # #region agent log
-            _debug_validate_cycle_log(
-                "ui_launcher._run_validation_job",
-                "async validation main thread callback started",
-                {
-                    "scan_scope": scan_scope,
-                    "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-                },
-                hypothesis_id="H-LOOP1",
-            )
-            # #endregion
             try:
                 result = done_future.result()
                 _apply_validation_job_result(
@@ -2578,14 +2413,6 @@ def _run_validation_job(
                     post_validate=post_validate,
                 )
             except Exception as exc:  # noqa: BLE001
-                # #region agent log
-                _debug_validate_job_log(
-                    "ui_launcher._run_validation_job",
-                    "Validation job failed",
-                    {"scan_scope": scan_scope, "error": str(exc)},
-                    hypothesis_id="H34",
-                )
-                # #endregion
                 message = f"Validation failed: {exc}"
                 _set_label_text(
                     content,
@@ -2615,24 +2442,6 @@ def _apply_validation_job_result(
     scan_scope: str,
     post_validate: Optional[Any] = None,
 ) -> None:
-    # #region agent log
-    _debug_validate_job_log(
-        "ui_launcher._run_validation_job",
-        "Validation job finished",
-        {
-            "scan_scope": scan_scope,
-            "succeeded": str(getattr(result, "succeeded", True)),
-            "failed_count": str(
-                sum(
-                    1
-                    for item in getattr(result, "results", ()) or ()
-                    if getattr(item, "status", "") == "failed"
-                )
-            ),
-        },
-        hypothesis_id="H34",
-    )
-    # #endregion
 
     if not getattr(result, "succeeded", True):
         _reset_panel_state(content, qt_widgets, status_message=result.message)
@@ -2640,23 +2449,7 @@ def _apply_validation_job_result(
         return
 
     content._pipeline_inspector_scan_scope = scan_scope
-    # #region agent log
-    _debug_validate_job_log(
-        "ui_launcher._run_validation_job",
-        "phase populate_ui_start",
-        {"scan_scope": scan_scope},
-        hypothesis_id="H-HANG5",
-    )
-    # #endregion
     _populate_validation_result(content, qt_widgets, result)
-    # #region agent log
-    _debug_validate_job_log(
-        "ui_launcher._run_validation_job",
-        "phase populate_ui_done",
-        {"scan_scope": scan_scope},
-        hypothesis_id="H-HANG5",
-    )
-    # #endregion
     _update_validation_chrome_labels(content, qt_widgets, result)
     _maybe_notify_validation(content, qt_widgets, result)
     if post_validate is not None:
@@ -3331,31 +3124,7 @@ def _revalidate_with_current_scope(content: Any, qt_widgets: Any) -> None:
         return
     if getattr(content, "_pipeline_inspector_validate_running", False):
         content._pipeline_inspector_pending_revalidate = True
-        # #region agent log
-        _debug_validate_cycle_log(
-            "ui_launcher._revalidate_with_current_scope",
-            "revalidate queued while validate running",
-            {
-                "scan_scope": scan_scope,
-                "failed_count": str(len(failed_results)),
-                "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            },
-            hypothesis_id="H-LOOP2",
-        )
-        # #endregion
         return
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._revalidate_with_current_scope",
-        "revalidate starting",
-        {
-            "scan_scope": scan_scope,
-            "failed_count": str(len(failed_results)),
-            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-        },
-        hypothesis_id="H-LOOP3",
-    )
-    # #endregion
     _validate_from_ui(content, qt_widgets, scan_scope=scan_scope)
 
 
@@ -3371,31 +3140,11 @@ def _finish_validate_running(
     *,
     reason: str,
 ) -> None:
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._finish_validate_running",
-        "validate running cleared",
-        {
-            "reason": reason,
-            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            "pending_revalidate": str(getattr(content, _PENDING_REVALIDATE_ATTR, False)),
-        },
-        hypothesis_id="H-LOOP1",
-    )
-    # #endregion
     content._pipeline_inspector_validate_running = False
     _set_validate_busy_state(content, qt_widgets, busy=False)
     if not getattr(content, _PENDING_REVALIDATE_ATTR, False):
         return
     content._pipeline_inspector_pending_revalidate = False
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._finish_validate_running",
-        "flushing pending revalidate",
-        {"cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0))},
-        hypothesis_id="H-LOOP2",
-    )
-    # #endregion
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -3442,27 +3191,6 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
     target_id = str(getattr(issue, "target_id", "") or "")
     node_name = str(getattr(issue, "node", "") or "")
     material_name = str(getattr(issue, "material", "") or "") or None
-    # #region agent log
-    _debug_nav_log_ui(
-        "ui_launcher._run_navigation_action",
-        "Navigation requested",
-        {
-            "action": action,
-            "target_id": target_id,
-            "node_name": node_name,
-            "material_name": material_name or "",
-            "has_snapshot": snapshot is not None,
-            "prim_nodes": sum(
-                1
-                for node in getattr(snapshot, "nodes", ()) or ()
-                if str(getattr(node, "id", "")).startswith("prim:")
-            )
-            if snapshot is not None
-            else 0,
-        },
-        hypothesis_id="H6",
-    )
-    # #endregion
     try:
         if action == "select_node":
             result = commands.select_node_action(
@@ -3498,29 +3226,6 @@ def _run_navigation_action(content: Any, qt_widgets: Any, action: str) -> None:
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         result.message,
     )
-    # #region agent log
-    _debug_nav_log_ui(
-        "ui_launcher._run_navigation_action",
-        "Navigation result",
-        {
-            "action": action,
-            "succeeded": result.succeeded,
-            "message": result.message,
-            "target": result.target,
-        },
-        hypothesis_id="H6",
-    )
-    # #endregion
-
-
-def _debug_nav_log_ui(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _issue_path(issue: Any) -> str:
@@ -3670,21 +3375,6 @@ def _resolution_probe_hint(snapshot: Any, asset_class_id: str) -> str:
 
 def _populate_validation_result(content: Any, qt_widgets: Any, result: Any) -> None:
     health = result.health_score
-    # region agent log
-    _debug_health_log(
-        "ui_launcher.py:_populate_validation_result",
-        "gui validation health score",
-        {
-            "gui_health": health.score,
-            "profile_id": getattr(result, "profile_id", ""),
-            "scan_scope": getattr(result, "scan_scope", ""),
-            "failed_count": sum(
-                1 for item in getattr(result, "results", ()) if item.status == "failed"
-            ),
-        },
-        hypothesis_id="H1",
-    )
-    # endregion
     _set_label_text(
         content,
         qt_widgets,
@@ -3837,52 +3527,6 @@ def _store_validation_state(
 def _populate_fix_queue(content: Any, result: Any) -> None:
     fix_plan = getattr(result, "fix_plan", None)
     actions = getattr(fix_plan, "actions", ())
-    # #region agent log
-    _debug_fix_queue_log(
-        "ui_launcher._populate_fix_queue",
-        "Fix queue populated",
-        {
-            "action_count": len(actions),
-            "usd_actions": sum(
-                1 for action in actions if str(action.target_id).startswith("prim:")
-            ),
-            "scene_usd_actions": sum(
-                1
-                for action in actions
-                if action.fix_type in {
-                    "set_default_prim",
-                    "set_attr",
-                    "normalize_path",
-                    "relink_path",
-                }
-                and action.target_kind in {"scene", "graph"}
-            ),
-            "unblocked": sum(1 for action in actions if not action.blocked),
-            "fix_types": "|".join(sorted({action.fix_type for action in actions})),
-            "texture_rename_blocked": sum(
-                1
-                for action in actions
-                if action.fix_type == "rename_texture_file" and action.blocked
-            ),
-            "texture_rename_unblocked": sum(
-                1
-                for action in actions
-                if action.fix_type == "rename_texture_file" and not action.blocked
-            ),
-            "texture_rename_block_reasons": "|".join(
-                sorted(
-                    {
-                        reason
-                        for action in actions
-                        if action.fix_type == "rename_texture_file" and action.blocked
-                        for reason in action.block_reasons
-                    }
-                )
-            ),
-        },
-        hypothesis_id="H4",
-    )
-    # #endregion
     fix_rows = tuple(
         FixQueueRow(
             selected=False,
@@ -4252,20 +3896,6 @@ def _apply_selected_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(selected)),
     )
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._apply_selected_fixes_from_ui",
-        "fix apply finished, triggering revalidate",
-        {
-            "selected_count": str(len(selected)),
-            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            "validate_running": str(
-                getattr(content, "_pipeline_inspector_validate_running", False)
-            ),
-        },
-        hypothesis_id="H-LOOP3",
-    )
-    # #endregion
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -4330,20 +3960,6 @@ def _apply_safe_fixes_from_ui(content: Any, qt_widgets: Any) -> None:
         main_window.VALIDATE_STATUS_LABEL_OBJECT_NAME,
         _format_fix_apply_message(report, selected_count=len(actions)),
     )
-    # #region agent log
-    _debug_validate_cycle_log(
-        "ui_launcher._apply_safe_fixes_from_ui",
-        "fix apply finished, triggering revalidate",
-        {
-            "action_count": str(len(actions)),
-            "cycle": str(getattr(content, _VALIDATE_CYCLE_ATTR, 0)),
-            "validate_running": str(
-                getattr(content, "_pipeline_inspector_validate_running", False)
-            ),
-        },
-        hypothesis_id="H-LOOP3",
-    )
-    # #endregion
     _revalidate_with_current_scope(content, qt_widgets)
 
 
@@ -4924,50 +4540,6 @@ def _studio_environment_from_content(content: Any) -> Any:
     from pipeline_inspector.maya.validation_pipeline import _studio_environment_for_validation
 
     return _studio_environment_for_validation(studio_config)
-
-
-def _debug_fix_queue_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
-
-
-def _debug_validate_job_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    _debug_health_log(location, message, data, hypothesis_id=hypothesis_id)
-
-
-def _debug_validate_cycle_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_agent_cycle_log
-
-    write_agent_cycle_log(location, message, dict(data), hypothesis_id=hypothesis_id)
-
-
-def _debug_health_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _print_export_result(result: Any) -> None:

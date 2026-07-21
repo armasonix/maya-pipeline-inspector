@@ -301,32 +301,10 @@ def run_validation(
         from pipeline_inspector.util.paths import sync_studio_environment_to_os
 
         sync_studio_environment_to_os(studio_environment)
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "phase prepare_snapshot_start",
-        {
-            "file_deps_in": len(snapshot.file_dependencies),
-            "nodes_in": len(snapshot.nodes),
-        },
-        hypothesis_id="H-HANG2",
-    )
-    # #endregion
     enriched = prepare_snapshot_for_validation(
         snapshot,
         studio_environment=studio_environment,
     )
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "phase prepare_snapshot_done",
-        {
-            "file_deps_out": len(enriched.file_dependencies),
-            "nodes_out": len(enriched.nodes),
-        },
-        hypothesis_id="H-HANG2",
-    )
-    # #endregion
     normalized_asset_class = (asset_class_id or "").strip()
     if profile_path is not None:
         profile = load_profile(profile_path)
@@ -365,28 +343,12 @@ def run_validation(
         profile=profile,
         extra_rule_paths=extra_rule_paths,
     )
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "phase engine_validate_start",
-        {"rule_count": len(rules)},
-        hypothesis_id="H-HANG3",
-    )
-    # #endregion
     results = list(
         ValidationEngine(
             naming_templates=_naming_templates_for_validation(studio_config),
             studio_environment=studio_environment,
         ).validate(enriched, rules)
     )
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "phase engine_validate_done",
-        {"result_count": len(results)},
-        hypothesis_id="H-HANG3",
-    )
-    # #endregion
     sidecar_path = waiver_sidecar_path or resolve_waiver_sidecar_path(enriched.scene_path)
     if sidecar_path is not None and sidecar_path.is_file():
         results = list(apply_waivers(results, load_waiver_sidecar(sidecar_path)))
@@ -394,129 +356,16 @@ def run_validation(
 
     results = dedupe_validation_results(enriched, results)
     results = enrich_rule_results(enriched, results)
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "phase build_fix_plan_start",
-        {},
-        hypothesis_id="H-HANG4",
-    )
-    # #endregion
     fix_plan = build_fix_plan(
         results,
         rules,
         enriched,
         studio_environment=studio_environment,
     )
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "phase build_fix_plan_done",
-        {"fix_actions": len(fix_plan.actions)},
-        hypothesis_id="H-HANG4",
-    )
-    # #endregion
     results = apply_fix_availability(results, fix_plan)
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "Path policy fix actions",
-        {
-            "path_normalize_actions": sum(
-                1
-                for action in fix_plan.actions
-                if action.fix_type == "normalize_path"
-                and "path.project_root" in action.rule_id
-            ),
-            "path_normalize_unblocked": sum(
-                1
-                for action in fix_plan.actions
-                if action.fix_type == "normalize_path"
-                and "path.project_root" in action.rule_id
-                and not action.blocked
-            ),
-            "project_root_failures": sum(
-                1
-                for item in results
-                if item.rule_id.endswith(".texture.path.project_root")
-                and item.status == "failed"
-            ),
-            "local_drive_failures": sum(
-                1
-                for item in results
-                if item.rule_id.endswith(".texture.path.local_drive")
-                and item.status == "failed"
-            ),
-        },
-        hypothesis_id="H33",
-    )
-    # #endregion
     summary = summarize_results(results)
     health_score = compute_health_score(results)
     failed_count = sum(1 for item in results if item.status == "failed")
-    # #region agent log
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "Validation summary",
-        {
-            "renderer_ids": ",".join(renderer_ids),
-            "snapshot_renderer": enriched.renderer,
-            "usd_metadata": enriched.usd_stage_metadata is not None,
-            "file_deps": len(enriched.file_dependencies),
-            "shader_colorspace_nodes": sum(
-                1
-                for node in enriched.nodes
-                if node.type_name == "Shader" and node.attrs.get("colorSpace")
-            ),
-            "failed_count": failed_count,
-            "failed_texture_rules": "|".join(
-                sorted(
-                    {
-                        item.rule_id
-                        for item in results
-                        if item.status == "failed"
-                        and ("texture" in item.rule_id or "colorspace" in item.rule_id)
-                    }
-                )
-            ),
-            "fix_actions": len(fix_plan.actions),
-            "fix_unblocked": sum(1 for action in fix_plan.actions if not action.blocked),
-            "blocked_actions": "|".join(
-                sorted(
-                    (
-                        f"{action.fix_type}:{action.target_id}:"
-                        f"{','.join(action.block_reasons) or 'policy'}"
-                    )
-                    for action in fix_plan.actions
-                    if action.blocked
-                )[:12]
-            ),
-            "colorspace_fix_targets": "|".join(
-                sorted(
-                    f"{action.target_id}:{action.blocked}"
-                    for action in fix_plan.actions
-                    if "colorspace" in action.rule_id
-                )
-            ),
-        },
-        hypothesis_id="H2",
-    )
-    _debug_validation_log(
-        "validation_pipeline.run_validation",
-        "Fix plan USD colorspace actions",
-        {
-            "usd_root_layer": str(
-                enriched.usd_stage_metadata.root_layer if enriched.usd_stage_metadata else ""
-            ),
-            "colorspace_actions": "|".join(
-                f"{action.target_id}->{action.after_value}:blocked={action.blocked}"
-                for action in fix_plan.actions
-                if "colorspace" in action.rule_id
-            ),
-        },
-        hypothesis_id="H16",
-    )
-    # #endregion
     scope_label = "selection" if scan_scope == "selection" else "scene"
     profile_label = effective_profile_id
     if normalized_asset_class:
@@ -537,18 +386,6 @@ def run_validation(
         profile_id=effective_profile_id,
         asset_class_id=normalized_asset_class,
     )
-
-
-def _debug_validation_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def run_validation_for_user(
