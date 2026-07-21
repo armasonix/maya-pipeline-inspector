@@ -12,6 +12,16 @@ Maya Pipeline Inspector is an **MIT-licensed open-source** project. We want a sh
 | [GitHub Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions) | Design questions, rollout ideas, show-and-tell |
 | Panel **Bug Report** | Plugin defects from Maya ([relay docs](docs/integrations/bug_report_relay.md)) |
 
+## Support the project
+
+Pipeline Inspector is MIT-licensed and maintained in spare production-engineering time. If it saves your studio debugging hours:
+
+- **[GitHub Sponsors](https://github.com/sponsors/armasonix)** — recurring support (enable after sponsor profile approval)
+- **Star / watch** the repo — helps visibility for other studios
+- **Contribute** rules, adapters, or sanitized integration examples ([`CONTRIBUTING.md`](CONTRIBUTING.md))
+
+Security issues: [`SECURITY.md`](SECURITY.md) (private report — do not use public issues for exploits).
+
 ## How to contribute
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, branch workflow, and PR checklist.
