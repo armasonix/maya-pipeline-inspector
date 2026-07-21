@@ -1,5 +1,9 @@
 # Tracker publish and report attachment
 
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD  
+**Related:** [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md) · [USER_GUIDE.md](../USER_GUIDE.md#reports) · [ARCHITECTURE.md](../ARCHITECTURE.md)
+
 Send to Tracker publishes a validation summary to the first enabled task tracker
 (Ftrack, ShotGrid, or Cerebro). Issue #223 adds enriched Markdown notes and optional
 HTML report attachments.

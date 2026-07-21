@@ -12,11 +12,11 @@ Accepted
 
 v0.4 ships a Settings screen with six category tabs, but only **Connectors → Deadline** and **Studio → Require .tx** are functional. Basic and Advanced tabs are placeholders. All persistent settings live in a single [`studio_config.py`](../../src/pipeline_inspector/studio_config.py) model at **schema 1.0** (`pipeline`, `connectors.deadline`, `studio_name`). Deadline connector UI is hard-coded in [`settings_panel.py`](../../src/pipeline_inspector/ui/settings_panel.py) via `_build_connectors_tab` and `_read_deadline_connector_from_view`.
 
-v0.5 expands Settings into a **studio platform hub**: artist/TD preferences, studio pipeline policy, network path constants, notification connectors (Telegram, Discord, Slack), task trackers (Ftrack, ShotGrid, Cerebro), Bug Report via a studio HTTPS relay, and Check for Updates via GitHub Releases. ADR 0005 requires GUI-first delivery; ADR 0001 requires the validation core to stay Maya-independent and testable. Settings architecture must therefore:
+v0.5 expands Settings into a **studio platform hub**: Technical Artist/TD preferences, studio pipeline policy, network path constants, notification connectors (Telegram, Discord, Slack), task trackers (Ftrack, ShotGrid, Cerebro), Bug Report via a studio HTTPS relay, and Check for Updates via GitHub Releases. ADR 0005 requires GUI-first delivery; ADR 0001 requires the validation core to stay Maya-independent and testable. Settings architecture must therefore:
 
 - separate **studio-wide policy** from **per-user preferences** without duplicating validation logic;
 - scale Connectors beyond Deadline without copy-pasting settings UI code;
-- keep secrets out of artist-visible files and out of the open-source plugin binary;
+- keep secrets out of user-visible files and out of the open-source plugin binary;
 - let headless CLI respect studio policy (known v0.4 limitation: `PIPELINE_INSPECTOR_STUDIO_CONFIG` not wired into `pipeline_inspector validate`).
 
 This ADR defines the v0.5 configuration model, merge semantics, connector registry, secret handling, and Bug Report relay security contract. Implementation issues #114–#118 depend on these decisions.
@@ -30,7 +30,7 @@ Pipeline Inspector v0.5 adopts a **two-layer configuration architecture** with a
 | Layer | File | Discovery | Owner | Typical contents |
 |---|---|---|---|---|
 | **StudioConfig** | `pipeline_inspector_studio.json` | `PIPELINE_INSPECTOR_STUDIO_CONFIG` env var, then `~/.pipeline_inspector/pipeline_inspector_studio.json`, then `~/pipeline_inspector_studio.json` | Pipeline TD / studio IT | `studio_name`, `pipeline`, `studio_environment`, `connectors`, studio-locked `bug_report` relay URL, optional embedded defaults |
-| **UserPreferences** | `~/.pipeline_inspector/user.json` | Fixed per-machine path | Artist / local TD | `default_profile_id`, `theme`, `ui_density`, `extra_rule_paths`, `debug_logging`, `mayapy_path`, `docs_url` |
+| **UserPreferences** | `~/.pipeline_inspector/user.json` | Fixed per-machine path | Technical Artist / local TD | `default_profile_id`, `theme`, `ui_density`, `extra_rule_paths`, `debug_logging`, `mayapy_path`, `docs_url` |
 
 Both layers are plain JSON with `schema_version`. Studio config bumps to **2.0** in issue #114; user config starts at **1.0**.
 
@@ -45,7 +45,7 @@ When both files are present, fields resolve by **ownership**, not deep JSON merg
 | Pipeline policy (`require_tx_derivatives`, waiver/manifest defaults, approved profile pins) | Studio | No |
 | `studio_environment` paths and `variable_aliases` | Studio | No |
 | Connector `enabled` flags and credentials | Studio | No — TDs deploy one studio file |
-| Connector non-secret defaults visible to artists (e.g. `notify_on[]`) | Studio | Optional read-only display in v0.5; edits require studio file |
+| Connector non-secret defaults visible to Technical Artists (e.g. `notify_on[]`) | Studio | Optional read-only display in v0.5; edits require studio file |
 | UI theme, density, default profile/asset class/scan scope | User | Yes |
 | `extra_rule_paths`, `debug_logging`, `max_issues_displayed`, local `mayapy_path` | User | Yes |
 | `bug_report` relay URL and API key | Studio | No |
@@ -147,7 +147,7 @@ class ConnectorDefinition:
 
 ### 6. Secret field policy
 
-Credentials must not appear in plaintext in artist-editable files beyond what studio IT already deploys. Policy:
+Credentials must not appear in plaintext in user-editable files beyond what studio IT already deploys. Policy:
 
 | Rule | Detail |
 |---|---|
@@ -158,7 +158,7 @@ Credentials must not appear in plaintext in artist-editable files beyond what st
 | Version control | `pipeline_inspector_studio.json` with secrets stays out of git (document in `STUDIO_OVERRIDES.md`) |
 | Bug Report | No GitHub PAT in Maya — relay holds GitHub App / PAT server-side |
 
-Optional v0.5.1 enhancement (out of scope here): OS keychain storage for user-entered secrets on solo-artist machines.
+Optional v0.5.1 enhancement (out of scope here): OS keychain storage for user-entered secrets on solo-user machines.
 
 ### 7. Bug Report — studio HTTPS relay
 
@@ -205,7 +205,7 @@ User preference `updates.check_on_startup` may trigger silent check; download/in
 
 | Tab | Audience | Config layer | v0.5 scope |
 |---|---|---|---|
-| Basic | Artist | User | Profile defaults, theme, density |
+| Basic | Technical Artist | User | Profile defaults, theme, density |
 | Advanced | TD | User | Rule roots, debug, perf caps, rule editor entry |
 | Connectors | TD | Studio | Registry-driven integrations |
 | Studio | TD | Studio | Pipeline policy, studio name |
@@ -226,9 +226,9 @@ Issue #118 wires studio config into CLI:
 
 ### 1. Single merged JSON file
 
-Pros: one Save button; simpler mental model for solo artists.
+Pros: one Save button; simpler mental model for solo Technical Artists.
 
-Cons: studio rollout requires overwriting artist theme/preferences; unsuitable for facility deployment; mixes IT-managed policy with personal prefs.
+Cons: studio rollout requires overwriting user theme/preferences; unsuitable for facility deployment; mixes IT-managed policy with personal prefs.
 
 Rejected. Two files with explicit save actions.
 
@@ -236,7 +236,7 @@ Rejected. Two files with explicit save actions.
 
 Pros: no relay server; direct `POST /repos/.../issues`.
 
-Cons: PAT in plaintext on artist workstations; unacceptable leak risk; violates studio security reviews.
+Cons: PAT in plaintext on Technical Artist workstations; unacceptable leak risk; violates studio security reviews.
 
 Rejected. Studio relay is required.
 
@@ -252,7 +252,7 @@ Rejected after Deadline. Registry pattern from v0.5 onward.
 
 Pros: flexible per-user connector toggles.
 
-Cons: artists could disable Deadline/Telegram alerts studio mandates; support nightmare.
+Cons: Technical Artists could disable Deadline/Telegram alerts studio mandates; support nightmare.
 
 Rejected. Ownership table with studio lock on policy/connectors.
 

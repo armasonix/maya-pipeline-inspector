@@ -1,18 +1,16 @@
 # User Guide
 
-Maya Pipeline Inspector is a production-oriented material QA tool for Autodesk Maya. It is designed to help artists, Shader TDs, Pipeline TDs, and render supervisors detect material problems before publish or render farm submission.
+**Product:** Maya Pipeline Inspector (`maya-pipeline-inspector`)  
+**Status:** v0.5.0 shipped (2026-07-12) · v0.6 in development on `dev`  
+**Related:** [MAYA_INSTALL.md](MAYA_INSTALL.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [CHANGELOG.md](../CHANGELOG.md)
 
-Status: **v0.5.0 shipped** (2026-07-12). See [CHANGELOG.md](../CHANGELOG.md). v0.5 cycle: [V0_5_DEVELOPMENT_PLAN.md](V0_5_DEVELOPMENT_PLAN.md).
+Maya Pipeline Inspector is an **open-source** production-oriented material and scene QA tool for Autodesk Maya (MIT, [GitHub](https://github.com/armasonix/maya-pipeline-inspector)). It helps Technical Artists, Shader TDs, Pipeline TDs, and render supervisors detect material and geometry problems before publish or render farm submission. To contribute rules, adapters, or integrations, see [CONTRIBUTING.md](../CONTRIBUTING.md), [`COMMUNITY.md`](../COMMUNITY.md), and the [README community section](../README.md#open-source--community).
 
-Install in Maya: [`docs/MAYA_INSTALL.md`](MAYA_INSTALL.md) (`MAYA_MODULE_PATH`, editable `pip`, menu/shelf bootstrap).
-
-In-app updates (module path vs pip, restart checklist): [`docs/integrations/auto_update.md`](integrations/auto_update.md).
-
-Studio rule packs and profile overrides: [`docs/STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md).
+> **Honest scope:** the project is **actively developed** and **far from feature-complete**. Many integrations are MVP-quality, Maya coverage is limited to tested versions, and headless paths do not mirror every panel behavior. Read [Known limitations & gaps](#known-limitations--gaps) before betting a facility rollout on it.
 
 ## GUI-first workflow
 
-Pipeline Inspector is built for daily use **inside the Maya dockable panel**. Pipeline TDs can automate the same checks headlessly, but artists and Shader TDs should not need a terminal or JSON export for routine validate → triage → fix → revalidate work.
+Pipeline Inspector is built for daily use **inside the Maya dockable panel**. Pipeline TDs can automate the same checks headlessly, but Technical Artists and Shader TDs should not need a terminal or JSON export for routine validate → triage → fix → revalidate work.
 
 Product principles ([ADR 0005](adr/0005-gui-first-product-philosophy.md)):
 
@@ -39,6 +37,8 @@ v0.3 adds manifest schema 1.1, manifest regression gates, headless apply-fixes, 
 - risky displacement setups;
 - expensive shader graphs;
 - duplicate or orphan material networks;
+- geometry polycount over asset-class budgets (v0.6);
+- accidental duplicate meshes with identical topology (v0.6);
 - basic renderer compatibility;
 - Deadline preflight safety.
 
@@ -87,7 +87,7 @@ Shader manifests (schema 1.1) include `max_dimension` per texture entry for diff
 
 ## Main User Roles
 
-### Artist / Lookdev Artist
+### Technical Artist
 
 Main needs:
 
@@ -98,7 +98,7 @@ Main needs:
 - apply low-risk fixes safely;
 - avoid rejected publishes or failed farm submissions.
 
-### Shader TD / Technical Artist
+### Shader TD
 
 Main needs:
 
@@ -146,12 +146,12 @@ Main needs:
 
 ## Maya UI Layout
 
-The dockable panel uses five tabs. Each tab shows the panel title and version at the top.
+The dockable panel uses six tabs. Each tab shows the panel title and version at the top.
 
 ```text
 +--------------------------------------------------------------------------------+
-| Maya Pipeline Inspector  v0.3.0                                           |
-| [Validate] [Waivers] [Fixes] [Reports] [Farm]                                  |
+| Maya Pipeline Inspector  v0.5.0+                                               |
+| [Validate] [Waivers] [Fixes] [Reports] [Readiness] [Farm]                    |
 +--------------------------------------------------------------------------------+
 | Validate tab (default)                                                         |
 | Health: 78/100   Critical: 2   Error: 5   Warning: 17   Info: 8                |
@@ -165,11 +165,18 @@ The dockable panel uses five tabs. Each tab shows the panel title and version at
 | Waivers tab: status, waiver table, [Make Waive] [Refresh] [Revoke Selected]     |
 | Fixes tab: checkbox column + fix queue table, [Fix Selected] [Apply Safe Fixes]  |
 |            [Export Fix Plan]                                                   |
-| Reports tab: compact export buttons for JSON/HTML/manifest/diff/compare        |
+| Reports tab: compact export buttons for JSON/HTML/manifest/diff/compare          |
+| Readiness tab: machine checks, [Run Machine Readiness], escalation actions       |
 | Farm tab: Deadline connection, scene readiness, eligibility, last report/job id |
 |           [Refresh Connection] [Run Farm Preflight] [Submit to Farm]          |
 +--------------------------------------------------------------------------------+
 ```
+
+Menu and shelf shortcuts (see [MAYA_INSTALL.md](MAYA_INSTALL.md)):
+
+- **Pipeline Inspector** — open panel (Validate tab)
+- **Pipeline Inspector Farm Check** — open Farm tab and run preflight
+- **Readiness Check** — open Readiness tab (v0.6)
 
 ### Validation profiles (Workflow + Asset class)
 
@@ -191,7 +198,36 @@ The dockable panel uses five tabs. Each tab shows the panel title and version at
 | `asset_class_prop` | 2048px |
 | `asset_class_background` | 1024px |
 
-When an asset class is selected, its resolution rule overrides are merged onto the active workflow profile. Pipeline-only profiles such as `ci_headless` are headless-only and do not appear in the Maya UI dropdown.
+When an asset class is selected, its resolution and geometry rule overrides are merged onto the active workflow profile. Pipeline-only profiles such as `ci_headless` are headless-only and do not appear in the Maya UI dropdown.
+
+## Machine Readiness (v0.6)
+
+The **Readiness** tab evaluates whether the current workstation meets studio prerequisites before publish or farm work:
+
+| Check category | Examples |
+| --- | --- |
+| Maya plugins | V-Ray, Arnold, studio custom plug-ins |
+| Mapped drives | Texture / asset roots |
+| Environment variables | `SHOW_ROOT`, pipeline tokens |
+| Network paths | UNC roots from `studio_environment` |
+| Installed software | Required DCC or utility versions |
+
+Pipeline TDs configure checks in `pipeline_inspector_studio.json` under `readiness.checks`. Technical Artists click **Run Machine Readiness**; failed checks show actionable detail. When connectors are enabled, the tab can escalate a summary to sysadmin or support.
+
+Open the tab from the panel or via menu/shelf **Readiness Check**. Architecture detail: [ARCHITECTURE.md](ARCHITECTURE.md#machine-readiness).
+
+## Roles and permissions (v0.6)
+
+Pipeline Inspector resolves an effective role (Technical Artist, Technical Support, Pipeline TD, Admin) and gates risky actions:
+
+| Action | Required capability |
+| --- | --- |
+| Apply high-risk fixes | `apply_risky_fixes` |
+| Submit to Farm | `submit_farm` |
+| Save studio config / edit connectors | `edit_studio_settings`, `edit_connectors` |
+| Add extra rule paths | `manage_rules` |
+
+Technical Artists set **Assigned role** in Settings → Basic unless studio policy locks it. Studio overrides: [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md#governance-and-role-assignment-v06) · [ADR 0008](adr/0008-role-based-governance-foundation.md).
 
 ## Health Score
 
@@ -211,7 +247,7 @@ Auto-fixable: 9
 Waived: 2
 ```
 
-A high score does not mean the scene is artistically correct. It means the scene has fewer detected technical material risks according to the selected profile.
+A high score does not mean the scene is visually final. It means the scene has fewer detected technical material risks according to the selected profile.
 
 ## Severity Meaning
 
@@ -404,8 +440,8 @@ Publish tools can gate asset commits with the `publish_strict` profile (or a stu
 Expected behavior:
 
 ```text
-1. Artist triggers publish.
-2. Publish tool runs shader health validation with publish_strict profile.
+1. Technical Artist triggers publish.
+2. Publish tool runs Pipeline Inspector validation with `publish_strict` profile.
 3. If block_publish is false, publish continues.
 4. If block_publish is true, publish stops and shows summary.
 5. JSON report is saved for review.
@@ -419,7 +455,7 @@ Deadline preflight should run validation before render submission.
 
 ### Farm Submit
 
-Artist workflow for Deadline 10 on-prem validation from Maya (v0.4):
+Technical Artist workflow for Deadline 10 on-prem validation from Maya (v0.4):
 
 | Step | Where | Action |
 | --- | --- | --- |
@@ -433,8 +469,8 @@ Artist workflow for Deadline 10 on-prem validation from Maya (v0.4):
 Headless / pipeline submit hooks use the same eligibility gate and profiles — see the [Deadline integration guide](integrations/deadline_submit_preflight.md#headless-automation).
 
 Expected behavior:
-1. Artist submits render (or clicks **Submit to Farm** in the panel).
-2. Submit tool runs shader health validation with `deadline_critical` profile.
+1. Technical Artist submits render (or clicks **Submit to Farm** in the panel).
+2. Submit tool runs Pipeline Inspector validation with `deadline_critical` profile.
 3. If `block_deadline` is false, submission continues.
 4. If `block_deadline` is true, submission stops and shows summary.
 5. JSON report is saved for review.
@@ -450,12 +486,94 @@ Expected behavior:
 
 ## Current Development Status
 
-v0.3 is implemented: manifest schema 1.1, manifest gates, headless apply-fixes, resolution budgets by asset class, plugin dual install, and GUI↔CLI parity for validate/manifest. Public CI runs pure Python tests; optional `mayapy` integration is documented in [`MAYA_INSTALL.md`](MAYA_INSTALL.md) and [`CLI_TESTING.md`](CLI_TESTING.md).
+Maya Pipeline Inspector is **not production-complete**. It solves a narrow but important problem — early material and scene QA inside Maya — while many surrounding pipeline concerns (asset versioning, shot tracking, render scheduling, cross-DCC validation) are only partially addressed or still on the roadmap.
+
+**Shipped:** **v0.5.0** (2026-07-12) — settings hub, notifications, trackers, rule authoring MVP, auto-update (module path), bug-report relay.
+
+**In active development on `dev`:** **v0.6** — geometry QA rules, Machine Readiness tab, role governance foundation ([ADR 0008](adr/0008-role-based-governance-foundation.md)), Deadline farm analytics CLI. These areas are **functional but still being refined**; behavior and configuration may change before the next release tag.
+
+Public CI runs pure Python tests without launching Maya. Optional `mayapy` integration is documented in [MAYA_INSTALL.md](MAYA_INSTALL.md) and [CLI_TESTING.md](CLI_TESTING.md), but **most contributors never run it in CI** — treat Maya-specific bugs as expected until reported.
+
+## Known limitations & gaps
+
+Use this section when deciding whether Pipeline Inspector fits your facility **today**, not on the roadmap slide.
+
+### Product scope
+
+- **Maya-first.** Other DCCs are out of scope. USD/MaterialX inspection is listed as a future adapter; do not assume cross-DCC parity.
+- **QA assistant, not a publish system.** The tool validates and reports; your publish tool, tracker, and farm scheduler still own submission, versioning, and scheduling.
+- **Beta quality.** Panel layout, Settings tabs, compact UI, and connector error messages are still being improved release to release.
+
+### Maya platform
+
+| Topic | Limitation |
+| --- | --- |
+| Supported Maya | **2024–2025** tested; **2026** best-effort; **2023−** not tested ([MAYA_INSTALL.md](MAYA_INSTALL.md)) |
+| Native plugin | Compiled `.mll` binaries are **not in the git repo** — build locally ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)) or use release attachments; Python plug-in fallback always available |
+| Maya in CI | Default GitHub Actions jobs **do not launch Maya**; integration smoke is optional on self-hosted runners |
+| Renderer plugins | V-Ray / Arnold rules require the matching plug-in **loaded in the session** being validated |
+
+### Validation engine
+
+- **Heuristic scoring.** Health score and farm cost score summarize rule outcomes; they are **not** measured render time or farm dollar cost.
+- **Texture versions.** Version freshness compares **filesystem siblings only** — no query against a publish database, Perforce/ShotGrid version, or texture library API ([Texture version freshness](#texture-version-freshness)).
+- **Semantic mapping.** Renderer adapter slot mapping can be **incomplete** on exotic node graphs ([ADR 0002](adr/0002-renderer-adapter-boundary.md)).
+- **Geometry (v0.6).** Polycount and duplicate-mesh checks depend on scan scope and budget; large scenes may **truncate** duplicate scans with evidence flagged in the report.
+- **False results.** Any rule can false-pass or false-fail on studio-specific setups. Waivers exist, but someone must curate them.
+
+### Panel vs headless
+
+| Surface | Loads studio config | Loads user.json | Notes |
+| --- | :---: | :---: | --- |
+| Maya panel | ✓ | ✓ | Primary, most complete experience |
+| CLI (`validate`, `gate`, …) | ✓ (`--studio-config` or env) | ✗ | Uses default user prefs; **role/governance may differ** from a Technical Artist's panel session |
+| Readiness tab | ✓ | ✓ | **Maya session only** — no headless readiness CLI parity |
+| Connectors (notify / tracker) | ✓ | partial | Require live network, credentials, and studio JSON rollout |
+
+### Roles and governance (v0.6)
+
+- Capability gates are a **foundation**, not full studio IAM.
+- **User-assigned role** in Settings → Basic is **self-reported** unless `governance.enforced_role` locks it.
+- Tracker role mapping uses **`PIPELINE_INSPECTOR_TRACKER_ROLE`** env + JSON map — not automatic session discovery from every tracker client.
+- Denied actions show a reason string; there is **no audit log export** for compliance review yet.
+
+### Connectors and integrations
+
+- **Notifications** (Telegram, Discord, Slack): webhook/token setup, `notify_on` tuning, and report links are studio responsibilities; delivery failures may be silent except in debug logs.
+- **Trackers:** Ftrack and ShotGrid support Markdown notes and optional HTML attachments; **Cerebro has no HTML upload API** — path is echoed in the note only ([tracker_publish.md](integrations/tracker_publish.md)).
+- **Deadline:** **On-prem Deadline 10** Web Service only in current docs; AWS Deadline Cloud is a separate integration surface. Farm tab **Submit to Farm** queues a **validation utility job**, not a beauty render pass.
+- **Bug report relay:** Requires a reachable HTTPS endpoint. The **public default** notifies upstream maintainers; a **studio private relay** is for facilities that **develop or fork the plugin locally** and need **in-house R&D** alerted about plugin defects (crashes, panel bugs, validation regressions) — not scene or asset issues. See [bug_report_relay.md](integrations/bug_report_relay.md#why-a-studio-private-relay).
+- **Auto-update:** **Module-path installs only** — `pip` / `site-packages` installs must upgrade manually ([auto_update.md](integrations/auto_update.md)).
+
+### Rule authoring and policy
+
+- Rule browser / new rule wizard covers **MVP templates**; complex checks need JSON by hand ([RULE_AUTHORING.md](RULE_AUTHORING.md)).
+- Session rule overrides from the Rule Editor **do not persist** across Maya restarts.
+- Studio `extra_rules_folder` deployment is manual unless your pipeline syncs it.
+
+### Safe fixes and scene mutation
+
+- Auto-fix covers **only rules that define a fix** and pass safety/reference checks.
+- Referenced and locked nodes are blocked by default; **reference edits** need explicit confirmation.
+- High-risk fixes require capability + confirmation; studios still need policy for what Technical Artists may change.
+- Undo chunks help, but **always validate again** after apply — fixes can miss edge cases.
+
+### What we are still building
+
+Non-exhaustive backlog visible on `dev` and in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md):
+
+- Deeper tracker-driven role resolution and publish routing
+- Additional renderer adapters (RenderMan, Redshift, USD/MaterialX)
+- Stronger headless parity for user prefs and readiness
+- Richer rule editor and audit trails
+- Broader Maya version CI coverage
+
+If you hit a gap, file an issue on GitHub with scene/profile steps — production feedback drives priority.
 
 See also:
 
-- `docs/MAYA_INSTALL.md`
-- `docs/integrations/deadline_submit_preflight.md`
-- `docs/DEVELOPMENT_PLAN.md`
-- `docs/ARCHITECTURE.md`
-- `docs/RULE_AUTHORING.md`
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [integrations/deadline_submit_preflight.md](integrations/deadline_submit_preflight.md)
+- [integrations/deadline_farm_analytics.md](integrations/deadline_farm_analytics.md)
+- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md)
+- [RULE_AUTHORING.md](RULE_AUTHORING.md)

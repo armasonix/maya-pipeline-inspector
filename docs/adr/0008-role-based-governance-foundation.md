@@ -10,14 +10,14 @@ Accepted
 
 ## Context
 
-v0.6 adds studio connectors, farm submission, risky auto-fixes, and editable studio policy. Today any artist with panel access can save `pipeline_inspector_studio.json`, apply high-risk fixes, and submit farm jobs without an auditable permission model.
+v0.6 adds studio connectors, farm submission, risky auto-fixes, and editable studio policy. Today any Technical Artist with panel access can save `pipeline_inspector_studio.json`, apply high-risk fixes, and submit farm jobs without an auditable permission model.
 
 Production studios need a **layered** model that combines:
 
 - studio-wide policy locks;
 - tracker-assigned production roles (Ftrack / ShotGrid / Cerebro);
 - per-machine user preference for self-declared role;
-- safe defaults for artists.
+- safe defaults for Technical Artists.
 
 The resolver must stay **Maya-independent** (ADR 0001) and work in headless CLI paths (ADR 0004).
 
@@ -86,7 +86,7 @@ Denied actions return a human-readable reason including effective role and role 
 ## Alternatives Considered
 
 1. **Maya-only OS user mapping** — rejected; not portable to headless CLI and farm hooks.
-2. **Single studio-wide capability list** — rejected; cannot express TD vs artist vs producer nuance.
+2. **Single studio-wide capability list** — rejected; cannot express TD vs Technical Artist vs producer nuance.
 3. **Per-action passwords** — rejected; poor UX and no studio rollout path.
 
 ## Consequences

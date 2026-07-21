@@ -4,7 +4,7 @@ Use this checklist before tagging **v0.2.0**. Public CI does not launch Maya; th
 
 ## Session 1 — Demo scene regression
 
-Scene: [`pipeline_inspector_demo_broken.ma`](../examples/broken_scene/pipeline_inspector_demo_broken.ma)
+Scene: [`vray_policy_scene.ma`](../examples/vray_policy/vray_policy_scene.ma) (V-Ray loaded) or [`arnold_policy_scene.ma`](../examples/arnold_policy/arnold_policy_scene.ma) (Arnold loaded)
 
 1. Open the panel via **Pipeline Inspector** menu or shelf.
 2. Profile `publish_strict` → **Validate Scene**.
@@ -38,9 +38,9 @@ Requires V-Ray or Arnold loaded in Maya.
 ## Session 4 — Headless parity
 
 ```powershell
-mayapy -m pipeline_inspector validate examples/broken_scene/pipeline_inspector_demo_broken.ma `
+mayapy -m pipeline_inspector validate examples/vray_policy/vray_policy_scene.ma `
   --input-kind scene --profile-id publish_strict --report report.json
-mayapy examples/publish/submit_preflight.py examples/broken_scene/pipeline_inspector_demo_broken.ma `
+mayapy examples/publish/submit_preflight.py examples/vray_policy/vray_policy_scene.ma `
   --repo-root D:\Workspace\portfolio\maya-pipeline-inspector `
   --mayapy "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
 ```

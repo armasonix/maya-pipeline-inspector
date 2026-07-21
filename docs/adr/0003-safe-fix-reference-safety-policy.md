@@ -12,11 +12,11 @@ Accepted
 
 Maya Pipeline Inspector will eventually offer safe auto-fixes for common material QA issues such as wrong color space, unsafe paths, outdated texture links, and low-risk attribute corrections.
 
-However, scene mutation in production Maya scenes is dangerous. Maya scenes often contain referenced assets, locked nodes, render-layer or namespace complexity, and shot-level overrides. A validator that silently edits scene data can damage production files, introduce unintended reference edits, or make artists distrust the tool.
+However, scene mutation in production Maya scenes is dangerous. Maya scenes often contain referenced assets, locked nodes, render-layer or namespace complexity, and shot-level overrides. A validator that silently edits scene data can damage production files, introduce unintended reference edits, or make Technical Artists distrust the tool.
 
 The project must support production-safe workflows for several user groups:
 
-- artists who need quick fixes;
+- Technical Artists who need quick fixes;
 - Shader TDs who need repeatable material policy;
 - Pipeline TDs who need headless/publish safety;
 - Render Supervisors who need control over risky exceptions.
@@ -83,7 +83,7 @@ Pros:
 
 Cons:
 
-- lower value for artists;
+- lower value for Technical Artists;
 - repetitive manual fixes remain costly;
 - tool becomes diagnostic only.
 
@@ -130,7 +130,7 @@ Accepted.
 ### Positive
 
 - The tool remains trustworthy in production scenes.
-- Artists can still use convenient low-risk fixes.
+- Technical Artists can still use convenient low-risk fixes.
 - Supervisors can control risky changes through profile policy.
 - Referenced assets are protected from accidental shot-level mutation.
 - Fixes can be reported, audited, and tested.

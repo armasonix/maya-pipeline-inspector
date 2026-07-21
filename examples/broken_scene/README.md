@@ -1,4 +1,6 @@
-# Broken demo scene
+# Broken demo scene (legacy)
+
+> **Superseded for onboarding:** prefer the renderer policy demos — [`../vray_policy/vray_policy_scene.ma`](../vray_policy/vray_policy_scene.ma) and [`../arnold_policy/arnold_policy_scene.ma`](../arnold_policy/arnold_policy_scene.ma). They target V-Ray and Arnold rule packs with pre-modeled production issues. This folder remains for headless fixtures, CI examples, and shared texture paths.
 
 This folder contains the v0.1 broken demo scene for Maya Pipeline Inspector.
 

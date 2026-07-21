@@ -1,6 +1,12 @@
 # Studio custom rules and profile overrides
 
+**Product:** Maya Pipeline Inspector (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD / tooling engineer  
+**Related:** [MAYA_INSTALL.md](MAYA_INSTALL.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [RULE_AUTHORING.md](RULE_AUTHORING.md) · [ADR 0007](adr/0007-settings-and-connectors-architecture.md) · [ADR 0008](adr/0008-role-based-governance-foundation.md)
+
 This guide explains how studios extend Maya Pipeline Inspector with show-specific rule packs and profile JSON without forking the core validator. It also documents how to roll out the studio-wide settings file `pipeline_inspector_studio.json` via `PIPELINE_INSPECTOR_STUDIO_CONFIG`.
+
+> Studio config controls policy, but the tool itself is **still in active development**. Connectors, governance, and rule packs may require iteration after rollout. See [USER_GUIDE — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps).
 
 Use it together with:
 
@@ -38,11 +44,33 @@ Pipeline Inspector uses **two JSON layers**. Studio policy cannot be overridden 
 
 The Settings screen exposes **Save Studio Config** and **Save User Preferences** as separate actions. See [ADR 0007](adr/0007-settings-and-connectors-architecture.md) for merge semantics and secret-field policy.
 
-### Settings screen map (v0.5)
+### Governance and role assignment (v0.6)
+
+Studios can lock effective roles and deny capabilities without code changes. Configuration lives in the `governance` section of `pipeline_inspector_studio.json`:
+
+```json
+{
+  "governance": {
+    "enforced_role": "",
+    "tracker_role_map": { "Pipeline Supervisor": "pipeline_td" },
+    "capability_denials": { "producer": ["submit_farm"] }
+  }
+}
+```
+
+| Field | Purpose |
+| --- | --- |
+| `enforced_role` | When set, overrides tracker mapping and user preference |
+| `tracker_role_map` | Maps `PIPELINE_INSPECTOR_TRACKER_ROLE` env values to pipeline roles |
+| `capability_denials` | Subtracts capabilities from the default matrix per role |
+
+Users may set `assigned_role` in `~/.pipeline_inspector/user.json` (Settings → Basic) unless `enforced_role` is active. `PermissionResolver` in `core/governance.py` enforces the matrix on studio save, risky fixes, farm submit, and extra rule paths. Full matrix: [ADR 0008](adr/0008-role-based-governance-foundation.md).
+
+### Settings screen map (v0.5+)
 
 | Settings tab | JSON section | Typical owner |
 | --- | --- | --- |
-| **Basic** | `user.json` defaults (profile, asset class, scan scope, theme) | Artist |
+| **Basic** | `user.json` defaults (profile, asset class, scan scope, theme) | Technical Artist |
 | **Advanced** | `user.json` (`extra_rule_paths`, rule authoring entry points, debug) | TD |
 | **Connectors** | `connectors.*` | Pipeline TD |
 | **Studio** | `studio_name`, `pipeline.*` | Pipeline TD |
@@ -121,7 +149,7 @@ print(StudioConfig.default().studio_name)
     }
   },
   "ui": {
-    "documentation_url": "https://wiki.studio.internal/shader-health"
+    "documentation_url": "https://wiki.studio.internal/maya-pipeline-inspector"
   },
   "connectors": {
     "deadline": {
@@ -202,7 +230,7 @@ Legacy **schema 1.0** files (`pipeline.require_tx_derivatives`, `connectors.dead
 | `schema_version` | `"2.0"` | Persistence format; rewritten on save from Settings |
 | `studio_name` | string | Display name in the panel status banner |
 | `pipeline.require_tx_derivatives` | bool | When `false`, disables packaged `.tx` derivative rules via studio rule overrides |
-| `pipeline.waiver_defaults` | `default_approved_by`, `default_expiry_days`, `allow_critical_waivers` | Defaults when artists create waiver sidecars |
+| `pipeline.waiver_defaults` | `default_approved_by`, `default_expiry_days`, `allow_critical_waivers` | Defaults when Technical Artists create waiver sidecars |
 | `pipeline.manifest_gate_defaults` | `max_new_changes`, `max_fingerprint_changes`, `block_on_new_textures` | Baseline manifest regression gate policy |
 | `pipeline.pinned_workflow_profile_ids` | string[] | Optional allow-list for workflow profile dropdown |
 | `pipeline.pinned_asset_class_profile_ids` | string[] | Optional allow-list for asset class overlay dropdown |
@@ -321,7 +349,11 @@ Used for explicit tracker actions from the panel (not automatic validation fan-o
 | `bug_report` | HTTPS relay for **plugin** defect reports | [bug_report_relay.md](integrations/bug_report_relay.md) |
 | `updates` | Studio policy for **Check for Updates** (`allow_check`, optional `pinned_version`) | [auto_update.md](integrations/auto_update.md) |
 
-Bug report stays enabled with the shipped public relay when `bug_report.enabled` is true; `api_key` is optional for the public endpoint. Studio private relays still use `relay_url` + `api_key`. Updates policy is studio-controlled; per-user check-on-startup preference lives in `user.json`.
+Bug report stays enabled with the shipped public relay when `bug_report.enabled` is true; `api_key` is optional for the public endpoint. That path notifies **upstream maintainers** — suitable for unmodified open-source installs.
+
+Studios that **continue local plugin development** (fork, internal branch, studio patches) should deploy a **private relay** (`relay_url` + `api_key`) so Bug Report submissions reach **in-house R&D / pipeline engineering** for operational triage, not external GitHub. See [bug_report_relay.md — Why a studio private relay?](integrations/bug_report_relay.md#why-a-studio-private-relay).
+
+Updates policy is studio-controlled; per-user check-on-startup preference lives in `user.json`.
 
 ## What studios typically customize
 

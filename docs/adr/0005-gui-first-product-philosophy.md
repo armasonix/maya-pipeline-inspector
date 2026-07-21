@@ -12,16 +12,16 @@ Accepted
 
 v0.3 delivered a functional Maya dockable panel, headless CLI, manifest gates, apply-fixes automation, and a Deadline preflight example. Pipeline TDs can integrate Pipeline Inspector without opening Maya, and the shared `validation_pipeline` keeps UI and headless results aligned.
 
-In practice, the primary daily users are artists and Shader TDs working inside Maya. They validate scenes during lookdev, triage issues before publish, and need fast, low-friction access to blocking state (`block_publish`, `block_deadline`) without reading JSON reports or running terminal commands. v0.4 expands farm submission (Deadline 10 on-prem), native plugin bootstrap, and UX improvements — all of which must land in the panel first or alongside headless delivery.
+In practice, the primary daily users are Technical Artists and Shader TDs working inside Maya. They validate scenes during lookdev, triage issues before publish, and need fast, low-friction access to blocking state (`block_publish`, `block_deadline`) without reading JSON reports or running terminal commands. v0.4 expands farm submission (Deadline 10 on-prem), native plugin bootstrap, and UX improvements — all of which must land in the panel first or alongside headless delivery.
 
-Without an explicit product philosophy, new features risk shipping as CLI-only utilities or scattered panel buttons. That pattern slows artist adoption, increases support burden on pipeline TDs, and creates GUI/headless drift over time.
+Without an explicit product philosophy, new features risk shipping as CLI-only utilities or scattered panel buttons. That pattern slows Technical Artist adoption, increases support burden on pipeline TDs, and creates GUI/headless drift over time.
 
 ## Decision
 
 Maya Pipeline Inspector adopts a **GUI-first product philosophy** for v0.4 and subsequent releases:
 
 1. **GUI first** — Every new pipeline-facing feature must ship with a Maya panel affordance before (or in the same milestone as) CLI-only delivery. Headless and farm wrappers remain required, but they are secondary surfaces that call the same modules the panel uses.
-2. **Speed** — Default artist flows should reach an actionable result in **three clicks or fewer** from an open panel: for example, open panel → Validate Scene → select or fix an issue. Farm preflight and submit paths follow the same constraint once the Farm tab ships (M26).
+2. **Speed** — Default Technical Artist flows should reach an actionable result in **three clicks or fewer** from an open panel: for example, open panel → Validate Scene → select or fix an issue. Farm preflight and submit paths follow the same constraint once the Farm tab ships (M26).
 3. **Clarity** — Publish and Deadline blocking state must be visible in the panel summary without opening exported JSON. Health score, severity counts, and `block_publish` / `block_deadline` chips belong in persistent UI chrome, not only in report files.
 4. **Delight** — Routine safe actions should not spam confirmation modals. Use consistent spacing, tooltips, non-blocking progress feedback, and deferred UI updates (existing Maya-safe patterns) so validation feels responsive during long scans.
 5. **Parity** — The Maya panel and headless entrypoints must call `pipeline_inspector.maya.validation_pipeline` (and future `integrations/deadline` helpers) — never duplicate validation or preflight decision logic in UI-only code paths.
@@ -31,7 +31,7 @@ Maya Pipeline Inspector adopts a **GUI-first product philosophy** for v0.4 and s
 The dockable panel is the **primary product surface**. CLI, JSON/HTML reports, manifest export, apply-fixes, and Deadline hooks are **integration surfaces** that reuse the same core pipeline:
 
 ```text
-Artist / TD (primary)
+Technical Artist / TD (primary)
   -> Maya dockable UI (tabs: Validate, Waivers, Fixes, Reports, Farm)
   -> ui_launcher callbacks
   -> validation_pipeline / integrations.deadline
@@ -64,7 +64,7 @@ Pros:
 
 Cons:
 
-- artists defer to TDs for routine validate/fix flows;
+- Technical Artists defer to TDs for routine validate/fix flows;
 - blocking state hidden in terminal output or JSON;
 - GUI lags behind CLI, increasing parity bugs.
 
@@ -74,7 +74,7 @@ Rejected as the default product stance. CLI remains first-class but not primary.
 
 Pros:
 
-- avoids perceived bias toward artists;
+- avoids perceived bias toward Technical Artists;
 - both surfaces evolve in parallel.
 
 Cons:
@@ -89,7 +89,7 @@ Rejected.
 
 Pros:
 
-- artists get farm, manifest, and fix workflows without leaving Maya;
+- Technical Artists get farm, manifest, and fix workflows without leaving Maya;
 - pipeline modules stay shared — panel is a thin controller;
 - M22 UX audit and M28 Wave 1 have explicit P0 criteria (action bar, triage speed, farm status).
 
@@ -107,11 +107,11 @@ Accepted.
 - v0.4 Farm tab, shelf shortcuts, and Deadline guides have a clear mandate before REST submit APIs are considered complete.
 - UX audit (#092) and Wave 1 (#108–#109) can gate scope on P0 panel improvements rather than open-ended polish.
 - Contributors know where to add new behavior: extend `validation_pipeline` or `integrations/`, then wire `ui_launcher` / `main_window`.
-- Artists see blocking state and farm eligibility without pipeline TD intervention.
+- Technical Artists see blocking state and farm eligibility without pipeline TD intervention.
 
 ### Negative / Tradeoffs
 
-- Features that are purely batch-oriented still need a minimal panel status or link (for example, “last farm preflight” on the Farm tab) even when artists rarely click it.
+- Features that are purely batch-oriented still need a minimal panel status or link (for example, “last farm preflight” on the Farm tab) even when Technical Artists rarely click it.
 - GUI work adds milestone time versus CLI-only shipping; parallel tracks (M24 native plugin, M25 Deadline core) must still reserve UI wiring in M26.
 - “Three clicks” is a design guideline, not a hard automated test — manual checklist and UX audit capture compliance.
 
@@ -122,7 +122,7 @@ Expected documentation and code touchpoints for v0.4:
 ```text
 docs/adr/0005-gui-first-product-philosophy.md   # this ADR
 docs/ARCHITECTURE.md                            # product surface diagram, status
-docs/USER_GUIDE.md                              # artist-facing principles
+docs/USER_GUIDE.md                              # Technical Artist-facing principles
 docs/MAYA_UX_AUDIT_v0.4.md                      # friction inventory (#092)
 src/pipeline_inspector/maya/ui_launcher.py           # panel callbacks (no duplicated validation)
 src/pipeline_inspector/ui/main_window.py             # tabs, summary chrome, Farm tab (#101)

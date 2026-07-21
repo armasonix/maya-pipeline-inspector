@@ -100,7 +100,7 @@ Accepted.
 
 ### Negative / Tradeoffs
 
-- Farm jobs must not treat headless apply as a substitute for artist review on high-risk fixes.
+- Farm jobs must not treat headless apply as a substitute for Technical Artist review on high-risk fixes.
 - Studios must govern `--allow-referenced` and `--allow-high-risk` usage in pipeline docs.
 - Headless apply requires Maya; snapshot-only CI cannot exercise real scene mutation without mayapy integration tests.
 

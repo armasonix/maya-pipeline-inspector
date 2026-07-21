@@ -2,17 +2,35 @@
 
 Thank you for your interest in contributing to Maya Pipeline Inspector.
 
-This project is an open-source, production-oriented Maya material QA framework. Contributions are welcome, but they must preserve the project's core principles: production safety, data-driven validation, explainable results, testable core logic, and clean renderer boundaries.
+This project is an open-source, production-oriented Maya material and scene QA framework. Contributions are welcome, but they must preserve the project's core principles: production safety, data-driven validation, explainable results, testable core logic, and clean renderer boundaries.
 
-## Project Status
+We want Maya Pipeline Inspector to grow **with the community** — shared rules, adapters, integration patterns, and demo scenes that studios can reuse instead of rebuilding the same validators in isolation. See the [README](README.md#open-source--community) and [`COMMUNITY.md`](COMMUNITY.md).
 
-The project is currently in early development. The architecture is being built from the pure Python validation core outward:
+## Project status
 
-```text
-Snapshot model -> rule engine -> rule packs -> Maya scanner -> adapters -> reports -> UI -> safe fixes -> headless -> Deadline -> demo -> release
-```
+| Milestone | State | Focus |
+| --- | --- | --- |
+| **v0.5.0** | Shipped (2026-07-12) | Settings hub, notifications, task trackers, rule authoring MVP, auto-update, bug-report relay |
+| **v0.6** | Active on `dev` | Geometry QA, Machine Readiness tab, role governance, Deadline farm analytics |
 
-Before opening a large pull request, check the current GitHub issues and milestones.
+The **snapshot-first core** (models → rules → validator → reports) is stable and heavily tested without Maya. **Maya panel**, **connectors**, and **v0.6 subsystems** are still evolving — check [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) and milestones before large PRs.
+
+Honest scope for users: [USER_GUIDE — Known limitations](docs/USER_GUIDE.md#known-limitations--gaps).
+
+## Ways to contribute
+
+| Contribution | Where to start |
+| --- | --- |
+| **Bug fix or small feature** | Issue → fork → PR to `dev` ([branch workflow](#branch-workflow) below) |
+| **New or changed rule** | [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) + fixtures in `tests/` |
+| **Renderer adapter** | [`src/pipeline_inspector/adapters/`](src/pipeline_inspector/adapters/) + snapshot fixtures |
+| **Integration example** | `examples/` or `docs/integrations/` (sanitized paths only) |
+| **Documentation** | README, USER_GUIDE, ARCHITECTURE, ADRs |
+| **Design discussion** | [GitHub Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions) or an issue |
+
+Demo scenes for onboarding: [`examples/vray_policy/`](examples/vray_policy/) and [`examples/arnold_policy/`](examples/arnold_policy/) — keep checked-in reports in sync when validation output changes.
+
+Before opening a large pull request, check open issues and the current milestone on GitHub.
 
 ## Development Setup
 
@@ -286,7 +304,8 @@ Good examples:
 
 ```text
 $ASSET_ROOT/char/demo_hero/tex/body_albedo_v001.<UDIM>.exr
-examples/broken_scene/textures/dress_roughness_v001.1001.exr
+examples/vray_policy/vray_policy_scene.ma
+examples/arnold_policy/arnold_policy_scene.ma
 ```
 
 ## Issue Guidelines
@@ -346,4 +365,6 @@ A validation rule is done when:
 
 ## Questions
 
-Use GitHub issues for design questions, rule requests, renderer support requests, and bug reports.
+- **Bugs and rule requests:** [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues)
+- **Design, rollout, and “how would this fit my studio?”:** [GitHub Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions)
+- **Plugin defects from Maya:** panel Bug Report or [`docs/integrations/bug_report_relay.md`](docs/integrations/bug_report_relay.md)

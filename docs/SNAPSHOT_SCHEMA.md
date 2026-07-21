@@ -524,7 +524,7 @@ A minimal fixture should include:
 ```json
 {
   "schema_version": "1.0",
-  "scene_path": "examples/broken_scene/pipeline_inspector_demo_broken.ma",
+  "scene_path": "examples/vray_policy/vray_policy_scene.ma",
   "maya_version": "2025",
   "renderer": "vray",
   "scan_scope": "scene",

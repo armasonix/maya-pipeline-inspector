@@ -1,16 +1,14 @@
-# Deadline 10 integration guide (v0.4)
+# Deadline 10 integration guide
 
-Studio guide for connecting **Maya Pipeline Inspector** to **Thinkbox Deadline 10 on-prem** via the Web Service REST API. Covers Web Service setup, routing (pool/group), artist GUI workflows, headless preflight, farm eligibility, and CommandScript utility submit.
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD / render wrangler  
+**Related:** [USER_GUIDE.md](../USER_GUIDE.md) · [MAYA_INSTALL.md](../MAYA_INSTALL.md) · [deadline_farm_analytics.md](deadline_farm_analytics.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
+
+Studio guide for connecting **Maya Pipeline Inspector** to **Thinkbox Deadline 10 on-prem** via the Web Service REST API. Covers Web Service setup, routing (pool/group), Technical Artist GUI workflows, headless preflight, farm eligibility, and CommandScript utility submit.
 
 **Package:** `pipeline_inspector.integrations.deadline`  
 **Default Web Service URL:** `http://localhost:8081`  
 **Default validation profile:** `deadline_critical`
-
-Related docs:
-
-- [USER_GUIDE.md](../USER_GUIDE.md) — artist-facing **Farm Submit** workflow
-- [MAYA_INSTALL.md](../MAYA_INSTALL.md) — menu/shelf entrypoints
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — shared validation pipeline
 
 ---
 
@@ -34,7 +32,7 @@ The example scripts under `examples/deadline/` are thin CLI wrappers around the 
 
 ```mermaid
 flowchart LR
-    subgraph artists [Artist_Surfaces]
+    subgraph ta_surfaces [Technical_Artist_Surfaces]
         FARM[Farm_tab]
         SHELF[Shelf_Farm_Check]
         MENU[Menu_Farm_Check]
@@ -79,8 +77,8 @@ Pipeline Inspector talks to Deadline through the **standalone Web Service** (`de
 
 1. **Deadline Repository** reachable from the Web Service host.
 2. **Web Service process** running on a stable host (often a small utility VM or the repository server).
-3. **Firewall** allows artists and pipeline hosts to reach the configured HTTP port (default **8081**).
-4. **Shared paths** for `AuxFiles` (CommandScript aux `.txt`) visible on the **Web Service host**, not only on the artist workstation.
+3. **Firewall** allows Technical Artists and pipeline hosts to reach the configured HTTP port (default **8081**).
+4. **Shared paths** for `AuxFiles` (CommandScript aux `.txt`) visible on the **Web Service host**, not only on the Technical Artist workstation.
 
 Thinkbox references:
 
@@ -112,7 +110,7 @@ client = DeadlineClient(DeadlineConfig(api_url="http://farm-controller:8081"))
 assert client.ping()  # GET /api/jobs?IdOnly=true → HTTP 200
 ```
 
-Set the studio default for artists:
+Set the studio default for Technical Artists:
 
 ```text
 PIPELINE_INSPECTOR_DEADLINE_API_URL=http://farm-controller:8081
@@ -238,7 +236,7 @@ Map facility policy in the JSON config:
 
 ---
 
-## Artist GUI workflow (Maya panel)
+## Technical Artist GUI workflow (Maya panel)
 
 ### Farm tab (#101)
 
@@ -260,7 +258,7 @@ The tab persists last JSON report path and last submitted job id.
 | **Pipeline Inspector → Pipeline Inspector Farm Check** | Opens panel on **Farm** tab and runs preflight |
 | Shelf **Pipeline Inspector Farm Check** | Same as menu shortcut |
 
-See [USER_GUIDE.md — Farm Submit](../USER_GUIDE.md#farm-submit) for the artist checklist.
+See [USER_GUIDE.md — Farm Submit](../USER_GUIDE.md#farm-submit) for the Technical Artist checklist.
 
 ---
 
@@ -308,7 +306,7 @@ Use when validation must run on a farm worker (same scene paths as render jobs).
 
 ```mermaid
 sequenceDiagram
-    participant ART as Artist_or_TD
+    participant ART as Technical_Artist_or_TD
     participant SH as submit_pipeline_inspector_validation_job
     participant WS as Deadline_Web_Service
     participant WRK as Worker
@@ -501,7 +499,7 @@ CommandScript REST shape:
 | 3 | Set `mayapy`, `repo_root`, `pool`/`group` for utility validation jobs |
 | 4 | Place CommandScript aux files on a share visible to the Web Service |
 | 5 | Confirm `deadline_critical` profile matches facility blocking policy |
-| 6 | Train artists: **Farm** tab or **Pipeline Inspector Farm Check** shortcut before farm submit |
+| 6 | Train Technical Artists: **Farm** tab or **Pipeline Inspector Farm Check** shortcut before farm submit |
 | 7 | Wire custom render submitters to `run_deadline_preflight()` before Deadline render jobs |
 | 8 | Archive JSON reports beside scenes for audit |
 

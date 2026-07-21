@@ -170,7 +170,7 @@ Milestones 10 and 11 can run in parallel. Milestone 12 depends on stable manifes
 
 **Goal:** Controlled, auditable fixes beyond colorSpace `set_attr`.
 
-**Deliverable:** Artists and TDs can apply medium-risk path fixes and high-risk feature disables with confirmation; every apply attempt is logged.
+**Deliverable:** Technical Artists and TDs can apply medium-risk path fixes and high-risk feature disables with confirmation; every apply attempt is logged.
 
 **Issues:** #049, #050, #051, #052, #053
 
@@ -646,7 +646,7 @@ v0.2.0 is ready when:
 - [x] Issues **#049–#069** are closed, or deferrals are explicit in CHANGELOG with rationale.
 - [x] Issue **#070** release checklist is complete.
 - [ ] No regression in headless exit codes (`0`, `1`, `2`, `3`, `4`).
-- [ ] Demo scene [`examples/broken_scene/`](../examples/broken_scene/) still produces expected issue categories.
+- [ ] Policy demo scenes [`examples/vray_policy/`](../examples/vray_policy/) and [`examples/arnold_policy/`](../examples/arnold_policy/) still produce expected issue categories.
 - [ ] [DEVELOPMENT_PLAN.md §27](DEVELOPMENT_PLAN.md) reflects realigned roadmap (#069).
 - [ ] All new user-facing behavior documented in USER_GUIDE and/or integration docs.
 
@@ -658,7 +658,7 @@ v0.2.0 is ready when:
 |---|---|
 | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) | Master plan, Milestones 0–9, architecture and v0.1 roadmap |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layer diagram, snapshot-first design, fix safety policy summary |
-| [USER_GUIDE.md](USER_GUIDE.md) | Artist/TD workflow, profiles, UI actions |
+| [USER_GUIDE.md](USER_GUIDE.md) | Technical Artist/TD workflow, profiles, UI actions |
 | [RULE_AUTHORING.md](RULE_AUTHORING.md) | JSON rule schema and examples |
 | [SNAPSHOT_SCHEMA.md](SNAPSHOT_SCHEMA.md) | GraphSnapshot field reference (update in #054, #056) |
 | [CHANGELOG.md](../CHANGELOG.md) | Release history |

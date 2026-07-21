@@ -10,7 +10,7 @@
 
 ## Executive summary
 
-The v0.3 dockable panel is **functionally complete** for validate → triage → fix → export, with shared `validation_pipeline` parity to CLI. For daily artist use, the **Validate tab is vertically overloaded**: summary, four action buttons, four filters, the issues table, a six-field details block, and a status line compete for the same scroll area. Pipeline actions (manifest gate, publish preflight) sit beside primary validate buttons without grouping, and farm/Deadline workflow is **absent from the panel** (CLI/example only).
+The v0.3 dockable panel is **functionally complete** for validate → triage → fix → export, with shared `validation_pipeline` parity to CLI. For daily Technical Artist use, the **Validate tab is vertically overloaded**: summary, four action buttons, four filters, the issues table, a six-field details block, and a status line compete for the same scroll area. Pipeline actions (manifest gate, publish preflight) sit beside primary validate buttons without grouping, and farm/Deadline workflow is **absent from the panel** (CLI/example only).
 
 This audit records **22 findings**. **Seven are P0** and map to M28 issues [#108](https://github.com/armasonix/maya-pipeline-inspector/issues/136) and [#109](https://github.com/armasonix/maya-pipeline-inspector/issues/137). **Farm tab work** (M26, #101) addresses a separate P0 gap.
 
@@ -23,7 +23,7 @@ This audit records **22 findings**. **Seven are P0** and map to M28 issues [#108
 | Step | Activity |
 |------|----------|
 | 1 | Static review of panel layout builders and `ui_launcher` callback flows |
-| 2 | Map artist task flows against ADR 0005 (speed, clarity, delight, parity) |
+| 2 | Map Technical Artist task flows against ADR 0005 (speed, clarity, delight, parity) |
 | 3 | Score each finding: **Impact** (1–5, time saved or risk reduced) × **Effort** (1–5, implementation cost) |
 | 4 | Assign priority: **P0** = Impact ≥ 4 and Effort ≤ 3, or blocks ADR 0005 acceptance; **P1** = high value, moderate effort; **P2** = polish / defer post–v0.4.0 |
 | 5 | Assign P0 items to M28 GitHub issues |
@@ -91,7 +91,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | 2 | Switch to **Reports** tab | 1 | No “last validated” or stale warning (F-09) |
 | 3 | **Export JSON Report** | 1 | Result only in Script Editor print (F-15) |
 
-### Flow E — Manifest gate (artist)
+### Flow E — Manifest gate (Technical Artist)
 
 | Step | Action | Clicks | Notes |
 |------|--------|--------|-------|
@@ -118,7 +118,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 |----|---------|------|--------|--------|----------|------------------|
 | F-01 | **No unified action bar** — Validate Scene, Validate Selection, Publish Preflight, and Manifest Gate are four equal buttons in one row; pipeline actions not visually grouped | Validate | 5 | 2 | **P0** | #108 |
 | F-02 | **Summary not sticky** — health, severities, block flags, and profile rows scroll away with tab content; ADR 0005 expects persistent blocking chrome | Validate | 5 | 2 | **P0** | #108 |
-| F-03 | **No last-validated timestamp** — artist cannot tell if results are stale after external scene edits (only full reset on SceneOpened) | Validate | 4 | 2 | **P0** | #108 |
+| F-03 | **No last-validated timestamp** — Technical Artist cannot tell if results are stale after external scene edits (only full reset on SceneOpened) | Validate | 4 | 2 | **P0** | #108 |
 | F-04 | ~~**No Farm / Deadline affordance**~~ — **Resolved (#101):** Farm tab with connection status, preflight, submit | Global | 5 | 4 | **P0** | M26 #101 ✅ |
 | F-05 | **No double-click triage** — must select row, then click **Select Node** (extra click vs. peer tools) | Validate | 4 | 2 | **P0** | #109 |
 | F-06 | **Issue details below fold** — layout order: header → summary (3 lines) → asset hint → buttons → filters → table → details; details panel often off-screen on default dock height | Validate | 5 | 3 | **P0** | #108 (splitter / compact summary) |
@@ -129,7 +129,7 @@ Blocking state is already in summary labels (`BLOCK_STATUS_LABEL`); modal adds f
 | F-11 | **Publish Preflight modal** — `_show_information_dialog` after summary already updated | Validate | 3 | 1 | **P1** | #108 |
 | F-12 | **Strict profile fix confirm spam** — `publish_strict` uses per-fix `QMessageBox` (`confirm_risky_fixes` → `_confirm_single_risky_fix`) | Fixes | 4 | 3 | **P1** | defer batch UX polish |
 | F-13 | **Duplicate panel header** — `build_panel_header()` on all four tabs (~14pt title + version) wastes ~40px × 4 | Global | 3 | 1 | **P1** | #108 (single header above tabs) |
-| F-14 | **Fix queue on separate tab** — artist leaves Validate to inspect/apply fixes; no inline “N fixes available” chip | Fixes | 4 | 3 | **P1** | post–Wave 1 |
+| F-14 | **Fix queue on separate tab** — Technical Artist leaves Validate to inspect/apply fixes; no inline “N fixes available” chip | Fixes | 4 | 3 | **P1** | post–Wave 1 |
 | F-15 | **Export feedback in Script Editor only** — no in-panel path label after JSON/HTML/manifest export | Reports | 3 | 2 | **P1** | #108 status line reuse |
 | F-16 | **Filter row density** — Severity, Owner, View, Sort each with label + combo; wraps on narrow docks | Validate | 3 | 2 | **P1** | #109 |
 | F-17 | **Filters reset on revalidate** — severity/owner filters repopulated; `setCurrentText(options[0])` clears user filter ( `_update_severity_filter_options`) | Validate | 4 | 2 | **P1** | #109 |
