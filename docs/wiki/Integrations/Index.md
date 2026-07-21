@@ -10,7 +10,7 @@ Pipeline Inspector connects to farm, trackers, chat, and update infrastructure. 
 | Farm analytics CLI | Shipped | [`deadline_farm_analytics.md`](../../integrations/deadline_farm_analytics.md) |
 | AWS Deadline Cloud | Not shipped | — |
 
-Wiki: [Farm tab](../Panel/Farm-Tab) · [Farm submission](../Workflows/Farm-Submission)
+Wiki: [Farm tab](Farm-Tab) · [Farm submission](Farm-Submission)
 
 ## Publish & preflight
 
@@ -18,7 +18,7 @@ Wiki: [Farm tab](../Panel/Farm-Tab) · [Farm submission](../Workflows/Farm-Submi
 | --- | --- |
 | Publish submit preflight | [`publish_submit_preflight.md`](../../integrations/publish_submit_preflight.md) |
 
-Wiki: [Publish preflight](../Workflows/Publish-Preflight)
+Wiki: [Publish preflight](Publish-Preflight)
 
 ## Trackers
 
@@ -45,10 +45,10 @@ HTTPS relay for in-panel **Bug Report** — [`bug_report_relay.md`](../../integr
 
 GitHub Releases zip + in-app wizard — [`auto_update.md`](../../integrations/auto_update.md)
 
-Wiki: [Updates & releases](../Administration/Updates-and-Releases)
+Wiki: [Updates & releases](Updates-and-Releases)
 
 ## Architecture
 
 Connectors registry: [ADR 0007 — Settings and connectors architecture](../../adr/0007-settings-and-connectors-architecture.md)
 
-Settings UI: [Settings hub](../Panel/Settings-Hub)
+Settings UI: [Settings hub](Settings-Hub)

@@ -53,4 +53,4 @@ Report actions route to supervisor by role — panel Reports / notifications.
 
 Denied actions show reason in status banner (compliance log export — roadmap gap).
 
-→ [Capability matrix](../Reference/Capability-Matrix)
+→ [Capability matrix](Capability-Matrix)

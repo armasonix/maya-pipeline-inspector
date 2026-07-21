@@ -54,11 +54,11 @@ You should see:
 
 | Concept | Where to go deeper |
 | --- | --- |
-| Profiles | [Profiles & asset class](../Rules-and-Validation/Profiles-and-Asset-Classes) |
-| Issue table & filters | [Validate tab](../Panel/Validate-Tab) |
-| Safe fixes | [Safe fixes](../Rules-and-Validation/Safe-Fixes) |
-| Blocking flags | [Publish preflight](../Workflows/Publish-Preflight) |
+| Profiles | [Profiles & asset class](Profiles-and-Asset-Classes) |
+| Issue table & filters | [Validate tab](Validate-Tab) |
+| Safe fixes | [Safe fixes](Safe-Fixes) |
+| Blocking flags | [Publish preflight](Publish-Preflight) |
 
 ## Next tutorial
 
-→ [First validation tutorial](../Tutorials/First-Validation-Tutorial) (structured walkthrough with broken scene)
+→ [First validation tutorial](First-Validation-Tutorial) (structured walkthrough with broken scene)

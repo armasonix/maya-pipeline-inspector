@@ -1,0 +1,3 @@
+---
+
+**Maya Pipeline Inspector** · [Home](Home) · [FAQ](FAQ-and-Troubleshooting) · **v0.6.0** · MIT · [Repository](https://github.com/armasonix/maya-pipeline-inspector) · [Releases](https://github.com/armasonix/maya-pipeline-inspector/releases) · [Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) · [Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions) · [User guide](https://github.com/armasonix/maya-pipeline-inspector/blob/main/docs/USER_GUIDE.md) · [Contributing](https://github.com/armasonix/maya-pipeline-inspector/blob/main/CONTRIBUTING.md) · [Wiki source](https://github.com/armasonix/maya-pipeline-inspector/tree/main/docs/wiki)

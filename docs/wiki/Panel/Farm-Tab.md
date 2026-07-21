@@ -32,7 +32,7 @@ Both use the same validation pipeline. Farm preflight emphasizes **Deadline bloc
 
 ## Submit governance
 
-Role capability **`submit_farm`** required ([Governance](../Administration/Governance)). Technical Artists may be denied by studio policy.
+Role capability **`submit_farm`** required ([Governance](Governance)). Technical Artists may be denied by studio policy.
 
 ## Analytics (TD)
 
@@ -46,4 +46,4 @@ python -m pipeline_inspector farm-analytics --help
 
 ## Workflow
 
-→ [Farm submission](../Workflows/Farm-Submission)
+→ [Farm submission](Farm-Submission)

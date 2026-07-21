@@ -30,7 +30,7 @@ No. It **feeds** publish/farm decisions with validation, manifests, and reports 
 
 Python fallback still loads UI. Build `.mll` locally or use release zip with binaries.
 
-→ [Installation](../Getting-Started/Installation)
+→ [Installation](Installation)
 
 ---
 
@@ -58,7 +58,7 @@ Health is heuristic. Trust **Publish Block** / **Deadline Block** for gates.
 
 Only **module-path** installs (sibling `maya_module/` + `src/`). Pip installs: manual `pip install -U`.
 
-→ [Updates & releases](../Administration/Updates-and-Releases)
+→ [Updates & releases](Updates-and-Releases)
 
 ### Version unchanged after update
 
@@ -70,7 +70,7 @@ Quit Maya fully; verify install root matches `MAYA_MODULE_PATH`.
 
 ### Submit disabled
 
-Role may lack `submit_farm` — [Governance](../Administration/Governance).
+Role may lack `submit_farm` — [Governance](Governance).
 
 ### Web Service connection failed
 
@@ -94,7 +94,7 @@ From [`USER_GUIDE.md`](../../USER_GUIDE.md#known-limitations--gaps):
 | AWS Deadline Cloud | Not integrated |
 | User prefs in CLI | Studio config only |
 
-Full matrix: [Capability matrix](../Reference/Capability-Matrix)
+Full matrix: [Capability matrix](Capability-Matrix)
 
 ---
 

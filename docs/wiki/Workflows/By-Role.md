@@ -22,7 +22,7 @@ flowchart TD
 | Farm | Use **Farm Check** when wrangler requests preflight |
 | Updates | **Check for Updates** if on module-path install |
 
-→ [Quick start](../Getting-Started/Quick-Start-5-Minutes)
+→ [Quick start](Quick-Start-5-Minutes)
 
 ## Shader TD
 
@@ -33,7 +33,7 @@ flowchart TD
 | Authoring | Rule browser, wizard, hand-edited packs |
 | Manifest | Export baselines for hero assets |
 
-→ [Authoring rules](../Rules-and-Validation/Authoring-Rules) · [`RULE_AUTHORING.md`](../../RULE_AUTHORING.md)
+→ [Authoring rules](Authoring-Rules) · [`RULE_AUTHORING.md`](../../RULE_AUTHORING.md)
 
 ## Pipeline TD
 
@@ -44,7 +44,7 @@ flowchart TD
 | Deadline | Package scripts + [`deadline_submit_preflight.md`](../../integrations/deadline_submit_preflight.md) |
 | CI | `pytest` + optional Maya integration runner |
 
-→ [Headless CLI](Headless-CLI) · [Studio config](../Administration/Studio-Config)
+→ [Headless CLI](Headless-CLI) · [Studio config](Studio-Config)
 
 ## Render supervisor
 
@@ -68,4 +68,4 @@ flowchart TD
 | Edit studio config | ✗ | policy | ✓ | ✓ |
 | Manage rules | ✗ | ✓ | ✓ | ✓ |
 
-Details: [Governance](../Administration/Governance)
+Details: [Governance](Governance)

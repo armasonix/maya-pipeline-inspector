@@ -47,6 +47,6 @@ TDs with write access: Settings → Studio / Connectors → **Save Studio Config
 
 ## Related
 
-- [Settings hub](../Panel/Settings-Hub)
+- [Settings hub](Settings-Hub)
 - [Governance](Governance)
 - [`MAYA_INSTALL.md` — Studio config rollout](../../MAYA_INSTALL.md)

@@ -44,8 +44,8 @@ mayapy -m pipeline_inspector apply-fixes hero.ma \
 
 ## Studio config
 
-CLI respects `PIPELINE_INSPECTOR_STUDIO_CONFIG` and `--studio-config`. User panel prefs may differ — known gap ([Capability matrix](../Reference/Capability-Matrix)).
+CLI respects `PIPELINE_INSPECTOR_STUDIO_CONFIG` and `--studio-config`. User panel prefs may differ — known gap ([Capability matrix](Capability-Matrix)).
 
 ## Full reference
 
-→ [CLI reference](../Reference/CLI-Reference) · [`CLI_TESTING.md`](../../CLI_TESTING.md)
+→ [CLI reference](CLI-Reference) · [`CLI_TESTING.md`](../../CLI_TESTING.md)

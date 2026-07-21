@@ -31,9 +31,9 @@ Configured in `pipeline_inspector_studio.json` → `readiness.checks`:
 
 ## Limits
 
-- Probes run **inside Maya session** — no separate readiness CLI yet ([Capability matrix](../Reference/Capability-Matrix)).
+- Probes run **inside Maya session** — no separate readiness CLI yet ([Capability matrix](Capability-Matrix)).
 - Readiness does not replace scene validation — use **both**.
 
 Architecture: [`ARCHITECTURE.md` — Machine Readiness](../../ARCHITECTURE.md)
 
-→ [Studio config](../Administration/Studio-Config)
+→ [Studio config](Studio-Config)

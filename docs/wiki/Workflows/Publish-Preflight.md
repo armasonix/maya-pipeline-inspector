@@ -43,4 +43,4 @@ mayapy -m pipeline_inspector gate "$SCENE" "$APPROVED_MANIFEST.json" \
 | Complexity | Simplify shader graph |
 | Geometry budget | Reduce polycount or reclassify asset |
 
-→ [Validate tab](../Panel/Validate-Tab)
+→ [Validate tab](Validate-Tab)

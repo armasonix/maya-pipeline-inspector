@@ -22,7 +22,7 @@ Export manifest → later run CLI or UI **Manifest Gate**:
 mayapy -m pipeline_inspector gate scene.ma baseline_manifest.json --profile-id publish_strict
 ```
 
-Exit codes suitable for publish hooks — see [CLI reference](../Reference/CLI-Reference).
+Exit codes suitable for publish hooks — see [CLI reference](CLI-Reference).
 
 ## Send to Tracker
 

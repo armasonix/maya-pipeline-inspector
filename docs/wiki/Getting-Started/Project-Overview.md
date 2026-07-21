@@ -26,7 +26,7 @@
 - Not AWS Deadline Cloud integration (on-prem Deadline 10 is supported)
 - Not texture freshness from a publish database (filesystem sibling scan only)
 
-See [FAQ — known limitations](../FAQ-and-Troubleshooting.md#known-limitations).
+See [FAQ — known limitations](../FAQ-and-Troubleshooting#known-limitations).
 
 ## Version & support matrix
 
@@ -40,4 +40,4 @@ See [FAQ — known limitations](../FAQ-and-Troubleshooting.md#known-limitations)
 
 ## Next steps
 
-→ [Installation](Installation) · [5-minute quick start](Quick-Start-5-Minutes) · [Panel overview](../Panel/Overview)
+→ [Installation](Installation) · [5-minute quick start](Quick-Start-5-Minutes) · [Panel overview](Panel-Overview)

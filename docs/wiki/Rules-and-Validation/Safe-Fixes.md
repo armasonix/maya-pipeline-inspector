@@ -30,8 +30,8 @@ Headless policy: [ADR 0004](../../adr/0004-headless-apply-fixes-policy.md)
 
 ## Governance
 
-Capability **`apply_risky_fixes`** — see [Governance](../Administration/Governance).
+Capability **`apply_risky_fixes`** — see [Governance](Governance).
 
 ## UI
 
-→ [Fixes & waivers panel](../Panel/Fixes-and-Waivers)
+→ [Fixes & waivers panel](Fixes-and-Waivers)

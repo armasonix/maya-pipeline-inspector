@@ -8,7 +8,7 @@ Shipped examples for learning, CI, and renderer policy demos. Open with **`MAYA_
 | --- | --- |
 | [`examples/broken_scene/broken_scene.ma`](../../../examples/broken_scene/broken_scene.ma) | Missing textures, path issues, common rule triggers |
 
-**Tutorial:** [First validation](../Tutorials/First-Validation-Tutorial)
+**Tutorial:** [First validation](First-Validation-Tutorial)
 
 ## V-Ray policy demo
 
@@ -18,7 +18,7 @@ Shipped examples for learning, CI, and renderer policy demos. Open with **`MAYA_
 
 Requires **V-Ray** loaded in session.
 
-**Walkthrough:** [V-Ray policy tutorial](../Tutorials/V-Ray-Policy-Walkthrough) · [`examples/vray_policy/README.md`](../../../examples/vray_policy/README.md)
+**Walkthrough:** [V-Ray policy tutorial](V-Ray-Policy-Walkthrough) · [`examples/vray_policy/README.md`](../../../examples/vray_policy/README.md)
 
 ## Arnold policy demo
 
@@ -28,7 +28,7 @@ Requires **V-Ray** loaded in session.
 
 Requires **Arnold** loaded in session.
 
-**Walkthrough:** [Arnold policy tutorial](../Tutorials/Arnold-Policy-Walkthrough) · [`examples/arnold_policy/README.md`](../../../examples/arnold_policy/README.md)
+**Walkthrough:** [Arnold policy tutorial](Arnold-Policy-Walkthrough) · [`examples/arnold_policy/README.md`](../../../examples/arnold_policy/README.md)
 
 ## Sample reports
 
@@ -42,4 +42,4 @@ mayapy -m pipeline_inspector validate examples/broken_scene/broken_scene.ma \
   --report /tmp/report.json
 ```
 
-→ [CLI reference](../Reference/CLI-Reference)
+→ [CLI reference](CLI-Reference)

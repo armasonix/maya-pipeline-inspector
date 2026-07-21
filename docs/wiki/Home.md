@@ -44,11 +44,11 @@ flowchart LR
 
 | I am a… | Start here | Time |
 | --- | --- | --- |
-| **Technical Artist** | [5-minute quick start](Getting-Started/Quick-Start-5-Minutes) → [Validate tab](Panel/Validate-Tab) | ~10 min |
-| **Shader TD** | [How rules work](Rules-and-Validation/How-Rules-Work) → [Authoring rules](Rules-and-Validation/Authoring-Rules) | ~30 min |
-| **Pipeline TD** | [Installation](Getting-Started/Installation) → [Studio config](Administration/Studio-Config) → [Headless CLI](Workflows/Headless-CLI) | ~1 h |
-| **Render supervisor** | [Reports tab](Panel/Reports-Tab) → [Publish preflight](Workflows/Publish-Preflight) → [Capability matrix](Reference/Capability-Matrix) | ~20 min |
-| **New to the project** | [Overview](Getting-Started/Overview) → [Architecture](Reference/Architecture-Overview) | ~15 min |
+| **Technical Artist** | [5-minute quick start](Quick-Start-5-Minutes) → [Validate tab](Validate-Tab) | ~10 min |
+| **Shader TD** | [How rules work](How-Rules-Work) → [Authoring rules](Authoring-Rules) | ~30 min |
+| **Pipeline TD** | [Installation](Installation) → [Studio config](Studio-Config) → [Headless CLI](Headless-CLI) | ~1 h |
+| **Render supervisor** | [Reports tab](Reports-Tab) → [Publish preflight](Publish-Preflight) → [Capability matrix](Capability-Matrix) | ~20 min |
+| **New to the project** | [Overview](Project-Overview) → [Architecture](Architecture-Overview) | ~15 min |
 
 ---
 
@@ -66,7 +66,7 @@ Six tabs — one validation pipeline underneath:
 | **Farm** | Deadline 10 connection, preflight, submit |
 | **Settings** *(gear)* | Roles, studio policy, connectors, bug report |
 
-Deep dive: [Panel overview](Panel/Overview) · Full user guide: [`USER_GUIDE.md`](../USER_GUIDE.md)
+Deep dive: [Panel overview](Panel-Overview) · Full user guide: [`USER_GUIDE.md`](../USER_GUIDE.md)
 
 ---
 
@@ -88,31 +88,28 @@ Honest gaps: [FAQ — known limitations](FAQ-and-Troubleshooting#known-limitatio
 
 | Layer | Wiki | Deep reference |
 | --- | --- | --- |
-| Install & bootstrap | [Installation](Getting-Started/Installation) | [`MAYA_INSTALL.md`](../MAYA_INSTALL.md) |
-| Daily UI workflow | [By role](Workflows/By-Role) | [`USER_GUIDE.md`](../USER_GUIDE.md) |
-| Rule packs | [Authoring rules](Rules-and-Validation/Authoring-Rules) | [`RULE_AUTHORING.md`](../RULE_AUTHORING.md) |
-| Studio rollout | [Studio config](Administration/Studio-Config) | [`STUDIO_OVERRIDES.md`](../STUDIO_OVERRIDES.md) |
-| Integrations | [Integration index](Integrations/Index) | [`docs/integrations/`](../integrations/) |
-| System design | [Architecture](Reference/Architecture-Overview) | [`ARCHITECTURE.md`](../ARCHITECTURE.md) |
-| CLI & CI | [CLI reference](Reference/CLI-Reference) | [`CLI_TESTING.md`](../CLI_TESTING.md) |
+| Install & bootstrap | [Installation](Installation) | [`MAYA_INSTALL.md`](../MAYA_INSTALL.md) |
+| Daily UI workflow | [By role](By-Role) | [`USER_GUIDE.md`](../USER_GUIDE.md) |
+| Rule packs | [Authoring rules](Authoring-Rules) | [`RULE_AUTHORING.md`](../RULE_AUTHORING.md) |
+| Studio rollout | [Studio config](Studio-Config) | [`STUDIO_OVERRIDES.md`](../STUDIO_OVERRIDES.md) |
+| Integrations | [Integration index](Index) | [`docs/integrations/`](../integrations/) |
+| System design | [Architecture](Architecture-Overview) | [`ARCHITECTURE.md`](../ARCHITECTURE.md) |
+| CLI & CI | [CLI reference](CLI-Reference) | [`CLI_TESTING.md`](../CLI_TESTING.md) |
 | Snapshot format | — | [`SNAPSHOT_SCHEMA.md`](../SNAPSHOT_SCHEMA.md) |
 
 ---
 
 ## Tutorials (hands-on)
 
-1. [First validation tutorial](Tutorials/First-Validation-Tutorial) — broken scene → fix → revalidate  
-2. [V-Ray policy walkthrough](Tutorials/V-Ray-Policy-Walkthrough) — `examples/vray_policy/`  
-3. [Arnold policy walkthrough](Tutorials/Arnold-Policy-Walkthrough) — `examples/arnold_policy/`
+1. [First validation tutorial](First-Validation-Tutorial) — broken scene → fix → revalidate  
+2. [V-Ray policy walkthrough](V-Ray-Policy-Walkthrough) — `examples/vray_policy/`  
+3. [Arnold policy walkthrough](Arnold-Policy-Walkthrough) — `examples/arnold_policy/`
 
 ---
 
 ## Community & releases
 
-- [GitHub Releases](https://github.com/armasonix/maya-pipeline-inspector/releases) · [`CHANGELOG.md`](../../CHANGELOG.md)
+- [GitHub Releases](https://github.com/armasonix/maya-pipeline-inspector/releases) · [`CHANGELOG.md`](https://github.com/armasonix/maya-pipeline-inspector/blob/main/CHANGELOG.md)
 - [Report a bug](https://github.com/armasonix/maya-pipeline-inspector/issues) · Panel **Bug Report**
-- [`COMMUNITY.md`](../../COMMUNITY.md) · [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+- [`COMMUNITY.md`](https://github.com/armasonix/maya-pipeline-inspector/blob/main/COMMUNITY.md) · [`CONTRIBUTING.md`](https://github.com/armasonix/maya-pipeline-inspector/blob/main/CONTRIBUTING.md)
 
----
-
-*Wiki source lives in `docs/wiki/` in the repository. Product principles: GUI-first ([ADR 0005](../adr/0005-gui-first-product-philosophy.md)), snapshot-first core ([ADR 0001](../adr/0001-snapshot-first-core.md)).*

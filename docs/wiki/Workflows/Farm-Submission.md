@@ -32,5 +32,5 @@ Then Deadline pre/post job scripts — see [`deadline_submit_preflight.md`](../.
 
 ## Related
 
-- [Farm tab](../Panel/Farm-Tab)
-- [Governance — submit_farm](../Administration/Governance)
+- [Farm tab](Farm-Tab)
+- [Governance — submit_farm](Governance)

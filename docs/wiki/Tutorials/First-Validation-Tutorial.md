@@ -14,7 +14,7 @@ Open → examples/broken_scene/broken_scene.ma
 Panel → Pipeline Inspector
 ```
 
-→ [Demo scenes](../Getting-Started/Demo-Scenes)
+→ [Demo scenes](Demo-Scenes)
 
 ## 2. Baseline validation
 
@@ -67,4 +67,4 @@ Same issue set as panel (same pipeline).
 
 ## Learn more
 
-→ [Validate tab](../Panel/Validate-Tab) · [Safe fixes](../Rules-and-Validation/Safe-Fixes)
+→ [Validate tab](Validate-Tab) · [Safe fixes](Safe-Fixes)

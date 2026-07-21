@@ -39,4 +39,4 @@ Status banner shows which studio file is loaded.
 | Ftrack / ShotGrid / Cerebro | [`tracker_publish.md`](../../integrations/tracker_publish.md) |
 | Bug report relay | [`bug_report_relay.md`](../../integrations/bug_report_relay.md) |
 
-→ [Studio config](../Administration/Studio-Config) · [Governance](../Administration/Governance)
+→ [Studio config](Studio-Config) · [Governance](Governance)

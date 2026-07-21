@@ -51,4 +51,4 @@ Material complexity metadata feeds rules like `common.shader_complexity.farm_cos
 Validate → filter Critical → select issue → fix or waiver → revalidate
 ```
 
-→ [Fixes & waivers](Fixes-and-Waivers) · [Profiles](../Rules-and-Validation/Profiles-and-Asset-Classes)
+→ [Fixes & waivers](Fixes-and-Waivers) · [Profiles](Profiles-and-Asset-Classes)

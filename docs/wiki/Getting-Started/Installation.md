@@ -53,7 +53,7 @@ Set once for all artists:
 $env:PIPELINE_INSPECTOR_STUDIO_CONFIG = "\\pipeline\config\pipeline_inspector_studio.json"
 ```
 
-→ [Studio config](../Administration/Studio-Config)
+→ [Studio config](Studio-Config)
 
 ## Verify install
 

@@ -25,7 +25,7 @@ A rule-backed mutation with a defined fix type ([ADR 0003](../../adr/0003-safe-f
 
 ### High-risk fixes
 
-Some fixes require **extra confirmation** or role capability `apply_risky_fixes` ([Governance](../Administration/Governance)).
+Some fixes require **extra confirmation** or role capability `apply_risky_fixes` ([Governance](Governance)).
 
 Reference nodes and locked attributes are protected — fixes skip or fail with audit entry.
 
@@ -55,5 +55,5 @@ Waivers live in sidecar JSON — version with scene or shot policy. They affect 
 
 ## Related
 
-- [Safe fixes deep dive](../Rules-and-Validation/Safe-Fixes)
+- [Safe fixes deep dive](Safe-Fixes)
 - [`USER_GUIDE.md`](../../USER_GUIDE.md)

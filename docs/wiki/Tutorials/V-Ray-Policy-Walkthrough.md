@@ -60,4 +60,4 @@ examples/vray_policy/sample_report.html
 
 ## Next
 
-→ [Arnold walkthrough](Arnold-Policy-Walkthrough) · [Authoring rules](../Rules-and-Validation/Authoring-Rules)
+→ [Arnold walkthrough](Arnold-Policy-Walkthrough) · [Authoring rules](Authoring-Rules)

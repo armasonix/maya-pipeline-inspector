@@ -43,4 +43,4 @@ Heuristic aggregate — **not** render time. Use severity counts and blocking fl
 
 Waivers suppress specific rule/node/path combinations per sidecar policy — blocking may clear while issue remains visible as waived.
 
-→ [Fixes & waivers](../Panel/Fixes-and-Waivers)
+→ [Fixes & waivers](Fixes-and-Waivers)

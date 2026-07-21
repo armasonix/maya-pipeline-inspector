@@ -46,7 +46,7 @@ See [Shader farm cost score](../../USER_GUIDE.md#shader-farm-cost-score) in user
 
 **Reports → Export Manifest** — use as teaching example for publish baseline workflow.
 
-→ [Publish preflight](../Workflows/Publish-Preflight)
+→ [Publish preflight](Publish-Preflight)
 
 ## 6. Compare sample output
 

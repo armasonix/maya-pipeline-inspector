@@ -36,8 +36,9 @@ maya_module/plug-ins/2026/*.bundle
 !docs/assets/
 !docs/assets/**
 
-# Virtual environments
-.venv/
+# Local GitHub wiki clone (publish from docs/wiki/, do not track in main repo)
+maya-pipeline-inspector.wiki/
+
 venv/
 env/
 ENV/
