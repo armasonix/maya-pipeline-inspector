@@ -1,7 +1,7 @@
 # Maya Pipeline Inspector
 
 [![CI](https://img.shields.io/github/actions/workflow/status/armasonix/maya-pipeline-inspector/ci.yml?branch=dev&label=CI)](https://github.com/armasonix/maya-pipeline-inspector/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/armasonix/maya-pipeline-inspector)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/armasonix/maya-pipeline-inspector?branch=main)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/armasonix/maya-pipeline-inspector?label=version)](https://github.com/armasonix/maya-pipeline-inspector/releases)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 [![Maya](https://img.shields.io/badge/Maya-2024--2026-orange)](docs/MAYA_INSTALL.md)
@@ -19,23 +19,6 @@
 Production material and scene QA framework for Autodesk Maya pipelines ([`maya-pipeline-inspector`](https://github.com/armasonix/maya-pipeline-inspector)).
 
 Built to prevent render-time failures by detecting missing textures, outdated maps, wrong color space, broken UDIMs, unsafe paths, displacement risk, geometry budget violations, duplicate meshes, and renderer-specific shader issues before assets reach publish or the render farm.
-
-## Open source & community
-
-**Maya Pipeline Inspector is an MIT-licensed open-source project.** The goal is not a closed studio script — it is a **shared production QA layer** for Maya pipelines that studios, TDs, and Technical Artists can extend together: common rule schema, renderer adapters, integration guides, and sanitized demo scenes that feed back upstream. See [`COMMUNITY.md`](COMMUNITY.md).
-
-| If you want to… | Start here |
-| --- | --- |
-| **Browse the full wiki (KB, tutorials, reference)** | **[`docs/wiki/Home.md`](docs/wiki/Home.md)** |
-| Report a bug or request a rule | [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) |
-| Discuss design or studio rollout | [GitHub Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions) · [`COMMUNITY.md`](COMMUNITY.md) |
-| Contribute code, rules, or docs | [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`COMMUNITY.md`](COMMUNITY.md) |
-| Propose a rule pack or profile change | [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) + an issue with fixture ideas |
-| Add or extend a renderer adapter | [`src/pipeline_inspector/adapters/`](src/pipeline_inspector/adapters/) + [`CONTRIBUTING.md`](CONTRIBUTING.md#renderer-adapter-contribution-guidelines) |
-| Share a studio integration pattern | `examples/` or `docs/integrations/` PR (sanitized paths only) |
-| Report a plugin defect from Maya | Panel **Bug Report** or [`docs/integrations/bug_report_relay.md`](docs/integrations/bug_report_relay.md) |
-
-Studios running a fork or internal rollout are welcome to open an issue or discussion if you want to be listed as an early adopter (optional, no commitment).
 
 **Status:** **v0.6.0 shipped** (2026-07-21) · **v1.0+** on roadmap  
 **Development honesty:** actively evolving — **v0.6.0** is the current public release; `dev` carries **v0.7+** work. Many surfaces remain **MVP-quality** — not a turnkey publish/AMS/farm stack. See [Known limitations & gaps](docs/USER_GUIDE.md#known-limitations--gaps) before production rollout.  
@@ -298,6 +281,23 @@ src/pipeline_inspector/
 ```
 
 The package uses a `src` layout so imports during tests match installed-package behavior.
+
+## Open source & community
+
+**Maya Pipeline Inspector is an MIT-licensed open-source project.** The goal is not a closed studio script — it is a **shared production QA layer** for Maya pipelines that studios, TDs, and Technical Artists can extend together: common rule schema, renderer adapters, integration guides, and sanitized demo scenes that feed back upstream. See [`COMMUNITY.md`](COMMUNITY.md).
+
+| If you want to… | Start here |
+| --- | --- |
+| **Browse the full wiki (KB, tutorials, reference)** | **[`docs/wiki/Home.md`](docs/wiki/Home.md)** |
+| Report a bug or request a rule | [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) |
+| Discuss design or studio rollout | [GitHub Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions) · [`COMMUNITY.md`](COMMUNITY.md) |
+| Contribute code, rules, or docs | [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`COMMUNITY.md`](COMMUNITY.md) |
+| Propose a rule pack or profile change | [`docs/RULE_AUTHORING.md`](docs/RULE_AUTHORING.md) + an issue with fixture ideas |
+| Add or extend a renderer adapter | [`src/pipeline_inspector/adapters/`](src/pipeline_inspector/adapters/) + [`CONTRIBUTING.md`](CONTRIBUTING.md#renderer-adapter-contribution-guidelines) |
+| Share a studio integration pattern | `examples/` or `docs/integrations/` PR (sanitized paths only) |
+| Report a plugin defect from Maya | Panel **Bug Report** or [`docs/integrations/bug_report_relay.md`](docs/integrations/bug_report_relay.md) |
+
+Studios running a fork or internal rollout are welcome to open an issue or discussion if you want to be listed as an early adopter (optional, no commitment).
 
 ## Documentation
 
