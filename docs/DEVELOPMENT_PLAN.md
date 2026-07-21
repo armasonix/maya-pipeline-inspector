@@ -10,7 +10,7 @@
 **Renderer rule packs:** Common Maya, V-Ray, Arnold (+ USD health rules for USD assets)  
 **Core principle:** Snapshot-first validation, renderer adapters, data-driven JSON rules, safe fixes, GUI-first product surface ([ADR 0005](adr/0005-gui-first-product-philosophy.md))
 
-**Companion docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [USER_GUIDE.md](USER_GUIDE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [RULE_AUTHORING.md](RULE_AUTHORING.md) · [CHANGELOG.md](../CHANGELOG.md)
+**Companion docs:** [Wiki Home](wiki/Home.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [USER_GUIDE.md](USER_GUIDE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [RULE_AUTHORING.md](RULE_AUTHORING.md) · [CHANGELOG.md](../CHANGELOG.md)
 
 ---
 

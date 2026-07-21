@@ -2,7 +2,7 @@
 
 **Product:** Maya Pipeline Inspector (`maya-pipeline-inspector`)  
 **Status:** v0.6.0 shipped (2026-07-21) · v1.0+ on roadmap  
-**Related:** [MAYA_INSTALL.md](MAYA_INSTALL.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [CHANGELOG.md](../CHANGELOG.md)
+**Related:** [Wiki Home](wiki/Home.md) · [MAYA_INSTALL.md](MAYA_INSTALL.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [CHANGELOG.md](../CHANGELOG.md)
 
 Maya Pipeline Inspector is an **open-source** production-oriented material and scene QA tool for Autodesk Maya (MIT, [GitHub](https://github.com/armasonix/maya-pipeline-inspector)). It helps Technical Artists, Shader TDs, Pipeline TDs, and render supervisors detect material and geometry problems before publish or render farm submission. To contribute rules, adapters, or integrations, see [CONTRIBUTING.md](../CONTRIBUTING.md), [`COMMUNITY.md`](../COMMUNITY.md), and the [README community section](../README.md#open-source--community).
 

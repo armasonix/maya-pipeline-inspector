@@ -26,6 +26,7 @@ Built to prevent render-time failures by detecting missing textures, outdated ma
 
 | If you want to… | Start here |
 | --- | --- |
+| **Browse the full wiki (KB, tutorials, reference)** | **[`docs/wiki/Home.md`](docs/wiki/Home.md)** |
 | Report a bug or request a rule | [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) |
 | Discuss design or studio rollout | [GitHub Discussions](https://github.com/armasonix/maya-pipeline-inspector/discussions) · [`COMMUNITY.md`](COMMUNITY.md) |
 | Contribute code, rules, or docs | [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`COMMUNITY.md`](COMMUNITY.md) |
@@ -302,6 +303,7 @@ The package uses a `src` layout so imports during tests match installed-package 
 
 | Guide | Audience |
 | --- | --- |
+| **[`docs/wiki/Home.md`](docs/wiki/Home.md)** | **Everyone — wiki KB, tutorials, panel guides, FAQ** |
 | [`COMMUNITY.md`](COMMUNITY.md) | Community — channels, early adopters, how to help |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributors — code, rules, adapters, docs |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | Technical Artists, Shader TDs, Supervisors |

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/wiki/`** — product wiki (knowledge base, panel guides, workflows, tutorials, FAQ); start at [`docs/wiki/Home.md`](docs/wiki/Home.md).
+
 ## [0.6.0] - 2026-07-21
 
 **Maya Pipeline Inspector v0.6 — Geometry QA, Machine Readiness, Role Governance & Farm Intelligence**
