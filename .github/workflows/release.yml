@@ -42,7 +42,7 @@ jobs:
           python -c "from pathlib import Path; import zipfile; from tools.build_release_package import list_native_plugins_in_zip; dist=Path('dist'); zips=sorted(dist.glob('maya-pipeline-inspector-*.zip')); assert zips, 'Release zip not found'; archive=zipfile.ZipFile(zips[-1]); bundled=list_native_plugins_in_zip(archive); print('Bundled native plug-ins:'); [print('  ' + item) for item in bundled]; assert any('/2024/' in item for item in bundled), 'Missing 2024 .mll'; assert any('/2025/' in item for item in bundled), 'Missing 2025 .mll'; assert 'maya_module/plug-ins/pipeline_inspector.mll' in bundled, 'Missing manager .mll'"
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/maya-pipeline-inspector-*.zip
           fail_on_unmatched_files: true
