@@ -102,8 +102,3 @@ desktop.ini
 .idea/
 *.swp
 *.swo
-
-# Agents
-/.agents
-skills-lock.json
-/.cursor
