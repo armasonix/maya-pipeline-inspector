@@ -53,7 +53,7 @@ Studios can lock effective roles and deny capabilities without code changes. Con
   "governance": {
     "enforced_role": "",
     "tracker_role_map": { "Pipeline Supervisor": "pipeline_td" },
-    "capability_denials": { "producer": ["submit_farm"] }
+    "capability_denials": { "technical_artist": ["submit_farm"] }
   }
 }
 ```
@@ -62,7 +62,7 @@ Studios can lock effective roles and deny capabilities without code changes. Con
 | --- | --- |
 | `enforced_role` | When set, overrides tracker mapping and user preference |
 | `tracker_role_map` | Maps `PIPELINE_INSPECTOR_TRACKER_ROLE` env values to pipeline roles |
-| `capability_denials` | Subtracts capabilities from the default matrix per role |
+| `capability_denials` | Subtracts capabilities from the default matrix per role (use pipeline role ids from [ADR 0008](adr/0008-role-based-governance-foundation.md); legacy `producer` is not a valid role since v0.6 — see [ADR 0009](adr/0009-report-to-supervisor-routing-by-role.md)) |
 
 Users may set `assigned_role` in `~/.pipeline_inspector/user.json` (Settings → Basic) unless `enforced_role` is active. `PermissionResolver` in `core/governance.py` enforces the matrix on studio save, risky fixes, farm submit, and extra rule paths. Full matrix: [ADR 0008](adr/0008-role-based-governance-foundation.md).
 

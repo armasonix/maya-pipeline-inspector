@@ -1,4 +1,5 @@
 """Cross-shell path helpers for CLI commands and verification scripts."""
+
 from __future__ import annotations
 
 import os
@@ -9,8 +10,8 @@ from typing import Optional
 
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
 
-_STUDIO_VARIABLE_PATTERN = re.compile(r"\$\{([^}]+)\}")
-_UDIM_TILE_IN_NAME_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
+_STUDIO_VARIABLE_PATTERN = re.compile("\\$\\{([^}]+)\\}")
+_UDIM_TILE_IN_NAME_RE = re.compile("(?<!\\d)(1\\d{3}|2\\d{3})(?!\\d)")
 _BUILTIN_STUDIO_VARIABLES = (
     "STUDIO_TEXTURE_ROOT",
     "STUDIO_ASSET_ROOT",
@@ -34,30 +35,30 @@ _STUDIO_REPLACE_TO_ROOT_ATTR = {
     "${STUDIO_TEXTURE_ROOT}": "texture_root",
 }
 
+
 def normalize_cli_path(path: str | Path) -> Path:
     """Convert Git Bash MSYS paths (/d/foo) to Windows paths on win32."""
-
     resolved = Path(path)
     raw = resolved.as_posix()
     if sys.platform != "win32":
         return resolved
     if len(raw) >= 2 and raw[1] == ":":
         return resolved
-    if len(raw) >= 3 and raw[0] == "/" and raw[2] == "/":
+    if len(raw) >= 3 and raw[0] == "/" and (raw[2] == "/"):
         drive = raw[1].upper()
         rest = raw[3:].replace("/", "\\")
         normalized = Path(f"{drive}:\\{rest}")
         return normalized
     return resolved
 
+
 def resolve_cli_path(path: str | Path) -> str:
     """Return a filesystem path string safe for ``open()`` in Windows Python."""
-
     return str(normalize_cli_path(path))
+
 
 def sanitize_studio_path_value(value: str) -> str:
     """Strip trailing punctuation accidentally copied from UI text fields."""
-
     text = str(value or "").strip()
     while text and text[-1] in ",;":
         text = text[:-1].rstrip()
@@ -66,7 +67,6 @@ def sanitize_studio_path_value(value: str) -> str:
 
 def studio_variable_aliases(environment: StudioEnvironmentSettings) -> dict[str, str]:
     """Build the substitution map for studio environment path tokens."""
-
     aliases = {
         "STUDIO_TEXTURE_ROOT": sanitize_studio_path_value(environment.texture_root),
         "STUDIO_ASSET_ROOT": sanitize_studio_path_value(environment.asset_root),
@@ -79,14 +79,11 @@ def studio_variable_aliases(environment: StudioEnvironmentSettings) -> dict[str,
             aliases[normalized_name] = sanitize_studio_path_value(str(value or ""))
     return aliases
 
+
 def resolve_studio_path(
-    path: str,
-    environment: StudioEnvironmentSettings,
-    *,
-    max_passes: int = 4,
+    path: str, environment: StudioEnvironmentSettings, *, max_passes: int = 4
 ) -> str:
     """Expand ``${VAR}`` tokens using studio environment roots and aliases."""
-
     if not path:
         return ""
     aliases = studio_variable_aliases(environment)
@@ -111,18 +108,16 @@ def resolve_studio_path(
 
 def studio_environment_is_configured(environment: StudioEnvironmentSettings) -> bool:
     """Return whether any studio path roots or aliases are configured."""
-
     for field_name, _token in _STUDIO_ROOT_TOKEN_PAIRS:
         if str(getattr(environment, field_name, "") or "").strip():
             return True
     return bool(environment.variable_aliases)
 
+
 def normalize_path_to_studio_tokens(
-    path: str,
-    environment: StudioEnvironmentSettings,
+    path: str, environment: StudioEnvironmentSettings
 ) -> Optional[str]:
     """Map absolute paths under configured studio roots to ``${STUDIO_*_ROOT}`` tokens."""
-
     for field_name, token in _STUDIO_ROOT_TOKEN_PAIRS:
         root = str(getattr(environment, field_name, "") or "").strip()
         if not root:
@@ -132,12 +127,11 @@ def normalize_path_to_studio_tokens(
             return normalized
     return None
 
+
 def effective_studio_normalize_target(
-    replace_to: str,
-    environment: StudioEnvironmentSettings | None,
+    replace_to: str, environment: StudioEnvironmentSettings | None
 ) -> str:
     """Prefer studio tokens for legacy ``${ASSET_ROOT}`` / ``${TEXTURE_ROOT}`` targets."""
-
     normalized = str(replace_to or "").strip()
     if not normalized or environment is None:
         return normalized
@@ -151,11 +145,11 @@ def effective_studio_normalize_target(
         return studio_token
     return normalized
 
+
 def studio_normalize_prefixes(
     environment: StudioEnvironmentSettings,
 ) -> tuple[tuple[str, str], ...]:
     """Return configured studio roots paired with their normalize tokens."""
-
     prefixes: list[tuple[str, str]] = []
     for field_name, token in _STUDIO_ROOT_TOKEN_PAIRS:
         root = str(getattr(environment, field_name, "") or "").strip()
@@ -163,29 +157,29 @@ def studio_normalize_prefixes(
             prefixes.append((root, token))
     return tuple(prefixes)
 
+
 def is_local_drive_path(path: str) -> bool:
     """Return whether ``path`` looks like a Windows drive-letter absolute path."""
-
     normalized = str(path or "").replace("\\", "/").strip()
-    return len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/"
+    return len(normalized) >= 3 and normalized[1] == ":" and (normalized[2] == "/")
 
 
 def normalize_udim_tile_token_in_path(path: str) -> str:
     """Replace a concrete UDIM tile suffix in a filename with ``<UDIM>``."""
-
     raw = str(path or "").strip().replace("\\", "/")
     if not raw or "<UDIM>" in raw or "<udim>" in raw:
         return raw
     if "/" in raw:
         directory, name = raw.rsplit("/", 1)
     else:
-        directory, name = "", raw
+        directory, name = ("", raw)
     matches = list(_UDIM_TILE_IN_NAME_RE.finditer(name))
     if not matches:
         return raw
     match = matches[-1]
     new_name = name[: match.start()] + "<UDIM>" + name[match.end() :]
     return f"{directory}/{new_name}" if directory else new_name
+
 
 def resolve_authored_absolute_path(
     planned_path: str,
@@ -194,25 +188,21 @@ def resolve_authored_absolute_path(
     fallback_absolute: str = "",
 ) -> str:
     """Expand studio tokens to an absolute path suitable for USD relpath authoring."""
-
     raw = str(planned_path or "").strip()
     if not raw:
         return ""
-
     expanded = raw
     if studio_environment is not None:
         expanded = resolve_studio_path(raw, studio_environment) or raw
-
     if "${" not in expanded:
         return expanded.replace("\\", "/")
-
     fallback = str(fallback_absolute or "").strip().replace("\\", "/")
     if fallback and "${" not in fallback:
         filename = Path(raw.replace("\\", "/").rstrip("/").split("/")[-1]).name
         if filename:
             return str((Path(fallback).parent / filename).resolve()).replace("\\", "/")
-
     return ""
+
 
 def author_usd_asset_path(
     path: str,
@@ -222,54 +212,48 @@ def author_usd_asset_path(
     fallback_absolute: str = "",
 ) -> str:
     """Return a USD layer path that resolves locally and avoids farm-local drives."""
-
     raw = str(path or "").strip()
     if not raw:
         return raw
-
     raw_norm = raw.replace("\\", "/")
     if (
         not is_local_drive_path(raw_norm)
         and "${" not in raw_norm
-        and not raw_norm.startswith("$")
-        and not raw_norm.startswith("//")
+        and (not raw_norm.startswith("$"))
+        and (not raw_norm.startswith("//"))
     ):
         return raw_norm.lstrip("/")
-
-    if raw_norm.startswith("$") and "${" not in raw_norm and not is_local_drive_path(raw_norm):
+    if raw_norm.startswith("$") and "${" not in raw_norm and (not is_local_drive_path(raw_norm)):
         return raw_norm
-
     absolute = resolve_authored_absolute_path(
-        raw,
-        studio_environment=studio_environment,
-        fallback_absolute=fallback_absolute,
+        raw, studio_environment=studio_environment, fallback_absolute=fallback_absolute
     )
     if not absolute or "${" in absolute:
-        absolute = resolve_authored_absolute_path(
-            fallback_absolute,
-            studio_environment=studio_environment,
-            fallback_absolute=fallback_absolute,
-        ) or ""
+        absolute = (
+            resolve_authored_absolute_path(
+                fallback_absolute,
+                studio_environment=studio_environment,
+                fallback_absolute=fallback_absolute,
+            )
+            or ""
+        )
     if not absolute or "${" in absolute:
         if "${" in raw_norm:
             return raw_norm
         absolute = raw_norm
-
     candidate = Path(str(absolute).replace("\\", "/"))
     if not candidate.is_absolute():
         candidate = (anchor_dir / candidate).resolve()
-
     try:
         relative = os.path.relpath(candidate, anchor_dir.resolve())
     except ValueError:
         relative = candidate.name
     else:
         relative = relative.replace("\\", "/")
-
-    if relative and not is_local_drive_path(relative) and "${" not in relative:
+    if relative and (not is_local_drive_path(relative)) and ("${" not in relative):
         return relative
-
     return candidate.name
+
 
 def author_maya_texture_path(
     path: str,
@@ -279,15 +263,11 @@ def author_maya_texture_path(
     fallback_absolute: str = "",
 ) -> str:
     """Return a Maya texture path that renderers can resolve immediately."""
-
     raw = str(path or "").strip()
     if not raw:
         return raw
-
     absolute = resolve_authored_absolute_path(
-        raw,
-        studio_environment=studio_environment,
-        fallback_absolute=fallback_absolute,
+        raw, studio_environment=studio_environment, fallback_absolute=fallback_absolute
     )
     if not absolute or "$" in absolute:
         fallback = str(fallback_absolute or "").strip().replace("\\", "/")
@@ -295,10 +275,8 @@ def author_maya_texture_path(
             filename = Path(raw.replace("\\", "/").rstrip("/").split("/")[-1]).name
             if filename:
                 absolute = str((Path(fallback).parent / filename).resolve()).replace("\\", "/")
-
     if not absolute:
         return raw.replace("\\", "/")
-
     absolute_path = Path(absolute.replace("\\", "/"))
     scene_parent = Path(scene_path).parent if scene_path else None
     if scene_parent is not None and scene_parent.is_dir() and absolute_path.is_absolute():
@@ -306,44 +284,39 @@ def author_maya_texture_path(
             relative = os.path.relpath(absolute_path, scene_parent.resolve()).replace("\\", "/")
             if (
                 relative
-                and not relative.startswith("../")
-                and not is_local_drive_path(relative)
-                and "$" not in relative
+                and (not relative.startswith("../"))
+                and (not is_local_drive_path(relative))
+                and ("$" not in relative)
             ):
                 return relative
         except ValueError:
             pass
-
     return str(absolute_path).replace("\\", "/")
+
 
 def replace_path_prefix(path: str, old_prefix: str, new_prefix: str) -> Optional[str]:
     """Replace a path prefix, preserving the remainder of the path."""
-
     path_norm = path.replace("\\", "/")
     old_norm = old_prefix.replace("\\", "/").rstrip("/")
     new_norm = new_prefix.replace("\\", "/").rstrip("/")
-    if not path_norm or not old_norm or not new_norm:
+    if not path_norm or not old_norm or (not new_norm):
         return None
-
     if path_norm.lower() == old_norm.lower():
         return new_norm
-
     old_with_sep = f"{old_norm}/"
     if path_norm.lower().startswith(old_with_sep.lower()):
         suffix = path_norm[len(old_norm) :]
         return new_norm + suffix
     return None
 
+
 def builtin_studio_variable_names() -> tuple[str, ...]:
     """Return the built-in studio environment variable names."""
-
     return _BUILTIN_STUDIO_VARIABLES
 
-def sync_studio_environment_to_os(
-    environment: StudioEnvironmentSettings | None,
-) -> None:
-    """Publish configured studio roots to process env vars for DCC path resolution."""
 
+def sync_studio_environment_to_os(environment: StudioEnvironmentSettings | None) -> None:
+    """Publish configured studio roots to process env vars for DCC path resolution."""
     if environment is None:
         return
     import os
@@ -367,19 +340,15 @@ def author_maya_texture_path_for_fix(
     fallback_absolute: str = "",
 ) -> str:
     """Return a Maya texture path that satisfies path-policy fixes and resolves locally."""
-
     raw = str(planned_path or "").strip()
     if not raw:
         return raw
-
     if "${" in raw or raw.startswith("$"):
         return raw.replace("\\", "/")
-
     if studio_environment is not None:
         tokenized = normalize_path_to_studio_tokens(raw, studio_environment)
         if tokenized is not None:
             return tokenized.replace("\\", "/")
-
     return author_maya_texture_path(
         raw,
         scene_path=scene_path,
@@ -388,18 +357,13 @@ def author_maya_texture_path_for_fix(
     )
 
 
-def path_under_studio_roots(
-    path: str,
-    environment: StudioEnvironmentSettings,
-) -> bool:
+def path_under_studio_roots(path: str, environment: StudioEnvironmentSettings) -> bool:
     """Return whether ``path`` resolves under a configured studio root."""
-
     candidates: list[str] = []
     for candidate in (path, resolve_studio_path(path, environment) or ""):
         normalized = str(candidate or "").replace("\\", "/").strip().lower().rstrip("/")
         if normalized:
             candidates.append(normalized)
-
     for root, _token in studio_normalize_prefixes(environment):
         root_norm = str(root or "").replace("\\", "/").strip().lower().rstrip("/")
         if not root_norm:
@@ -411,16 +375,12 @@ def path_under_studio_roots(
 
 
 def is_render_safe_studio_texture_path(
-    raw_path: str,
-    resolved_path: str,
-    environment: StudioEnvironmentSettings,
+    raw_path: str, resolved_path: str, environment: StudioEnvironmentSettings
 ) -> bool:
     """Return whether a Maya texture path is an absolute/relative path under studio roots."""
-
     raw = str(raw_path or "").strip()
     if not raw or "\\" in raw or "${" in raw or raw.startswith("$"):
         return False
-
     raw_norm = raw.replace("\\", "/")
     resolved_norm = str(resolved_path or raw).replace("\\", "/").strip()
     if raw_norm.startswith("//") or resolved_norm.startswith("//"):
@@ -437,15 +397,12 @@ def is_render_safe_studio_texture_path(
 
 
 def is_farm_token_texture_path(
-    raw_path: str,
-    allowed_prefixes: list[str] | tuple[str, ...],
+    raw_path: str, allowed_prefixes: list[str] | tuple[str, ...]
 ) -> bool:
     """Return whether ``raw_path`` is a forward-slash studio token path for farm handoff."""
-
     raw = str(raw_path or "").strip()
     if not raw or "\\" in raw or "$" not in raw:
         return False
-
     raw_norm = raw.replace("\\", "/")
     normalized_prefixes = [
         str(prefix).replace("\\", "/").strip().rstrip("/").lower()
@@ -454,8 +411,7 @@ def is_farm_token_texture_path(
     ]
     path_norm = raw_norm.strip().rstrip("/").lower()
     return any(
-        path_norm == prefix or path_norm.startswith(f"{prefix}/")
-        for prefix in normalized_prefixes
+        path_norm == prefix or path_norm.startswith(f"{prefix}/") for prefix in normalized_prefixes
     )
 
 
@@ -466,10 +422,7 @@ def texture_path_policy_compliant(
     environment: StudioEnvironmentSettings | None,
 ) -> bool:
     """Return whether a texture path satisfies project-root policy for the active context."""
-
-    configured = (
-        environment is not None and studio_environment_is_configured(environment)
-    )
+    configured = environment is not None and studio_environment_is_configured(environment)
     render_safe = bool(
         environment is not None
         and is_render_safe_studio_texture_path(raw_path, resolved_path, environment)
@@ -487,21 +440,4 @@ def texture_path_policy_compliant(
         compliant = True
     else:
         compliant = False
-    # #region agent log
-    if "${" in str(raw_path or "") or str(raw_path or "").startswith("$"):
-        from pipeline_inspector.util.debug_log import write_debug_log
-
-        write_debug_log(
-            "paths.texture_path_policy_compliant",
-            "Token path policy decision",
-            {
-                "raw_path": str(raw_path or "")[:160],
-                "configured": str(configured),
-                "render_safe": str(render_safe),
-                "farm_token": str(farm_token),
-                "compliant": str(compliant),
-            },
-            hypothesis_id="H36",
-        )
-    # #endregion
     return compliant

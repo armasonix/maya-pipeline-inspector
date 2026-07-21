@@ -1,7 +1,7 @@
 # User Guide
 
 **Product:** Maya Pipeline Inspector (`maya-pipeline-inspector`)  
-**Status:** v0.5.0 shipped (2026-07-12) · v0.6 in development on `dev`  
+**Status:** v0.6.0 shipped (2026-07-21) · v1.0+ on roadmap  
 **Related:** [MAYA_INSTALL.md](MAYA_INSTALL.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [CHANGELOG.md](../CHANGELOG.md)
 
 Maya Pipeline Inspector is an **open-source** production-oriented material and scene QA tool for Autodesk Maya (MIT, [GitHub](https://github.com/armasonix/maya-pipeline-inspector)). It helps Technical Artists, Shader TDs, Pipeline TDs, and render supervisors detect material and geometry problems before publish or render farm submission. To contribute rules, adapters, or integrations, see [CONTRIBUTING.md](../CONTRIBUTING.md), [`COMMUNITY.md`](../COMMUNITY.md), and the [README community section](../README.md#open-source--community).
@@ -150,7 +150,7 @@ The dockable panel uses six tabs. Each tab shows the panel title and version at 
 
 ```text
 +--------------------------------------------------------------------------------+
-| Maya Pipeline Inspector  v0.5.0+                                               |
+| Maya Pipeline Inspector  v0.6.0+                                               |
 | [Validate] [Waivers] [Fixes] [Reports] [Readiness] [Farm]                    |
 +--------------------------------------------------------------------------------+
 | Validate tab (default)                                                         |
@@ -488,9 +488,9 @@ Expected behavior:
 
 Maya Pipeline Inspector is **not production-complete**. It solves a narrow but important problem — early material and scene QA inside Maya — while many surrounding pipeline concerns (asset versioning, shot tracking, render scheduling, cross-DCC validation) are only partially addressed or still on the roadmap.
 
-**Shipped:** **v0.5.0** (2026-07-12) — settings hub, notifications, trackers, rule authoring MVP, auto-update (module path), bug-report relay.
+**Shipped:** **v0.6.0** (2026-07-21) — geometry QA, Machine Readiness tab, role governance ([ADR 0008](adr/0008-role-based-governance-foundation.md)), supervisor routing ([ADR 0009](adr/0009-report-to-supervisor-routing-by-role.md)), Deadline farm analytics CLI, public MIT release packaging.
 
-**In active development on `dev`:** **v0.6** — geometry QA rules, Machine Readiness tab, role governance foundation ([ADR 0008](adr/0008-role-based-governance-foundation.md)), Deadline farm analytics CLI. These areas are **functional but still being refined**; behavior and configuration may change before the next release tag.
+Previously **v0.5.0** (2026-07-12) — settings hub, notifications, trackers, rule authoring MVP, auto-update (module path), bug-report relay.
 
 Public CI runs pure Python tests without launching Maya. Optional `mayapy` integration is documented in [MAYA_INSTALL.md](MAYA_INSTALL.md) and [CLI_TESTING.md](CLI_TESTING.md), but **most contributors never run it in CI** — treat Maya-specific bugs as expected until reported.
 
@@ -560,7 +560,7 @@ Use this section when deciding whether Pipeline Inspector fits your facility **t
 
 ### What we are still building
 
-Non-exhaustive backlog visible on `dev` and in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md):
+Non-exhaustive backlog in [DEVELOPMENT_PLAN.md §14](DEVELOPMENT_PLAN.md#14-roadmap--strengthen-and-extend):
 
 - Deeper tracker-driven role resolution and publish routing
 - Additional renderer adapters (RenderMan, Redshift, USD/MaterialX)

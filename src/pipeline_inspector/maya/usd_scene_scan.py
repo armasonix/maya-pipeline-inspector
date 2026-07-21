@@ -1,4 +1,5 @@
 """Merge OpenUSD proxy stages from the active Maya scene into a GraphSnapshot."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -7,33 +8,12 @@ from typing import Any
 
 from pipeline_inspector.core.models import GraphSnapshot
 
-_DEBUG_LOG = Path(__file__).resolve().parents[2] / "debug-618f4f.log"
 
-
-def merge_usd_proxy_snapshots(
-    snapshot: GraphSnapshot,
-    cmds: Any,
-) -> GraphSnapshot:
+def merge_usd_proxy_snapshots(snapshot: GraphSnapshot, cmds: Any) -> GraphSnapshot:
     """Append USD stage scans from ``mayaUsdProxyShape`` nodes."""
-
     paths = _collect_usd_proxy_paths(cmds)
-    # #region agent log
-    _debug_log(
-        "usd_scene_scan.merge_usd_proxy_snapshots",
-        "USD proxy discovery",
-        {
-            "proxy_count": len(paths),
-            "proxy_paths": "|".join(str(path) for path in paths),
-            "base_renderer": snapshot.renderer,
-            "base_file_deps": len(snapshot.file_dependencies),
-            "base_nodes": len(snapshot.nodes),
-        },
-        hypothesis_id="H1",
-    )
-    # #endregion
     if not paths:
         return snapshot
-
     from pipeline_inspector.usd.scanner import scan_usd_stage
 
     merged = snapshot
@@ -41,36 +21,10 @@ def merge_usd_proxy_snapshots(
     for path in paths:
         try:
             usd_snapshot = scan_usd_stage(path, scan_scope="asset")
-        except Exception as exc:  # noqa: BLE001
-            # #region agent log
-            _debug_log(
-                "usd_scene_scan.merge_usd_proxy_snapshots",
-                "USD proxy scan failed",
-                {"path": str(path), "error": str(exc)},
-                hypothesis_id="H1",
-            )
-            # #endregion
+        except Exception:
             continue
         merged = _merge_snapshots(merged, usd_snapshot, proxy_usd_path=path)
         merged_paths.append(str(path))
-
-    # #region agent log
-    _debug_log(
-        "usd_scene_scan.merge_usd_proxy_snapshots",
-        "USD proxy merge complete",
-        {
-            "merged_paths": "|".join(merged_paths),
-            "merged_file_deps": len(merged.file_dependencies),
-            "merged_nodes": len(merged.nodes),
-            "shader_nodes_with_colorspace": sum(
-                1
-                for node in merged.nodes
-                if node.type_name == "Shader" and node.attrs.get("colorSpace")
-            ),
-        },
-        hypothesis_id="H1",
-    )
-    # #endregion
     return merged
 
 
@@ -85,7 +39,7 @@ def _collect_usd_proxy_paths(cmds: Any) -> list[Path]:
         for attr in ("filePath", "fp"):
             try:
                 raw_path = str(cmds.getAttr(f"{shape}.{attr}") or "").strip()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
             if not raw_path or raw_path in seen:
                 continue
@@ -99,10 +53,7 @@ def _collect_usd_proxy_paths(cmds: Any) -> list[Path]:
 
 
 def _merge_snapshots(
-    base: GraphSnapshot,
-    usd: GraphSnapshot,
-    *,
-    proxy_usd_path: Path | None = None,
+    base: GraphSnapshot, usd: GraphSnapshot, *, proxy_usd_path: Path | None = None
 ) -> GraphSnapshot:
     node_ids = {node.id for node in base.nodes}
     nodes = list(base.nodes)
@@ -110,7 +61,6 @@ def _merge_snapshots(
         if node.id not in node_ids:
             nodes.append(node)
             node_ids.add(node.id)
-
     dep_keys = {(dep.node_id, dep.attr, dep.raw_path) for dep in base.file_dependencies}
     file_dependencies = list(base.file_dependencies)
     for dependency in usd.file_dependencies:
@@ -119,21 +69,18 @@ def _merge_snapshots(
             continue
         file_dependencies.append(dependency)
         dep_keys.add(key)
-
     shape_ids = {shape.node_id for shape in base.shapes}
     shapes = list(base.shapes)
     for shape in usd.shapes:
         if shape.node_id not in shape_ids:
             shapes.append(shape)
             shape_ids.add(shape.node_id)
-
     material_ids = {material.node_id for material in base.materials}
     materials = list(base.materials)
     for material in usd.materials:
         if material.node_id not in material_ids:
             materials.append(material)
             material_ids.add(material.node_id)
-
     metadata = base.usd_stage_metadata
     usd_root_layer = str(
         proxy_usd_path
@@ -158,7 +105,6 @@ def _merge_snapshots(
                 missing_reference_paths=list(metadata.missing_reference_paths)
                 + list(usd.usd_stage_metadata.missing_reference_paths),
             )
-
     return replace(
         base,
         nodes=nodes,
@@ -167,15 +113,3 @@ def _merge_snapshots(
         materials=materials,
         usd_stage_metadata=metadata,
     )
-
-
-def _debug_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

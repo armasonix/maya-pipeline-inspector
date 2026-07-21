@@ -91,7 +91,7 @@ Then follow the [Maya restart checklist](#maya-restart-checklist-after-update) b
 | Field | Purpose |
 | --- | --- |
 | `allow_check` | When `false`, the wizard stops immediately — studio policy disables in-app update checks |
-| `pinned_version` | When set (e.g. `"0.5.0"`), download/install is skipped if the latest GitHub tag is **newer** than the pinned version (facility lock-down) |
+| `pinned_version` | When set (e.g. `"0.6.0"`), download/install is skipped if the latest GitHub tag is **newer** than the pinned version (facility lock-down) |
 
 **User preference** (`~/.pipeline_inspector/user.json`):
 

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import GraphSnapshot
@@ -12,8 +11,6 @@ from pipeline_inspector.maya.navigation import (
     _result,
 )
 from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
-
-_DEBUG_LOG = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
 
 
 def is_usd_prim_target(*, target_id: str = "", node_name: str = "") -> bool:
@@ -106,31 +103,8 @@ def find_usd_prim_for_issue(
             continue
         match = _match_prim_on_stage(stage, search_tokens)
         if match:
-            _debug_nav_log(
-                "usd_navigation.find_usd_prim_for_issue",
-                "Resolved Maya-style issue to USD prim",
-                {
-                    "target_id": target_id,
-                    "node_name": node_name,
-                    "material_name": material_name,
-                    "prim_path": match,
-                    "tokens": "|".join(search_tokens[:5]),
-                },
-                hypothesis_id="H7",
-            )
             return match
 
-    _debug_nav_log(
-        "usd_navigation.find_usd_prim_for_issue",
-        "No USD prim match for Maya-style issue",
-        {
-            "target_id": target_id,
-            "node_name": node_name,
-            "material_name": material_name,
-            "tokens": "|".join(search_tokens[:5]),
-        },
-        hypothesis_id="H7",
-    )
     return ""
 
 
@@ -211,12 +185,6 @@ def select_usd_prim(
     normalized = _normalize_prim_path(target)
     shape, ufe_path = _resolve_proxy_ufe_path(normalized, proxy_shapes, maya_cmds)
     if shape is None or not ufe_path:
-        _debug_nav_log(
-            "usd_navigation.select_usd_prim",
-            "USD prim not found on proxy stages",
-            {"prim_path": normalized, "proxy_count": len(proxy_shapes)},
-            hypothesis_id="H6",
-        )
         return _result(
             "select_node",
             normalized,
@@ -225,12 +193,6 @@ def select_usd_prim(
         )
 
     if _select_ufe_path(ufe_path, maya_cmds):
-        _debug_nav_log(
-            "usd_navigation.select_usd_prim",
-            "USD prim selected",
-            {"ufe_path": ufe_path},
-            hypothesis_id="H6",
-        )
         return _result(
             "select_node",
             ufe_path,
@@ -238,12 +200,6 @@ def select_usd_prim(
             f"USD prim selected: {normalized}",
         )
 
-    _debug_nav_log(
-        "usd_navigation.select_usd_prim",
-        "USD UFE selection failed",
-        {"ufe_path": ufe_path},
-        hypothesis_id="H6",
-    )
     return _result(
         "select_node",
         ufe_path,
@@ -319,19 +275,7 @@ def open_usd_shader_view(
 
     maya_mel = mel or _maya_mel()
     opened_panels = _open_usd_material_panels(maya_cmds, maya_mel)
-    graph_focused = _focus_usd_hypershade_graph(maya_cmds, maya_mel)
-    _debug_nav_log(
-        "usd_navigation.open_usd_shader_view",
-        "USD material view opened",
-        {
-            "requested_prim": prim_path,
-            "material_prim": selected_prim,
-            "material_name": material_name,
-            "opened_panels": "|".join(opened_panels),
-            "graph_focused": graph_focused,
-        },
-        hypothesis_id="H9",
-    )
+    _focus_usd_hypershade_graph(maya_cmds, maya_mel)
     panels_label = ", ".join(opened_panels) if opened_panels else "selection"
     return _result(
         "open_in_hypershade",
@@ -510,18 +454,6 @@ def _replace_ufe_selection(ufe_path: str) -> bool:
         pass
 
     return False
-
-
-def _debug_nav_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)
 
 
 def _maya_cmds() -> Any:

@@ -41,7 +41,7 @@ Requires V-Ray or Arnold loaded in Maya.
 mayapy -m pipeline_inspector validate examples/vray_policy/vray_policy_scene.ma `
   --input-kind scene --profile-id publish_strict --report report.json
 mayapy examples/publish/submit_preflight.py examples/vray_policy/vray_policy_scene.ma `
-  --repo-root D:\Workspace\portfolio\maya-pipeline-inspector `
+  --repo-root D:\...\maya-pipeline-inspector `
   --mayapy "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
 ```
 

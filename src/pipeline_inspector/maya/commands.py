@@ -378,21 +378,6 @@ def open_in_hypershade_action(
             snapshot=snapshot,
             cmds=maya_cmds,
         )
-        # #region agent log
-        _debug_hypershade_route_log(
-            "commands.open_in_hypershade_action",
-            "USD hypershade routing",
-            {
-                "node_name": node_name,
-                "target_id": target_id,
-                "material_name": material_name or "",
-                "prim_path": prim_path,
-                "maya_material": maya_material,
-                "route": "maya" if maya_material else ("usd" if prim_path else "fallback"),
-            },
-            hypothesis_id="H17",
-        )
-        # #endregion
         if maya_material:
             return open_in_hypershade(maya_material, cmds=maya_cmds)
         if prim_path:
@@ -739,14 +724,6 @@ def capture_validation_snapshot(
 
     from pipeline_inspector.maya.scanner import scan_scene, scan_selection, selection_node_names
 
-    # #region agent log
-    _debug_health_log_command(
-        "commands.capture_validation_snapshot",
-        "phase validate_start",
-        {"scan_scope": scan_scope, "profile_id": profile_id},
-        hypothesis_id="H-HANG1",
-    )
-    # #endregion
 
     if scan_scope == "selection":
         selected = selection_node_names()
@@ -768,19 +745,6 @@ def capture_validation_snapshot(
     else:
         raw_snapshot = scan_scene()
 
-    # #region agent log
-    _debug_health_log_command(
-        "commands.capture_validation_snapshot",
-        "phase scan_done",
-        {
-            "scan_scope": scan_scope,
-            "file_deps": len(getattr(raw_snapshot, "file_dependencies", []) or []),
-            "nodes": len(getattr(raw_snapshot, "nodes", []) or []),
-            "materials": len(getattr(raw_snapshot, "materials", []) or []),
-        },
-        hypothesis_id="H-HANG2",
-    )
-    # #endregion
     return SimpleNamespace(succeeded=True, snapshot=raw_snapshot, scan_scope=scan_scope)
 
 
@@ -817,28 +781,6 @@ def execute_validation_on_snapshot(
             extra_rule_paths=extra_rule_paths,
             session_rule_overrides=session_rule_overrides,
         )
-    # #region agent log
-    _debug_health_log_command(
-        "commands.execute_validation_on_snapshot",
-        "Maya validation finished",
-        {
-            "scan_scope": scan_scope,
-            "snapshot_renderer": getattr(run.snapshot, "renderer", ""),
-            "usd_metadata": getattr(run.snapshot, "usd_stage_metadata", None) is not None,
-            "prim_nodes": sum(
-                1 for node in getattr(run.snapshot, "nodes", []) if str(node.id).startswith("prim:")
-            ),
-            "failed_count": sum(1 for item in run.results if item.status == "failed"),
-            "failed_rules": "|".join(
-                sorted({item.rule_id for item in run.results if item.status == "failed"})[:12]
-            ),
-            "fix_unblocked": sum(
-                1 for action in (run.fix_plan.actions if run.fix_plan else ()) if not action.blocked
-            ),
-        },
-        hypothesis_id="H1",
-    )
-    # #endregion
     return _validation_result(run, action=f"validate_{scan_scope}")
 
 
@@ -902,21 +844,6 @@ def _export_html_report(path: Optional[str]) -> Any:
     from pipeline_inspector.reports.html_report import write_html_report
 
     validation = _validate(scan_scope="scene", profile_id=DEFAULT_PROFILE_ID)
-    export_health = validation.health_score.score
-    # region agent log
-    _debug_health_log_command(
-        "commands.py:_export_html_report",
-        "revalidated export health score",
-        {
-            "path": "revalidate",
-            "export_health": export_health,
-            "profile_id": DEFAULT_PROFILE_ID,
-            "scan_scope": "scene",
-            "failed_count": sum(1 for item in validation.results if item.status == "failed"),
-        },
-        hypothesis_id="H1",
-    )
-    # endregion
     output_path = _runtime_output_path(path, validation.snapshot.scene_path, "report", "html")
     write_html_report(output_path, validation.snapshot, validation.results)
     return _runtime_result("export_html_report", output_path, "HTML report exported.")
@@ -1255,23 +1182,3 @@ def _maya_mel() -> Any:
         raise RuntimeError("Maya MEL is available only inside Autodesk Maya.") from exc
 
 
-def _debug_hypershade_route_log(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    _debug_health_log_command(location, message, data, hypothesis_id=hypothesis_id)
-
-
-def _debug_health_log_command(
-    location: str,
-    message: str,
-    data: dict[str, object],
-    *,
-    hypothesis_id: str,
-) -> None:
-    from pipeline_inspector.util.debug_log import write_debug_log
-
-    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

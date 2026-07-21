@@ -11,7 +11,7 @@ Manual steps for **#164** / **#198** — prepare `v0.5.0` on branch `dev`, then 
 ### Git Bash
 
 ```bash
-export REPO="/d/Workspace/portfolio/maya-pipeline-inspector"
+export REPO="/d/.../maya-pipeline-inspector"
 cd "$REPO"
 
 python -m pip install -e ".[dev]"
@@ -27,7 +27,7 @@ echo "validate exit=$?"
 ### PowerShell
 
 ```powershell
-$REPO = "D:\Workspace\portfolio\maya-pipeline-inspector"
+$REPO = "D:\...\maya-pipeline-inspector"
 Set-Location $REPO
 
 python -m pip install -e ".[dev]"
@@ -59,7 +59,7 @@ Smoke in Maya before tagging:
 | Area | Action |
 |------|--------|
 | Version | `0.5.0` in `version.py`, `pyproject.toml`, `test_import.py` |
-| Docs | `CHANGELOG.md`, `README.md`, `USER_GUIDE`, `ARCHITECTURE`, `DEVELOPMENT_PLAN` §27 |
+| Docs | `CHANGELOG.md`, `README.md`, `USER_GUIDE`, `ARCHITECTURE`, `DEVELOPMENT_PLAN` (release history; see current §13–§14) |
 | Plan | `V0_5_DEVELOPMENT_PLAN.md`, this file |
 
 ---

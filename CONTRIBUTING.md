@@ -10,10 +10,10 @@ We want Maya Pipeline Inspector to grow **with the community** — shared rules,
 
 | Milestone | State | Focus |
 | --- | --- | --- |
+| **v0.6.0** | Shipped (2026-07-21) | Geometry QA, Machine Readiness, role governance, farm analytics CLI, public MIT release |
 | **v0.5.0** | Shipped (2026-07-12) | Settings hub, notifications, task trackers, rule authoring MVP, auto-update, bug-report relay |
-| **v0.6** | Active on `dev` | Geometry QA, Machine Readiness tab, role governance, Deadline farm analytics |
 
-The **snapshot-first core** (models → rules → validator → reports) is stable and heavily tested without Maya. **Maya panel**, **connectors**, and **v0.6 subsystems** are still evolving — check [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) and milestones before large PRs.
+The **snapshot-first core** (models → rules → validator → reports) is stable and heavily tested without Maya. **Maya panel**, **connectors**, and **v0.6 subsystems** are functional but still evolving — check [GitHub Issues](https://github.com/armasonix/maya-pipeline-inspector/issues) and milestones before large PRs.
 
 Honest scope for users: [USER_GUIDE — Known limitations](docs/USER_GUIDE.md#known-limitations--gaps).
 

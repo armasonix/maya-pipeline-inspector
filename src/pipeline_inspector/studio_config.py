@@ -1,4 +1,5 @@
 """Studio-wide plugin settings loaded from JSON or the Maya settings UI."""
+
 from __future__ import annotations
 
 import json
@@ -34,7 +35,6 @@ DEFAULT_DEADLINE_WEB_SERVICE_PORT = 8081
 DEFAULT_DEADLINE_PROFILE_ID = "deadline_critical"
 DEFAULT_DEADLINE_TIMEOUT_SECONDS = 30.0
 DEFAULT_DEADLINE_API_URL = "http://localhost:8081"
-
 TX_DERIVATIVE_RULE_IDS = (
     "common.texture.optimized.exists",
     "common.texture.optimized.fresh",
@@ -138,12 +138,8 @@ class PipelineSettings:
             "waiver_defaults": self.waiver_defaults.to_dict(),
             "manifest_gate_defaults": {
                 "max_new_changes": int(self.manifest_gate_defaults.max_new_changes),
-                "max_fingerprint_changes": int(
-                    self.manifest_gate_defaults.max_fingerprint_changes
-                ),
-                "block_on_new_textures": bool(
-                    self.manifest_gate_defaults.block_on_new_textures
-                ),
+                "max_fingerprint_changes": int(self.manifest_gate_defaults.max_fingerprint_changes),
+                "block_on_new_textures": bool(self.manifest_gate_defaults.block_on_new_textures),
             },
             "naming_templates": self.naming_templates.to_dict(),
             "pinned_workflow_profile_ids": list(self.pinned_workflow_profile_ids),
@@ -250,11 +246,8 @@ class SoftwareVersionRequirement:
         )
 
 
-def parse_software_version_requirements(
-    raw: object,
-) -> tuple[SoftwareVersionRequirement, ...]:
+def parse_software_version_requirements(raw: object) -> tuple[SoftwareVersionRequirement, ...]:
     """Parse readiness software requirements from JSON or UI text."""
-
     if raw is None:
         return ()
     if isinstance(raw, str):
@@ -279,15 +272,11 @@ def parse_software_version_requirements(
                 for entry in version:
                     version_text = str(entry or "").strip()
                     if version_text:
-                        requirements.append(
-                            SoftwareVersionRequirement(product_text, version_text)
-                        )
+                        requirements.append(SoftwareVersionRequirement(product_text, version_text))
             else:
                 version_text = str(version or "").strip()
                 if version_text:
-                    requirements.append(
-                        SoftwareVersionRequirement(product_text, version_text)
-                    )
+                    requirements.append(SoftwareVersionRequirement(product_text, version_text))
         return tuple(requirements)
     return ()
 
@@ -350,10 +339,7 @@ class ReadinessSettings:
     support: ReadinessSupportContacts = field(default_factory=ReadinessSupportContacts)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "checks": self.checks.to_dict(),
-            "support": self.support.to_dict(),
-        }
+        return {"checks": self.checks.to_dict(), "support": self.support.to_dict()}
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> ReadinessSettings:
@@ -383,15 +369,10 @@ class BugReportSettings:
     api_key: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "enabled": self.enabled,
-            "relay_url": self.relay_url,
-            "api_key": self.api_key,
-        }
+        return {"enabled": self.enabled, "relay_url": self.relay_url, "api_key": self.api_key}
 
     def to_bug_report_config(self) -> Any | None:
         """Convert connector settings into a bug report relay runtime config object."""
-
         from pipeline_inspector.integrations.bug_report.config import (
             BUG_REPORT_MAX_REPORTS_PER_DAY,
             BugReportRelayConfig,
@@ -403,9 +384,7 @@ class BugReportSettings:
         if not relay_url:
             return None
         return BugReportRelayConfig(
-            relay_url=relay_url,
-            api_key=api_key,
-            max_reports_per_day=BUG_REPORT_MAX_REPORTS_PER_DAY,
+            relay_url=relay_url, api_key=api_key, max_reports_per_day=BUG_REPORT_MAX_REPORTS_PER_DAY
         )
 
     @classmethod
@@ -486,7 +465,6 @@ class DeadlineConnectorSettings:
 
     def to_deadline_config_for_quality(self, quality: str) -> Any:
         """Convert connector settings into a Deadline config for a quality tier."""
-
         _ = quality
         return self.to_deadline_config()
 
@@ -499,7 +477,6 @@ class DeadlineConnectorSettings:
 
     def to_deadline_config(self) -> Any:
         """Convert connector settings into a Deadline runtime config object."""
-
         from pipeline_inspector.integrations.deadline.config import DeadlineConfig
 
         return DeadlineConfig(
@@ -566,10 +543,7 @@ class DeadlineConnectorSettings:
 
     @classmethod
     def from_deadline_config(
-        cls,
-        config: Any,
-        *,
-        enabled: bool = True,
+        cls, config: Any, *, enabled: bool = True
     ) -> DeadlineConnectorSettings:
         host, port = _parse_api_url(config.api_url)
         return cls(
@@ -619,11 +593,7 @@ class NotifyTarget:
         events_raw = data.get("events")
         events: tuple[str, ...] = ()
         if isinstance(events_raw, (list, tuple)):
-            events = tuple(
-                str(event).strip()
-                for event in events_raw
-                if str(event).strip()
-            )
+            events = tuple(str(event).strip() for event in events_raw if str(event).strip())
         return cls(
             role=str(data.get("role", "") or ""),
             chat_id=str(data.get("chat_id", "") or ""),
@@ -636,11 +606,7 @@ def _parse_notify_on(data: Mapping[str, Any]) -> tuple[str, ...]:
     notify_raw = data.get("notify_on")
     if not isinstance(notify_raw, (list, tuple)):
         return ()
-    return tuple(
-        str(event).strip()
-        for event in notify_raw
-        if str(event).strip()
-    )
+    return tuple(str(event).strip() for event in notify_raw if str(event).strip())
 
 
 def _parse_notify_targets(data: Mapping[str, Any]) -> tuple[NotifyTarget, ...]:
@@ -682,17 +648,13 @@ class SlackConnectorSettings:
 
     def to_slack_config(self) -> Any | None:
         """Convert connector settings into a Slack runtime config object."""
-
         from pipeline_inspector.integrations.slack.config import SlackConfig
 
         publish = self.publish_webhook_url.strip()
         deadline = self.deadline_webhook_url.strip()
-        if not publish and not deadline:
+        if not publish and (not deadline):
             return None
-        return SlackConfig(
-            publish_webhook_url=publish,
-            deadline_webhook_url=deadline,
-        )
+        return SlackConfig(publish_webhook_url=publish, deadline_webhook_url=deadline)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -734,7 +696,6 @@ class FtrackConnectorSettings:
 
     def to_ftrack_config(self) -> Any | None:
         """Convert connector settings into an Ftrack runtime config object."""
-
         from pipeline_inspector.integrations.ftrack.config import (
             DEFAULT_NOTE_AUTHOR_USERNAME,
             DEFAULT_TASK_STATUS_NAME,
@@ -745,7 +706,7 @@ class FtrackConnectorSettings:
         api_user = self.api_user.strip()
         api_key = self.api_key.strip()
         project = self.project.strip()
-        if not api_url or not api_user or not api_key or not project:
+        if not api_url or not api_user or (not api_key) or (not project):
             return None
         note_author_username = self.note_author_username.strip() or DEFAULT_NOTE_AUTHOR_USERNAME
         task_status_name = self.task_status_name.strip() or DEFAULT_TASK_STATUS_NAME
@@ -797,7 +758,6 @@ class ShotGridConnectorSettings:
 
     def to_shotgrid_config(self) -> Any | None:
         """Convert connector settings into a ShotGrid runtime config object."""
-
         from pipeline_inspector.integrations.shotgrid.config import ShotGridConfig
 
         site_url = self.site_url.strip()
@@ -805,7 +765,7 @@ class ShotGridConnectorSettings:
         api_key = self.api_key.strip()
         project = self.project.strip()
         entity_type = self.entity_type.strip() or "Shot"
-        if not site_url or not script_name or not api_key or not project:
+        if not site_url or not script_name or (not api_key) or (not project):
             return None
         return ShotGridConfig(
             site_url=site_url,
@@ -854,14 +814,13 @@ class CerebroConnectorSettings:
 
     def to_cerebro_config(self) -> Any | None:
         """Convert connector settings into a Cerebro runtime config object."""
-
         from pipeline_inspector.integrations.cerebro.config import CerebroConfig
 
         server_url = self.server_url.strip()
         api_user = self.api_user.strip()
         api_password = self.api_password.strip()
         project = self.project.strip()
-        if not server_url or not api_user or not api_password or not project:
+        if not server_url or not api_user or (not api_password) or (not project):
             return None
         return CerebroConfig(
             server_url=server_url,
@@ -918,7 +877,6 @@ class DiscordConnectorSettings:
 
     def to_discord_config(self) -> Any | None:
         """Convert connector settings into a Discord runtime config object."""
-
         from pipeline_inspector.integrations.discord.config import DiscordConfig
 
         webhook_url = self.webhook_url.strip()
@@ -966,7 +924,6 @@ class TelegramConnectorSettings:
 
     def to_telegram_config(self) -> Any | None:
         """Convert connector settings into a Telegram runtime config object."""
-
         from pipeline_inspector.integrations.telegram.config import TelegramConfig
 
         token = self.bot_token.strip()
@@ -1011,17 +968,8 @@ class ConnectorSettings:
     shotgrid: ShotGridConnectorSettings = ShotGridConnectorSettings()
     cerebro: CerebroConnectorSettings = CerebroConnectorSettings()
     extra: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
-
     _TYPED_CONNECTOR_IDS = frozenset(
-        {
-            "deadline",
-            "telegram",
-            "discord",
-            "slack",
-            "ftrack",
-            "shotgrid",
-            "cerebro",
-        }
+        {"deadline", "telegram", "discord", "slack", "ftrack", "shotgrid", "cerebro"}
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -1043,7 +991,6 @@ class ConnectorSettings:
 
     def connector_settings(self, connector_id: str) -> Mapping[str, Any] | None:
         """Return raw settings for a connector id, including Deadline."""
-
         if connector_id == "deadline":
             return self.deadline.to_dict()
         if connector_id == "telegram":
@@ -1168,8 +1115,7 @@ class GovernanceSettings:
             "enforced_role": self.enforced_role,
             "tracker_role_map": dict(self.tracker_role_map),
             "capability_denials": {
-                role: list(capabilities)
-                for role, capabilities in self.capability_denials.items()
+                role: list(capabilities) for role, capabilities in self.capability_denials.items()
             },
             "supervisor_routes": {
                 role: route.to_dict() for role, route in self.supervisor_routes.items()
@@ -1194,9 +1140,7 @@ class GovernanceSettings:
             for role, capabilities in denials_raw.items():
                 if not isinstance(capabilities, list):
                     continue
-                normalized = tuple(
-                    str(item).strip() for item in capabilities if str(item).strip()
-                )
+                normalized = tuple(str(item).strip() for item in capabilities if str(item).strip())
                 if normalized:
                     capability_denials[str(role)] = normalized
         routes_raw = data.get("supervisor_routes")
@@ -1261,9 +1205,9 @@ class StudioConfig:
             schema_version=self.schema_version if schema_version is None else schema_version,
             studio_name=self.studio_name if studio_name is None else studio_name,
             pipeline=self.pipeline if pipeline is None else pipeline,
-            studio_environment=(
-                self.studio_environment if studio_environment is None else studio_environment
-            ),
+            studio_environment=self.studio_environment
+            if studio_environment is None
+            else studio_environment,
             ui=self.ui if ui is None else ui,
             bug_report=self.bug_report if bug_report is None else bug_report,
             readiness=self.readiness if readiness is None else readiness,
@@ -1276,14 +1220,12 @@ class StudioConfig:
 
     def normalized(self) -> StudioConfig:
         """Return a copy with the current schema version for persistence."""
-
         if self.schema_version == STUDIO_CONFIG_SCHEMA_VERSION:
             return self
         return replace(self, schema_version=STUDIO_CONFIG_SCHEMA_VERSION)
 
     def rule_overrides(self) -> dict[str, RuleOverride]:
         """Return profile rule overrides implied by studio pipeline settings."""
-
         if self.pipeline.require_tx_derivatives:
             return {}
         return {
@@ -1389,7 +1331,6 @@ class StudioConfig:
 
 def resolve_deadline_config(config: StudioConfig | None) -> Any:
     """Return Deadline runtime config from studio settings, env, or disabled state."""
-
     from pipeline_inspector.integrations.deadline.config import DeadlineConfig
 
     if config is None:
@@ -1400,22 +1341,11 @@ def resolve_deadline_config(config: StudioConfig | None) -> Any:
     runtime = deadline.to_deadline_config()
     if config.config_path is not None:
         runtime = runtime.with_overrides(studio_config_path=config.config_path)
-        # region agent log
-        from pipeline_inspector.util.debug_log import write_debug_log
-
-        write_debug_log(
-            "studio_config.py:resolve_deadline_config",
-            "merged studio config path into deadline runtime config",
-            {"studio_config_path": str(config.config_path)},
-            hypothesis_id="H2",
-        )
-        # endregion
     return runtime
 
 
 def resolve_telegram_config(config: StudioConfig | None) -> Any | None:
     """Return Telegram runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     telegram = config.connectors.telegram
@@ -1426,7 +1356,6 @@ def resolve_telegram_config(config: StudioConfig | None) -> Any | None:
 
 def resolve_discord_config(config: StudioConfig | None) -> Any | None:
     """Return Discord runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     discord = config.connectors.discord
@@ -1437,7 +1366,6 @@ def resolve_discord_config(config: StudioConfig | None) -> Any | None:
 
 def resolve_slack_config(config: StudioConfig | None) -> Any | None:
     """Return Slack runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     slack = config.connectors.slack
@@ -1448,7 +1376,6 @@ def resolve_slack_config(config: StudioConfig | None) -> Any | None:
 
 def resolve_ftrack_config(config: StudioConfig | None) -> Any | None:
     """Return Ftrack runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     ftrack = config.connectors.ftrack
@@ -1459,7 +1386,6 @@ def resolve_ftrack_config(config: StudioConfig | None) -> Any | None:
 
 def resolve_shotgrid_config(config: StudioConfig | None) -> Any | None:
     """Return ShotGrid runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     shotgrid = config.connectors.shotgrid
@@ -1470,7 +1396,6 @@ def resolve_shotgrid_config(config: StudioConfig | None) -> Any | None:
 
 def resolve_cerebro_config(config: StudioConfig | None) -> Any | None:
     """Return Cerebro runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     cerebro = config.connectors.cerebro
@@ -1481,7 +1406,6 @@ def resolve_cerebro_config(config: StudioConfig | None) -> Any | None:
 
 def resolve_bug_report_config(config: StudioConfig | None) -> Any | None:
     """Return bug report relay runtime config from studio settings when enabled."""
-
     if config is None:
         return None
     bug_report = config.bug_report
@@ -1504,16 +1428,15 @@ def _parse_api_url(api_url: str) -> tuple[str, int]:
     parsed = urlparse(normalized)
     host = parsed.hostname or "localhost"
     port = parsed.port or DEFAULT_DEADLINE_WEB_SERVICE_PORT
-    return host, port
+    return (host, port)
 
 
 def _normalize_farm_submit_qualities(
-    allow_draft: bool,
-    allow_production: bool,
+    allow_draft: bool, allow_production: bool
 ) -> tuple[bool, bool]:
-    if allow_production and not allow_draft:
-        return False, True
-    return True, False
+    if allow_production and (not allow_draft):
+        return (False, True)
+    return (True, False)
 
 
 def _optional_str(value: str) -> str | None:
@@ -1542,7 +1465,6 @@ def _as_str_tuple(value: Any) -> tuple[str, ...]:
 
 def discover_studio_config_path() -> Path | None:
     """Return the first discovered studio config path, if any."""
-
     env_path = os.environ.get(STUDIO_CONFIG_ENV_VAR, "").strip()
     if not env_path:
         env_path = os.environ.get(LEGACY_STUDIO_CONFIG_ENV_VAR, "").strip()
@@ -1550,7 +1472,6 @@ def discover_studio_config_path() -> Path | None:
         candidate = Path(env_path)
         if candidate.is_file():
             return candidate
-
     candidates = (
         Path.home() / ".pipeline_inspector" / STUDIO_CONFIG_FILENAME,
         Path.home() / LEGACY_STUDIO_CONFIG_DIRNAME / STUDIO_CONFIG_FILENAME,
@@ -1564,18 +1485,15 @@ def discover_studio_config_path() -> Path | None:
     return None
 
 
-def resolve_studio_config_for_headless(
-    *,
-    cli_path: Path | None = None,
-) -> StudioConfig | None:
+def resolve_studio_config_for_headless(*, cli_path: Path | None = None) -> StudioConfig | None:
     """Resolve studio config for headless CLI entrypoints.
 
     Precedence:
+        pass
     1. Explicit ``--studio-config`` path when provided.
     2. ``PIPELINE_INSPECTOR_STUDIO_CONFIG`` env var.
     3. Default discovery under ``~/.pipeline_inspector/`` and home directory.
     """
-
     if cli_path is not None:
         resolved = cli_path.resolve()
         if not resolved.is_file():
@@ -1589,7 +1507,6 @@ def resolve_studio_config_for_headless(
 
 def load_studio_config(path: Path) -> StudioConfig:
     """Load studio settings from a JSON file."""
-
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Studio config must be a JSON object: {path}")
@@ -1598,7 +1515,6 @@ def load_studio_config(path: Path) -> StudioConfig:
 
 def save_studio_config(path: Path, config: StudioConfig) -> Path:
     """Write studio settings to a JSON file."""
-
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = config.normalized().to_dict()
@@ -1607,11 +1523,9 @@ def save_studio_config(path: Path, config: StudioConfig) -> Path:
 
 
 def merge_studio_rule_overrides(
-    profile_overrides: Mapping[str, RuleOverride],
-    studio_config: StudioConfig | None,
+    profile_overrides: Mapping[str, RuleOverride], studio_config: StudioConfig | None
 ) -> dict[str, RuleOverride]:
     """Merge studio pipeline overrides on top of a composed workflow profile."""
-
     merged = dict(profile_overrides)
     if studio_config is None:
         return merged

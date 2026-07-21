@@ -5,6 +5,8 @@
 
 This guide documents how to load **Maya Pipeline Inspector** inside Autodesk Maya using the packaged `maya_module/` layout, and how to use an editable `pip` install as an alternative.
 
+**Status:** **v0.6.0 shipped** (2026-07-21). Supported install paths below match the current release; `dev` may add requirements before the next tag.
+
 The module path is intended for studio deployment from a cloned or packaged repo. The `pip` path is convenient for TD workstations and for environments where `MAYA_MODULE_PATH` is not used.
 
 ## What gets installed
@@ -35,7 +37,7 @@ Maintainer-tested versions in this repository:
 | 2026 | Best effort | Not regularly CI-tested; report issues if panel or `mayapy` integration differs |
 | 2023 and earlier | Not tested | May work with PySide2-based Maya builds, but is outside the current support matrix |
 
-Pipeline Inspector is **under active development**. Even on supported Maya versions, expect occasional panel regressions, incomplete Settings flows, and connector setup friction. See [USER_GUIDE — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps).
+Pipeline Inspector is **under active development** beyond each tagged release. **v0.6.0** is the current public release. Even on supported Maya versions, expect occasional panel regressions on `dev`, incomplete Settings flows, and connector setup friction. See [USER_GUIDE — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps).
 
 The UI loads Qt through PySide2 or PySide6 depending on what the active Maya build provides.
 
@@ -365,7 +367,7 @@ When using Plug-in Manager, unloading `pipeline_inspector` runs the same cleanup
 - [`adr/0007-settings-and-connectors-architecture.md`](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
 - [`integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) — publish gate example
 - [`integrations/deadline_submit_preflight.md`](integrations/deadline_submit_preflight.md) — Deadline 10 on-prem integration guide (v0.4)
-- [`integrations/auto_update.md`](integrations/auto_update.md) — Check for Updates wizard, module vs pip paths, restart checklist (v0.5)
+- [`integrations/auto_update.md`](integrations/auto_update.md) — Check for Updates wizard, module vs pip paths, restart checklist (v0.5+)
 
 ## Automated checks
 
@@ -385,7 +387,7 @@ mayapy -m pytest tests/integration -v
 When validating v0.3 manifest automation locally, also run:
 
 ```bash
-# Policy demo (manual / portfolio); legacy headless.ma still works for CI fixtures
+# Policy demo (manual); legacy headless.ma still works for CI fixtures
 DEMO_SCENE="examples/vray_policy/vray_policy_scene.ma"
 OUT_MANIFEST="/tmp/pipeline_inspector_manifest_smoke.json"
 GATE_REPORT="/tmp/pipeline_inspector_gate_smoke.json"
