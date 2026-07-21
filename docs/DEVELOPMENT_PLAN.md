@@ -3,7 +3,7 @@
 > **v0.1.0 shipped** (2026-07-03). **v0.2.0 shipped** (2026-07-06). **v0.3.0 shipped** (2026-07-07). **v0.4.0 shipped** (2026-07-08). **v0.5.0 shipped** (2026-07-12). **v1.0+** — see [§27](#27-roadmap). v0.5 detail: [V0_5_DEVELOPMENT_PLAN.md](V0_5_DEVELOPMENT_PLAN.md) (Milestones 29–41, Issues #113–#164).
 
 **Project type:** Open-source Maya plug-in / pipeline QA framework  
-**Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor, Lookdev Artist  
+**Primary user:** Technical Artist, Shader TD, Pipeline TD, Render Supervisor  
 **Primary DCC:** Autodesk Maya  
 **Initial renderers:** Common Maya, V-Ray, Arnold  
 **Future renderers:** RenderMan, Redshift, USD / MaterialX  
@@ -44,7 +44,7 @@ Feature animation and VFX productions often accumulate hundreds of unique materi
 - stale texture versions;
 - wrong color space on data maps;
 - broken UDIM tile sets;
-- local artist paths that render farm machines cannot access;
+- local workstation paths that render farm machines cannot access;
 - overly expensive displacement;
 - shader graphs that became too complex over production;
 - duplicate / orphan material networks;
@@ -63,7 +63,7 @@ The production cost is high because these issues are usually found late: during 
 1. Detect shader/material failures before render time.
 2. Make material QA repeatable, data-driven, and explainable.
 3. Support V-Ray and Arnold through renderer adapters while keeping the core renderer-agnostic.
-4. Provide a fast, useful artist-facing dockable Maya panel.
+4. Provide a fast, useful Technical Artist-facing dockable Maya panel.
 5. Provide headless validation for publish systems, Deadline submission, and CI.
 6. Provide safe auto-fixes with preview, undo, reference protection, and audit logging.
 7. Produce useful reports for supervisors and pipeline review.
@@ -87,7 +87,7 @@ These can be future directions, but MVP must remain achievable.
 
 ## 4. Target Users and Value
 
-### 4.1 Lookdev / Shading Artist
+### 4.1 Lookdev / Technical Artist
 
 Needs:
 
@@ -158,10 +158,10 @@ Value:
 2. **Renderer-agnostic core.** V-Ray and Arnold logic belongs in adapters/rule packs, not in the core validator.
 3. **Explain every issue.** Every result must answer: what is wrong, why it matters, expected value, current value, suggested action.
 4. **Safe by default.** No silent scene mutation. All fixes must be previewed, undoable, and reference-aware.
-5. **Fast artist UX.** The UI should make common actions one click away: validate, filter, select node, frame graph, apply fix, export report.
+5. **Fast Technical Artist UX.** The UI should make common actions one click away: validate, filter, select node, frame graph, apply fix, export report.
 6. **Headless parity.** Anything validated in UI should also work through mayapy/headless mode.
 7. **Testable core.** The core validator must operate on plain Python snapshots, so most logic is testable without Maya.
-8. **Production profiles.** Strictness must be configurable: sandbox, artist, publish, Deadline, supervisor.
+8. **Production profiles.** Strictness must be configurable: sandbox, lookdev (`artist_relaxed`), publish, Deadline, supervisor.
 9. **No false authority.** The tool should show confidence and rule source. Risky decisions require override/waiver.
 10. **Open-source extensibility.** Studios should be able to add rules without modifying framework internals.
 
@@ -188,7 +188,7 @@ Value:
 | “Why this matters” UI | Yes | Yes | Yes | Required in rule schema |
 | Rule Authoring UI | No | Partial | Yes | MVP can ship JSON examples only |
 | Incident-to-Rule Workflow | No | Partial | Yes | v1.x feature |
-| Preflight Modes | Yes | Yes | Yes | artist/publish/deadline profiles |
+| Preflight Modes | Yes | Yes | Yes | lookdev/publish/deadline profiles |
 | Incremental Scan Cache | No | Partial | Yes | Full scan MVP, cache later |
 | Material Duplicate Detector | Basic | Yes | Yes | hash-based graph fingerprint later |
 | Orphan / Dead Shader Network Cleanup | Yes | Yes | Yes | safe cleanup plan, not auto-delete by default |
@@ -707,7 +707,7 @@ Severity examples:
 | Issue | Default Severity | Block Deadline |
 |---|---:|---:|
 | Missing texture | Critical | Yes |
-| Local artist path | Critical | Yes |
+| Local workstation path | Critical | Yes |
 | Texture outside project root | Error | Profile-dependent |
 | Mixed path slashes | Warning | No |
 
@@ -1146,7 +1146,7 @@ Before submitting a Maya render job to Deadline, run the validator in `deadline_
 
 ### 21.2 Integration Modes
 
-1. **Maya UI submit hook** — validate current scene before artist submits.
+1. **Maya UI submit hook** — validate current scene before a Technical Artist submits.
 2. **Deadline submitter wrapper** — run headless validation as part of submit tool.
 3. **Repository event plugin** — future optional server-side validation.
 
@@ -1155,7 +1155,7 @@ Before submitting a Maya render job to Deadline, run the validator in `deadline_
 - run critical-only scan;
 - generate JSON report next to scene or temp location;
 - block submission if `block_deadline=true`;
-- show artist-friendly summary;
+- show Technical Artist-friendly summary;
 - allow supervisor override only if profile permits.
 
 ---
@@ -1305,10 +1305,15 @@ maya-pipeline-inspector/
 │           ├── logging.py
 │           └── json_io.py
 ├── examples/
+│   ├── vray_policy/
+│   │   ├── vray_policy_scene.ma
+│   │   └── reports/
+│   ├── arnold_policy/
+│   │   ├── arnold_policy_scene.ma
+│   │   └── reports/
 │   ├── broken_scene/
-│   │   ├── pipeline_inspector_demo_broken.ma
 │   │   ├── textures/
-│   │   └── expected_report.json
+│   │   └── (legacy CI fixtures)
 │   ├── rules/
 │   └── reports/
 ├── tests/
@@ -1556,7 +1561,7 @@ Tasks:
 
 Deliverable:
 
-- artist can validate scene and navigate issues in Maya.
+- Technical Artist can validate scene and navigate issues in Maya.
 
 ### Phase 7 — Safe Auto-Fix
 
@@ -2304,7 +2309,7 @@ A release is done when:
 | Renderer node names differ by version | False negatives | adapter versioning, unknown node reporting, fixtures |
 | Auto-fix mutates referenced assets | Production damage | reference-safe mode, blocked by default |
 | Rule schema becomes too complex | Low adoption | MVP schema small, examples, rule validation CLI |
-| False positives annoy artists | Tool ignored | profiles, waivers, explainability, severity tuning |
+| False positives annoy Technical Artists | Tool ignored | profiles, waivers, explainability, severity tuning |
 | Headless Maya differs from UI Maya | Pipeline failures | deterministic snapshot/report tests |
 | V-Ray/Arnold not installed on dev machine | Hard to test | fixtures and adapter tests independent of plugin load |
 | Texture metadata reading adds dependencies | Install friction | optional image-info backend; missing metadata becomes warning/skipped |
@@ -2332,11 +2337,21 @@ and renderer-specific shader issues before assets reach the farm.
 
 ## 32. Demo Scene Plan
 
-Create a compact but convincing demo:
+Primary onboarding demos (renderer policy scenes):
+
+```text
+examples/vray_policy/vray_policy_scene.ma
+examples/arnold_policy/arnold_policy_scene.ma
+examples/broken_scene/textures/          # shared texture paths referenced by policy scenes
+```
+
+Each policy scene targets one render engine with pre-modeled common + renderer-specific issues. See [`examples/vray_policy/README.md`](vray_policy/README.md) and [`examples/arnold_policy/README.md`](arnold_policy/README.md).
+
+Legacy compact demo (maintainer fixtures only):
 
 ```text
 examples/broken_scene/
-├── pipeline_inspector_demo_broken.ma
+├── pipeline_inspector_demo_broken_headless.ma
 ├── textures/
 │   ├── dress_albedo_v001.1001.exr
 │   ├── dress_albedo_v001.1002.exr

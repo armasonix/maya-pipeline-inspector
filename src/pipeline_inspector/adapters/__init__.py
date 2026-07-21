@@ -9,6 +9,7 @@ from pipeline_inspector.adapters.base import (
     RendererAdapterError,
     RendererAdapterRegistry,
     TextureSlotSemantics,
+    UsdAdapter,
     VrayAdapter,
 )
 from pipeline_inspector.adapters.semantic import (
@@ -28,6 +29,7 @@ __all__ = [
     "SemanticSlotResolution",
     "SemanticTextureSlotResolver",
     "TextureSlotSemantics",
+    "UsdAdapter",
     "VrayAdapter",
     "classify_semantic_data_kind",
 ]

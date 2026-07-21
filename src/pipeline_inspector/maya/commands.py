@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -298,27 +297,119 @@ def revoke_waiver_action(waiver_id: str, scene_path: Optional[str] = None) -> An
     )
 
 
-def select_node_action(node_name: str) -> NavigationActionResult:
-    """Select a Maya node from a UI action."""
+def select_node_action(
+    node_name: str,
+    *,
+    target_id: str = "",
+    material_name: Optional[str] = None,
+    snapshot: Optional[Any] = None,
+) -> NavigationActionResult:
+    """Select a Maya node or USD prim from a UI action."""
 
-    return select_node(_maya_node_name(node_name))
+    from pipeline_inspector.maya.usd_navigation import (
+        is_usd_prim_target,
+        resolve_usd_prim_path,
+        select_usd_prim,
+    )
+
+    maya_cmds = _maya_cmds()
+    maya_target = _resolve_maya_target_name(node_name, target_id)
+    should_try_usd = is_usd_prim_target(
+        target_id=target_id,
+        node_name=node_name,
+    ) or _looks_like_usd_prim_issue(
+        target_id=target_id,
+        node_name=node_name,
+        snapshot=snapshot,
+    )
+    if should_try_usd:
+        prim_path = resolve_usd_prim_path(
+            target_id=target_id,
+            node_name=node_name,
+            material_name=material_name or "",
+            snapshot=snapshot,
+            cmds=maya_cmds,
+        )
+        if prim_path:
+            return select_usd_prim(prim_path, cmds=maya_cmds)
+
+    if maya_target and maya_cmds.objExists(maya_target):
+        return select_node(maya_target)
+
+    return select_node(maya_target or _maya_node_name(node_name))
 
 
 def open_in_hypershade_action(
     node_name: str,
     *,
     material_name: Optional[str] = None,
+    target_id: str = "",
+    snapshot: Optional[Any] = None,
 ) -> NavigationActionResult:
-    """Open Hypershade focused on the issue material from a UI action."""
+    """Open Hypershade or the USD shader editor for an issue target."""
+
+    from pipeline_inspector.maya.usd_navigation import (
+        is_usd_prim_target,
+        open_usd_shader_view,
+        resolve_usd_prim_path,
+    )
 
     maya_cmds = _maya_cmds()
+    should_try_usd = is_usd_prim_target(
+        target_id=target_id,
+        node_name=node_name,
+    ) or _looks_like_usd_prim_issue(
+        target_id=target_id,
+        node_name=node_name,
+        snapshot=snapshot,
+    )
+    if should_try_usd:
+        prim_path = resolve_usd_prim_path(
+            target_id=target_id,
+            node_name=node_name,
+            material_name=material_name or "",
+            snapshot=snapshot,
+            cmds=maya_cmds,
+        )
+        maya_material = _resolve_maya_hypershade_target(
+            material_name=material_name or "",
+            node_name=node_name,
+            target_id=target_id,
+            snapshot=snapshot,
+            cmds=maya_cmds,
+        )
+        # #region agent log
+        _debug_hypershade_route_log(
+            "commands.open_in_hypershade_action",
+            "USD hypershade routing",
+            {
+                "node_name": node_name,
+                "target_id": target_id,
+                "material_name": material_name or "",
+                "prim_path": prim_path,
+                "maya_material": maya_material,
+                "route": "maya" if maya_material else ("usd" if prim_path else "fallback"),
+            },
+            hypothesis_id="H17",
+        )
+        # #endregion
+        if maya_material:
+            return open_in_hypershade(maya_material, cmds=maya_cmds)
+        if prim_path:
+            return open_usd_shader_view(
+                prim_path,
+                material_name=material_name or "",
+                cmds=maya_cmds,
+            )
+
+    maya_target = _resolve_maya_target_name(node_name, target_id)
     candidates: list[str] = []
     if material_name:
         candidates.append(_maya_node_name(material_name))
-    if node_name:
-        node = _maya_node_name(node_name)
-        if node not in candidates:
-            candidates.append(node)
+    if maya_target:
+        candidates.append(maya_target)
+    elif node_name:
+        candidates.append(_maya_node_name(node_name))
     target = next((name for name in candidates if maya_cmds.objExists(name)), None)
     if target is None:
         label = material_name or node_name or "node"
@@ -329,6 +420,87 @@ def open_in_hypershade_action(
             message="Material or node does not exist.",
         )
     return open_in_hypershade(target)
+
+
+def _resolve_maya_hypershade_target(
+    *,
+    material_name: str,
+    node_name: str,
+    target_id: str,
+    snapshot: Optional[Any],
+    cmds: Any,
+) -> str:
+    """Return a Maya DAG material node when one exists for the issue target."""
+
+    candidates: list[str] = []
+    if material_name:
+        candidates.append(material_name.strip())
+        candidates.append(material_name.strip().rsplit("/", 1)[-1])
+    if node_name:
+        candidates.append(_maya_node_name(node_name))
+        if "/" in str(node_name):
+            candidates.append(str(node_name).rsplit("/", 1)[-1])
+    if str(target_id).startswith("prim:"):
+        prim_body = str(target_id).removeprefix("prim:")
+        if "/" in prim_body:
+            candidates.append(prim_body.rsplit("/", 1)[-1])
+    elif target_id:
+        candidates.append(_resolve_maya_target_name(node_name, target_id))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = _maya_node_name(candidate)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        if cmds.objExists(normalized):
+            return normalized
+
+    if snapshot is not None and material_name:
+        material_key = material_name.strip().rsplit("/", 1)[-1]
+        for material in getattr(snapshot, "materials", ()) or ():
+            if material.name != material_key and material.full_name != material_name:
+                continue
+            node_id = str(material.node_id or "")
+            if node_id.startswith("prim:"):
+                continue
+            maya_target = node_id.removeprefix("node:")
+            if cmds.objExists(maya_target):
+                return maya_target
+    return ""
+
+
+def _resolve_maya_target_name(node_name: str, target_id: str) -> str:
+    if str(target_id).startswith("node:"):
+        return str(target_id).removeprefix("node:")
+    if str(node_name).startswith("node:"):
+        return str(node_name).removeprefix("node:")
+    if node_name:
+        return _maya_node_name(node_name)
+    return ""
+
+
+def _looks_like_usd_prim_issue(
+    *,
+    target_id: str = "",
+    node_name: str = "",
+    snapshot: Optional[Any],
+) -> bool:
+    from pipeline_inspector.maya.usd_navigation import is_usd_prim_target
+
+    if is_usd_prim_target(target_id=target_id, node_name=node_name):
+        return True
+    if snapshot is None:
+        return False
+    nodes = getattr(snapshot, "nodes", ()) or ()
+    if not any(str(node.id).startswith("prim:") for node in nodes):
+        return False
+    for node in nodes:
+        if not str(node.id).startswith("prim:"):
+            continue
+        if node.name == node_name or node.full_name == node_name:
+            return True
+    return False
 
 
 def open_attribute_editor_action(node_name: str) -> NavigationActionResult:
@@ -543,7 +715,38 @@ def _validate(
     user_config: Optional[UserPreferences] = None,
     session_rule_overrides: Optional[dict[str, Any]] = None,
 ) -> Any:
+    captured = capture_validation_snapshot(scan_scope=scan_scope, profile_id=profile_id)
+    if not getattr(captured, "succeeded", False):
+        return captured
+    return execute_validation_on_snapshot(
+        captured.snapshot,
+        scan_scope=scan_scope,
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+        studio_config=studio_config,
+        extra_rule_paths=extra_rule_paths,
+        user_config=user_config,
+        session_rule_overrides=session_rule_overrides,
+    )
+
+
+def capture_validation_snapshot(
+    *,
+    scan_scope: str,
+    profile_id: str = "",
+) -> Any:
+    """Scan the Maya scene or selection for validation. Must run on the Maya main thread."""
+
     from pipeline_inspector.maya.scanner import scan_scene, scan_selection, selection_node_names
+
+    # #region agent log
+    _debug_health_log_command(
+        "commands.capture_validation_snapshot",
+        "phase validate_start",
+        {"scan_scope": scan_scope, "profile_id": profile_id},
+        hypothesis_id="H-HANG1",
+    )
+    # #endregion
 
     if scan_scope == "selection":
         selected = selection_node_names()
@@ -564,6 +767,36 @@ def _validate(
             )
     else:
         raw_snapshot = scan_scene()
+
+    # #region agent log
+    _debug_health_log_command(
+        "commands.capture_validation_snapshot",
+        "phase scan_done",
+        {
+            "scan_scope": scan_scope,
+            "file_deps": len(getattr(raw_snapshot, "file_dependencies", []) or []),
+            "nodes": len(getattr(raw_snapshot, "nodes", []) or []),
+            "materials": len(getattr(raw_snapshot, "materials", []) or []),
+        },
+        hypothesis_id="H-HANG2",
+    )
+    # #endregion
+    return SimpleNamespace(succeeded=True, snapshot=raw_snapshot, scan_scope=scan_scope)
+
+
+def execute_validation_on_snapshot(
+    raw_snapshot: Any,
+    *,
+    scan_scope: str,
+    profile_id: str,
+    asset_class_id: str = "",
+    studio_config: Optional[Any] = None,
+    extra_rule_paths: tuple[Path, ...] = (),
+    user_config: Optional[UserPreferences] = None,
+    session_rule_overrides: Optional[dict[str, Any]] = None,
+) -> Any:
+    """Run the validation pipeline on a pre-scanned snapshot."""
+
     if user_config is not None:
         run = run_validation_for_user(
             raw_snapshot,
@@ -584,6 +817,28 @@ def _validate(
             extra_rule_paths=extra_rule_paths,
             session_rule_overrides=session_rule_overrides,
         )
+    # #region agent log
+    _debug_health_log_command(
+        "commands.execute_validation_on_snapshot",
+        "Maya validation finished",
+        {
+            "scan_scope": scan_scope,
+            "snapshot_renderer": getattr(run.snapshot, "renderer", ""),
+            "usd_metadata": getattr(run.snapshot, "usd_stage_metadata", None) is not None,
+            "prim_nodes": sum(
+                1 for node in getattr(run.snapshot, "nodes", []) if str(node.id).startswith("prim:")
+            ),
+            "failed_count": sum(1 for item in run.results if item.status == "failed"),
+            "failed_rules": "|".join(
+                sorted({item.rule_id for item in run.results if item.status == "failed"})[:12]
+            ),
+            "fix_unblocked": sum(
+                1 for action in (run.fix_plan.actions if run.fix_plan else ()) if not action.blocked
+            ),
+        },
+        hypothesis_id="H1",
+    )
+    # #endregion
     return _validation_result(run, action=f"validate_{scan_scope}")
 
 
@@ -1000,6 +1255,16 @@ def _maya_mel() -> Any:
         raise RuntimeError("Maya MEL is available only inside Autodesk Maya.") from exc
 
 
+def _debug_hypershade_route_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    _debug_health_log_command(location, message, data, hypothesis_id=hypothesis_id)
+
+
 def _debug_health_log_command(
     location: str,
     message: str,
@@ -1007,17 +1272,6 @@ def _debug_health_log_command(
     *,
     hypothesis_id: str,
 ) -> None:
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": {key: str(value) for key, value in data.items()},
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

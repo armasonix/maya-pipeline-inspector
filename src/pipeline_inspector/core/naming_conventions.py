@@ -20,6 +20,7 @@ NAMING_OBJECT_TYPES: tuple[str, ...] = (
     "texture",
     "shading_engine",
     "light_source",
+    "camera",
 )
 
 
@@ -77,6 +78,8 @@ def resolve_object_type(target_obj: object) -> Optional[str]:
         return "shading_engine"
     if isinstance(target_obj, ShapeSnapshot):
         type_name = target_obj.type_name.lower()
+        if type_name == "camera":
+            return "camera"
         if type_name == "nurbscurve":
             return "control"
         if type_name in {"mesh", "nurbssurface", "subdiv", "aistandin", "vrayproxy"}:
@@ -100,6 +103,12 @@ def resolve_object_type(target_obj: object) -> Optional[str]:
             return "control"
         if type_name in {"file", "vraybitmap", "aiimage"}:
             return "texture"
+        if type_name == "shader" and str(target_obj.renderer_family or "").casefold() == "usd":
+            if target_obj.attrs.get("file") or target_obj.attrs.get("semantic_slot"):
+                return "texture"
+            info_id = str(target_obj.attrs.get("info_id", "")).casefold()
+            if any(token in info_id for token in ("bitmap", "uvtexture", "image", "file")):
+                return "texture"
     return None
 
 

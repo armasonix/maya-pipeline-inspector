@@ -10,6 +10,7 @@ SETTINGS_ADVANCED_TAB_OBJECT_NAME = "pipelineInspectorSettingsAdvancedTab"
 SETTINGS_CONNECTORS_TAB_OBJECT_NAME = "pipelineInspectorSettingsConnectorsTab"
 SETTINGS_STUDIO_TAB_OBJECT_NAME = "pipelineInspectorSettingsStudioTab"
 SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME = "pipelineInspectorSettingsStudioEnvironmentTab"
+SETTINGS_RENDER_TAB_OBJECT_NAME = "pipelineInspectorSettingsRenderTab"
 SETTINGS_BUG_REPORT_TAB_OBJECT_NAME = "pipelineInspectorSettingsBugReportTab"
 
 @dataclass(frozen=True)
@@ -50,6 +51,12 @@ SETTINGS_TAB_SPECS: tuple[SettingsTabSpec, ...] = (
         tab_id="studio_environment",
         title="Studio Environment",
         object_name=SETTINGS_STUDIO_ENVIRONMENT_TAB_OBJECT_NAME,
+        placeholder_text="",
+    ),
+    SettingsTabSpec(
+        tab_id="render",
+        title="Render",
+        object_name=SETTINGS_RENDER_TAB_OBJECT_NAME,
         placeholder_text="",
     ),
     SettingsTabSpec(

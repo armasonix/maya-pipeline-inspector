@@ -12,9 +12,13 @@ class FakePanel:
     def __init__(self) -> None:
         self.show_calls: list[dict[str, Any]] = []
         self.closed = False
+        self.raised = False
 
     def show(self, **kwargs: Any) -> None:
         self.show_calls.append(dict(kwargs))
+
+    def raise_(self) -> None:
+        self.raised = True
 
     def close(self) -> None:
         self.closed = True
@@ -39,22 +43,29 @@ class FakeCmds:
         self.closed: list[str] = []
         self.docked: list[tuple[str, tuple[str, int]]] = []
         self.hidden: list[str] = []
+        self.edited: list[dict[str, Any]] = []
+        self.floating = False
 
     def workspaceControl(self, name: str, **kwargs: Any) -> Optional[bool]:
         if kwargs.get("query") and kwargs.get("exists"):
             return self.workspace_exists
-        if kwargs.get("edit") and kwargs.get("visible") is False:
-            self.hidden.append(name)
-            return None
-        if kwargs.get("edit") and kwargs.get("restore"):
-            self.restored.append(name)
-            return None
-        if kwargs.get("edit") and kwargs.get("close"):
-            self.closed.append(name)
-            self.workspace_exists = False
-            return None
-        if kwargs.get("edit") and kwargs.get("dockToMainWindow"):
-            self.docked.append((name, kwargs["dockToMainWindow"]))
+        if kwargs.get("query") and kwargs.get("floating"):
+            return self.floating
+        if kwargs.get("edit"):
+            self.edited.append(dict(kwargs))
+            if kwargs.get("floating") is True:
+                self.floating = True
+            if kwargs.get("floating") is False:
+                self.floating = False
+            if kwargs.get("visible") is False:
+                self.hidden.append(name)
+            if kwargs.get("restore"):
+                self.restored.append(name)
+            if kwargs.get("close"):
+                self.closed.append(name)
+                self.workspace_exists = False
+            if kwargs.get("dockToMainWindow"):
+                self.docked.append((name, kwargs["dockToMainWindow"]))
             return None
         return None
 
@@ -104,12 +115,19 @@ def test_show_panel_creates_dockable_panel(monkeypatch: Any):
             "dockable": True,
             "area": "right",
             "floating": False,
-            "retain": False,
+            "retain": True,
+            "width": 420,
         }
     ]
     assert remembered == [ui_launcher.__version__]
     assert visible_flags == [True]
     assert cmds.docked == []
+    assert any(
+        edit.get("widthProperty") == "free"
+        and edit.get("actLikeMayaUIElement") is True
+        and edit.get("retain") is True
+        for edit in cmds.edited
+    )
 
 
 def test_show_panel_restores_existing_panel(monkeypatch: Any):
@@ -125,7 +143,123 @@ def test_show_panel_restores_existing_panel(monkeypatch: Any):
 
     assert result is panel
     assert cmds.restored == [ui_launcher.WORKSPACE_CONTROL_NAME]
-    assert panel.show_calls == [{}]
+    assert panel.show_calls == []
+    assert panel.raised is True
+    assert any(edit.get("widthProperty") == "free" for edit in cmds.edited)
+
+
+def test_preferred_docked_panel_width_uses_content_density(monkeypatch: Any):
+    content = SimpleNamespace(_pipeline_inspector_ui_density="compact")
+    panel = SimpleNamespace(_pipeline_inspector_content=content)
+
+    assert ui_launcher._preferred_docked_panel_width(panel) == 300
+    assert ui_launcher._preferred_docked_panel_width(SimpleNamespace()) == 420
+
+
+def test_detach_panel_floats_workspace_control(monkeypatch: Any):
+    cmds = FakeCmds(workspace_exists=True)
+    panel = FakePanel()
+    monkeypatch.setattr(ui_launcher, "_PANEL", panel)
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
+    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
+
+    assert ui_launcher.detach_panel() is True
+    assert cmds.floating is True
+    assert any(edit.get("floating") is True for edit in cmds.edited)
+    assert panel.show_calls == []
+
+
+def test_detach_panel_falls_back_to_standalone_window(monkeypatch: Any):
+    cmds = FakeCmds(workspace_exists=True)
+    panel = FakePanel()
+
+    def workspace_control(name: str, **kwargs: Any) -> Optional[bool]:
+        if kwargs.get("query") and kwargs.get("exists"):
+            return True
+        if kwargs.get("query") and kwargs.get("floating"):
+            return False
+        if kwargs.get("edit"):
+            cmds.edited.append(dict(kwargs))
+        return None
+
+    cmds.workspaceControl = workspace_control  # type: ignore[method-assign]
+    monkeypatch.setattr(ui_launcher, "_PANEL", panel)
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
+    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
+
+    assert ui_launcher.detach_panel() is True
+    assert panel.show_calls == [{"dockable": False, "floating": True}]
+
+
+def test_dock_panel_redocks_workspace_control(monkeypatch: Any):
+    cmds = FakeCmds(workspace_exists=True)
+    cmds.floating = True
+    panel = FakePanel()
+    monkeypatch.setattr(ui_launcher, "_PANEL", panel)
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
+    monkeypatch.setattr(ui_launcher, "_sync_workspace_control_width", lambda _content: None)
+    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
+
+    assert ui_launcher.dock_panel() is True
+    assert cmds.floating is False
+    assert any(edit.get("dockToMainWindow") == ("right", True) for edit in cmds.edited)
+    assert panel.show_calls == []
+
+
+def test_dock_panel_redocks_via_mixin(monkeypatch: Any):
+    cmds = FakeCmds(workspace_exists=True)
+    cmds.floating = True
+    panel = FakePanel()
+
+    def set_dockable_parameters(**kwargs: Any) -> None:
+        if kwargs.get("floating") is False:
+            cmds.floating = False
+
+    panel.setDockableParameters = set_dockable_parameters  # type: ignore[attr-defined]
+    monkeypatch.setattr(ui_launcher, "_PANEL", panel)
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
+    monkeypatch.setattr(ui_launcher, "_sync_workspace_control_width", lambda _content: None)
+    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
+
+    assert ui_launcher.dock_panel() is True
+    assert cmds.floating is False
+    assert panel.show_calls == []
+
+
+def test_dock_panel_recreates_dock_from_standalone_window(monkeypatch: Any):
+    cmds = FakeCmds(workspace_exists=False)
+    panel = _panel_that_creates_workspace(cmds)
+    monkeypatch.setattr(ui_launcher, "_PANEL", panel)
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+    monkeypatch.setattr(ui_launcher, "_configure_workspace_control_mobility", lambda _cmds: None)
+    monkeypatch.setattr(ui_launcher, "_sync_workspace_control_width", lambda _content: None)
+    monkeypatch.setattr(ui_launcher, "_debug_workspace_dock_log", lambda *_args, **_kwargs: None)
+
+    assert ui_launcher.dock_panel() is True
+    assert panel.show_calls == [
+        {
+            "dockable": True,
+            "area": "right",
+            "floating": False,
+            "retain": True,
+            "width": 420,
+        }
+    ]
+
+
+def test_sync_workspace_control_width_skips_floating_panel(monkeypatch: Any):
+    cmds = FakeCmds(workspace_exists=True)
+    cmds.floating = True
+    content = SimpleNamespace(_pipeline_inspector_ui_density="compact")
+    monkeypatch.setattr(ui_launcher, "_maya_cmds", lambda: cmds)
+
+    ui_launcher._sync_workspace_control_width(content)
+
+    assert cmds.edited == []
 
 
 def test_show_panel_recreates_stale_workspace_control(monkeypatch: Any):
@@ -212,6 +346,66 @@ def test_schedule_ui_validation_defers_validation_job(monkeypatch: Any):
     assert content._pipeline_inspector_validate_running is False
 
 
+def test_schedule_on_main_thread_uses_execute_deferred_from_worker(monkeypatch: Any):
+    deferred: list[Any] = []
+    scheduled: list[Any] = []
+
+    class FakeMayaUtils:
+        @staticmethod
+        def executeDeferred(callback: Any) -> None:
+            deferred.append(callback)
+
+    class FakeTimer:
+        @staticmethod
+        def singleShot(_delay_ms: int, callback: Any) -> None:
+            scheduled.append(callback)
+
+    monkeypatch.setitem(__import__("sys").modules, "maya.utils", FakeMayaUtils())
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.qt.qt_single_shot_callback",
+        lambda _qt_widgets=None: FakeTimer.singleShot,
+    )
+    monkeypatch.setattr(ui_launcher, "_debug_validate_cycle_log", lambda *_args, **_kwargs: None)
+
+    import threading
+
+    def _worker() -> None:
+        ui_launcher._schedule_on_main_thread(lambda: deferred.append("ran"))
+
+    thread = threading.Thread(target=_worker)
+    thread.start()
+    thread.join()
+
+    assert scheduled == []
+    assert len(deferred) == 1
+
+
+def test_schedule_on_main_thread_uses_qtimer_on_main_thread(monkeypatch: Any):
+    deferred: list[Any] = []
+    scheduled: list[Any] = []
+
+    class FakeMayaUtils:
+        @staticmethod
+        def executeDeferred(callback: Any) -> None:
+            deferred.append(callback)
+
+    class FakeTimer:
+        @staticmethod
+        def singleShot(_delay_ms: int, callback: Any) -> None:
+            scheduled.append(callback)
+
+    monkeypatch.setitem(__import__("sys").modules, "maya.utils", FakeMayaUtils())
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.qt.qt_single_shot_callback",
+        lambda _qt_widgets=None: FakeTimer.singleShot,
+    )
+
+    ui_launcher._schedule_on_main_thread(lambda: scheduled.append("ran"))
+
+    assert len(scheduled) == 1
+    assert deferred == []
+
+
 def test_schedule_ui_validation_falls_back_to_main_thread_schedule(monkeypatch: Any):
     content = SimpleNamespace(_pipeline_inspector_validate_running=False)
     runs: list[str] = []
@@ -230,7 +424,7 @@ def test_schedule_ui_validation_falls_back_to_main_thread_schedule(monkeypatch: 
     monkeypatch.setattr(
         ui_launcher,
         "_schedule_on_main_thread",
-        lambda callback: scheduled.append(callback),
+        lambda callback, qt_widgets=None: scheduled.append(callback),
     )
 
     ui_launcher._schedule_ui_validation(content, object(), scan_scope="selection")
@@ -363,6 +557,7 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
 
     content = SimpleNamespace(
         _pipeline_inspector_studio_config=ui_launcher.StudioConfig.default(),
+        _pipeline_inspector_validate_running=False,
     )
     result = SimpleNamespace(
         succeeded=True,
@@ -371,21 +566,47 @@ def test_run_validation_job_notifies_connectors_after_successful_validation(monk
         scan_scope="scene",
         profile_id="lookdev",
         asset_class_id="",
+        results=(),
         health_score=HealthScore(score=80, raw_score=80, block_publish=True),
     )
     calls: list[tuple[Any, Any]] = []
 
     monkeypatch.setattr(
-        "pipeline_inspector.maya.commands.validate_scene_action",
-        lambda **_kwargs: result,
+        "pipeline_inspector.maya.commands.capture_validation_snapshot",
+        lambda **_kwargs: SimpleNamespace(
+            succeeded=True,
+            snapshot=SimpleNamespace(scene_path="hero.ma"),
+        ),
+    )
+    monkeypatch.setattr(
+        "pipeline_inspector.maya.commands.execute_validation_on_snapshot",
+        lambda *_args, **_kwargs: result,
     )
     monkeypatch.setattr(ui_launcher, "_selected_asset_class_id", lambda *_args: "")
     monkeypatch.setattr(ui_launcher, "_populate_validation_result", lambda *_args: None)
     monkeypatch.setattr(ui_launcher, "_update_validation_chrome_labels", lambda *_args: None)
+    monkeypatch.setattr(ui_launcher, "_finish_validate_running", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         ui_launcher,
         "_maybe_notify_validation",
         lambda content_arg, _qt_widgets, result_arg: calls.append((content_arg, result_arg)),
+    )
+
+    def _immediate_submit(fn: Any, *args: Any, **kwargs: Any) -> Any:
+        class _ImmediateFuture:
+            def result(self) -> Any:
+                return fn(*args, **kwargs)
+
+            def add_done_callback(self, callback: Any) -> None:
+                callback(self)
+
+        return _ImmediateFuture()
+
+    monkeypatch.setattr(ui_launcher._VALIDATION_EXECUTOR, "submit", _immediate_submit)
+    monkeypatch.setattr(
+        ui_launcher,
+        "_schedule_on_main_thread",
+        lambda callback, qt_widgets=None: callback(),
     )
 
     ui_launcher._run_validation_job(

@@ -136,3 +136,51 @@ def test_effective_studio_normalize_target_prefers_studio_tokens_when_roots_exis
         paths.effective_studio_normalize_target("${ASSET_ROOT}", StudioEnvironmentSettings())
         == "${ASSET_ROOT}"
     )
+
+
+def test_sanitize_studio_path_value_strips_trailing_commas():
+    assert (
+        paths.sanitize_studio_path_value(
+            "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures,"
+        )
+        == "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures"
+    )
+
+
+def test_resolve_studio_path_strips_comma_artifact_from_texture_alias():
+    environment = StudioEnvironmentSettings(
+        asset_root="D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene",
+        texture_root="D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures",
+        variable_aliases={
+            "STUDIO_TEXTURE_ROOT": (
+                "D:/Workspace/portfolio/maya-shader-health-inspector/examples/broken_scene/textures,"
+            ),
+            "STUDIO_ASSET_ROOT": (
+                "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene"
+            ),
+        },
+    )
+    resolved = paths.resolve_studio_path(
+        "${STUDIO_ASSET_ROOT}/textures/demo_roughness_v001.<UDIM>.exr",
+        environment,
+    )
+    assert resolved == (
+        "D:/Workspace/portfolio/maya-pipeline-inspector/examples/broken_scene/textures/"
+        "demo_roughness_v001.<UDIM>.exr"
+    )
+    assert ",/" not in resolved
+
+
+def test_normalize_udim_tile_token_in_path_replaces_concrete_tile():
+    assert (
+        paths.normalize_udim_tile_token_in_path(
+            "D:/show/tex/demo_roughness_v001.1001.exr"
+        )
+        == "D:/show/tex/demo_roughness_v001.<UDIM>.exr"
+    )
+    assert (
+        paths.normalize_udim_tile_token_in_path(
+            "${STUDIO_TEXTURE_ROOT}/demo_roughness_v001.1001.exr"
+        )
+        == "${STUDIO_TEXTURE_ROOT}/demo_roughness_v001.<UDIM>.exr"
+    )

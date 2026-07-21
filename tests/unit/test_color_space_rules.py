@@ -133,8 +133,10 @@ def test_color_managed_rule_pack_has_production_defaults():
     assert rule.check.params["expected"] == ["sRGB", "ACEScg"]
     assert rule.policy.block_publish is True
     assert rule.policy.block_deadline is False
-    assert rule.policy.auto_fix_allowed is False
-    assert rule.fix is None
+    assert rule.policy.auto_fix_allowed is True
+    assert rule.fix is not None
+    assert rule.fix.type == "set_attr"
+    assert rule.fix.params["value"] == "sRGB"
 
 
 def test_color_managed_rule_fails_for_raw_base_color():
@@ -150,7 +152,8 @@ def test_color_managed_rule_fails_for_raw_base_color():
     assert result.expected_value == ["sRGB", "ACEScg"]
     assert result.block_publish is True
     assert result.block_deadline is False
-    assert result.auto_fix_available is False
+    assert result.auto_fix_available is True
+    assert result.fix_id == "set_attr"
 
 
 def test_color_managed_rule_passes_for_srgb_base_color():

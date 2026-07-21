@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from pipeline_inspector.core import GraphSnapshot
 from pipeline_inspector.core.fix_audit import (
@@ -18,6 +19,7 @@ from pipeline_inspector.maya.validation_pipeline import (
     persist_fix_apply_audit,
 )
 from pipeline_inspector.reports import build_json_report
+from pipeline_inspector.usd.fix_applier import AppliedUsdFixRecord
 
 
 def test_fix_audit_sidecar_path_for_scene():
@@ -68,6 +70,41 @@ def test_build_fix_audit_session_sorts_records_by_fix_id():
     assert session.total == 2
     assert session.applied_count == 2
     assert [record["fix_id"] for record in session.records] == ["a.fix", "z.fix"]
+
+
+def test_build_fix_audit_session_accepts_usd_apply_records() -> None:
+    report = SimpleNamespace(
+        undo_chunk_name="Pipeline Inspector Apply Fixes",
+        total=1,
+        applied_count=1,
+        blocked_count=0,
+        failed_count=0,
+        records=(
+            AppliedUsdFixRecord(
+                fix_id="common.texture.colorspace.color_managed:prim:/Base/mtl/albedo:set_attr",
+                fix_type="set_attr",
+                target_id="prim:/Base/mtl/albedo",
+                target_attr="colorSpace",
+                before_value="Raw",
+                after_value="sRGB",
+                succeeded=True,
+            ),
+        ),
+    )
+
+    session = build_fix_audit_session(
+        scene_path="D:/show/asset/shading/hero.ma",
+        profile_id="artist_relaxed",
+        apply_report=report,
+    )
+
+    assert session.total == 1
+    assert session.records[0]["target_node"] == "/Base/mtl/albedo"
+    assert session.records[0]["applied"] is True
+    assert (
+        session.records[0]["rule_id"]
+        == "common.texture.colorspace.color_managed:prim:/Base/mtl/albedo"
+    )
 
 
 def test_load_and_write_fix_audit_sidecar_round_trip(tmp_path: Path):

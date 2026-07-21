@@ -247,13 +247,19 @@ def build_deadline_connector_section(
 
     hint = qt_widgets.QLabel(
         "When Remote Farm is enabled, the Farm tab goes online using these Deadline settings. "
-        "When disabled, the Farm tab stays offline until the connector is turned on."
+        "Submission qualities live on the Farm tab; render presets live under Settings → Render."
     )
     hint.setWordWrap(True)
     section_layout.addWidget(hint)
     return section
 
-def read_deadline_connector_from_view(view: Any, qt_widgets: Any) -> DeadlineConnectorSettings:
+def read_deadline_connector_from_view(
+    view: Any,
+    qt_widgets: Any,
+    *,
+    base: DeadlineConnectorSettings | None = None,
+) -> DeadlineConnectorSettings:
+    current = base or DeadlineConnectorSettings()
     toggle = find_child(view, qt_widgets.QWidget, SETTINGS_DEADLINE_ENABLED_TOGGLE_OBJECT_NAME)
     enabled = bool(getattr(toggle, "isChecked", lambda: False)()) if toggle is not None else False
     port_text = line_edit_text(view, qt_widgets, SETTINGS_DEADLINE_PORT_INPUT_OBJECT_NAME) or "8081"
@@ -284,6 +290,8 @@ def read_deadline_connector_from_view(view: Any, qt_widgets: Any) -> DeadlineCon
         pool=line_edit_text(view, qt_widgets, SETTINGS_DEADLINE_POOL_INPUT_OBJECT_NAME),
         group=line_edit_text(view, qt_widgets, SETTINGS_DEADLINE_GROUP_INPUT_OBJECT_NAME),
         user_name=line_edit_text(view, qt_widgets, SETTINGS_DEADLINE_USER_INPUT_OBJECT_NAME),
+        allow_draft_submit=current.allow_draft_submit,
+        allow_production_submit=current.allow_production_submit,
     )
 
 def update_deadline_connector_view(

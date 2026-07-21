@@ -1,6 +1,6 @@
 # Pipeline Inspector shelf and menu icons
 
-Artist-provided PNGs for Maya menu/shelf entry points and panel header buttons.
+Contributor-provided PNGs for Maya menu/shelf entry points and panel header buttons.
 
 | PNG basename | Entry |
 | --- | --- |

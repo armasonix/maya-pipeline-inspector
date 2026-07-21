@@ -1,8 +1,15 @@
 # Architecture
 
-Maya Pipeline Inspector is designed as a data-driven Maya material QA framework with a testable pure Python core and thin Maya integration layers.
+**Product:** Maya Pipeline Inspector (`maya-pipeline-inspector`)
 
-Status: **v0.5.0 shipped** (2026-07-12). GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); settings and connectors hub ([ADR 0007](adr/0007-settings-and-connectors-architecture.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Maya dockable panel is the primary surface; CLI, reports, Deadline, notifications, and tracker hooks are integration surfaces on the same validation pipeline.
+Maya Pipeline Inspector is designed as a data-driven Maya material and scene QA framework with a testable pure Python core and thin Maya integration layers.
+
+**Status:** v0.5.0 shipped (2026-07-12) · v0.6 in development on `dev`  
+**Related:** [USER_GUIDE.md](USER_GUIDE.md) · [MAYA_INSTALL.md](MAYA_INSTALL.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md)
+
+GUI-first product philosophy ([ADR 0005](adr/0005-gui-first-product-philosophy.md)); settings and connectors hub ([ADR 0007](adr/0007-settings-and-connectors-architecture.md)); native Maya plugin bootstrap strategy ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)): thin C++ `.mll` delegates to Python, with `.py` plug-in fallback. Role governance ([ADR 0008](adr/0008-role-based-governance-foundation.md)) gates risky actions in v0.6+. The Maya dockable panel is the primary surface; CLI, reports, Deadline, readiness checks, notifications, and tracker hooks are integration surfaces on the same validation pipeline.
+
+> **Implementation reality:** architecture describes target design. Gaps between panel and CLI, incomplete adapter coverage, and MVP connectors are documented in [USER_GUIDE.md — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps).
 
 ## Goals
 
@@ -18,7 +25,7 @@ Status: **v0.5.0 shipped** (2026-07-12). GUI-first product philosophy ([ADR 0005
 Contributors should implement behavior in the shared validation pipeline first, then expose it in the dockable panel. Headless CLI, JSON/HTML reports, manifest export, apply-fixes, and Deadline integration call the same modules — they do not fork validation logic.
 
 ```text
-Primary surface (artists / Shader TDs)
+Primary surface (Technical Artists / Shader TDs)
   Maya dockable UI  ->  ui_launcher  ->  validation_pipeline  ->  core engine
 
 Integration surfaces (pipeline TDs / farm / CI)
@@ -55,7 +62,7 @@ Maya scene
 
 ## UX Layer (panel)
 
-The dockable panel (`pipeline_inspector.ui.main_window`, launched via `pipeline_inspector.maya.ui_launcher`) is the primary artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and `pipeline_inspector.integrations.deadline` — no duplicated rule evaluation in widgets.
+The dockable panel (`pipeline_inspector.ui.main_window`, launched via `pipeline_inspector.maya.ui_launcher`) is the primary Technical Artist-facing surface. Tabs group routine tasks; callbacks delegate to `validation_pipeline` and `pipeline_inspector.integrations.deadline` — no duplicated rule evaluation in widgets.
 
 ```mermaid
 flowchart TD
@@ -149,6 +156,46 @@ Benefits:
 - headless validation parity;
 - reduced Maya API coupling.
 
+## v0.6 subsystems
+
+### Geometry validation
+
+Geometry checks extend the snapshot-first model beyond materials:
+
+- Maya scanner and enrichment populate `ShapeSnapshot` entries on `GraphSnapshot`.
+- Rules in `rules/common/geometry_polycount.json` and `rules/common/duplicate_geometry.json` use `scope: geometry`.
+- Check types `duplicate_geometry` and `duplicate_geometry_scan_budget` live in `core/rule_schema.py`; large scenes honor a scan budget with truncated evidence.
+- Asset-class profile overlays (`asset_class_hero`, `asset_class_prop`, `asset_class_background`) tighten polycount thresholds per tier.
+
+Geometry failures participate in the same severity, blocking, waiver, and report flows as material rules.
+
+### Machine readiness
+
+The **Readiness** panel tab validates workstation prerequisites before Technical Artists publish or submit to farm:
+
+```text
+studio_config.readiness.checks
+  -> integrations/readiness/engine.py (run_readiness_checks)
+  -> integrations/readiness/probes.py (Maya plugins, drives, env, paths, software)
+  -> Readiness tab UI (readiness_tab.py)
+  -> optional notification connectors (sysadmin / support escalation)
+```
+
+Readiness is Maya-adjacent (live probes) but configuration-driven and testable with injected probes. It does not mutate the scene.
+
+### Role governance
+
+`core/governance.py` exposes `PermissionResolver`, which resolves an effective pipeline role from studio policy, tracker env mapping, user preference, or default, then enforces a capability matrix:
+
+| Capability | Typical gate |
+| --- | --- |
+| `apply_risky_fixes` | High-risk fix apply, CLI `--allow-high-risk` |
+| `submit_farm` | Farm tab **Submit to Farm** |
+| `manage_rules` | Extra rule paths, CLI `--extra-rules` |
+| `edit_studio_settings` / `edit_connectors` | Settings **Save Studio Config** |
+
+Denied actions return a human-readable reason with effective role and role source. See [ADR 0008](adr/0008-role-based-governance-foundation.md) and [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md#governance-and-role-assignment-v06).
+
 ## Package Layout
 
 Target structure:
@@ -165,7 +212,8 @@ src/pipeline_inspector/
 │   ├── fix_plan.py
 │   ├── reports.py
 │   ├── manifest.py
-│   └── diff.py
+│   ├── diff.py
+│   └── governance.py          # PermissionResolver (v0.6)
 ├── maya/
 │   ├── scanner.py
 │   ├── snapshot_enrichment.py
@@ -174,21 +222,28 @@ src/pipeline_inspector/
 │   ├── selection.py
 │   ├── fix_applier.py
 │   ├── reference_safety.py
+│   ├── readiness_actions.py   # Readiness tab Maya hooks (v0.6)
 │   ├── ui_launcher.py
 │   └── commands.py
 ├── ui/
 │   ├── main_window.py
+│   ├── readiness_tab.py       # Machine Readiness tab (v0.6)
 │   ├── models.py
 │   ├── delegates.py
 │   ├── widgets.py
 │   └── styles.qss
+├── integrations/
+│   ├── readiness/             # Probe engine + installed software checks
+│   ├── deadline/
+│   ├── trackers/
+│   └── update/
 ├── adapters/
 │   ├── base.py
 │   ├── common_maya.py
 │   ├── vray.py
 │   └── arnold.py
 ├── rules/
-│   ├── common/
+│   ├── common/                # includes geometry_polycount, duplicate_geometry
 │   ├── vray/
 │   ├── arnold/
 │   └── profiles/
@@ -233,6 +288,7 @@ Expected contents:
 - connections;
 - materials;
 - shading engines;
+- shapes and geometry metadata (v0.6+);
 - file dependencies;
 - references;
 - scan scope.

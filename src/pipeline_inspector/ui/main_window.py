@@ -36,6 +36,10 @@ PANEL_HEADER_OBJECT_NAME = "pipelineInspectorPanelHeader"
 PANEL_HEADER_TITLE_OBJECT_NAME = "pipelineInspectorPanelHeaderTitle"
 PANEL_HEADER_UNSAVED_OBJECT_NAME = "pipelineInspectorPanelHeaderUnsaved"
 SETTINGS_GEAR_BUTTON_OBJECT_NAME = "pipelineInspectorSettingsGearButton"
+DETACH_PANEL_BUTTON_OBJECT_NAME = "pipelineInspectorDetachPanelButton"
+DOCK_PANEL_BUTTON_OBJECT_NAME = "pipelineInspectorDockPanelButton"
+DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME = "pipelineInspectorDockPanelMicroButton"
+DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME = "pipelineInspectorDetachPanelMicroButton"
 DOCUMENTATION_BUTTON_OBJECT_NAME = "pipelineInspectorDocumentationButton"
 REPORT_BUG_BUTTON_OBJECT_NAME = "pipelineInspectorReportBugButton"
 CHECK_FOR_UPDATES_BUTTON_OBJECT_NAME = "pipelineInspectorCheckForUpdatesButton"
@@ -45,6 +49,12 @@ SUMMARY_PROFILE_ROW_OBJECT_NAME = "pipelineInspectorSummaryProfileRow"
 VALIDATE_ACTION_OVERFLOW_BUTTON_OBJECT_NAME = "pipelineInspectorValidateActionOverflowButton"
 VALIDATE_ACTION_BAR_SEPARATOR_OBJECT_NAME = "pipelineInspectorValidateActionBarSeparator"
 SETTINGS_GEAR_TOOLTIP = "Open settings"
+DETACH_PANEL_BUTTON_TOOLTIP = (
+    "Detach the panel into a floating window that you can move freely."
+)
+DOCK_PANEL_BUTTON_TOOLTIP = (
+    "Dock the panel back to the default position on the right of the Maya window."
+)
 DOCUMENTATION_BUTTON_TOOLTIP = "Open Pipeline Inspector documentation in your browser."
 REPORT_BUG_BUTTON_TOOLTIP = (
     "Report a bug in Pipeline Inspector to the plugin maintainers. "
@@ -267,6 +277,8 @@ class PanelNavigationCallbacks:
     on_open_documentation: Optional[Callable[[], None]] = None
     on_report_bug: Optional[Callable[[], None]] = None
     on_check_for_updates: Optional[Callable[[], None]] = None
+    on_detach_panel: Optional[Callable[[], None]] = None
+    on_dock_panel: Optional[Callable[[], None]] = None
 
 
 @dataclass(frozen=True)
@@ -422,6 +434,24 @@ def build_panel_header(
         connect(navigation_callbacks.on_open_settings)
     row_layout.addWidget(gear_button)
 
+    dock_button = _compact_button(
+        qt_widgets,
+        "Dock",
+        DOCK_PANEL_BUTTON_OBJECT_NAME,
+        DOCK_PANEL_BUTTON_TOOLTIP,
+        navigation_callbacks.on_dock_panel,
+    )
+    row_layout.addWidget(dock_button)
+
+    detach_button = _compact_button(
+        qt_widgets,
+        "Detach",
+        DETACH_PANEL_BUTTON_OBJECT_NAME,
+        DETACH_PANEL_BUTTON_TOOLTIP,
+        navigation_callbacks.on_detach_panel,
+    )
+    row_layout.addWidget(detach_button)
+
     title_label = qt_widgets.QLabel(f"{PANEL_TITLE}  v{version}")
     title_label.setObjectName(PANEL_HEADER_TITLE_OBJECT_NAME)
     set_style = getattr(title_label, "setStyleSheet", None)
@@ -439,6 +469,25 @@ def build_panel_header(
         set_unsaved_visible(False)
     row_layout.addWidget(unsaved_label, 0)
     row_layout.addStretch(1)
+
+    row_layout.addWidget(
+        _micro_panel_header_button(
+            qt_widgets,
+            "\u229e",
+            DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME,
+            DOCK_PANEL_BUTTON_TOOLTIP,
+            navigation_callbacks.on_dock_panel,
+        )
+    )
+    row_layout.addWidget(
+        _micro_panel_header_button(
+            qt_widgets,
+            "\u2922",
+            DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME,
+            DETACH_PANEL_BUTTON_TOOLTIP,
+            navigation_callbacks.on_detach_panel,
+        )
+    )
 
     docs_button = _compact_button(
         qt_widgets,
@@ -1098,25 +1147,51 @@ def update_severity_count_indicators(
             )
 
 
+def format_block_status_label(
+    *,
+    label: str,
+    blocked: bool,
+    blocker_count: int = 0,
+) -> str:
+    text = f"{label}: {_yes_no(blocked)}"
+    if blocked and blocker_count > 0:
+        text += f" ({blocker_count})"
+    return text
+
+
 def update_block_status_indicators(
     content: Any,
     qt_widgets: Any,
     *,
     block_publish: bool,
     block_deadline: bool,
+    publish_blocker_count: int = 0,
+    deadline_blocker_count: int = 0,
 ) -> None:
     """Update publish/deadline block labels and lamps after validation."""
 
     publish_label = _find_child_widget(content, qt_widgets, PUBLISH_BLOCK_LABEL_OBJECT_NAME)
     if publish_label is not None:
-        publish_label.setText(f"Publish Block: {_yes_no(block_publish)}")
+        publish_label.setText(
+            format_block_status_label(
+                label="Publish Block",
+                blocked=block_publish,
+                blocker_count=publish_blocker_count,
+            )
+        )
     publish_lamp = _find_child_widget(content, qt_widgets, PUBLISH_BLOCK_LAMP_OBJECT_NAME)
     if publish_lamp is not None:
         _apply_block_lamp_style(publish_lamp, block_publish)
 
     deadline_label = _find_child_widget(content, qt_widgets, DEADLINE_BLOCK_LABEL_OBJECT_NAME)
     if deadline_label is not None:
-        deadline_label.setText(f"Deadline Block: {_yes_no(block_deadline)}")
+        deadline_label.setText(
+            format_block_status_label(
+                label="Deadline Block",
+                blocked=block_deadline,
+                blocker_count=deadline_blocker_count,
+            )
+        )
     deadline_lamp = _find_child_widget(content, qt_widgets, DEADLINE_BLOCK_LAMP_OBJECT_NAME)
     if deadline_lamp is not None:
         _apply_block_lamp_style(deadline_lamp, block_deadline)
@@ -2018,6 +2093,35 @@ def apply_density_tokens(content: Any, qt_widgets: Any, tokens: Any) -> None:
     _apply_validate_issues_pane_layout(content, qt_widgets, tokens)
     _apply_validate_sticky_chrome_spacing(content, qt_widgets, tokens)
     _apply_panel_shell_width(content, qt_widgets, tokens)
+    _log_panel_header_layout_debug(content, qt_widgets, tokens)
+
+
+def _log_panel_header_layout_debug(content: Any, qt_widgets: Any, tokens: Any) -> None:
+    # #region agent log
+    from pipeline_inspector.util.debug_log import debug_log_enabled, write_agent_cycle_log
+
+    if not debug_log_enabled():
+        return
+
+    header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
+    if header is None:
+        return
+    maximum_height = getattr(header, "maximumHeight", None)
+    size_policy = getattr(header, "sizePolicy", None)
+    write_agent_cycle_log(
+        "main_window.py:apply_density_tokens",
+        "panel header layout after density apply",
+        {
+            "panel_header_max_height_token": tokens.panel_header_max_height,
+            "header_maximum_height": maximum_height() if callable(maximum_height) else "",
+            "header_size_policy": str(size_policy() if callable(size_policy) else size_policy),
+            "header_has_stylesheet": bool(tokens.panel_header_chrome_stylesheet),
+            "main_tab_has_stylesheet": bool(tokens.main_tab_chrome_stylesheet),
+        },
+        hypothesis_id="H1",
+        run_id="post-fix",
+    )
+    # #endregion
 
 
 def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2052,6 +2156,28 @@ def _apply_panel_header_density(content: Any, qt_widgets: Any, tokens: Any) -> N
         set_visible = getattr(overflow, "setVisible", None)
         if set_visible is not None:
             set_visible(tokens.panel_header_overflow)
+
+    for full_object_name, micro_object_name in (
+        (DOCK_PANEL_BUTTON_OBJECT_NAME, DOCK_PANEL_MICRO_BUTTON_OBJECT_NAME),
+        (DETACH_PANEL_BUTTON_OBJECT_NAME, DETACH_PANEL_MICRO_BUTTON_OBJECT_NAME),
+    ):
+        full_button = _find_child_widget(header, qt_widgets, full_object_name)
+        micro_button = _find_child_widget(header, qt_widgets, micro_object_name)
+        if full_button is not None:
+            set_visible = getattr(full_button, "setVisible", None)
+            if set_visible is not None:
+                set_visible(not tokens.panel_header_overflow)
+        if micro_button is not None:
+            set_visible = getattr(micro_button, "setVisible", None)
+            if set_visible is not None:
+                set_visible(tokens.panel_header_overflow)
+            if tokens.panel_header_max_height is not None:
+                set_fixed_height = getattr(micro_button, "setFixedHeight", None)
+                if set_fixed_height is not None:
+                    set_fixed_height(tokens.panel_header_max_height)
+                set_fixed_width = getattr(micro_button, "setFixedWidth", None)
+                if set_fixed_width is not None:
+                    set_fixed_width(tokens.panel_header_max_height)
 
     header_layout = _widget_layout(header)
     if header_layout is not None:
@@ -2604,28 +2730,31 @@ def _apply_widget_width_constraint(
     widget: Any,
     max_width: int | None,
     size_policy: Any | None,
+    *,
+    vertical_policy: str = "expanding",
 ) -> None:
     """Clamp a widget to a compact panel width or restore the Qt default."""
 
     set_max_width = getattr(widget, "setMaximumWidth", None)
     set_policy = getattr(widget, "setSizePolicy", None)
+    preferred = getattr(size_policy, "Preferred", None) if size_policy is not None else None
+    vertical = None
+    if size_policy is not None:
+        if vertical_policy == "fixed":
+            vertical = getattr(size_policy, "Fixed", None)
+        else:
+            vertical = getattr(size_policy, "Expanding", None)
     if max_width is None:
         if set_max_width is not None:
             set_max_width(_QT_WIDGETSIZE_MAX)
-        if size_policy is not None and set_policy is not None:
-            preferred = getattr(size_policy, "Preferred", None)
-            expanding = getattr(size_policy, "Expanding", None)
-            if preferred is not None and expanding is not None:
-                set_policy(preferred, expanding)
+        if preferred is not None and vertical is not None and set_policy is not None:
+            set_policy(preferred, vertical)
         return
 
     if set_max_width is not None:
         set_max_width(max_width)
-    if size_policy is not None and set_policy is not None:
-        maximum = getattr(size_policy, "Maximum", None)
-        expanding = getattr(size_policy, "Expanding", None)
-        if maximum is not None and expanding is not None:
-            set_policy(maximum, expanding)
+    if preferred is not None and vertical is not None and set_policy is not None:
+        set_policy(preferred, vertical)
 
 
 def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None:
@@ -2640,7 +2769,6 @@ def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None
         SUMMARY_HEADER_OBJECT_NAME,
         ISSUES_TABLE_WIDGET_OBJECT_NAME,
         DETAILS_PANEL_OBJECT_NAME,
-        PANEL_HEADER_OBJECT_NAME,
     ):
         widget = _find_child_widget(content, qt_widgets, object_name)
         if widget is not None:
@@ -2649,12 +2777,16 @@ def _apply_panel_shell_width(content: Any, qt_widgets: Any, tokens: Any) -> None
     for target in targets:
         _apply_widget_width_constraint(target, tokens.panel_max_width, size_policy)
 
-    dock = getattr(content, "_pipeline_inspector_dock", None)
-    if dock is not None:
-        _apply_widget_width_constraint(dock, tokens.panel_max_width, size_policy)
-        adjust_size = getattr(dock, "adjustSize", None)
-        if adjust_size is not None and tokens.panel_max_width is not None:
-            adjust_size()
+    header = _find_child_widget(content, qt_widgets, PANEL_HEADER_OBJECT_NAME)
+    if header is not None:
+        _apply_widget_width_constraint(
+            header,
+            tokens.panel_max_width,
+            size_policy,
+            vertical_policy="fixed",
+        )
+
+    # Keep the Maya dock shell QWidget flexible so users can undock and move it.
 
 
 
@@ -2827,6 +2959,34 @@ def _walk_widget_tree(root: Any) -> list[Any]:
         discovered.append(current)
         stack.extend(_widget_children(current))
     return discovered
+
+
+def _micro_panel_header_button(
+    qt_widgets: Any,
+    label: str,
+    object_name: str,
+    tooltip: str,
+    callback: Optional[Callable[[], None]],
+) -> Any:
+    """Build a tooltip-only micro header control for compact panel width."""
+
+    button = qt_widgets.QPushButton(label)
+    button.setObjectName(object_name)
+    set_tooltip = getattr(button, "setToolTip", None)
+    if set_tooltip is not None:
+        set_tooltip(tooltip)
+    set_fixed_width = getattr(button, "setFixedWidth", None)
+    if set_fixed_width is not None:
+        set_fixed_width(22)
+    set_visible = getattr(button, "setVisible", None)
+    if set_visible is not None:
+        set_visible(False)
+    size_policy = getattr(qt_widgets, "QSizePolicy", None)
+    policy = getattr(button, "setSizePolicy", None)
+    if size_policy is not None and policy is not None:
+        policy(size_policy.Preferred, size_policy.Fixed)
+    _connect_button(button, callback)
+    return button
 
 
 def _compact_button(

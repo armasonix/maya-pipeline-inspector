@@ -1,5 +1,9 @@
 # Slack notifications
 
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD  
+**Related:** [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md) · [ADR 0007](../adr/0007-settings-and-connectors-architecture.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
+
 Pipeline Inspector can post validation summaries to Slack using **incoming webhooks** with **severity routing**:
 
 - **Publish block** events route to `connectors.slack.publish_webhook_url`

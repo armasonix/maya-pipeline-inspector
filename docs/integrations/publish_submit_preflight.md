@@ -1,5 +1,9 @@
 # Publish submit preflight example
 
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD  
+**Related:** [USER_GUIDE.md](../USER_GUIDE.md#publish-preflight) · [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
+
 This integration example shows how to run Maya Pipeline Inspector before an
 asset or shading publish is committed to the pipeline.
 

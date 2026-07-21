@@ -105,7 +105,7 @@
       "id": "studio.naming.texture.pattern",
       "name": "Texture node name must match studio naming template",
       "enabled": true,
-      "renderer": ["common", "vray", "arnold"],
+      "renderer": ["common", "vray", "arnold", "usd"],
       "scope": "node",
       "severity": "warning",
       "owner": "shader_td",
@@ -142,6 +142,31 @@
       "check": {
         "type": "name_matches",
         "object_type": "shading_engine"
+      },
+      "policy": {
+        "block_publish": false,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "studio.naming.camera.pattern",
+      "name": "Camera name must match studio naming template",
+      "enabled": true,
+      "renderer": ["common", "vray", "arnold"],
+      "scope": "shape",
+      "severity": "warning",
+      "owner": "layout_td",
+      "message": "Camera name does not match the studio naming template.",
+      "why": "Consistent camera naming keeps shot exports, farm renders, and playblast automation aligned with studio manifests.",
+      "match": {
+        "object_type": "camera"
+      },
+      "check": {
+        "type": "name_matches",
+        "object_type": "camera"
       },
       "policy": {
         "block_publish": false,

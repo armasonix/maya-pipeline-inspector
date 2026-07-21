@@ -14,6 +14,7 @@ def test_settings_tab_specs_include_v05_tabs():
         "Connectors",
         "Studio",
         "Studio Environment",
+        "Render",
         "Bug Report",
     )
 

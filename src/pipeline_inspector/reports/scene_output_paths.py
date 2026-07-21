@@ -1,8 +1,6 @@
 """Organized scene-adjacent output paths for Pipeline Inspector exports."""
 from __future__ import annotations
 
-import json
-import time
 from pathlib import Path
 
 REPORTS_DIR_NAME = "reports"
@@ -130,17 +128,6 @@ def resolve_existing_farm_html_report_path(scene_path: str | Path | None) -> Pat
 
 
 def _debug_log(location: str, message: str, data: dict[str, str], *, hypothesis_id: str) -> None:
-    try:
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

@@ -36,6 +36,8 @@ on:
       - "native/**"
       - "tests/integration/**"
       - "examples/deadline/**"
+      - "examples/vray_policy/**"
+      - "examples/arnold_policy/**"
       - "examples/broken_scene/**"
       - ".github/workflows/maya-integration.yml"
       - "tools/ci/**"
@@ -61,7 +63,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
 
     env:
-      DEMO_SCENE: examples/broken_scene/pipeline_inspector_demo_broken_headless.ma
+      DEMO_SCENE: examples/vray_policy/vray_policy_scene.ma
       DEADLINE_PROFILE: src/pipeline_inspector/rules/profiles/deadline_critical.json
 
     steps:

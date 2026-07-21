@@ -19,7 +19,7 @@ Local reports go to `_cli_test_out/` or `_parity_out/` (gitignored).
 export REPO="/d/Workspace/portfolio/maya-pipeline-inspector"
 export OUT="$REPO/_cli_test_out"
 export MAYAPY="/c/Program Files/Autodesk/Maya2024/bin/mayapy.exe"
-export SCENE="$REPO/examples/broken_scene/pipeline_inspector_demo_broken_headless.ma"
+export SCENE="$REPO/examples/vray_policy/vray_policy_scene.ma"
 cd "$REPO" && mkdir -p "$OUT"
 ```
 
@@ -63,7 +63,7 @@ python -c "from pipeline_inspector.util.paths import resolve_cli_path; import js
 $REPO = "D:\Workspace\portfolio\maya-pipeline-inspector"
 $OUT = Join-Path $REPO "_cli_test_out"
 $MAYAPY = "C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe"
-$SCENE = Join-Path $REPO "examples\broken_scene\pipeline_inspector_demo_broken_headless.ma"
+$SCENE = Join-Path $REPO "examples\vray_policy\vray_policy_scene.ma"
 Set-Location $REPO; New-Item -ItemType Directory -Force -Path $OUT | Out-Null
 ```
 
@@ -87,7 +87,7 @@ Use the same scene in Maya UI and CLI. Export GUI JSON reports to `_parity_out/`
 
 ```bash
 mkdir -p _parity_out
-export SCENE="$REPO/examples/broken_scene/pipeline_inspector_demo_broken_headless.ma"
+export SCENE="$REPO/examples/vray_policy/vray_policy_scene.ma"
 ```
 
 **S1 — `publish_strict`, no asset class**

@@ -1,6 +1,8 @@
 """Safe auto-fix planning for validation results."""
 from __future__ import annotations
 
+import glob
+import os
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -8,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.core.models import (
+    FileDependencySnapshot,
     GraphSnapshot,
     MaterialSnapshot,
     NodeSnapshot,
@@ -24,9 +27,13 @@ from pipeline_inspector.util.paths import (
     effective_studio_normalize_target,
     normalize_path_to_studio_tokens,
     replace_path_prefix,
+    resolve_authored_absolute_path,
+    resolve_studio_path,
     studio_environment_is_configured,
     studio_normalize_prefixes,
 )
+
+_DEBUG_LOG = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
 
 JsonDict = dict[str, Any]
 JsonValue = Any
@@ -50,6 +57,7 @@ UNDO_SUPPORTED_FIX_TYPES = frozenset(
         "normalize_path",
         "disable_feature",
         "rename_node",
+        "set_default_prim",
     }
 )
 NAMING_FIX_TYPE = "rename_node"
@@ -210,11 +218,21 @@ def apply_fix_availability(
 ) -> list[RuleResult]:
     """Mark validation results auto-fixable when the fix planner produced an action."""
 
-    available_keys = {
-        (action.rule_id, action.target_id)
-        for action in fix_plan.actions
-        if not action.blocked
-    }
+    available_keys: set[tuple[str, str]] = set()
+    for action in fix_plan.actions:
+        if action.blocked:
+            continue
+        available_keys.add((action.rule_id, action.target_id))
+        target_id = str(action.target_id or "")
+        if target_id.startswith("prim:"):
+            prim_path = target_id.removeprefix("prim:")
+            available_keys.add((action.rule_id, prim_path))
+            available_keys.add((action.rule_id, f"prim:{prim_path.lstrip('/')}"))
+        resolved = action.params.get("resolved_prim_path")
+        if isinstance(resolved, str) and resolved.strip():
+            normalized = resolved if resolved.startswith("/") else f"/{resolved.lstrip('/')}"
+            available_keys.add((action.rule_id, f"prim:{normalized}"))
+            available_keys.add((action.rule_id, normalized))
     enriched: list[RuleResult] = []
     for result in results:
         key = (result.rule_id, result.target_id)
@@ -294,6 +312,12 @@ def _build_naming_action(
         "low",
         fix_type=NAMING_FIX_TYPE,
     )
+    target_id, target_node, action_params = _usd_prim_fix_fields(
+        result,
+        node,
+        target_node=target_node,
+        base_params={"pattern": pattern, "object_type": object_type},
+    )
 
     return FixAction(
         fix_id=_fix_id(result, NAMING_FIX_TYPE),
@@ -302,7 +326,7 @@ def _build_naming_action(
         fix_type=NAMING_FIX_TYPE,
         risk="low",
         target_kind=result.target_kind,
-        target_id=result.target_id,
+        target_id=target_id,
         target_node=target_node,
         before_value=rename_before,
         after_value=proposed_name,
@@ -315,7 +339,7 @@ def _build_naming_action(
         undo_supported=True,
         blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
-        params={"pattern": pattern, "object_type": object_type},
+        params=action_params,
     )
 
 
@@ -406,7 +430,7 @@ def _build_texture_file_naming_action(
     node_index: _NodeIndex,
     pattern: str,
 ) -> Optional[FixAction]:
-    dependency = node_index.file_dependency(result.target_id)
+    dependency = node_index.file_dependency_for_result(result)
     raw_path = dependency.raw_path if dependency is not None else None
     if not raw_path:
         return None
@@ -424,11 +448,61 @@ def _build_texture_file_naming_action(
     node = node_index.find(result)
     target_node = _target_node_name(result, node)
     block_reasons = _block_reasons(node, "low")
-    if dependency is not None and not dependency.exists:
+    resolved_before = node_index.resolved_texture_path(
+        result.target_id,
+        str(result.plug or "") or None,
+    )
+    if resolved_before is None and dependency is not None:
+        resolved_before = dependency.resolved_path or raw_path
+    source_exists = _rename_texture_source_exists(
+        node_index,
+        result.target_id,
+        dependency,
+        resolved_before,
+        raw_after=proposed_path,
+    )
+    if dependency is not None and not source_exists:
         block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
-    if dependency is not None and dependency.is_udim and not dependency.exists:
-        block_reasons.append(TEXTURE_FILE_MISSING_BLOCK_REASON)
+    # #region agent log
+    _debug_texture_rename_log(
+        "fix_plan._build_texture_file_naming_action",
+        "Texture rename plan decision",
+        {
+            "target_id": result.target_id,
+            "target_node": target_node,
+            "dependency_exists": dependency.exists if dependency is not None else "",
+            "raw_path": raw_path,
+            "raw_after": proposed_path,
+            "resolved_before": resolved_before or "",
+            "source_exists": source_exists,
+            "destination_exists": texture_path_resolves_on_disk(
+                proposed_path,
+                is_udim=bool(dependency.is_udim) if dependency is not None else False,
+                studio_environment=node_index.studio_environment,
+                usd_anchor_dir=node_index.usd_anchor_dir
+                if str(result.target_id).startswith("prim:")
+                else None,
+                scene_path=node_index.scene_path,
+            ),
+            "blocked": bool(hard_block_reasons(block_reasons)),
+            "block_reasons": "|".join(block_reasons),
+        },
+        hypothesis_id="H18",
+    )
+    # #endregion
 
+    target_id, target_node, action_params = _usd_prim_fix_fields(
+        result,
+        node,
+        target_node=target_node,
+        base_params={
+            "pattern": pattern,
+            "node_name_before": result.node or texture_filename_stem(raw_path),
+            "node_name_after": proposed_node,
+            "resolved_before": resolved_before or raw_path,
+            "is_udim": bool(dependency.is_udim) if dependency else False,
+        },
+    )
 
     return FixAction(
         fix_id=_fix_id(result, TEXTURE_FILE_FIX_TYPE),
@@ -437,7 +511,7 @@ def _build_texture_file_naming_action(
         fix_type=TEXTURE_FILE_FIX_TYPE,
         risk="medium",
         target_kind=result.target_kind,
-        target_id=result.target_id,
+        target_id=target_id,
         target_node=target_node,
         target_attr=dependency.attr if dependency else "fileTextureName",
         before_value=raw_path,
@@ -454,13 +528,7 @@ def _build_texture_file_naming_action(
         undo_supported=False,
         blocked=bool(hard_block_reasons(block_reasons)),
         block_reasons=block_reasons,
-        params={
-            "pattern": pattern,
-            "node_name_before": result.node or texture_filename_stem(raw_path),
-            "node_name_after": proposed_node,
-            "resolved_before": dependency.resolved_path if dependency else raw_path,
-            "is_udim": bool(dependency.is_udim) if dependency else False,
-        },
+        params=action_params,
     )
 
 
@@ -474,6 +542,11 @@ def _build_action(
     target_node = _target_node_name(result, node)
     target_attr = _target_attr(result, rule.fix.params)
     fix_type = rule.fix.type
+    if fix_type == "set_attr" and target_attr == "colorSpace":
+        usd_node = node_index.find_usd_shader_for_result(result)
+        if usd_node is not None:
+            node = usd_node
+            target_node = _target_node_name(result, usd_node)
     before_value = _before_value(result, node_index, fix_type)
     after_value = _after_value(
         result,
@@ -499,6 +572,29 @@ def _build_action(
     ):
         params["studio_environment"] = node_index.studio_environment.to_dict()
 
+    target_id, target_node, params = _usd_prim_fix_fields(
+        result,
+        node,
+        target_node=target_node,
+        base_params=params,
+    )
+    if fix_type == "normalize_path":
+        dependency = node_index.file_dependency_for_result(result)
+        if _normalize_path_should_use_udim_token(
+            dependency,
+            node,
+            str(before_value or ""),
+        ):
+            params["is_udim"] = True
+    if fix_type in {"normalize_path", "relink_path", "rename_texture_file"}:
+        resolved_after = resolve_authored_absolute_path(
+            str(after_value or ""),
+            studio_environment=node_index.studio_environment,
+            fallback_absolute=str(before_value or ""),
+        )
+        if resolved_after:
+            params["resolved_after"] = resolved_after
+
     return FixAction(
         fix_id=_fix_id(result, rule.fix.type),
         rule_id=rule.id,
@@ -506,7 +602,7 @@ def _build_action(
         fix_type=rule.fix.type,
         risk=rule.fix.risk,
         target_kind=result.target_kind,
-        target_id=result.target_id,
+        target_id=target_id,
         target_node=target_node,
         target_attr=target_attr,
         before_value=before_value,
@@ -524,6 +620,9 @@ def _build_action(
     )
 
 def _target_attr(result: RuleResult, fix_params: Mapping[str, Any]) -> Optional[str]:
+    plug = str(result.plug or "").strip()
+    if plug:
+        return plug
     attr = fix_params.get("attribute")
     if attr:
         return str(attr)
@@ -535,7 +634,7 @@ def _before_value(
     fix_type: str,
 ) -> JsonValue:
     if fix_type in {"relink_path", "normalize_path"}:
-        dependency_path = node_index.file_dependency_path(result.target_id)
+        dependency_path = node_index.file_dependency_path_for_result(result)
         if dependency_path:
             return dependency_path
     return result.current_value
@@ -552,7 +651,9 @@ def _after_value(
         if isinstance(explicit_path, str) and explicit_path.strip():
             return explicit_path.strip()
         dependency_path = (
-            node_index.file_dependency_path(result.target_id) if node_index is not None else None
+            node_index.file_dependency_path_for_result(result)
+            if node_index is not None
+            else None
         )
         if dependency_path and result.current_value and result.expected_value:
             relinked = swap_texture_version_in_path(
@@ -564,11 +665,24 @@ def _after_value(
                 return relinked
     if fix_type == "normalize_path":
         dependency_path = (
-            node_index.file_dependency_path(result.target_id) if node_index is not None else None
+            node_index.file_dependency_path_for_result(result)
+            if node_index is not None
+            else None
         )
         before_path = str(dependency_path or result.current_value or "")
+        dependency = (
+            node_index.file_dependency_for_result(result)
+            if node_index is not None
+            else None
+        )
+        node = node_index.find(result) if node_index is not None else None
+        normalize_source = before_path.replace("\\", "/")
+        if _normalize_path_should_use_udim_token(dependency, node, normalize_source):
+            from pipeline_inspector.util.paths import normalize_udim_tile_token_in_path
+
+            normalize_source = normalize_udim_tile_token_in_path(normalize_source)
         normalized = resolve_normalize_path_value(
-            before_path,
+            normalize_source,
             fix_params,
             scene_path=node_index.scene_path if node_index is not None else "",
             studio_environment=(
@@ -576,16 +690,75 @@ def _after_value(
             ),
         )
         if normalized is not None:
+            if node_index is not None and node_index.studio_environment is not None:
+                if str(result.target_id).startswith("prim:"):
+                    from pathlib import Path
+
+                    from pipeline_inspector.util.paths import (
+                        author_usd_asset_path,
+                        normalize_path_to_studio_tokens,
+                    )
+
+                    tokenized = normalize_path_to_studio_tokens(
+                        before_path,
+                        node_index.studio_environment,
+                    )
+                    if tokenized is not None:
+                        return tokenized.replace("\\", "/")
+                    normalized_text = str(normalized).replace("\\", "/")
+                    if "$" in normalized_text:
+                        return normalized_text
+                    anchor = node_index.usd_anchor_dir or Path(
+                        node_index.scene_path or "."
+                    ).parent
+                    return author_usd_asset_path(
+                        normalized,
+                        anchor_dir=anchor,
+                        studio_environment=node_index.studio_environment,
+                        fallback_absolute=before_path,
+                    )
+                from pipeline_inspector.util.paths import author_maya_texture_path_for_fix
+
+                return author_maya_texture_path_for_fix(
+                    normalized,
+                    scene_path=node_index.scene_path,
+                    studio_environment=node_index.studio_environment,
+                    fallback_absolute=before_path,
+                ).replace("\\", "/")
             return normalized
     if fix_type == "disable_feature":
         if "value" in fix_params:
             return fix_params["value"]
         return False
+    if fix_type == "set_default_prim":
+        value_from = fix_params.get("value_from")
+        if isinstance(value_from, str) and node_index is not None:
+            nested = _read_snapshot_value(node_index.snapshot, value_from)
+            if nested:
+                return nested
     if "value" in fix_params:
         return fix_params["value"]
     if "path" in fix_params:
         return fix_params["path"]
     return result.expected_value
+
+
+_UDIM_MODE_VALUES = {3, "3", "UDIM", "udim", "Mari", "mari"}
+
+
+def _normalize_path_should_use_udim_token(
+    dependency: Optional[FileDependencySnapshot | _FileDependencyRef],
+    node: Optional[NodeSnapshot],
+    raw_path: str,
+) -> bool:
+    if dependency is not None and dependency.is_udim:
+        return True
+    if "<UDIM>" in str(raw_path or "") or "<udim>" in str(raw_path or ""):
+        return True
+    if node is None:
+        return False
+    return node.attrs.get("uvTilingMode") in _UDIM_MODE_VALUES
+
 
 def swap_texture_version_in_path(
     path: str,
@@ -632,6 +805,31 @@ def _target_node_name(result: RuleResult, node: Optional[NodeSnapshot]) -> str:
     if node is not None:
         return node.full_name or node.name or node.id
     return result.node or result.target_id
+
+
+def _usd_prim_fix_fields(
+    result: RuleResult,
+    node: Optional[NodeSnapshot],
+    *,
+    target_node: str,
+    base_params: dict[str, Any],
+) -> tuple[str, str, dict[str, Any]]:
+    """Prefer full USD prim paths in fix actions when the snapshot provides them."""
+
+    params = dict(base_params)
+    target_id = result.target_id
+    resolved_target_node = target_node
+    if node is None or not str(node.id).startswith("prim:"):
+        return target_id, resolved_target_node, params
+
+    prim_path = str(node.full_name or node.id.removeprefix("prim:")).strip()
+    if prim_path and not prim_path.startswith("/"):
+        prim_path = f"/{prim_path.lstrip('/')}"
+    if prim_path:
+        params["resolved_prim_path"] = prim_path
+        target_id = f"prim:{prim_path}"
+        resolved_target_node = prim_path
+    return target_id, resolved_target_node, params
 
 def _fix_id(result: RuleResult, fix_type: str) -> str:
     target = result.target_id or result.node or "scene"
@@ -730,7 +928,11 @@ def _is_plannable_path_value(value: JsonValue) -> bool:
 def _is_plannable_normalize(before_value: JsonValue, after_value: JsonValue) -> bool:
     if not _is_plannable_path_value(after_value):
         return False
-    return str(before_value or "").strip() != str(after_value or "").strip()
+    before = str(before_value or "").strip()
+    after = str(after_value or "").strip()
+    if before != after:
+        return True
+    return "$" in before or "$" in after
 
 
 @dataclass(frozen=True)
@@ -750,10 +952,12 @@ class _NodeIndex:
         studio_environment: Optional[StudioEnvironmentSettings] = None,
     ) -> None:
         self.scene_path = snapshot.scene_path or ""
+        self.snapshot = snapshot
         self.studio_environment = studio_environment
+        self.usd_anchor_dir = _usd_anchor_dir(snapshot)
         self._by_key: dict[str, NodeSnapshot] = {}
         self._shapes_by_id: dict[str, ShapeSnapshot] = {}
-        self._file_dependencies: dict[str, _FileDependencyRef] = {}
+        self._file_dependencies: dict[tuple[str, str], _FileDependencyRef] = {}
         for node in snapshot.nodes:
             self._add(node.id, node)
             self._add(node.name, node)
@@ -796,7 +1000,8 @@ class _NodeIndex:
         for dependency in snapshot.file_dependencies:
             raw_path = dependency.raw_path or dependency.resolved_path or ""
             resolved_path = dependency.resolved_path or dependency.raw_path or ""
-            self._file_dependencies[dependency.node_id] = _FileDependencyRef(
+            key = (dependency.node_id, str(dependency.attr or ""))
+            self._file_dependencies[key] = _FileDependencyRef(
                 raw_path=raw_path,
                 resolved_path=resolved_path,
                 attr=dependency.attr,
@@ -804,15 +1009,74 @@ class _NodeIndex:
                 exists=dependency.exists,
             )
 
-    def file_dependency(self, target_id: str) -> Optional[_FileDependencyRef]:
-        return self._file_dependencies.get(str(target_id or ""))
+    def file_dependency(
+        self,
+        target_id: str,
+        attr: str | None = None,
+    ) -> Optional[_FileDependencyRef]:
+        target_id = str(target_id or "")
+        if attr:
+            return self._file_dependencies.get((target_id, str(attr)))
+        matches = [
+            ref
+            for (node_id, _attr), ref in self._file_dependencies.items()
+            if node_id == target_id
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        return None
 
-    def file_dependency_path(self, target_id: str) -> Optional[str]:
-        dependency = self.file_dependency(target_id)
+    def file_dependency_for_result(self, result: RuleResult) -> Optional[_FileDependencyRef]:
+        plug = str(result.plug or "").strip()
+        if plug:
+            dependency = self.file_dependency(result.target_id, plug)
+            if dependency is not None:
+                return dependency
+        return self.file_dependency(result.target_id)
+
+    def file_dependency_path(
+        self,
+        target_id: str,
+        attr: str | None = None,
+    ) -> Optional[str]:
+        dependency = self.file_dependency(target_id, attr)
         if dependency is None:
             return None
         path = dependency.raw_path.strip()
         return path or None
+
+    def file_dependency_path_for_result(self, result: RuleResult) -> Optional[str]:
+        dependency = self.file_dependency_for_result(result)
+        if dependency is None:
+            return None
+        path = dependency.raw_path.strip()
+        return path or None
+
+    def resolved_texture_path(
+        self,
+        target_id: str,
+        attr: str | None = None,
+    ) -> Optional[str]:
+        dependency = self.file_dependency(target_id, attr)
+        if dependency is None:
+            return None
+        candidate = (dependency.resolved_path or dependency.raw_path or "").strip()
+        if not candidate:
+            return None
+        for resolved in _expand_texture_path_candidates(
+            candidate,
+            studio_environment=self.studio_environment,
+            usd_anchor_dir=self.usd_anchor_dir if str(target_id).startswith("prim:") else None,
+            scene_path=self.scene_path,
+            is_udim=dependency.is_udim,
+        ):
+            return resolved.replace("\\", "/")
+        path = Path(candidate)
+        if path.is_absolute():
+            return str(path).replace("\\", "/")
+        scene_dir = Path(self.scene_path).parent if self.scene_path else Path.cwd()
+        resolved_path = (scene_dir / candidate).resolve()
+        return str(resolved_path).replace("\\", "/")
 
     def find(self, result: RuleResult) -> Optional[NodeSnapshot]:
         for key in (result.target_id, result.node):
@@ -820,6 +1084,44 @@ class _NodeIndex:
             if node is not None:
                 return node
         return None
+
+    def find_usd_shader_for_result(self, result: RuleResult) -> Optional[NodeSnapshot]:
+        if str(result.target_id).startswith("prim:"):
+            return self.find(result)
+
+        search_names = {
+            _short_dag_name(str(result.node or "")),
+            _short_dag_name(str(result.target_id or "")),
+        }
+        search_names.discard("")
+
+        prim_candidates: list[NodeSnapshot] = []
+        for node in self.snapshot.nodes:
+            if not str(node.id).startswith("prim:"):
+                continue
+            if node.type_name != "Shader":
+                continue
+            names = {
+                _short_dag_name(str(node.name or "")),
+                _short_dag_name(str(node.full_name or "")),
+            }
+            if search_names.intersection(names):
+                prim_candidates.append(node)
+                continue
+            if result.material and result.material in str(node.full_name or ""):
+                prim_candidates.append(node)
+
+        if not prim_candidates:
+            return None
+        if len(prim_candidates) == 1:
+            return prim_candidates[0]
+        return max(
+            prim_candidates,
+            key=lambda item: (
+                1 if item.attrs.get("colorSpace") else 0,
+                len(str(item.full_name or "")),
+            ),
+        )
 
     def find_shape(self, result: RuleResult) -> Optional[ShapeSnapshot]:
         return self._shapes_by_id.get(str(result.target_id or ""))
@@ -838,3 +1140,167 @@ class _NodeIndex:
         node = self._by_key.get(material.node_id)
         if node is not None:
             self._add(material.name, node)
+
+
+def _read_snapshot_value(snapshot: GraphSnapshot, dotted_path: str) -> Any:
+    from pipeline_inspector.core.rule_schema import _read_nested_value
+
+    return _read_nested_value(snapshot, dotted_path)
+
+
+def _usd_anchor_dir(snapshot: GraphSnapshot) -> Optional[Path]:
+    metadata = snapshot.usd_stage_metadata
+    if metadata is not None and metadata.root_layer:
+        root = Path(str(metadata.root_layer))
+        if root.suffix.casefold() in {".usd", ".usda", ".usdc"} and root.is_file():
+            return root.parent
+    for dependency in snapshot.file_dependencies:
+        if not str(dependency.node_id).startswith("prim:"):
+            continue
+        for candidate in (dependency.resolved_path, dependency.raw_path):
+            if not candidate:
+                continue
+            path = Path(str(candidate))
+            if path.is_absolute() and path.is_file():
+                return path.parent
+            if path.is_absolute() and path.parent.is_dir():
+                return path.parent
+    return None
+
+
+def _rename_texture_source_exists(
+    node_index: _NodeIndex,
+    target_id: str,
+    dependency: Optional[_FileDependencyRef],
+    resolved_before: Optional[str],
+    *,
+    raw_after: Optional[str] = None,
+) -> bool:
+    if dependency is not None and dependency.exists:
+        return True
+    is_udim = bool(dependency.is_udim) if dependency is not None else False
+    usd_anchor = node_index.usd_anchor_dir if str(target_id).startswith("prim:") else None
+    candidates: list[str] = []
+    for value in (
+        resolved_before,
+        node_index.resolved_texture_path(target_id),
+        dependency.resolved_path if dependency is not None else None,
+        dependency.raw_path if dependency is not None else None,
+    ):
+        if value and str(value).strip():
+            candidates.append(str(value).strip())
+    for candidate in candidates:
+        if texture_path_resolves_on_disk(
+            candidate,
+            is_udim=is_udim,
+            studio_environment=node_index.studio_environment,
+            usd_anchor_dir=usd_anchor,
+            scene_path=node_index.scene_path,
+        ):
+            return True
+    return bool(
+        raw_after
+        and texture_path_resolves_on_disk(
+            raw_after,
+            is_udim=is_udim or "<UDIM>" in str(raw_after) or "<udim>" in str(raw_after),
+            studio_environment=node_index.studio_environment,
+            usd_anchor_dir=usd_anchor,
+            scene_path=node_index.scene_path,
+        )
+    )
+
+
+def texture_path_resolves_on_disk(
+    path: str,
+    *,
+    is_udim: bool = False,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
+    usd_anchor_dir: Optional[Path] = None,
+    scene_path: str = "",
+) -> bool:
+    """Return whether a texture path (or UDIM template) resolves to files on disk."""
+
+    return bool(
+        _expand_texture_path_candidates(
+            path,
+            studio_environment=studio_environment,
+            usd_anchor_dir=usd_anchor_dir,
+            scene_path=scene_path,
+            is_udim=is_udim,
+        )
+    )
+
+
+def _expand_texture_path_candidates(
+    candidate: str,
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings],
+    usd_anchor_dir: Optional[Path],
+    scene_path: str,
+    is_udim: bool,
+) -> list[str]:
+    expanded = candidate.replace("\\", "/")
+    if studio_environment is not None:
+        expanded = resolve_studio_path(expanded, studio_environment) or expanded
+    expanded = os.path.expanduser(os.path.expandvars(expanded.replace("\\", "/")))
+    paths: list[str] = []
+    if is_udim or "<UDIM>" in expanded or "<udim>" in expanded:
+        glob_source = expanded
+        if is_udim and "<UDIM>" not in glob_source and "<udim>" not in glob_source:
+            from pipeline_inspector.util.paths import normalize_udim_tile_token_in_path
+
+            glob_source = normalize_udim_tile_token_in_path(glob_source)
+        glob_pattern = (
+            glob_source.replace("<UDIM>", "[0-9][0-9][0-9][0-9]")
+            .replace("<udim>", "[0-9][0-9][0-9][0-9]")
+        )
+        matched = glob.glob(glob_pattern)
+        if matched:
+            paths.append(glob_source)
+        # #region agent log
+        _debug_texture_rename_log(
+            "fix_plan._expand_texture_path_candidates",
+            "UDIM texture resolve",
+            {
+                "candidate": candidate[:160],
+                "expanded": expanded[:160],
+                "glob_source": glob_source[:160],
+                "glob_pattern": glob_pattern[:160],
+                "matched_count": len(matched),
+                "is_udim": is_udim,
+            },
+            hypothesis_id="H-UDIM1",
+        )
+        # #endregion
+        return paths
+    path = Path(expanded.replace("/", os.sep))
+    if path.is_file():
+        paths.append(str(path))
+        return paths
+    if usd_anchor_dir is not None:
+        anchored = (usd_anchor_dir / candidate).resolve()
+        if anchored.is_file():
+            paths.append(str(anchored))
+            return paths
+    if not path.is_absolute() and scene_path:
+        scene_relative = (Path(scene_path).parent / candidate).resolve()
+        if scene_relative.is_file():
+            paths.append(str(scene_relative))
+            return paths
+    if not path.is_absolute() and scene_path:
+        expanded_relative = (Path(scene_path).parent / expanded).resolve()
+        if expanded_relative.is_file():
+            paths.append(str(expanded_relative))
+    return paths
+
+
+def _debug_texture_rename_log(
+    location: str,
+    message: str,
+    data: dict[str, object],
+    *,
+    hypothesis_id: str,
+) -> None:
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

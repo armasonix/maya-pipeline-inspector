@@ -1,0 +1,38 @@
+{
+  "profiles": {
+    "publish_strict": {
+      "failed": [
+        {
+          "rule_id": "usd.stage.default_prim.required",
+          "severity": "error",
+          "block_publish": true,
+          "block_deadline": true
+        },
+        {
+          "rule_id": "usd.mesh.unbound_material.error",
+          "severity": "error",
+          "block_publish": true,
+          "block_deadline": false
+        },
+        {
+          "rule_id": "usd.reference.missing.error",
+          "severity": "critical",
+          "block_publish": true,
+          "block_deadline": true
+        },
+        {
+          "rule_id": "usd.texture.missing",
+          "severity": "critical",
+          "block_publish": true,
+          "block_deadline": true
+        },
+        {
+          "rule_id": "usd.texture.path.local_drive",
+          "severity": "critical",
+          "block_publish": true,
+          "block_deadline": true
+        }
+      ]
+    }
+  }
+}

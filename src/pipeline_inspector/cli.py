@@ -46,6 +46,7 @@ EXIT_CONFIG_ERROR = 4
 INPUT_AUTO = "auto"
 INPUT_SCENE = "scene"
 INPUT_SNAPSHOT = "snapshot"
+INPUT_USD = "usd"
 ASSET_CLASS_ID_HELP = (
     "Optional asset class overlay: asset_class_hero, asset_class_prop, asset_class_background."
 )
@@ -93,10 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
         "validate",
         help="Validate a Maya scene or snapshot.",
     )
-    validate.add_argument("input_path", help="Maya scene path or GraphSnapshot JSON path.")
+    validate.add_argument("input_path", help="Maya scene, USD asset, or GraphSnapshot JSON path.")
     validate.add_argument(
         "--input-kind",
-        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT),
+        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT, INPUT_USD),
         default=INPUT_AUTO,
     )
     validate.add_argument("--report", required=True, help="Output JSON report path.")
@@ -155,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("baseline_manifest", help="Approved baseline manifest JSON path.")
     gate.add_argument(
         "--input-kind",
-        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT),
+        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT, INPUT_USD),
         default=INPUT_AUTO,
     )
     gate.add_argument("--profile", help="Profile JSON path for manifest_diff_policy.")
@@ -175,7 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("--out", required=True, help="Output manifest JSON path.")
     manifest.add_argument(
         "--input-kind",
-        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT),
+        choices=(INPUT_AUTO, INPUT_SCENE, INPUT_SNAPSHOT, INPUT_USD),
         default=INPUT_AUTO,
     )
     manifest.add_argument("--profile", help="Profile JSON path for validation context.")
@@ -188,9 +189,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_studio_config_argument(manifest)
     apply_fixes = subparsers.add_parser(
         "apply-fixes",
-        help="Apply planned fixes to a Maya scene (requires mayapy).",
+        help="Apply planned fixes to a Maya scene or USD asset.",
     )
-    apply_fixes.add_argument("input_path", help="Maya scene path.")
+    apply_fixes.add_argument("input_path", help="Maya scene or USD asset path.")
     apply_fixes.add_argument(
         "--fix-plan",
         help="Fix plan export JSON path. When omitted, fixes are planned from validation.",
@@ -224,6 +225,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Plan fixes without mutating the scene.",
     )
     _add_asset_class_argument(apply_fixes)
+    _add_studio_config_argument(apply_fixes)
     rules = subparsers.add_parser(
         "rules",
         help="Rule pack validation tooling.",
@@ -393,9 +395,10 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
             if not decision.allowed:
                 print(decision.reason, file=sys.stderr)
                 return EXIT_CONFIG_ERROR
-        scene_path = _cli_path(args.input_path)
-        fix_plan = _load_fix_plan_for_scene(
-            scene_path,
+        input_path = _cli_path(args.input_path)
+        studio_config = _studio_config_from_args(args)
+        fix_plan = _load_fix_plan_for_input(
+            input_path,
             profile_id=str(args.profile_id),
             asset_class_id=_asset_class_id_from_args(args),
             profile_path=_optional_path(args.profile),
@@ -407,8 +410,23 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
             _write_apply_report(args.report, report)
             return EXIT_OK
 
+        if _is_usd_input_path(input_path):
+            apply_report = _apply_fixes_in_usd(
+                input_path,
+                selected_actions,
+                studio_environment=(
+                    studio_config.environment if studio_config is not None else None
+                ),
+            )
+            _write_apply_report(args.report, apply_report)
+            if apply_report["failed_count"]:
+                return EXIT_RUNTIME_ERROR
+            if apply_report["blocked_count"] and not apply_report["applied_count"]:
+                return EXIT_PUBLISH_BLOCK
+            return EXIT_OK
+
         apply_report = _apply_fixes_in_scene(
-            scene_path,
+            input_path,
             selected_actions,
             allow_referenced=bool(args.allow_referenced),
             allow_high_risk=bool(args.allow_high_risk),
@@ -416,9 +434,9 @@ def apply_fixes_command(args: argparse.Namespace) -> int:
         _write_apply_report(args.report, apply_report.to_dict())
         audit_path, _ = persist_fix_apply_audit(
             apply_report,
-            scene_path=str(scene_path),
+            scene_path=str(input_path),
             profile_id=str(args.profile_id),
-            audit_sidecar_path=fix_audit_sidecar_path_for_scene(str(scene_path)),
+            audit_sidecar_path=fix_audit_sidecar_path_for_scene(str(input_path)),
         )
         if audit_path is not None:
             print(f"Fix audit appended: {audit_path}")
@@ -562,8 +580,8 @@ def _manifest_gate_policy(
     return profile.manifest_diff_policy
 
 
-def _load_fix_plan_for_scene(
-    scene_path: Path,
+def _load_fix_plan_for_input(
+    input_path: Path,
     *,
     profile_id: str,
     asset_class_id: Optional[str],
@@ -576,15 +594,32 @@ def _load_fix_plan_for_scene(
             raise ValueError("fix plan export must be a JSON object")
         return fix_plan_from_export(payload)
 
-    snapshot = _snapshot_from_scene(scene_path)
+    snapshot = _load_snapshot(input_path, INPUT_AUTO)
     run = run_validation(
         snapshot,
         profile_id=profile_id,
         asset_class_id=asset_class_id,
         profile_path=profile_path,
-        scan_scope="scene",
+        scan_scope=snapshot.scan_scope or "scene",
     )
     return run.fix_plan
+
+
+def _load_fix_plan_for_scene(
+    scene_path: Path,
+    *,
+    profile_id: str,
+    asset_class_id: Optional[str],
+    profile_path: Optional[Path],
+    fix_plan_path: Optional[Path],
+) -> FixPlan:
+    return _load_fix_plan_for_input(
+        scene_path,
+        profile_id=profile_id,
+        asset_class_id=asset_class_id,
+        profile_path=profile_path,
+        fix_plan_path=fix_plan_path,
+    )
 
 
 def _filter_fix_actions(fix_plan: FixPlan, fix_ids: tuple[str, ...]) -> tuple[Any, ...]:
@@ -592,6 +627,50 @@ def _filter_fix_actions(fix_plan: FixPlan, fix_ids: tuple[str, ...]) -> tuple[An
         return tuple(action for action in fix_plan.actions if not action.blocked)
     allowed = {fix_id.strip() for fix_id in fix_ids if fix_id.strip()}
     return tuple(action for action in fix_plan.actions if action.fix_id in allowed)
+
+
+def _apply_fixes_in_usd(
+    usd_path: Path,
+    actions: Sequence[Any],
+    *,
+    studio_environment: Optional[Any] = None,
+) -> dict[str, Any]:
+    from pipeline_inspector.usd.fix_applier import apply_usd_fix_actions
+
+    records = apply_usd_fix_actions(
+        usd_path,
+        list(actions),
+        studio_environment=studio_environment,
+    )
+    applied_count = sum(1 for record in records if record.succeeded)
+    blocked_count = sum(1 for action in actions if action.blocked)
+    failed_count = sum(
+        1 for record in records if not record.succeeded and record.message != "blocked"
+    )
+    return {
+        "dry_run": False,
+        "total": len(records),
+        "applied_count": applied_count,
+        "blocked_count": blocked_count,
+        "failed_count": failed_count,
+        "records": [
+            {
+                "fix_id": record.fix_id,
+                "fix_type": record.fix_type,
+                "target_id": record.target_id,
+                "target_attr": record.target_attr,
+                "before_value": record.before_value,
+                "after_value": record.after_value,
+                "succeeded": record.succeeded,
+                "message": record.message,
+            }
+            for record in records
+        ],
+    }
+
+
+def _is_usd_input_path(path: Path) -> bool:
+    return path.suffix.casefold() in {".usd", ".usda", ".usdc"}
 
 
 def _apply_fixes_in_scene(
@@ -690,13 +769,29 @@ def _load_snapshot(path: Path, input_kind: str) -> GraphSnapshot:
     resolved_kind = _resolve_input_kind(path, input_kind)
     if resolved_kind == INPUT_SNAPSHOT:
         return GraphSnapshot.from_json(path.read_text(encoding="utf-8"))
+    if resolved_kind == INPUT_USD:
+        return _snapshot_from_usd(path)
     return _snapshot_from_scene(path)
 
 
 def _resolve_input_kind(path: Path, input_kind: str) -> str:
     if input_kind != INPUT_AUTO:
         return input_kind
-    return INPUT_SNAPSHOT if path.suffix.casefold() == ".json" else INPUT_SCENE
+    suffix = path.suffix.casefold()
+    if suffix == ".json":
+        return INPUT_SNAPSHOT
+    if suffix in {".usd", ".usda", ".usdc"}:
+        return INPUT_USD
+    return INPUT_SCENE
+
+
+def _snapshot_from_usd(path: Path) -> GraphSnapshot:
+    from pipeline_inspector.usd.scanner import scan_usd_stage
+
+    snapshot = scan_usd_stage(path, scan_scope="asset")
+    if not isinstance(snapshot, GraphSnapshot):
+        raise RuntimeError("USD scanner did not return a GraphSnapshot")
+    return snapshot
 
 
 def _snapshot_from_scene(path: Path) -> GraphSnapshot:

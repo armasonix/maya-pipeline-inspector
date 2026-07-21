@@ -1,5 +1,8 @@
 # Maya install guide
 
+**Product:** Maya Pipeline Inspector (`maya-pipeline-inspector`)  
+**Related:** [USER_GUIDE.md](USER_GUIDE.md) · [STUDIO_OVERRIDES.md](STUDIO_OVERRIDES.md) · [ARCHITECTURE.md](ARCHITECTURE.md)
+
 This guide documents how to load **Maya Pipeline Inspector** inside Autodesk Maya using the packaged `maya_module/` layout, and how to use an editable `pip` install as an alternative.
 
 The module path is intended for studio deployment from a cloned or packaged repo. The `pip` path is convenient for TD workstations and for environments where `MAYA_MODULE_PATH` is not used.
@@ -10,9 +13,9 @@ Regardless of install method, the UI entrypoints are the same:
 
 | Entrypoint | Name | Behavior |
 | --- | --- | --- |
-| Main menu | `Pipeline Inspector` | Items: **Open Pipeline Inspector**, **Pipeline Inspector Farm Check**, **Close Pipeline Inspector** |
-| Shelf tab | `PipelineInspector` | Buttons: **Pipeline Inspector** (open panel), **Pipeline Inspector Farm Check** (Farm tab + preflight) |
-| Python API | `pipeline_inspector.maya.commands` | `install_ui()`, `show_ui()`, `show_farm_check_ui()`, `close_ui()`, validation and export commands |
+| Main menu | `Pipeline Inspector` | Items: **Open Pipeline Inspector**, **Pipeline Inspector Farm Check**, **Readiness Check**, **Close Pipeline Inspector** |
+| Shelf tab | `PipelineInspector` | Buttons: **Pipeline Inspector** (open panel), **Pipeline Inspector Farm Check** (Farm tab + preflight), **Readiness Check** (Readiness tab) |
+| Python API | `pipeline_inspector.maya.commands` | `install_ui()`, `show_ui()`, `show_farm_check_ui()`, `show_readiness_check_ui()`, `close_ui()`, validation and export commands |
 
 On module startup, [`maya_module/scripts/userSetup.py`](../maya_module/scripts/userSetup.py) defers UI installation and runs **dual-install detection** ([ADR 0006](adr/0006-native-mll-plugin-strategy.md)):
 
@@ -27,10 +30,12 @@ Maintainer-tested versions in this repository:
 
 | Maya version | Status | Notes |
 | --- | --- | --- |
-| 2024 | Tested | Demo scene [`examples/broken_scene/pipeline_inspector_demo_broken.ma`](../examples/broken_scene/pipeline_inspector_demo_broken.ma) is saved in Maya 2024 |
+| 2024 | Tested | Policy demos [`examples/vray_policy/vray_policy_scene.ma`](../examples/vray_policy/vray_policy_scene.ma) and [`examples/arnold_policy/arnold_policy_scene.ma`](../examples/arnold_policy/arnold_policy_scene.ma) |
 | 2025 | Tested | Scanner and command unit tests target Maya 2025 APIs |
 | 2026 | Best effort | Not regularly CI-tested; report issues if panel or `mayapy` integration differs |
 | 2023 and earlier | Not tested | May work with PySide2-based Maya builds, but is outside the current support matrix |
+
+Pipeline Inspector is **under active development**. Even on supported Maya versions, expect occasional panel regressions, incomplete Settings flows, and connector setup friction. See [USER_GUIDE — Known limitations & gaps](USER_GUIDE.md#known-limitations--gaps).
 
 The UI loads Qt through PySide2 or PySide6 depending on what the active Maya build provides.
 
@@ -178,9 +183,12 @@ from pipeline_inspector.maya.commands import show_ui
 show_ui()
 ```
 
-Then open the demo scene and run **Validate Scene**:
+Then open a **policy demo scene** (load the matching renderer) and run **Validate Scene**:
 
-`examples/broken_scene/pipeline_inspector_demo_broken.ma`
+- `examples/vray_policy/vray_policy_scene.ma` (V-Ray)
+- `examples/arnold_policy/arnold_policy_scene.ma` (Arnold)
+
+See [`examples/vray_policy/README.md`](../examples/vray_policy/README.md) and [`examples/arnold_policy/README.md`](../examples/arnold_policy/README.md).
 
 ## Option B — Editable `pip` install (TD / workstation alternative)
 
@@ -195,7 +203,7 @@ Windows example with Maya 2025:
 & "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe" -m pip install -e "D:\tools\maya-pipeline-inspector"
 ```
 
-Use the `mayapy` executable that matches the Maya version artists launch.
+Use the `mayapy` executable that matches the Maya version Technical Artists launch.
 
 ### 2. Install UI entrypoints for the session
 
@@ -220,7 +228,7 @@ Scene validation requires `mayapy`; regular system Python can validate snapshot 
 
 ## Studio config rollout (`pipeline_inspector_studio.json`)
 
-Pipeline TDs deploy one JSON file for studio-wide policy: pipeline toggles, network path roots, connector credentials, bug-report relay URL, and waiver/manifest defaults. Per-machine artist preferences stay in `~/.pipeline_inspector/user.json` (see [ADR 0007](adr/0007-settings-and-connectors-architecture.md)).
+Pipeline TDs deploy one JSON file for studio-wide policy: pipeline toggles, network path roots, connector credentials, bug-report relay URL, and waiver/manifest defaults. Per-machine user preferences stay in `~/.pipeline_inspector/user.json` (see [ADR 0007](adr/0007-settings-and-connectors-architecture.md)).
 
 ### Discovery order
 
@@ -311,7 +319,7 @@ Prefer **Option A** or **Option B** for repeatable studio rollout.
 
 ## In-app updates (Check for Updates)
 
-When the plugin is installed via **Option A** (`MAYA_MODULE_PATH` + full repo checkout), artists and TDs can use the panel header **Check for Updates** button to download a GitHub Release and install it with config preservation and rollback.
+When the plugin is installed via **Option A** (`MAYA_MODULE_PATH` + full repo checkout), Technical Artists and TDs can use the panel header **Check for Updates** button to download a GitHub Release and install it with config preservation and rollback.
 
 **Option B (`pip`)** and legacy `PYTHONPATH`-only layouts are not updated in-place by the wizard — use `mayapy -m pip install -U` and restart Maya instead.
 
@@ -352,7 +360,7 @@ When using Plug-in Manager, unloading `pipeline_inspector` runs the same cleanup
 
 ## Related docs
 
-- [`USER_GUIDE.md`](USER_GUIDE.md) — artist and TD workflow inside the panel
+- [`USER_GUIDE.md`](USER_GUIDE.md) — Technical Artist and TD workflow inside the panel
 - [`STUDIO_OVERRIDES.md`](STUDIO_OVERRIDES.md) — rolling `pipeline_inspector_studio.json` and custom rule packs
 - [`adr/0007-settings-and-connectors-architecture.md`](adr/0007-settings-and-connectors-architecture.md) — studio vs user config split
 - [`integrations/publish_submit_preflight.md`](integrations/publish_submit_preflight.md) — publish gate example
@@ -377,7 +385,8 @@ mayapy -m pytest tests/integration -v
 When validating v0.3 manifest automation locally, also run:
 
 ```bash
-DEMO_SCENE="examples/broken_scene/pipeline_inspector_demo_broken.ma"
+# Policy demo (manual / portfolio); legacy headless.ma still works for CI fixtures
+DEMO_SCENE="examples/vray_policy/vray_policy_scene.ma"
 OUT_MANIFEST="/tmp/pipeline_inspector_manifest_smoke.json"
 GATE_REPORT="/tmp/pipeline_inspector_gate_smoke.json"
 
@@ -421,7 +430,7 @@ Real Maya integration runs on a **self-hosted runner** labeled `self-hosted` and
 
 #### Smoke steps (v0.4)
 
-Demo scene: [`examples/broken_scene/pipeline_inspector_demo_broken_headless.ma`](../examples/broken_scene/pipeline_inspector_demo_broken_headless.ma)
+Demo scene for integration smoke: [`examples/vray_policy/vray_policy_scene.ma`](../examples/vray_policy/vray_policy_scene.ma) (load V-Ray) or [`examples/arnold_policy/arnold_policy_scene.ma`](../examples/arnold_policy/arnold_policy_scene.ma) (load Arnold).
 
 After `pytest tests/integration`:
 
@@ -436,7 +445,7 @@ Default CI in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) stays Ma
 
 ```powershell
 $env:MAYA_PY = "C:\Program Files\Autodesk\Maya2025\bin\mayapy.exe"
-$SCENE = "examples\broken_scene\pipeline_inspector_demo_broken_headless.ma"
+$SCENE = "examples\vray_policy\vray_policy_scene.ma"
 & $env:MAYA_PY -m pip install -e ".[dev]"
 & $env:MAYA_PY -m pytest tests/integration -v
 & $env:MAYA_PY -m pipeline_inspector validate $SCENE --input-kind scene --profile-id publish_strict --report "$env:TEMP\validate_smoke.json"

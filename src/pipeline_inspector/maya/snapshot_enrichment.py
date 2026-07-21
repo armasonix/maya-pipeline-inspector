@@ -39,6 +39,7 @@ from pipeline_inspector.maya.displacement_enrichment import enrich_displacement_
 from pipeline_inspector.maya.optimized_texture_enrichment import enrich_optimized_texture_metadata
 from pipeline_inspector.maya.vray_enrichment import enrich_vray_metadata
 from pipeline_inspector.studio_config import StudioEnvironmentSettings
+from pipeline_inspector.usd.enrichment import usd_material_name_from_prim_path
 from pipeline_inspector.util.paths import resolve_studio_path
 
 _UDIM_TILE_RE = re.compile(r"(?<!\d)(1\d{3}|2\d{3})(?!\d)")
@@ -51,6 +52,17 @@ def prepare_snapshot_for_validation(
     studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> GraphSnapshot:
     """Return a validation-ready snapshot with runtime semantics and UDIM metadata."""
+
+    from pipeline_inspector.usd.enrichment import (
+        is_usd_snapshot,
+        prepare_usd_snapshot_for_validation,
+    )
+
+    if is_usd_snapshot(snapshot):
+        return prepare_usd_snapshot_for_validation(
+            snapshot,
+            studio_environment=studio_environment,
+        )
 
     enriched = enrich_snapshot(snapshot, studio_environment=studio_environment)
     resolver = SemanticTextureSlotResolver(_default_adapter_registry())
@@ -93,6 +105,11 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
     for material in snapshot.materials:
         index[material.node_id] = material.name
         index[material.name] = material.name
+        if str(material.node_id).startswith("prim:"):
+            prim_path = material.full_name or material.node_id.removeprefix("prim:")
+            if prim_path:
+                index[prim_path] = material.name
+                index[f"prim:{prim_path}"] = material.name
         for node_id in material.texture_nodes:
             index[node_id] = material.name
             index[_short_node_id(node_id)] = material.name
@@ -107,6 +124,29 @@ def build_material_index(snapshot: GraphSnapshot) -> dict[str, str]:
             ):
                 index[texture_id] = material.name
                 index[_short_node_id(texture_id)] = material.name
+
+    for node in snapshot.nodes:
+        if not str(node.id).startswith("prim:"):
+            continue
+        prim_path = node.full_name or node.id.removeprefix("prim:")
+        material_name = usd_material_name_from_prim_path(prim_path)
+        if not material_name:
+            continue
+        index[node.id] = material_name
+        index[prim_path] = material_name
+        index[f"prim:{prim_path}"] = material_name
+
+    for dependency in snapshot.file_dependencies:
+        if not str(dependency.node_id).startswith("prim:"):
+            continue
+        prim_path = dependency.node_id.removeprefix("prim:")
+        material_name = usd_material_name_from_prim_path(prim_path)
+        if not material_name:
+            continue
+        index[dependency.node_id] = material_name
+        index[prim_path] = material_name
+        index[f"prim:{prim_path}"] = material_name
+
     return index
 
 def _upstream_texture_nodes(
@@ -147,11 +187,12 @@ def enrich_snapshot(
     nodes = tuple(_apply_node_semantic(node, node_semantics.get(node.id)) for node in base_nodes)
     nodes_by_id = {node.id: node for node in nodes}
     scene_dir = Path(snapshot.scene_path).parent if snapshot.scene_path else Path.cwd()
+    usd_anchor = _usd_anchor_dir(snapshot)
     file_dependencies = tuple(
         _enrich_file_dependency(
             dependency,
             nodes_by_id.get(dependency.node_id),
-            scene_dir,
+            usd_anchor if str(dependency.node_id).startswith("prim:") and usd_anchor else scene_dir,
             studio_environment,
         )
         for dependency in snapshot.file_dependencies
@@ -264,6 +305,23 @@ def _enrich_file_dependency(
         return _enrich_dependency_image_metadata(enriched)
 
     tiles = _existing_udim_tiles(resolved_path)
+    missing = _missing_udim_tiles(tiles)
+    # #region agent log
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(
+        "snapshot_enrichment._enrich_file_dependency",
+        "UDIM dependency enrichment",
+        {
+            "raw_path": (udim_pattern or dependency.raw_path)[:160],
+            "resolved_path": resolved_path[:160],
+            "tile_count": len(tiles),
+            "tiles": ",".join(str(tile) for tile in tiles[:8]),
+            "missing_tiles": ",".join(str(tile) for tile in missing[:8]),
+        },
+        hypothesis_id="H-UDIM2",
+    )
+    # #endregion
     enriched = replace(
         dependency,
         raw_path=udim_pattern or dependency.raw_path,
@@ -271,7 +329,7 @@ def _enrich_file_dependency(
         exists=bool(tiles),
         is_udim=True,
         udim_tiles=tiles,
-        missing_udim_tiles=_missing_udim_tiles(tiles),
+        missing_udim_tiles=missing,
     )
     return _enrich_dependency_image_metadata(enriched)
 
@@ -379,17 +437,18 @@ def _resolve_path(
     scene_dir: Path,
     studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> str:
-    path_text = raw_path
+    path_text = raw_path.replace("\\", "/")
     if studio_environment is not None:
-        path_text = resolve_studio_path(path_text, studio_environment)
+        path_text = resolve_studio_path(path_text, studio_environment).replace("\\", "/")
     expanded = os.path.expanduser(os.path.expandvars(path_text)).replace("\\", "/")
     path = Path(expanded)
     if path.is_absolute():
         return str(path).replace("\\", "/")
 
-    candidates = [Path(expanded), scene_dir / expanded]
+    scene_resolved = (scene_dir / expanded).resolve()
+    candidates = [scene_resolved, Path(expanded), scene_dir / expanded]
     parts = Path(expanded).parts
-    if "textures" in parts:
+    if "textures" in parts and not any(part == ".." for part in parts):
         index = parts.index("textures")
         candidates.append(scene_dir.joinpath(*parts[index:]))
 
@@ -464,9 +523,38 @@ def _resolve_result_material(
         material = material_index.get(prefixed)
         if material:
             return material
+        prim_path = str(key)
+        if prim_path.startswith("prim:"):
+            prim_path = prim_path.removeprefix("prim:")
+        if prim_path.startswith("/"):
+            material = material_index.get(prim_path) or usd_material_name_from_prim_path(
+                prim_path
+            )
+            if material:
+                return material
     return None
 
 def _short_node_id(node_id: str) -> str:
     if node_id.startswith("node:"):
         return node_id.split(":", 1)[1]
     return node_id
+
+
+def _usd_anchor_dir(snapshot: GraphSnapshot) -> Optional[Path]:
+    metadata = snapshot.usd_stage_metadata
+    if metadata is not None and metadata.root_layer:
+        root = Path(str(metadata.root_layer))
+        if root.suffix.casefold() in {".usd", ".usda", ".usdc"} and root.is_file():
+            return root.parent
+    for dependency in snapshot.file_dependencies:
+        if not str(dependency.node_id).startswith("prim:"):
+            continue
+        for candidate in (dependency.resolved_path, dependency.raw_path):
+            if not candidate:
+                continue
+            path = Path(str(candidate))
+            if path.is_absolute() and path.is_file():
+                return path.parent
+            if path.is_absolute() and path.parent.is_dir():
+                return path.parent
+    return None

@@ -1,9 +1,7 @@
 """Deadline submit preflight helpers for Pipeline Inspector."""
 from __future__ import annotations
 
-import json
 import subprocess
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -151,17 +149,6 @@ def _farm_debug_log(
     *,
     hypothesis_id: str,
 ) -> None:
-    try:
-        payload = {
-            "sessionId": "618f4f",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        log_path = Path(__file__).resolve().parents[3] / "debug-618f4f.log"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except OSError:
-        return
+    from pipeline_inspector.util.debug_log import write_debug_log
+
+    write_debug_log(location, message, data, hypothesis_id=hypothesis_id)

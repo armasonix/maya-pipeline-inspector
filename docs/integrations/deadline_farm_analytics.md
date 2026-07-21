@@ -1,5 +1,9 @@
 # Deadline farm analytics collection
 
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD / render wrangler  
+**Related:** [deadline_submit_preflight.md](deadline_submit_preflight.md) · [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
+
 Studio guide for collecting Deadline 10 on-prem farm analytics through the Web Service REST API.
 
 ## Overview

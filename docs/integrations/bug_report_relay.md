@@ -1,8 +1,32 @@
 # Bug report relay server specification
 
-Pipeline Inspector ships a **client-only** bug report path for **plugin defects** — crashes, wrong validation results, panel freezes, and other issues in the tool itself. Artists and TDs use it to notify **plugin maintainers** (open-source developers and contributors) so the problem can be triaged, patched, and released.
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Plugin maintainer / pipeline TD deploying a private relay  
+**Related:** [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md) · [ADR 0007](../adr/0007-settings-and-connectors-architecture.md)
+
+Pipeline Inspector ships a **client-only** bug report path for **plugin defects** — crashes, wrong validation results, panel freezes, and other issues in the tool itself. Technical Artists and TDs use it to notify **plugin maintainers** (open-source developers and contributors) so the problem can be triaged, patched, and released.
 
 This is **not** a general pipeline bug tracker for scene shading or asset issues. It is specifically: *something is wrong with Pipeline Inspector → report to the people who ship the plugin*.
+
+## Why a studio private relay?
+
+Bug Report always posts to an **HTTPS relay** — a small server you or the upstream project operate. The Maya panel never talks to GitHub (or your internal tracker) directly; the relay receives the multipart POST and creates tickets or notifications on the backend.
+
+| Relay target | Who gets notified | When to use |
+| --- | --- | --- |
+| **Public default** (empty `relay_url`) | Upstream open-source maintainers | Stock installs of the published plugin; defects you want fixed in the public repo |
+| **Studio private relay** (`relay_url` + `api_key`) | **Your in-house R&D / pipeline engineering team** | Local fork, custom branch, patched build, or any facility where **you** own ongoing plugin development |
+
+If your studio **continues local development** of Maya Pipeline Inspector inside the facility — maintaining a fork, carrying studio-specific patches on `dev`, or rolling out internal builds before upstream releases — you typically **should not** send those reports to the public maintainer relay. Technical Artists would otherwise alert external developers about bugs in **your** codebase, and your R&D team would not see them in time.
+
+Deploying a **self-hosted private relay** gives you:
+
+- **Operational alerting for your R&D department** — panel crashes, wrong validation results, freezes, and regressions from studio patches surface on **your** channels (issue tracker, email, chat — whatever your relay implements);
+- **Correct ownership** — triage and fixes stay with the team that ships your internal build;
+- **Same security model as upstream** — GitHub PATs and internal API keys stay on the relay server, not on Technical Artist workstations;
+- **No client fork** — only `bug_report.relay_url` and `api_key` in `pipeline_inspector_studio.json` change; the shipped Bug Report form and HTTP contract stay the same.
+
+The public relay remains appropriate for unmodified open-source rollouts. A private relay is the intended path when Pipeline Inspector is part of **your** software stack, not only a downloaded third-party tool.
 
 ## Public maintainer relay (default)
 
@@ -20,9 +44,11 @@ Studios may still override `relay_url` and `api_key` for a **private studio rela
 
 ## Studio private relay (override)
 
-Each studio may deploy a **private HTTPS relay** that accepts submissions from Maya, creates a GitHub Issue in the plugin repository, optionally emails maintainers, and returns the issue URL to the panel.
+Each studio may deploy a **private HTTPS relay** that accepts submissions from Maya, creates issues in **your** tracker (GitHub, Jira, email, etc.), optionally notifies R&D on-call, and returns a ticket URL to the panel.
 
-The open-source plugin never stores a GitHub PAT on artist workstations. Private relay credentials (`relay_url`, `api_key`) live in `pipeline_inspector_studio.json` and are managed by pipeline TDs.
+Typical motivation: **in-house plugin development** — your pipeline or R&D group maintains a fork or custom build and needs Technical Artists to report **plugin** defects to **your** team, not to upstream maintainers.
+
+The open-source plugin never stores a GitHub PAT on Technical Artist workstations. Private relay credentials (`relay_url`, `api_key`) live in `pipeline_inspector_studio.json` and are managed by pipeline TDs.
 
 See [ADR 0007](../adr/0007-settings-and-connectors-architecture.md) for the security checklist and Settings architecture.
 
@@ -46,7 +72,7 @@ Client-side throttling mirrors `max_reports_per_day` per `{machine_id}:{os_user}
 {
   "bug_report": {
     "enabled": true,
-    "relay_url": "https://pipeline.studio.internal/shader-health/bug-report",
+    "relay_url": "https://pipeline.studio.internal/maya-pipeline-inspector/bug-report",
     "api_key": "rotatable-studio-secret",
     "allow_screenshot": true,
     "max_reports_per_day": 5
@@ -130,7 +156,7 @@ Optional relay observability fields (ignored by the Maya client):
 }
 ```
 
-The Maya panel shows `issue_url` to the artist after a successful submission (header **Report Plugin Bug** dialog).
+The Maya panel shows `issue_url` to the Technical Artist after a successful submission (header **Report Plugin Bug** dialog).
 
 ## Maintainer email notification
 
@@ -157,7 +183,7 @@ After the GitHub issue is created, the relay may send a **best-effort email** to
 | `SMTP_USER` / `SMTP_PASSWORD` | Depends on provider | SMTP authentication when required |
 | `SMTP_USE_TLS` | No | StartTLS for submission port (default `true`) |
 
-Studios may substitute an internal mail API (SendGrid, SES, Microsoft Graph) behind the same contract: send after issue creation, never fail the artist HTTP response on mail errors.
+Studios may substitute an internal mail API (SendGrid, SES, Microsoft Graph) behind the same contract: send after issue creation, never fail the submitter HTTP response on mail errors.
 
 ### Email template
 
@@ -231,7 +257,7 @@ The Maya client maps **429** to `skipped_reason="rate_limited"`. Other failures 
 | Field | Required | Notes |
 | --- | --- | --- |
 | `schema_version` | Yes | Must be `1.0` for v0.5 clients |
-| `title` | Yes | Short issue title from the artist |
+| `title` | Yes | Short issue title from the Technical Artist |
 | `description` | Yes | Free-text bug description |
 | `plugin_version` | Yes | Pipeline Inspector release string |
 | `scene_basename` | Yes | Filename only — **no full scene path** |
@@ -299,7 +325,7 @@ info:
     Studio-hosted HTTPS relay between Maya Pipeline Inspector and GitHub Issues.
     The open-source plugin implements the client; each studio hosts this API.
 servers:
-  - url: https://pipeline.studio.internal/shader-health
+  - url: https://pipeline.studio.internal/maya-pipeline-inspector
     description: Example studio relay base URL
 paths:
   /bug-report:
@@ -488,9 +514,9 @@ Entry point for UI and automation: `maybe_submit_bug_report(studio_config, paylo
 
 ## Settings UI
 
-Open **Settings → Bug Report** in the Maya panel to configure relay URL, API key (password echo), screenshot policy, daily cap, and the privacy notice shown to artists.
+Open **Settings → Bug Report** in the Maya panel to configure relay URL, API key (password echo), screenshot policy, daily cap, and the privacy notice shown to Technical Artists.
 
-Artists submit plugin bug reports from the panel header **Report Plugin Bug** button (`ui/bug_report_dialog.py`). On success the dialog shows the GitHub `issue_url` where maintainers track the fix.
+Technical Artists submit plugin bug reports from the panel header **Report Plugin Bug** button (`ui/bug_report_dialog.py`). On success the dialog shows the GitHub `issue_url` where maintainers track the fix.
 
 ## Testing notes
 
@@ -569,7 +595,7 @@ Wrangler prints the worker URL (for example `https://maya-pipeline-inspector-bug
 {
   "bug_report": {
     "enabled": true,
-    "relay_url": "https://pipeline.studio.internal/shader-health/bug-report",
+    "relay_url": "https://pipeline.studio.internal/maya-pipeline-inspector/bug-report",
     "api_key": "rotatable-studio-secret",
     "allow_screenshot": true,
     "max_reports_per_day": 5

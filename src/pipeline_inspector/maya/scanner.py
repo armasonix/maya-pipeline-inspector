@@ -160,7 +160,7 @@ def _scan_snapshot(
     selected_nodes: Optional[list[str]] = None,
 ) -> GraphSnapshot:
     graph = _collect_shader_graph(cmds, options=options, selected_nodes=selected_nodes)
-    return GraphSnapshot(
+    snapshot = GraphSnapshot(
         scene_path=_scene_path(cmds),
         maya_version=_maya_version(cmds),
         renderer=_current_renderer(cmds),
@@ -174,6 +174,11 @@ def _scan_snapshot(
         references=graph.references,
         shapes=graph.shapes,
     )
+    if scan_scope == "scene":
+        from pipeline_inspector.maya.usd_scene_scan import merge_usd_proxy_snapshots
+
+        snapshot = merge_usd_proxy_snapshots(snapshot, cmds)
+    return snapshot
 
 @dataclass
 class _GraphBuildResult:

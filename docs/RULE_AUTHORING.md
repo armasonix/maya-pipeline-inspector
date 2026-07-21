@@ -10,7 +10,7 @@ Rules should be:
 
 - readable by Technical Artists, Shader TDs, and Pipeline TDs;
 - stable across renderer adapter changes;
-- explainable to artists;
+- explainable to Technical Artists;
 - testable with snapshot fixtures;
 - configurable by profile;
 - safe when they define auto-fixes.
@@ -103,7 +103,7 @@ Every production rule should include:
 | `renderer` | Renderer families where the rule can run. |
 | `scope` | Target domain: node, material, file dependency, graph, scene. |
 | `severity` | User-facing importance: info, warning, error, critical. |
-| `owner` | Expected fix owner: artist, texture_artist, shader_td, pipeline_td, supervisor. |
+| `owner` | Expected fix owner (JSON value): `artist` (Technical Artist), `texture_artist`, `shader_td`, `pipeline_td`, `supervisor`. |
 | `message` | Short issue text. |
 | `why` | Explanation shown in UI/report. |
 | `match` | Target selection criteria. |
@@ -229,7 +229,7 @@ Policy controls production behavior.
 }
 ```
 
-Rules should be conservative by default. Profiles may override policy for artist, publish, deadline, supervisor, or CI modes.
+Rules should be conservative by default. Profiles may override policy for lookdev (`artist_relaxed`), publish, deadline, supervisor, or CI modes.
 
 ## Auto-Fix Section
 
@@ -409,7 +409,7 @@ Metadata fields (`source_rule_id`, `scene_path`, `exported_at_utc`) support TD r
 ### Pipeline handoff checklist
 
 1. Review the sidecar or saved draft in version control (no client names, real production paths, or secrets in open-source examples).
-2. Rename or finalize the rule id before release — avoid shipping `.draft` suffixes to artists.
+2. Rename or finalize the rule id before release — avoid shipping `.draft` suffixes to Technical Artists.
 3. Run `python tools/validate_rules.py` (and profile override checks if the rule is referenced in a studio profile).
 4. Deploy the JSON into the facility `extra_rules` tree or show rule pack loaded by `--extra-rules` / `extra_rule_paths`.
 5. Confirm Maya and headless CLI use the same extra rule paths so validation matches TD review.

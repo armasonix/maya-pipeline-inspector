@@ -108,7 +108,7 @@ Extends v0.3 with Deadline 10 on-prem integration (core package + Farm tab), nat
 
 #### Product philosophy and UX audit (M22)
 
-- [ADR 0005](docs/adr/0005-gui-first-product-philosophy.md) — GUI-first product philosophy for artist-facing workflows.
+- [ADR 0005](docs/adr/0005-gui-first-product-philosophy.md) — GUI-first product philosophy for Technical Artist-facing workflows.
 - [`docs/MAYA_UX_AUDIT_v0.4.md`](docs/MAYA_UX_AUDIT_v0.4.md) — friction inventory and prioritized Wave 1 backlog.
 
 #### Maya integration CI (M23)

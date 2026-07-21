@@ -44,6 +44,9 @@ dev = [
     "ruff>=0.5.0",
     "mypy>=1.10,<2.0",
 ]
+usd = [
+    "usd-core>=24.11",
+]
 
 [project.urls]
 Homepage = "https://github.com/armasonix/maya-pipeline-inspector"
@@ -72,7 +75,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["UP045"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 packages = ["pipeline_inspector"]
 strict = false
 warn_unused_configs = true
@@ -89,4 +92,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "maya.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pxr"
 ignore_missing_imports = true

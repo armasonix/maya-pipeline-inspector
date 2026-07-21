@@ -38,7 +38,7 @@ role, with real Ftrack and Cerebro role discovery.
 
 ## Consequences
 
-- Artists route block reports to Lead TD without manual chat selection.
+- Technical Artists route block reports to Lead TD without manual chat selection.
 - Ftrack/Cerebro connectors now participate in governance, not only publish.
 - Producer role removed; use `technical_artist` or studio-specific tracker maps.
 

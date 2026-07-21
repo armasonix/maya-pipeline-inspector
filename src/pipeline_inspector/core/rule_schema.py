@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pipeline_inspector.core.models import (
     BoundingBoxSnapshot,
@@ -27,6 +27,9 @@ from pipeline_inspector.core.naming_conventions import (
 )
 from pipeline_inspector.core.naming_fix import texture_filename_stem
 
+if TYPE_CHECKING:
+    from pipeline_inspector.studio_config import StudioEnvironmentSettings
+
 JsonDict = dict[str, Any]
 JsonValue = Any
 
@@ -36,6 +39,7 @@ _TEXTURE_PATH_ATTRS = {
     "file": "fileTextureName",
     "VRayBitmap": "file",
     "aiImage": "filename",
+    "Shader": "file",
 }
 
 SEVERITIES = frozenset({"info", "warning", "error", "critical"})
@@ -405,8 +409,13 @@ class _TargetContext:
 class ValidationEngine:
     """Evaluate rule definitions against a GraphSnapshot."""
 
-    def __init__(self, naming_templates: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        naming_templates: Mapping[str, str] | None = None,
+        studio_environment: Optional[StudioEnvironmentSettings] = None,
+    ) -> None:
         self._naming_templates = dict(naming_templates or {})
+        self._studio_environment = studio_environment
 
     def validate(
         self,
@@ -811,7 +820,7 @@ class ValidationEngine:
                 current = self._read_value(target, name_field)
         else:
             current = self._read_value(target, name_field)
-            if object_type == "mesh" and isinstance(target.obj, ShapeSnapshot):
+            if object_type in {"mesh", "camera"} and isinstance(target.obj, ShapeSnapshot):
                 current = mesh_transform_name_from_shape(target.obj)
         if not isinstance(current, str) or not current.strip():
             return self._skipped(
@@ -913,7 +922,11 @@ class ValidationEngine:
                 reason="path_policy_requires_file_dependency",
             )
 
-        violations = _path_policy_violations(target.obj, rule.check.params)
+        violations = _path_policy_violations(
+            target.obj,
+            rule.check.params,
+            studio_environment=self._studio_environment,
+        )
         status = "failed" if violations else "passed"
         evidence = {"violations": violations} if violations else {}
         return self._result(
@@ -1026,6 +1039,8 @@ class ValidationEngine:
             return target.semantic or self._read_value(target, "semantic_slot")
         if key == "dependency_kind" and isinstance(target.obj, FileDependencySnapshot):
             return "texture"
+        if key == "usd_prim" and isinstance(target.obj, FileDependencySnapshot):
+            return str(target.obj.node_id).startswith("prim:")
         return self._read_value(target, key)
 
     def _read_value(self, target: _TargetContext, key: str) -> Any:
@@ -1091,9 +1106,13 @@ class ValidationEngine:
             return None
         obj = target.obj
         if isinstance(obj, (NodeSnapshot, MaterialSnapshot, ShadingEngineSnapshot, ShapeSnapshot)):
+            if isinstance(obj, NodeSnapshot) and str(obj.id).startswith("prim:"):
+                return obj.full_name or obj.id.removeprefix("prim:")
+            if isinstance(obj, MaterialSnapshot) and str(obj.node_id).startswith("prim:"):
+                return obj.full_name or obj.node_id.removeprefix("prim:")
             return obj.name
         if isinstance(obj, FileDependencySnapshot):
-            return obj.node_id
+            return obj.node_id.removeprefix("prim:") or obj.node_id
         if isinstance(obj, ConnectionSnapshot):
             return obj.dst_node
         return None
@@ -1412,9 +1431,10 @@ def _as_optional_int(value: Any) -> Optional[int]:
 def _path_policy_violations(
     dependency: FileDependencySnapshot,
     params: Mapping[str, Any],
+    *,
+    studio_environment: Optional[StudioEnvironmentSettings] = None,
 ) -> list[str]:
     authored_paths = [dependency.raw_path] if dependency.raw_path else []
-    paths = _dependency_paths(dependency)
     disallowed = params.get("disallow", [])
     if not isinstance(disallowed, list):
         disallowed = [disallowed]
@@ -1422,10 +1442,15 @@ def _path_policy_violations(
     violations: list[str] = []
     for policy in disallowed:
         policy_name = str(policy)
-        if policy_name == "local_drive" and any(
-            _is_local_drive_path(path) for path in authored_paths
-        ):
-            violations.append("local_drive")
+        if policy_name == "local_drive":
+            local_drive_hit = False
+            for path in authored_paths:
+                if not _is_local_drive_path(path):
+                    continue
+                local_drive_hit = True
+                break
+            if local_drive_hit:
+                violations.append("local_drive")
         elif policy_name == "user_home" and any(
             _is_user_home_path(path) for path in authored_paths
         ):
@@ -1444,8 +1469,41 @@ def _path_policy_violations(
             violations.append("temp")
 
     allowed_prefixes = params.get("allowed_prefixes", [])
-    if allowed_prefixes and not _matches_allowed_prefix(paths, allowed_prefixes):
-        violations.append("outside_project_root")
+    if allowed_prefixes:
+        prefix_list = (
+            allowed_prefixes if isinstance(allowed_prefixes, list) else [allowed_prefixes]
+        )
+        raw_path = str(dependency.raw_path or "")
+        resolved_path = str(dependency.resolved_path or raw_path)
+        from pipeline_inspector.util.paths import texture_path_policy_compliant
+
+        if not texture_path_policy_compliant(
+            raw_path,
+            resolved_path,
+            prefix_list,
+            studio_environment,
+        ):
+            violations.append("outside_project_root")
+
+    # #region agent log
+    if violations or "${" in str(dependency.raw_path or "") or _is_local_drive_path(
+        str(dependency.raw_path or "")
+    ):
+        from pipeline_inspector.util.debug_log import write_debug_log
+
+        write_debug_log(
+            "rule_schema._path_policy_violations",
+            "File dependency path policy",
+            {
+                "target_id": str(dependency.node_id or "")[:120],
+                "attr": str(dependency.attr or ""),
+                "raw_path": str(dependency.raw_path or "")[:160],
+                "violations": "|".join(violations) or "none",
+                "usd_prim": str(str(dependency.node_id or "").startswith("prim:")),
+            },
+            hypothesis_id="H37",
+        )
+    # #endregion
 
     return violations
 

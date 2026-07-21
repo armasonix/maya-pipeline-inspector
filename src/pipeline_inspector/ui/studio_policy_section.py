@@ -40,6 +40,7 @@ _NAMING_LABELS: dict[str, str] = {
     "texture": "Texture",
     "shading_engine": "Shading engine",
     "light_source": "Light Sources",
+    "camera": "Camera",
 }
 _NAMING_PLACEHOLDERS: dict[str, str] = {
     "mesh": r"^geo_[A-Za-z0-9_]+$",
@@ -49,6 +50,7 @@ _NAMING_PLACEHOLDERS: dict[str, str] = {
     "texture": r"^tex_[A-Za-z0-9_]+$",
     "shading_engine": r"^SG_[A-Za-z0-9_]+$",
     "light_source": r"^lgt_[A-Za-z0-9_]+$",
+    "camera": r"^cam_[A-Za-z0-9_]+$",
 }
 _STUDIO_TOGGLE_LABEL_WIDTH = 228
 _STUDIO_TOGGLE_GAP = 12
@@ -95,6 +97,7 @@ SETTINGS_NAMING_SHADING_ENGINE_INPUT_OBJECT_NAME = (
 SETTINGS_NAMING_LIGHT_SOURCE_INPUT_OBJECT_NAME = (
     "pipelineInspectorSettingsNamingLightSourceInput"
 )
+SETTINGS_NAMING_CAMERA_INPUT_OBJECT_NAME = "pipelineInspectorSettingsNamingCameraInput"
 SETTINGS_NAMING_TEMPLATE_INPUT_OBJECT_NAMES: dict[str, str] = {
     "mesh": SETTINGS_NAMING_MESH_INPUT_OBJECT_NAME,
     "group": SETTINGS_NAMING_GROUP_INPUT_OBJECT_NAME,
@@ -103,6 +106,7 @@ SETTINGS_NAMING_TEMPLATE_INPUT_OBJECT_NAMES: dict[str, str] = {
     "texture": SETTINGS_NAMING_TEXTURE_INPUT_OBJECT_NAME,
     "shading_engine": SETTINGS_NAMING_SHADING_ENGINE_INPUT_OBJECT_NAME,
     "light_source": SETTINGS_NAMING_LIGHT_SOURCE_INPUT_OBJECT_NAME,
+    "camera": SETTINGS_NAMING_CAMERA_INPUT_OBJECT_NAME,
 }
 
 

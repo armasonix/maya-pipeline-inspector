@@ -1,0 +1,180 @@
+{
+  "rules": [
+    {
+      "schema_version": "1.0",
+      "id": "usd.stage.default_prim.required",
+      "name": "USD asset must define a default prim",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "scene",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "USD asset is missing a default prim.",
+      "why": "Publish and farm pipelines rely on default prim selection for predictable asset loading.",
+      "match": {},
+      "check": {
+        "type": "attribute_equals",
+        "attribute": "usd_stage_metadata.has_default_prim",
+        "expected": true
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "set_default_prim",
+        "attribute": "defaultPrim",
+        "value_from": "usd_stage_metadata.suggested_default_prim",
+        "risk": "low"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "usd.mesh.unbound_material.error",
+      "name": "USD mesh prims must be bound to a material",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "scene",
+      "severity": "error",
+      "owner": "shader_td",
+      "message": "One or more mesh prims have no direct material binding.",
+      "why": "Unbound meshes render with unexpected fallback shading and fail lookdev QA.",
+      "match": {},
+      "check": {
+        "type": "numeric_max",
+        "attribute": "usd_stage_metadata.unbound_mesh_count",
+        "max": 0
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "usd.reference.missing.error",
+      "name": "USD payload or reference layers must resolve",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "scene",
+      "severity": "critical",
+      "owner": "pipeline_td",
+      "message": "USD asset references a missing layer or payload file.",
+      "why": "Broken composition breaks asset loading on farm workers and in downstream DCCs.",
+      "match": {},
+      "check": {
+        "type": "numeric_max",
+        "attribute": "usd_stage_metadata.missing_reference_count",
+        "max": 0
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": false,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "usd.texture.missing",
+      "name": "USD texture asset path must exist",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "shader_td",
+      "message": "USD shader input points to a missing texture file.",
+      "why": "Missing textures break lookdev and waste farm time on incomplete assets.",
+      "match": {
+        "dependency_kind": "texture",
+        "usd_prim": true
+      },
+      "check": {
+        "type": "path_exists"
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": false
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "usd.texture.path.local_drive",
+      "name": "USD texture path must not use a local drive root",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "file_dependency",
+      "severity": "critical",
+      "owner": "pipeline_td",
+      "message": "USD texture path points to a local drive and may not resolve on the farm.",
+      "why": "Local drive paths are machine-specific and commonly fail on render workers.",
+      "match": {
+        "dependency_kind": "texture",
+        "usd_prim": true
+      },
+      "check": {
+        "type": "path_policy",
+        "disallow": ["local_drive"]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": true,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "normalize_path",
+        "attribute": "file",
+        "replace_to": "${ASSET_ROOT}",
+        "risk": "medium"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "id": "usd.texture.path.project_root",
+      "name": "USD texture path must use an approved project root",
+      "enabled": true,
+      "renderer": ["usd"],
+      "scope": "file_dependency",
+      "severity": "error",
+      "owner": "pipeline_td",
+      "message": "USD texture path is outside the approved project texture roots.",
+      "why": "Project-rooted paths keep USD shader inputs portable between artists, publish tools, and render farm workers.",
+      "match": {
+        "dependency_kind": "texture",
+        "usd_prim": true
+      },
+      "check": {
+        "type": "path_policy",
+        "allowed_prefixes": [
+          "$ASSET_ROOT",
+          "${ASSET_ROOT}",
+          "$TEXTURE_ROOT",
+          "${TEXTURE_ROOT}",
+          "${STUDIO_TEXTURE_ROOT}",
+          "${STUDIO_ASSET_ROOT}",
+          "${STUDIO_CACHE_ROOT}",
+          "${STUDIO_RENDER_ROOT}"
+        ]
+      },
+      "policy": {
+        "block_publish": true,
+        "block_deadline": false,
+        "waiver_allowed": true,
+        "auto_fix_allowed": true
+      },
+      "fix": {
+        "type": "normalize_path",
+        "attribute": "file",
+        "replace_to": "${ASSET_ROOT}",
+        "risk": "medium"
+      }
+    }
+  ]
+}

@@ -1,8 +1,12 @@
 # Auto-update (Check for Updates)
 
+**Product:** [Maya Pipeline Inspector](../USER_GUIDE.md) (`maya-pipeline-inspector`)  
+**Audience:** Pipeline TD / maintainer liaison  
+**Related:** [MAYA_INSTALL.md](../MAYA_INSTALL.md) · [STUDIO_OVERRIDES.md](../STUDIO_OVERRIDES.md) · [ADR 0007](../adr/0007-settings-and-connectors-architecture.md)
+
 Pipeline Inspector can check [GitHub Releases](https://github.com/armasonix/maya-pipeline-inspector/releases) for a newer version, download a release package to a local staging directory, install it with rollback on failure, and show a manual Maya restart checklist.
 
-The flow is **GUI-first**: artists and TDs start it from the panel header **Check for Updates** button. Download and install always run inside the wizard — there is no silent auto-install.
+The flow is **GUI-first**: Technical Artists and TDs start it from the panel header **Check for Updates** button. Download and install always run inside the wizard — there is no silent auto-install.
 
 See [ADR 0007](../adr/0007-settings-and-connectors-architecture.md) for settings architecture and security notes.
 
@@ -103,7 +107,7 @@ Then follow the [Maya restart checklist](#maya-restart-checklist-after-update) b
 
 ## Building release packages
 
-Maintainers build the auto-update zip from the repository root. The archive must include **native `.mll` plug-ins** so artists receive a complete module-path update from **Check for Updates** without manual rebuild steps.
+Maintainers build the auto-update zip from the repository root. The archive must include **native `.mll` plug-ins** so Technical Artists receive a complete module-path update from **Check for Updates** without manual rebuild steps.
 
 ```powershell
 .\tools\build_release_assets.ps1
@@ -114,7 +118,7 @@ This script:
 1. Builds `pipeline_inspector.mll` for each installed Maya year (2024 / 2025 / 2026 when present)
 2. Produces `dist/maya-pipeline-inspector-{version}.zip` with `maya_module/`, `src/`, and the built `.mll` files
 
-Zip-only packaging without native binaries (not suitable for artist auto-update):
+Zip-only packaging without native binaries (not suitable for Technical Artist auto-update):
 
 ```powershell
 python tools/build_release_package.py
@@ -176,9 +180,9 @@ Use this checklist after a **successful** module-path install or after a **manua
 2. **Close Pipeline Inspector** — close the dockable panel (optional but avoids stale UI state).
 3. **Close Maya** — exit the application completely so plug-ins and `import pipeline_inspector` reload from disk.
 4. **Verify install (TD, optional)** — for module-path installs, confirm `{install_root}/src/pipeline_inspector/version.py` or the panel header version matches the expected release tag.
-5. **Relaunch Maya** — start the same Maya version artists use in production.
+5. **Relaunch Maya** — start the same Maya version Technical Artists use in production.
 6. **Confirm entrypoints** — open **Window → Pipeline Inspector** (or the **PipelineInspector** shelf) and open the panel.
-7. **Smoke validate** — run **Validate Scene** on a known test scene (for example `examples/broken_scene/pipeline_inspector_demo_broken.ma`) and confirm the panel loads studio/user settings.
+7. **Smoke validate** — run **Validate Scene** on a policy demo scene (for example `examples/vray_policy/vray_policy_scene.ma` or `examples/arnold_policy/arnold_policy_scene.ma`, with the matching renderer loaded) and confirm the panel loads studio/user settings.
 
 If anything looks wrong after restart, TDs can restore from `~/.pipeline_inspector/updates/backups/{tag}/` (module-path installs) or reinstall the previous release / `pip` version.
 

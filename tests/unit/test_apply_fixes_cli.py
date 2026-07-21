@@ -157,7 +157,7 @@ def test_apply_fixes_cli_plans_fixes_inline_when_fix_plan_omitted(
             ),
         )
     )
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: inline_plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: inline_plan)
     monkeypatch.setattr(
         cli,
         "_apply_fixes_in_scene",
@@ -215,7 +215,7 @@ def test_apply_fixes_cli_dry_run_writes_planned_actions_without_applying(
             ),
         )
     )
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
 
     def fail_if_apply(*_args, **_kwargs):
         raise AssertionError("apply-fixes dry-run must not mutate the scene")
@@ -273,7 +273,7 @@ def test_apply_fixes_cli_fix_ids_select_explicit_actions(tmp_path: Path, monkeyp
         captured["actions"] = tuple(actions)
         return ApplyFixReport(records=())
 
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
     monkeypatch.setattr(cli, "_apply_fixes_in_scene", capture_apply)
 
     exit_code = cli.main(
@@ -314,7 +314,7 @@ def test_apply_fixes_cli_forwards_policy_flags_to_applier(tmp_path: Path, monkey
         captured["allow_high_risk"] = kwargs["allow_high_risk"]
         return ApplyFixReport(records=())
 
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
     monkeypatch.setattr(cli, "_apply_fixes_in_scene", capture_apply)
     monkeypatch.setattr(
         cli,
@@ -367,7 +367,7 @@ def test_apply_fixes_cli_appends_fix_audit_sidecar_on_real_apply(tmp_path: Path,
             ),
         )
     )
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
     monkeypatch.setattr(cli, "_apply_fixes_in_scene", lambda *_args, **_kwargs: fake_report)
 
     exit_code = cli.main(["apply-fixes", str(scene_path)])
@@ -396,7 +396,7 @@ def test_apply_fixes_cli_dry_run_skips_fix_audit_sidecar(tmp_path: Path, monkeyp
             ),
         )
     )
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
 
     exit_code = cli.main(["apply-fixes", str(scene_path), "--dry-run"])
 
@@ -440,7 +440,7 @@ def test_apply_fixes_cli_returns_publish_block_when_all_actions_blocked(
             ),
         )
     )
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
     monkeypatch.setattr(cli, "_apply_fixes_in_scene", lambda *_args, **_kwargs: fake_report)
 
     exit_code = cli.main(["apply-fixes", str(scene_path)])
@@ -477,7 +477,7 @@ def test_apply_fixes_cli_returns_runtime_error_when_apply_fails(tmp_path: Path, 
             ),
         )
     )
-    monkeypatch.setattr(cli, "_load_fix_plan_for_scene", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(cli, "_load_fix_plan_for_input", lambda *_args, **_kwargs: plan)
     monkeypatch.setattr(cli, "_apply_fixes_in_scene", lambda *_args, **_kwargs: fake_report)
 
     exit_code = cli.main(["apply-fixes", str(scene_path)])
