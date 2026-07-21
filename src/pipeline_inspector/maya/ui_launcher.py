@@ -857,17 +857,35 @@ def _resolve_maya_version_for_bug_report(content: Any) -> str:
 def open_documentation_action() -> bool:
     """Open documentation from menu, shelf, or scripts without showing the panel."""
 
-    from pipeline_inspector.ui.documentation_actions import open_documentation_url
+    from pipeline_inspector.studio_config import StudioConfig
+    from pipeline_inspector.ui.documentation_actions import (
+        open_documentation_url,
+        resolve_documentation_url,
+    )
     from pipeline_inspector.user_config import UserPreferences
 
-    return open_documentation_url(UserPreferences.default().docs_url)
+    user = UserPreferences.default()
+    studio = StudioConfig.default()
+    url = resolve_documentation_url(
+        user_docs_url=user.docs_url,
+        studio_documentation_url=studio.ui.documentation_url,
+    )
+    return open_documentation_url(url)
 
 
 def _open_documentation_from_ui(content: Any, qt_widgets: Any) -> None:
-    from pipeline_inspector.ui.documentation_actions import open_documentation_url
+    from pipeline_inspector.ui.documentation_actions import (
+        open_documentation_url,
+        resolve_documentation_url,
+    )
 
     user_config = _user_config_for_content(content)
-    opened = open_documentation_url(user_config.docs_url)
+    studio_config = _studio_config_for_content(content)
+    url = resolve_documentation_url(
+        user_docs_url=user_config.docs_url,
+        studio_documentation_url=studio_config.ui.documentation_url,
+    )
+    opened = open_documentation_url(url)
     if opened:
         return
     _set_label_text(

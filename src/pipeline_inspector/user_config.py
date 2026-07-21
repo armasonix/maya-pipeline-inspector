@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pipeline_inspector.studio_config import StudioConfig
+from pipeline_inspector.ui.documentation_actions import DEFAULT_DOCUMENTATION_URL
 
 USER_CONFIG_SCHEMA_VERSION = "1.0"
 USER_CONFIG_ENV_VAR = "PIPELINE_INSPECTOR_USER_CONFIG"
@@ -16,7 +17,7 @@ LEGACY_USER_CONFIG_ENV_VAR = "SHADER_HEALTH_USER_CONFIG"
 USER_CONFIG_DIRNAME = ".pipeline_inspector"
 LEGACY_USER_CONFIG_DIRNAME = ".shader_health"
 USER_CONFIG_FILENAME = "user.json"
-DEFAULT_USER_DOCS_URL = "https://github.com/armasonix/maya-pipeline-inspector/wiki"
+DEFAULT_USER_DOCS_URL = DEFAULT_DOCUMENTATION_URL
 DEFAULT_MAX_ISSUES_DISPLAYED = 500
 SUPPORTED_USER_THEMES = frozenset({"classic", "dark"})
 SUPPORTED_UI_DENSITIES = frozenset({"compact", "comfortable"})

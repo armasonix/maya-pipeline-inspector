@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`docs/wiki/`** — product wiki (knowledge base, panel guides, workflows, tutorials, FAQ); start at [`docs/wiki/Home.md`](docs/wiki/Home.md).
+- **`docs/wiki/`** — product wiki (knowledge base, panel guides, workflows, tutorials, FAQ, `_Sidebar`, `_Footer`); start at [`docs/wiki/Home.md`](docs/wiki/Home.md).
 
 ## [0.6.0] - 2026-07-21
 

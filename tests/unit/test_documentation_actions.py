@@ -5,6 +5,7 @@ from pipeline_inspector.ui.documentation_actions import (
     is_valid_http_url,
     normalize_documentation_url,
     open_documentation_url,
+    resolve_documentation_url,
 )
 
 
@@ -62,4 +63,44 @@ def test_open_documentation_url_falls_back_to_default_when_blank():
 
 def test_open_documentation_url_rejects_invalid_urls():
     assert open_documentation_url("not-a-url", qt_gui=FakeQtGui) is False
+    assert FakeQDesktopServices.opened == []
+
+
+def test_resolve_documentation_url_prefers_user_then_studio_then_default():
+    assert resolve_documentation_url(
+        user_docs_url="https://user.test/docs",
+        studio_documentation_url="https://studio.test/docs",
+    ) == "https://user.test/docs"
+    assert resolve_documentation_url(
+        user_docs_url="not-a-url",
+        studio_documentation_url="https://studio.test/docs",
+    ) == "https://studio.test/docs"
+    assert resolve_documentation_url(
+        user_docs_url="",
+        studio_documentation_url="",
+    ) == DEFAULT_DOCUMENTATION_URL
+
+
+def test_open_documentation_url_falls_back_to_webbrowser(monkeypatch):
+    class BrokenQtGui:
+        QUrl = FakeQUrl
+        QDesktopServices = type(
+            "BrokenDesktop",
+            (),
+            {"openUrl": classmethod(lambda cls, url: False)},
+        )
+
+    opened: list[str] = []
+
+    def fake_open(url: str, new: int = 0) -> bool:
+        opened.append(url)
+        return True
+
+    monkeypatch.setattr(
+        "pipeline_inspector.ui.documentation_actions.webbrowser.open",
+        fake_open,
+    )
+
+    assert open_documentation_url("https://example.test/docs", qt_gui=BrokenQtGui) is True
+    assert opened == ["https://example.test/docs"]
     assert FakeQDesktopServices.opened == []

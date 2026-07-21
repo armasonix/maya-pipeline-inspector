@@ -26,7 +26,6 @@ Built to prevent render-time failures by detecting missing textures, outdated ma
 
 ## Contents
 
-- [Open source & community](#open-source--community) · [`COMMUNITY.md`](COMMUNITY.md)
 - [Visual demo](#visual-demo)
 - [Feature matrix](#feature-matrix)
 - [Development status & limitations](#development-status--limitations)
@@ -37,6 +36,7 @@ Built to prevent render-time failures by detecting missing textures, outdated ma
 - [What's shipping](#whats-shipping)
 - [Install in Maya](#install-in-maya)
 - [Development](#development)
+- [Open source & community](#open-source--community) · [`COMMUNITY.md`](COMMUNITY.md)
 - [Documentation](#documentation)
 - [License](#license)
 
